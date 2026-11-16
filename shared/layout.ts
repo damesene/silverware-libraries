@@ -60,7 +60,7 @@ export type LayoutProvider = {
   // table holding its header in view while its rows scroll away, those above the header hidden. Silverware Layout
   // places the handle of its width by it. None (or undefined): the widget's box
   seen?(element: Element): { readonly top: number; readonly bottom: number } | undefined;
-  // Optional: the kinds of widget it draws (a medium's preview and original, a table), each its default alignment, the
+  // Optional: the kinds of widget it draws (a medium's preview and full view, a table), each its default alignment, the
   // user's own default of each set in Silverware Layout's dialog; and which kind the widget whose element this is (none
   // said: the first). A widget stands as its entry `align` says, else its kind's default as the user set it, else as
   // its kind says, else centred. A provider with no kinds: its widgets as they are drawn (a width centred) where no

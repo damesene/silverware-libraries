@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type Asset, type AssetAction, type AssetType, assetsOf, ASSETS_VERSION } from "../../../shared/assets.ts";
 import { registerBuiltins } from "../builtin/index.ts";
 import { BUILTIN_TYPES } from "../builtin/types.ts";
-import { DEFAULT_ASSET_SETTINGS, DEFAULT_LABEL, insertAsFor, labelFor, previewSize, readAssetSettings, storedAssetSettings, validatePreviewFolder } from "../model/settings.ts";
+import { DEFAULT_ASSET_SETTINGS, DEFAULT_LABEL, fullHeight, insertAsFor, labelFor, previewSize, readAssetSettings, storedAssetSettings, validatePreviewFolder } from "../model/settings.ts";
 import { actionFor, extOf, mimeOf, typeFor, viewFor } from "./choose.ts";
 import { AssetRegistry, validateAssetType } from "./registry.ts";
 
@@ -34,43 +34,55 @@ describe("an asset's type", () => {
 });
 
 describe("the view and the action", () => {
-  const { settings } = readAssetSettings({ views: { default: "preview", types: { pdf: "icon" } }, actions: { types: { image: { click: "popover" } } } });
+  const { settings } = readAssetSettings({ views: { default: "preview", types: { pdf: "card" } }, actions: { types: { image: { click: "open-enlarged" } } } });
   const all = () => true;
 
   it("takes the embed's own view, else the type's setting, else the default; one that cannot be drawn falls on", () => {
-    expect(viewFor("embed", "pdf", settings, all)).toBe("embed");
-    expect(viewFor(undefined, "pdf", settings, all)).toBe("icon");
+    expect(viewFor("full", "pdf", settings, all)).toBe("full");
+    expect(viewFor(undefined, "pdf", settings, all)).toBe("card");
     expect(viewFor(undefined, "image", settings, all)).toBe("preview");
-    expect(viewFor("embed", "file", settings, (view) => view !== "embed" && view !== "preview")).toBe("icon");
+    expect(viewFor("full", "file", settings, (view) => view !== "full" && view !== "preview")).toBe("card");
     expect(viewFor("nonsense", undefined, settings, all)).toBe("preview");
   });
 
   it("runs the type's action where it fits, else the default's; none fitting: none", () => {
     const openTab: AssetAction = { name: "open-tab", fits: (asset) => "url" in asset, run: () => undefined };
-    const popover: AssetAction = { name: "popover", fits: (_asset, can) => can.views.includes("embed"), run: () => undefined };
-    const actions = (name: string) => ({ "open-tab": openTab, popover })[name];
-    expect(actionFor("click", "image", settings, actions, file("a.png"), { views: ["icon", "preview", "embed"] })?.name).toBe("popover");
-    expect(actionFor("click", "image", settings, actions, file("a.png"), { views: ["icon"] })?.name).toBe("open-tab");
-    expect(actionFor("click", "page", settings, actions, { kind: "page", page: "P" }, { views: ["icon"] })).toBeUndefined();
+    const openEnlarged: AssetAction = { name: "open-enlarged", fits: (_asset, can) => can.views.includes("full"), run: () => undefined };
+    const actions = (name: string) => ({ "open-tab": openTab, "open-enlarged": openEnlarged })[name];
+    expect(actionFor("click", "image", settings, actions, file("a.png"), { views: ["card", "preview", "full"] })?.name).toBe("open-enlarged");
+    expect(actionFor("click", "image", settings, actions, file("a.png"), { views: ["card"] })?.name).toBe("open-tab");
+    expect(actionFor("click", "page", settings, actions, { kind: "page", page: "P" }, { views: ["card"] })).toBeUndefined();
   });
 });
 
 describe("the settings", () => {
   it("give a preview's size for a type: its own sides, else all files' (the width none: as wide as it fits)", () => {
-    const { settings } = readAssetSettings({ heights: { preview: 160 }, previews: { width: 300, types: { pdf: { height: 400 }, image: { width: 1, height: 120 }, video: "big" } } });
+    const { settings } = readAssetSettings({ preview: { height: 160, width: 300, types: { pdf: { height: 400 }, image: { width: 1, height: 120 }, video: "big" } } });
     expect(previewSize(settings, "pdf")).toEqual({ width: 300, height: 400 });
     // (A side out of bounds: none, all files' then)
     expect(previewSize(settings, "image")).toEqual({ width: 300, height: 120 });
     expect(previewSize(settings, "file")).toEqual({ width: 300, height: 160 });
     expect(previewSize(readAssetSettings({}).settings, "pdf")).toEqual({ height: 160 });
     // Kept and read back alike
-    expect(readAssetSettings(storedAssetSettings(settings)).settings.previews).toEqual(settings.previews);
+    expect(readAssetSettings(storedAssetSettings(settings)).settings.preview).toEqual(settings.preview);
   });
 
-  it("write the former settings of where a file stands as none, so a save takes their lines out of CONFIG", () => {
+  it("write the former settings as none, so a save takes their lines out of CONFIG: where a file stands, a view's before they were kept by view", () => {
     const stored = storedAssetSettings(readAssetSettings({}).settings);
-    expect("originals" in stored && stored.originals === undefined).toBe(true);
-    expect("anchor" in stored && stored.anchor === undefined).toBe(true);
+    for (const key of ["originals", "anchor", "heights", "previews", "labels", "originalLabels", "linkIcons"]) expect(key in stored && stored[key] === undefined, key).toBe(true);
+  });
+
+  it("keep each view's own by view: a preview's and a full file's height and label, a card's and a link's fields, kept and read back", () => {
+    const { settings } = readAssetSettings({ full: { height: 640, types: { pdf: { height: 900 }, xlsx: { height: 5 }, docx: "tall" }, labels: { default: { above: ["alt"] } } }, card: { fields: ["name", "size", "colour"] }, link: { fields: [] } });
+    // A document's height shown full: a type's own (one out of bounds or no number: none), else all files'
+    expect([fullHeight(settings, "pdf"), fullHeight(settings, "xlsx"), fullHeight(settings, "docx")]).toEqual([900, 640, 640]);
+    expect([settings.full.height, labelFor(settings, "pdf", "full").above, settings.card.fields, settings.link.fields]).toEqual([640, [{ field: "alt", on: true }], ["name", "size"], []]);
+    // (None given: a link shows its icon, a card its icon and name)
+    expect([DEFAULT_ASSET_SETTINGS.link.fields, DEFAULT_ASSET_SETTINGS.card.fields]).toEqual([["icon"], ["icon", "name"]]);
+    expect(readAssetSettings(storedAssetSettings(settings)).settings).toEqual(settings);
+    // None shown, as CONFIG gives it back: an empty Lua table is an object, not a list
+    const back = readAssetSettings({ card: { fields: {} }, link: { fields: {} } }).settings;
+    expect([back.card.fields, back.link.fields]).toEqual([[], []]);
   });
 
   it("give a preview's label: the icon and the alt text above by default, a type's own whole, read leniently, kept and read back", () => {
@@ -78,13 +90,15 @@ describe("the settings", () => {
     expect(labelFor(defaults, "pdf")).toEqual(DEFAULT_LABEL);
     expect(DEFAULT_LABEL.above.filter((part) => part.on).map((part) => part.field)).toEqual(["icon", "alt"]);
     const { settings } = readAssetSettings({
-      labels: {
-        default: { above: [{ field: "name", on: true }], below: [{ field: "size" }, "modified", { field: "colour" }, { field: "name", on: true }] },
-        types: { pdf: { above: [], below: [{ field: "alt", on: true }] } },
+      preview: {
+        labels: {
+          default: { above: [{ field: "name", on: true }], below: [{ field: "size" }, "modified", { field: "colour" }, { field: "name", on: true }] },
+          types: { pdf: { above: [], below: [{ field: "alt", on: true }] } },
+        },
       },
     });
     // (A field's name alone, or one without `on`: on; one unknown dropped, one given twice kept where it is first, one missing added under it, off)
-    expect(settings.labels.default).toEqual({
+    expect(settings.preview.labels.default).toEqual({
       above: [{ field: "name", on: true }],
       below: [
         { field: "size", on: true },
@@ -103,17 +117,17 @@ describe("the settings", () => {
         { field: "modified", on: false },
       ],
     });
-    expect(labelFor(settings, "image")).toBe(settings.labels.default);
-    expect(readAssetSettings(storedAssetSettings(settings)).settings.labels).toEqual(settings.labels);
+    expect(labelFor(settings, "image")).toBe(settings.preview.labels.default);
+    expect(readAssetSettings(storedAssetSettings(settings)).settings.preview.labels).toEqual(settings.preview.labels);
   });
 
   it("are the defaults where none are set, and say what they could not read", () => {
     expect(readAssetSettings(undefined)).toEqual({ settings: DEFAULT_ASSET_SETTINGS, problems: [] });
-    const { settings, problems } = readAssetSettings({ views: { default: "huge", types: { pdf: "tiny", image: "icon" } }, card: ["name", "colour"], heights: { preview: -1, embed: 300 } });
-    expect(settings.views).toEqual({ default: "embed", types: { image: "icon" } });
-    expect(settings.card).toEqual(["name"]);
-    expect(settings.heights).toEqual({ preview: 160, embed: 300 });
-    expect(problems).toEqual(['"huge" is no view (icon, preview or embed)', '"tiny" is no view (icon, preview or embed), for pdf']);
+    const { settings, problems } = readAssetSettings({ views: { default: "huge", types: { pdf: "tiny", image: "card" } }, card: { fields: ["name", "colour"] }, preview: { height: -1 }, full: { height: 300 } });
+    expect(settings.views).toEqual({ default: "full", types: { image: "card" } });
+    expect(settings.card.fields).toEqual(["name"]);
+    expect([settings.preview.height, settings.full.height]).toEqual([160, 300]);
+    expect(problems).toEqual(['"huge" is no view (card, preview or full)', '"tiny" is no view (card, preview or full), for pdf']);
   });
 
   it("keep previews in the folder given, its slashes at either end taken off; one SilverBullet cannot read, the default", () => {
@@ -124,7 +138,7 @@ describe("the settings", () => {
       expect(settings.previewFolder, folder).toBe(DEFAULT_ASSET_SETTINGS.previewFolder);
       expect(problems, folder).toHaveLength(1);
     }
-    expect(validatePreviewFolder("_silverware-asset-preview")).toBeUndefined();
+    expect(validatePreviewFolder("_silverware-assets-previews")).toBeUndefined();
   });
 
   it("insert files through the dialog unless turned off, each as shown unless set (a type's own over all files'), and say what they could not read", () => {
@@ -133,7 +147,7 @@ describe("the settings", () => {
     expect(settings.insert).toEqual({ enabled: false, as: { default: "link", types: { image: "preview" } } });
     expect(insertAsFor(settings, "image")).toBe("preview");
     expect(insertAsFor(settings, "zip")).toBe("link");
-    expect(problems).toEqual(['"huge" is no way to insert a file (shown, link, icon, preview or embed), for pdf']);
+    expect(problems).toEqual(['"huge" is no way to insert a file (shown, link, card, preview or full), for pdf']);
     expect(readAssetSettings(storedAssetSettings(settings)).settings.insert).toEqual(settings.insert);
   });
 });
@@ -187,7 +201,7 @@ describe("the registry", () => {
 
   it("says why a type is wrong", () => {
     expect(validateAssetType({ name: "x", match: { kind: [] }, icon: "" })).toBe("the type x matches no kind of asset");
-    expect(validateAssetType({ name: "x", match: { kind: ["file"] }, icon: "", views: { big: () => null } })).toBe('the type x renders a view "big" (preview or embed only)');
+    expect(validateAssetType({ name: "x", match: { kind: ["file"] }, icon: "", views: { big: () => null } })).toBe('the type x renders a view "big" (preview or full only)');
   });
 
   it("is reached through assetsOf where its version is this, a stand-in else", () => {

@@ -4,7 +4,7 @@ import { expect, PIXEL_PNG, test } from "./helpers.ts";
 
 test("on a phone a tap on a file shows its bar for its menu alone: aligned right from it, no width to drag or take off", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\nText above.\n\n![[${space.folder}/a.png|Photo|120]]\n\nText under.\n` }, "Page", { "a.png": PIXEL_PNG });
-  const image = page.locator("#sb-main [data-swa-asset='image']");
+  const image = page.locator("#sb-main [data-swa-type='image']");
   await expect(image).toBeVisible();
   // A finger put on it (SilverBullet 2.12.1 opens the file as a tap on an image ends, its main does not: the touch
   // alone, which is what shows the bar)

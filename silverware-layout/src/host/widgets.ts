@@ -12,18 +12,23 @@ import { anchorOf, cssWidgetWidth, keptWidgetWidth, type LayoutAnchor, readAlign
 import { markContent, textWidthOf } from "./marks.ts";
 import type { PageHost } from "./page.ts";
 import { scaledPx } from "../../../shared/contentscale.ts";
+import { composedClosest, composedContains, inShadow } from "../../../shared/shadow.ts";
 
 const WIDTH_ATTRIBUTE = "data-swl-width";
 const WIDTH_VARIABLE = "--swl-width";
-// Where a widget stands (start, center, end: its alignment, docs/silverware-layout-align.md), marked for the style
+// Where a widget stands (left, center, right: its alignment, docs/silverware-layout-align.md), marked for the style
 // page's rules; none where nothing says (a provider without kinds, no entry: drawn as it is, a width centred)
-const ANCHOR_ATTRIBUTE = "data-swl-anchor";
+const ALIGN_ATTRIBUTE = "data-swl-align";
 // The inline box the host draws a widget centred or at the end in (SilverBullet's inline block round its widget, which
 // shrinks to it): a line's width then, so the widget has room to stand in. Marked here, its parent alone and only an
 // inline one (a list's item, a table's cell keep their own display)
-const HOLDER_ATTRIBUTE = "data-swl-anchor-holder";
+const HOLDER_ATTRIBUTE = "data-swl-align-holder";
 // A widget laid out in a room of its own, not the page's text (a cell): the style page holds it within that room
 const ROOM_ATTRIBUTE = "data-swl-in-room";
+// A widget drawn in a shadow root in the content (another plugin's editor field: a grid's cell edited), where the style
+// page's rules of the content do not reach: its own rules size and place it (the field puts the page's rules naming
+// `swl-` in its root)
+const SHADOW_ATTRIBUTE = "data-swl-in-shadow";
 
 /** A widget of a provider's, as rendered */
 export type Widget = { readonly element: HTMLElement; readonly provider: LayoutProvider };
@@ -31,6 +36,8 @@ export type Widget = { readonly element: HTMLElement; readonly provider: LayoutP
 export class Widgets {
   private observer: MutationObserver | undefined;
   private content: Element | undefined;
+  // The open shadow roots in the content watched as well (an editor's field: what is drawn in it is no node of the content's)
+  private shadows = new Set<ShadowRoot>();
 
   constructor(
     private readonly doc: Document,
@@ -56,16 +63,38 @@ export class Widgets {
     // (No content yet: the document watched until it is there)
     const watched = this.content ?? this.doc.body;
     if (!watched) return;
+    this.shadows.clear();
     this.observer = new win.MutationObserver((records) => {
       if (!this.content?.isConnected) return this.watch();
       // Each widget once a batch: a view drawn a row at a time adds hundreds of nodes to one widget, and reading what it
       // keeps may parse its block (a database's)
       const found = new Map<HTMLElement, LayoutProvider>();
-      for (const record of records) for (const node of record.addedNodes) if (node.nodeType === 1) this.widgetsIn(node as Element, found);
+      for (const record of records)
+        for (const node of record.addedNodes)
+          if (node.nodeType === 1) {
+            this.widgetsIn(node as Element, found);
+            if (this.content) this.watchShadows(node as Element, found);
+          }
       for (const [element, provider] of found) this.layOut({ element, provider });
     });
     this.observer.observe(watched, { childList: true, subtree: true });
-    if (this.content) this.layOutAll();
+    if (this.content) {
+      this.watchShadows(this.content, new Map());
+      this.layOutAll();
+    }
+  }
+
+  /** The open shadow roots in a node of the content (an editor's field) watched too, their widgets added to `found` */
+  private watchShadows(root: Element, found: Map<HTMLElement, LayoutProvider>): void {
+    for (const shadow of [...this.shadows]) if (!shadow.host.isConnected) this.shadows.delete(shadow);
+    for (const element of [root, ...root.querySelectorAll("*")]) {
+      const shadow = element.shadowRoot;
+      if (!shadow || this.shadows.has(shadow)) continue;
+      this.shadows.add(shadow);
+      this.observer?.observe(shadow, { childList: true, subtree: true });
+      this.widgetsIn(shadow, found);
+      for (const inner of shadow.querySelectorAll("*")) if (inner.shadowRoot) this.watchShadows(inner, found);
+    }
   }
 
   /** The page's content followed where the host made a new one since (watched, marked, its widgets laid out) */
@@ -76,31 +105,34 @@ export class Widgets {
 
   /** Every widget in the page's content laid out as its entries keep it */
   layOutAll(): void {
-    if (this.content) this.layOutIn(this.content);
+    if (!this.content) return;
+    this.layOutIn(this.content);
+    for (const shadow of this.shadows) if (shadow.host.isConnected) this.layOutIn(shadow);
   }
 
-  private layOutIn(root: Element): void {
+  private layOutIn(root: Element | ShadowRoot): void {
     const found = new Map<HTMLElement, LayoutProvider>();
     this.widgetsIn(root, found);
     for (const [element, provider] of found) this.layOut({ element, provider });
     // An element laid out before that no provider takes any more (a medium shown another way by its plugin, which its
     // provider's selector leaves out): its width taken off, it is no widget now
-    for (const element of root.querySelectorAll<HTMLElement>(`[${WIDTH_ATTRIBUTE}], [${ANCHOR_ATTRIBUTE}], [${ROOM_ATTRIBUTE}]`)) {
+    for (const element of root.querySelectorAll<HTMLElement>(`[${WIDTH_ATTRIBUTE}], [${ALIGN_ATTRIBUTE}], [${ROOM_ATTRIBUTE}]`)) {
       if (found.has(element)) continue;
       this.show(element, undefined);
-      element.removeAttribute(ANCHOR_ATTRIBUTE);
+      element.removeAttribute(ALIGN_ATTRIBUTE);
       element.parentElement?.removeAttribute(HOLDER_ATTRIBUTE);
       element.removeAttribute(ROOM_ATTRIBUTE);
+      element.removeAttribute(SHADOW_ATTRIBUTE);
     }
   }
 
   /** The widgets a node is in or holds, added to `found` (a widget once, however many of its nodes came) */
-  private widgetsIn(root: Element, found: Map<HTMLElement, LayoutProvider>): void {
+  private widgetsIn(root: Element | ShadowRoot, found: Map<HTMLElement, LayoutProvider>): void {
     for (const provider of this.registry.providers) {
       // The widget it is in, or is: SilverBullet puts a widget's element in first and its content after (a table into
       // its widget), so what the widget keeps is read again as its content comes
-      const around = root.closest<HTMLElement>(provider.selector);
-      if (around && !found.has(around) && (!this.content || this.content.contains(around))) found.set(around, provider);
+      const around = "closest" in root ? root.closest<HTMLElement>(provider.selector) : null;
+      if (around && !found.has(around) && (!this.content || composedContains(this.content, around))) found.set(around, provider);
       for (const element of root.querySelectorAll<HTMLElement>(provider.selector)) if (!found.has(element)) found.set(element, provider);
     }
   }
@@ -124,12 +156,15 @@ export class Widgets {
 
   /** A widget placed: where it stands marked (none: no mark, as it is drawn), its box marked where it stands in a line */
   private place(widget: Widget, align: LayoutAlign | undefined): void {
-    const anchor = align === undefined ? undefined : anchorOf(align);
-    if (anchor === undefined) widget.element.removeAttribute(ANCHOR_ATTRIBUTE);
-    else if (widget.element.getAttribute(ANCHOR_ATTRIBUTE) !== anchor) widget.element.setAttribute(ANCHOR_ATTRIBUTE, anchor);
+    if (align === undefined) widget.element.removeAttribute(ALIGN_ATTRIBUTE);
+    else if (widget.element.getAttribute(ALIGN_ATTRIBUTE) !== align) widget.element.setAttribute(ALIGN_ATTRIBUTE, align);
     const inRoom = this.room(widget) !== undefined;
     if (widget.element.hasAttribute(ROOM_ATTRIBUTE) !== inRoom) widget.element.toggleAttribute(ROOM_ATTRIBUTE, inRoom);
-    this.markHolder(widget.element, (anchor === "center" || anchor === "end") && !inRoom);
+    const shadowed = inShadow(widget.element);
+    if (widget.element.hasAttribute(SHADOW_ATTRIBUTE) !== shadowed) widget.element.toggleAttribute(SHADOW_ATTRIBUTE, shadowed);
+    // (In a shadow root, an editor's field: its inline box the line's width whatever its alignment, so a share of its
+    // room is of the line, not of a box shrunk to the widget)
+    this.markHolder(widget.element, shadowed || ((align === "center" || align === "right") && !inRoom));
   }
 
   /** A widget's kind, as its provider says (none said: its first); none where it names none */
@@ -166,8 +201,8 @@ export class Widgets {
    * provider's read may parse a block
    */
   anchor(widget: Widget): LayoutAnchor {
-    const marked = widget.element.getAttribute(ANCHOR_ATTRIBUTE);
-    return marked === "start" || marked === "end" ? marked : "center";
+    const marked = readAlign(widget.element.getAttribute(ALIGN_ATTRIBUTE));
+    return marked === undefined ? "center" : anchorOf(marked);
   }
 
   /** What a widget's plugin adds to its handle's menu (none where it adds nothing, or fails to say) */
@@ -198,10 +233,13 @@ export class Widgets {
     if (problem) this.problem(`Silverware Layout: where it stands could not be saved (${problem}); it holds until the widget is drawn again`);
   }
 
-  /** A widget's parent marked as the box it stands in (a line's width), where it stands centred or at the end and its parent is an inline box of the content */
+  /**
+   * A widget's parent marked as the box it stands in (a line's width), where it stands centred or at the end (in an
+   * editor's field, anywhere) and its parent is an inline box of the content
+   */
   private markHolder(element: HTMLElement, aligned: boolean): void {
     const parent = element.parentElement;
-    if (!parent || parent === this.content || !this.content?.contains(parent)) return;
+    if (!parent || parent === this.content || !this.content || !composedContains(this.content, parent)) return;
     // (Marked already: a block by the mark now, so its own display is not asked again; asked once per parent, as every
     // widget is laid out again with each change of the page)
     const holds = aligned && (parent.hasAttribute(HOLDER_ATTRIBUTE) || this.inline(parent));
@@ -261,8 +299,12 @@ export class Widgets {
     }
     const kept = keptWidgetWidth(width);
     if (element.getAttribute(WIDTH_ATTRIBUTE) !== kept) element.setAttribute(WIDTH_ATTRIBUTE, kept);
-    // (A widget whose sizes follow the content's scale: its width in px times it, as the text grows with the zoom)
-    const css = typeof width === "number" && this.widgetAt(element)?.provider.scales ? scaledPx(width) : cssWidgetWidth(width);
+    // (A widget whose sizes follow the content's scale: its width in px times it, as the text grows with the zoom. A share
+    // in a room, a cell, is of the room, which the style page's rule sizes it in; a share of a widget of its own size, a
+    // file, is of the box it is in, as its plugin's host draws one (SilverBullet's `|50%`); else of the pane)
+    const provider = this.widgetAt(element)?.provider;
+    const ofBox = typeof width === "string" && width !== "full" && (element.hasAttribute(ROOM_ATTRIBUTE) || provider?.unsized === "own");
+    const css = ofBox ? width : typeof width === "number" && provider?.scales ? scaledPx(width) : cssWidgetWidth(width);
     if (element.style.getPropertyValue(WIDTH_VARIABLE) !== css) element.style.setProperty(WIDTH_VARIABLE, css);
   }
 
@@ -278,14 +320,17 @@ export class Widgets {
     if (problem) this.problem(`Silverware Layout: the width could not be saved (${problem}); it holds until the widget is drawn again`);
   }
 
-  /** The widget a node is in (its own outer element, a provider's), where it is in the page's flow: the innermost, where one is in another (a medium in a grid) */
+  /**
+   * The widget a node is in (its own outer element, a provider's), where it is in the page's flow: the innermost, where
+   * one is in another (a medium in a grid; a file in a grid's cell edited, in its field's shadow root)
+   */
   widgetAt(node: Element): Widget | undefined {
-    if (!this.content?.contains(node)) return undefined;
+    if (!this.content || !composedContains(this.content, node)) return undefined;
     let found: Widget | undefined;
     for (const provider of this.registry.providers) {
-      const element = node.closest<HTMLElement>(provider.selector);
-      if (!element || !this.content.contains(element) || element.closest(`[${OVER_WINDOW_ATTRIBUTE}]`)) continue;
-      if (!found || found.element.contains(element)) found = { element, provider };
+      const element = composedClosest<HTMLElement>(node, provider.selector);
+      if (!element || !composedContains(this.content, element) || composedClosest(element, `[${OVER_WINDOW_ATTRIBUTE}]`)) continue;
+      if (!found || composedContains(found.element, element)) found = { element, provider };
     }
     return found;
   }

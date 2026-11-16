@@ -1,5 +1,5 @@
-// Silverware Assets XLSX in SilverBullet, with Silverware Assets: a workbook's preview its first sheet's first cells, its
-// original a reader of every sheet as a spreadsheet shows it (in the page and in Assets' side panel), a file it cannot
+// Silverware Assets XLSX in SilverBullet, with Silverware Assets: a workbook's preview its first sheet's first cells,
+// shown full a reader of every sheet as a spreadsheet shows it (in the page and in Assets' side panel), a file it cannot
 // read said so.
 import { expect, test, xlsxOf } from "./helpers.ts";
 
@@ -37,7 +37,7 @@ const BUDGET = () =>
 
 test("a workbook's preview is its first sheet's first cells, drawn small in a preview's room; its click the preview's", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/budget.xlsx|||{ view: preview }]]\n\nAfter\n` }, "Page", { "budget.xlsx": await BUDGET() });
-  const preview = page.locator("#sb-main [data-swa-asset='xlsx'][data-swa-view='preview']");
+  const preview = page.locator("#sb-main [data-swa-type='xlsx'][data-swa-view='preview']");
   const sheet = preview.locator(".swa-xlsx-preview[data-swa-xlsx-state='sheet'] table.swa-xlsx-sheet");
   await expect(sheet).toBeVisible();
   await expect(sheet).toContainText("Monthly budget");
@@ -59,7 +59,7 @@ test("a workbook's preview is its first sheet's first cells, drawn small in a pr
 
 test("a workbook's preview grows with the content's scale (files zoomed with the font: 150 %) at once, nothing drawn again", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/budget.xlsx|||{ view: preview }]]\n\nAfter\n` }, "Page", { "budget.xlsx": await BUDGET() });
-  const preview = page.locator("#sb-main [data-swa-asset='xlsx'][data-swa-view='preview'] .swa-xlsx-preview");
+  const preview = page.locator("#sb-main [data-swa-type='xlsx'][data-swa-view='preview'] .swa-xlsx-preview");
   const sheet = preview.locator("table.swa-xlsx-sheet");
   await expect(sheet).toBeVisible();
   expect(Math.round((await preview.boundingBox())!.height)).toBe(160);
@@ -79,7 +79,7 @@ test("a workbook's preview kept in the space as HTML once drawn, shown from ther
 
 ![[${space.folder}/budget.xlsx|||{ view: preview }]]
 ` }, "Page", { "budget.xlsx": await BUDGET() });
-  const sheet = page.locator("#sb-main [data-swa-asset='xlsx'] .swa-xlsx-preview[data-swa-xlsx-state='sheet'] table.swa-xlsx-sheet");
+  const sheet = page.locator("#sb-main [data-swa-type='xlsx'] .swa-xlsx-preview[data-swa-xlsx-state='sheet'] table.swa-xlsx-sheet");
   await expect(sheet).toContainText("Monthly budget");
   await expect.poll(() => space.kept("budget.xlsx.html")).toContain("Monthly budget");
   const kept = (await space.kept("budget.xlsx.html"))!;
@@ -89,9 +89,9 @@ test("a workbook's preview kept in the space as HTML once drawn, shown from ther
   await expect(sheet).toContainText("1,200.00");
 });
 
-test("a workbook shown as the original is a reader of its sheets as a spreadsheet shows them: formats, a merged title, the frozen row held, its tabs, zoom", async ({ page, space }) => {
-  await space.open({ Page: `# Page\n\n![[${space.folder}/budget.xlsx|Budget||{ view: embed }]]\n\nAfter\n` }, "Page", { "budget.xlsx": await BUDGET() });
-  const reader = page.locator("#sb-main [data-swa-asset='xlsx'] .swa-xlsx-reader[data-swa-xlsx-state='sheet']");
+test("a workbook shown full is a reader of its sheets as a spreadsheet shows them: formats, a merged title, the frozen row held, its tabs, zoom", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/budget.xlsx|Budget||{ view: full }]]\n\nAfter\n` }, "Page", { "budget.xlsx": await BUDGET() });
+  const reader = page.locator("#sb-main [data-swa-type='xlsx'] .swa-xlsx-reader[data-swa-xlsx-state='sheet']");
   await expect(reader).toBeVisible();
   expect(Math.round((await reader.boundingBox())!.height)).toBe(480);
   const sheet = reader.locator("table.swa-xlsx-sheet");
@@ -127,7 +127,7 @@ test("a workbook shown as the original is a reader of its sheets as a spreadshee
 
 test("a workbook in the side panel is the reader filling it", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/budget.xlsx|Budget||{ view: preview }]]\n\nAfter\n` }, "Page", { "budget.xlsx": await BUDGET() });
-  const preview = page.locator("#sb-main [data-swa-asset='xlsx']");
+  const preview = page.locator("#sb-main [data-swa-type='xlsx']");
   await expect(preview.locator(".swa-xlsx-preview[data-swa-xlsx-state='sheet']")).toBeVisible();
   await preview.hover();
   await preview.locator(".swa-more").click();
@@ -146,8 +146,8 @@ test("a workbook in the side panel is the reader filling it", async ({ page, spa
 });
 
 test("a file ExcelJS cannot read: its preview its icon and name, its reader saying so", async ({ page, space }) => {
-  await space.open({ Page: `# Page\n\n![[${space.folder}/bad.xlsx|||{ view: preview }]]\n\n![[${space.folder}/bad.xlsx|Bad||{ view: embed }]]\n` }, "Page", { "bad.xlsx": "not a workbook" });
-  const [preview, original] = [page.locator("#sb-main [data-swa-asset='xlsx'][data-swa-view='preview']"), page.locator("#sb-main [data-swa-asset='xlsx'][data-swa-view='embed']")];
+  await space.open({ Page: `# Page\n\n![[${space.folder}/bad.xlsx|||{ view: preview }]]\n\n![[${space.folder}/bad.xlsx|Bad||{ view: full }]]\n` }, "Page", { "bad.xlsx": "not a workbook" });
+  const [preview, full] = [page.locator("#sb-main [data-swa-type='xlsx'][data-swa-view='preview']"), page.locator("#sb-main [data-swa-type='xlsx'][data-swa-view='full']")];
   await expect(preview.locator(".swa-xlsx-preview[data-swa-xlsx-state='failed'] .swa-xlsx-preview-name")).toHaveText("bad.xlsx");
-  await expect(original.locator(".swa-xlsx-reader[data-swa-xlsx-state='failed'] .swa-xlsx-reader-failed")).toContainText("This workbook cannot be shown here");
+  await expect(full.locator(".swa-xlsx-reader[data-swa-xlsx-state='failed'] .swa-xlsx-reader-failed")).toContainText("This workbook cannot be shown here");
 });

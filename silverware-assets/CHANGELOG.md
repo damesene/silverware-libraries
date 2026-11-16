@@ -4,8 +4,9 @@
 
 First release.
 
-- Embedded files shown three ways, chosen per file or for all and per kind: as the original (as SilverBullet shows it), as a preview, or as a card with the file's icon, name, size and date; a file SilverBullet cannot show (a zip, a document) a card instead of an error.
-- A file's menu (its "…", or its card's icon): how it is shown, open it in a new tab, in a side panel or enlarged over the page, show it as a link.
-- Links to files with their file's icon, its menu too: open it, show it enlarged, or embed it.
-- An embedded image's or video's width dragged by Silverware Layout's handle, in a grid's column too.
+- Embedded files shown three ways, chosen per file or for all and per kind: full (as SilverBullet shows it), as a preview, or as a card with the file's icon, name, size and date; a file SilverBullet cannot show (a zip, a document) a card instead of an error.
+- A file's menu (its "…", or the small arrow after a card's name): how it is shown, open it in a new tab, in a side panel or enlarged over the page, show it as a link.
+- Rename… in a file's menu: its title on the page and its file's name in the space, each changed on its own, the name made from the title if you like; the links to a renamed file follow.
+- Links to files with their file's icon, and a small arrow after them for the file's menu: open it, show it enlarged, or embed it.
+- An embedded image's or video's width dragged by Silverware Layout's handle, in a grid's cell too.
 - In SilverBullet's markdown-as-written mode, embedded files hidden and a click on a link only placing the cursor.

@@ -393,8 +393,8 @@ describe("the page writer", () => {
   });
 
   it("writes an embed as a link and a link as an embed, the one of those alike asked", async () => {
-    const { map, writer } = memory({ A: "![[cat.png|Cat|300|{ view: icon }]] and [[doc.pdf]] [[doc.pdf]]\n" });
-    await writer.write(pageChanges().page("A", (p) => p.embeds.toLink("![[cat.png|Cat|300|{ view: icon }]]")).build());
+    const { map, writer } = memory({ A: "![[cat.png|Cat|300|{ view: card }]] and [[doc.pdf]] [[doc.pdf]]\n" });
+    await writer.write(pageChanges().page("A", (p) => p.embeds.toLink("![[cat.png|Cat|300|{ view: card }]]")).build());
     expect(map.get("A")).toBe("[[cat.png|Cat]] and [[doc.pdf]] [[doc.pdf]]\n");
     await writer.write(pageChanges().page("A", (p) => p.links.toEmbed("[[doc.pdf]]", { occurrence: 1, of: 2 })).build());
     expect(map.get("A")).toBe("[[cat.png|Cat]] and [[doc.pdf]] ![[doc.pdf]]\n");
@@ -516,6 +516,16 @@ describe("the page writer", () => {
         .build(),
     );
     expect(names.get("D")).toBe("\\_draft\\_.pdf, \\*Notes\\*, **Bold**, 50%20off.pdf\n");
+  });
+
+  it("gives a link another text it shows, its target as it is: none, a wiki link its target alone, a markdown link its file's name", async () => {
+    const { map, writer } = memory({ A: "[[a.pdf]], [[b.pdf|B]], [the c](Docs/c.pdf \"C\"), [the d](d.pdf), [[a.pdf]]\n" });
+    await writer.write(
+      pageChanges()
+        .page("A", (p) => p.links.setText("[[a.pdf]]", "The A", { occurrence: 1, of: 2 }).links.setText("[[b.pdf|B]]", "").links.setText('[the c](Docs/c.pdf "C")', "C, new").links.setText("[the d](d.pdf)", ""))
+        .build(),
+    );
+    expect(map.get("A")).toBe('[[a.pdf]], [[b.pdf]], [C, new](Docs/c.pdf "C"), [d.pdf](d.pdf), [[a.pdf|The A]]\n');
   });
 
   it("closes a grid's cell left open as it writes it", async () => {

@@ -36,7 +36,7 @@ export function offsetInCell(content: string, cellElement: HTMLElement, target: 
 }
 
 /**
- * The end of a cell's markdown, where a point is under all of its rendering (a column shorter than its row, clicked
+ * The end of a cell's markdown, where a point is under all of its rendering (a cell shorter than its row, clicked
  * under its text: the caret after its last character); none where it is not
  */
 export function endAt(content: string, cellElement: HTMLElement, y: number): number | undefined {

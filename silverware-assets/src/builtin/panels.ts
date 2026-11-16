@@ -1,6 +1,6 @@
 // Two of Silverware Assets' own actions (docs/silverware-assets.md, *Actions*), registered as anyone's: the
-// asset shown in a panel at the window's right (`peek`: the page beside it still used) or enlarged over the page
-// (`popover`), each rendered as the core renders it (`render`: the type's own view, else the host's drawing, else its
+// asset shown in a panel at the window's right (`open-panel`: the page beside it still used) or enlarged over the page
+// (`open-enlarged`), each rendered as the core renders it (`render`: the type's own view, else the host's drawing, else its
 // card). One of each at a time: another shown takes its place. Esc, ×, or (the popover) a click beside it closes it.
 // Over the window, so marked `data-silverware-over-window` (the other plugins stand back: shared/overwindow.ts, its
 // attribute named here as the contract leaves this part to know no more than the contract and the elements).
@@ -11,7 +11,7 @@ import { sheetRect } from "../../../shared/sheetarea.ts";
 const OVER_WINDOW = "data-silverware-over-window";
 
 // What a panel shows: an asset drawn larger than its card (a card alone is no more than the card in the page)
-const shows = (_asset: Asset, can: Capabilities) => can.views.includes("embed") || can.views.includes("preview");
+const shows = (_asset: Asset, can: Capabilities) => can.views.includes("full") || can.views.includes("preview");
 
 /** The one shown now of a kind (peek, popover), closed as another takes its place */
 const open = new Map<string, () => void>();
@@ -40,7 +40,7 @@ function show(kind: "peek" | "popover", context: ActionContext, build: (close: (
   doc.body.append(root);
   doc.addEventListener("keydown", key, true);
   open.set(kind, close);
-  void context.render("embed", body).catch(() => body.replaceChildren(el(doc, "div", { class: "swa-panel-failed", text: "This file cannot be shown here" })));
+  void context.render("full", body).catch(() => body.replaceChildren(el(doc, "div", { class: "swa-panel-failed", text: "This file cannot be shown here" })));
   return close;
 }
 
@@ -141,7 +141,7 @@ function placeIn(panel: HTMLElement, context: ActionContext): void {
 }
 
 export const peek: AssetAction = {
-  name: "peek",
+  name: "open-panel",
   label: "Open in side panel",
   fits: shows,
   run: (context) =>
@@ -157,7 +157,7 @@ export const peek: AssetAction = {
 };
 
 export const popover: AssetAction = {
-  name: "popover",
+  name: "open-enlarged",
   label: "Open enlarged",
   fits: shows,
   run: (context) =>

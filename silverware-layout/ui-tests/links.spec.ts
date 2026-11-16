@@ -60,7 +60,7 @@ test("SilverBullet's markdown shown as written: a click on an embed's `![[` plac
   await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");
   await dialog.getByRole("tab", { name: "Markdown" }).click();
-  await dialog.getByLabel("Clicking a link shown as markdown only places the cursor").uncheck();
+  await dialog.getByLabel("A click only places the cursor; Ctrl+click opens the link").uncheck();
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect.poll(() => space.config()).toContain('config.set("silverware.layout.links.clickPlacesCursor", false)');
   await expect.poll(() => page.evaluate(() => document.documentElement.hasAttribute("data-swl-syntax-clicks")), { timeout: 15_000 }).toBe(false);

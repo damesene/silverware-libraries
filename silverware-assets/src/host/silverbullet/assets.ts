@@ -12,7 +12,7 @@ import type { Bridge } from "../../bridge.ts";
 import type { Rendered, RenderedItem } from "../../../../shared/rendered.ts";
 import { ASSETS_PATH } from "../../model/settings.ts";
 import type { FileFacts } from "../../core/stored.ts";
-import { documentUrl } from "../../../../shared/silverbullet/platform.ts";
+import { documentUrl, pageNamesOf } from "../../../../shared/silverbullet/platform.ts";
 import { editorPosition } from "./editorposition.ts";
 import { editorSheetArea } from "../../../../shared/silverbullet/editorarea.ts";
 
@@ -21,7 +21,7 @@ const FRAME = ".sb-inline-content";
 // be decorated as SilverBullet's widget is
 const OWN_FRAME = "swa-frame";
 // A frame of ours its medium was decorated in (decorate.ts marks the type it was drawn as)
-const DECORATED = `.${OWN_FRAME}[data-swa-asset]`;
+const DECORATED = `.${OWN_FRAME}[data-swa-type]`;
 const MEDIA = "img, video, audio, object";
 const BARS = ".button-bar, .sb-widget-menu-bar";
 // (The frame's whole text: a page embedded there whose own embed failed says it deeper, after its words)
@@ -294,6 +294,29 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
       : {}),
     removeEmbed: (write: FormWrite) => inPage((p) => p.embeds.remove(write.text, where(write))),
     linkToText: (write: FormWrite) => inPage((p) => p.links.toText(write.text, where(write))),
+    writeLinkText: (write: FormWrite & { readonly shown: string }) => inPage((p) => p.links.setText(write.text, write.shown, where(write))),
+    // A file renamed by SilverBullet's own command (Document: Rename's: the links to it in every page written anew, its
+    // embeds too, the result told by it), handed `invokeFunction`; none: Rename sets a title alone
+    ...(bridge.invokeFunction
+      ? {
+          renameFile: async (from: string, to: string): Promise<string | undefined> => {
+            try {
+              await bridge.invokeFunction!("index.renameDocumentCommand", { oldDocument: from, document: to });
+              // (It gives true where it refused too, a name taken or not valid, said in its own notification: told by the
+              // space's files, the new one there and the old one gone)
+              if (!bridge.listFiles) return undefined;
+              const paths = pageNamesOf(await bridge.listFiles());
+              if (!paths.includes(to) || paths.includes(from)) return "SilverBullet did not rename it (its notification says why)";
+              // (The page open rewritten on disk by it, its links to the file: shown, and not saved over by the editor's text of before)
+              await bridge.reloadPage?.();
+              return undefined;
+            } catch (error) {
+              return error instanceof Error ? error.message : String(error);
+            }
+          },
+        }
+      : {}),
+    ...(bridge.listFiles ? { filePaths: async (): Promise<readonly string[]> => pageNamesOf(await bridge.listFiles!()) } : {}),
     // The files previews are kept in (core/stored.ts): SilverBullet's documents, read, written and deleted through its
     // space API, their time of change its file's meta (none: previews made each time)
     ...(bridge.fileMeta && bridge.readDocument && bridge.writeDocument && bridge.deleteDocument

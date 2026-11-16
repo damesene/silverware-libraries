@@ -185,11 +185,11 @@ export function editCell(cell: HTMLElement, markdown: string, at: number | TextS
 }
 
 /**
- * What of a cell stays while it is edited: its column's grip (src/grid/ui/columngrips.ts), so the column edited has its
+ * What of a cell stays while it is edited: its grip (src/grid/ui/columngrips.ts), so the cell edited has its
  * menu too (on a phone, the grips shown while the grid has the focus: the cell tapped into was the one without)
  */
 function keptWhileEdited(cell: HTMLElement): HTMLElement[] {
-  return [...cell.querySelectorAll<HTMLElement>(":scope > .swl-grid-column-grip")];
+  return [...cell.querySelectorAll<HTMLElement>(":scope > .swl-grid-cell-grip")];
 }
 
 // How long an editor that lost the focus to nothing waits before taking it back, in the page still (`moveTo` gives it

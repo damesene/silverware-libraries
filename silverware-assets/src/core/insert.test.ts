@@ -46,10 +46,10 @@ describe("a file inserted: its name and path", () => {
 
 describe("a file inserted: what is written", () => {
   it("writes a link in SilverBullet's link style, an embed its view where it is not the one configured", () => {
-    expect(markdownOf("Notes/a.pdf", "link", "embed", "wikilink")).toBe("[[Notes/a.pdf]]");
-    expect(markdownOf("Notes/my a.pdf", "link", "embed", "markdown")).toBe("[Notes/my a.pdf](Notes/my%20a.pdf)");
-    expect(markdownOf("a.pdf", "embed", "embed", "wikilink")).toBe("![[a.pdf]]");
-    expect(markdownOf("a.pdf", "icon", "embed", "markdown")).toBe("![[a.pdf|||{ view: icon }]]");
+    expect(markdownOf("Notes/a.pdf", "link", "full", "wikilink")).toBe("[[Notes/a.pdf]]");
+    expect(markdownOf("Notes/my a.pdf", "link", "full", "markdown")).toBe("[Notes/my a.pdf](Notes/my%20a.pdf)");
+    expect(markdownOf("a.pdf", "full", "full", "wikilink")).toBe("![[a.pdf]]");
+    expect(markdownOf("a.pdf", "card", "full", "markdown")).toBe("![[a.pdf|||{ view: card }]]");
   });
 
   it("puts several embeds a line each (a list's item's lines indented), links and what goes into a line a space apart", () => {
@@ -113,7 +113,7 @@ describe("an image of the web linked at its address", () => {
 
   it("is written as SilverBullet's image of a URL, its view in its metadata where it is not the one shown; a link by its name", () => {
     expect(webMarkdownOf("https://a.b/c d.png", "c d.png", "preview", "preview")).toBe("![](https://a.b/c%20d.png)");
-    expect(webMarkdownOf("https://a.b/c.png", "c.png", "icon", "preview")).toBe("![||{ view: icon }](https://a.b/c.png)");
+    expect(webMarkdownOf("https://a.b/c.png", "c.png", "card", "preview")).toBe("![||{ view: card }](https://a.b/c.png)");
     expect(webMarkdownOf("https://a.b/(x).png", "(x).png", "link", "preview")).toBe("[(x).png](https://a.b/%28x%29.png)");
     expect(webNameOf("https://a.b/pics/c%20d.png?s=1")).toBe("c d.png");
     expect(webNameOf("https://a.b/")).toBe("image");

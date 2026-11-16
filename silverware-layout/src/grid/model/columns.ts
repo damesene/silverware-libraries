@@ -1,29 +1,29 @@
 // A grid's columns as its `columns` attribute gives them (docs/silverware-layout-grid.md, *Layout*): a number of equal
 // columns (`3`), their widths (`1fr 2fr`, `30% 70%`, `200px 1fr`), or `auto`: as many equal columns in a row as fit,
-// none narrower than its `min` attribute (a gallery); made a CSS grid's column template. Pure.
+// none narrower than its `min-width` attribute (a gallery); made a CSS grid's column template. Pure.
 
 /** The most columns a grid's menu offers, and a grid of no `columns` has (a column of its own per cell up to it) */
 export const MAX_COLUMNS = 8;
 
-/** The `columns` of a grid whose columns are as many as fit, each as wide as the others, none under its `min` */
+/** The `columns` of a grid whose columns are as many as fit, each as wide as the others, none under its `min-width` */
 export const FIT = "auto";
 
 /** Whether a grid's columns are as many as fit (`columns="auto"`): equal, none resized by hand */
 export const fitsColumns = (columns: string | undefined): boolean => columns?.trim().toLowerCase() === FIT;
 
-/** The named narrowest widths of a column of a grid of `columns="auto"` (px), its `min` attribute */
+/** The named narrowest widths of a column of a grid of `columns="auto"` (px), its `min-width` attribute */
 export const MIN_WIDTHS = { xs: 100, s: 160, m: 240, l: 360 } as const;
 export type MinWidthName = keyof typeof MIN_WIDTHS;
-/** A grid of `columns="auto"` without a `min`: its columns at least this wide */
+/** A grid of `columns="auto"` without a `min-width`: its columns at least this wide */
 export const DEFAULT_MIN_WIDTH: MinWidthName = "m";
-// The narrowest and widest a `min` given in px may be
+// The narrowest and widest a `min-width` given in px may be
 const MIN_PX = 40;
 const MAX_PX = 1200;
 
 /** Whether a text is a min width's name (its own keys alone: never `constructor`, `toString`) */
 const isMinWidthName = (text: string): text is MinWidthName => Object.hasOwn(MIN_WIDTHS, text);
 
-/** Why a `min` value cannot be read (a name, xs, s, m or l, or px from 40 to 1200, as `180` or `180px`), as text; undefined where it can */
+/** Why a `min-width` value cannot be read (a name, xs, s, m or l, or px from 40 to 1200, as `180` or `180px`), as text; undefined where it can */
 export function validateMinWidth(value: string): string | undefined {
   const text = value.trim().toLowerCase();
   if (isMinWidthName(text)) return undefined;
@@ -33,14 +33,14 @@ export function validateMinWidth(value: string): string | undefined {
   return n >= MIN_PX && n <= MAX_PX ? undefined : `${n} px: from ${MIN_PX} to ${MAX_PX}`;
 }
 
-/** A grid's `min` as px (one that cannot be read, or none: the default's) */
+/** A grid's `min-width` as px (one that cannot be read, or none: the default's) */
 export function minWidthOf(min: string | undefined): number {
   const text = min?.trim().toLowerCase() ?? "";
   if (!text || validateMinWidth(text) !== undefined) return MIN_WIDTHS[DEFAULT_MIN_WIDTH];
   return isMinWidthName(text) ? MIN_WIDTHS[text] : parseInt(text, 10);
 }
 
-/** A grid's `min` as its menu shows it: a name it is (none: the default's), or its px (`custom`) */
+/** A grid's `min-width` as its menu shows it: a name it is (none: the default's), or its px (`custom`) */
 export function minWidthChoice(min: string | undefined): { readonly name: MinWidthName } | { readonly custom: number } {
   const text = min?.trim().toLowerCase() ?? "";
   if (!text || validateMinWidth(text) !== undefined) return { name: DEFAULT_MIN_WIDTH };
@@ -63,7 +63,7 @@ export function validateColumns(value: string): string | undefined {
 
 /**
  * The CSS column template of a grid: its `columns` where they can be read (`auto`: as many equal columns as fit, none
- * narrower than `min` nor than the grid, fewer cells than fit sharing the row's whole width, none left empty; a count: that many equal columns; widths: each, a share `fr` never narrower
+ * narrower than `min-width` nor than the grid, fewer cells than fit sharing the row's whole width, none left empty; a count: that many equal columns; widths: each, a share `fr` never narrower
  * than its content allows to shrink, so a long word does not widen a column); else as many equal columns as cells, at
  * most MAX_COLUMNS, one at least
  */

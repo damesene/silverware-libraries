@@ -1,7 +1,8 @@
 // An asset's "…" button (docs/silverware-assets.md, *Views*; its menu: docs/silverware-assets-menu.md): on its frame, at
 // its top right, opening the asset's menu (the shared popup menu, shared/popupmenu.ts). What changes the page first (how
-// the file is shown there: a row of a link, a card, a preview, the original), then the ways of opening it, then what
-// is done with the file itself (a copy, a download), its deletion last, apart: a separator between.
+// the file is shown there: a row of a link, a card, a preview, the file in full), then the ways of opening it, then what
+// is done with the file itself (a copy, a download), its deletion last, apart: a separator between. Rename… (its title,
+// its file's name) is with the page's row: it changes the page.
 import { el } from "../../../shared/elements.ts";
 import { TRASH } from "../../../shared/glyphs.ts";
 import { opensMenu, type PopupMenu } from "../../../shared/popupmenu.ts";
@@ -18,6 +19,8 @@ export type MoreMenu = {
   readonly title: string;
   // How it is shown in the page: one row, the one shown active (none: no row)
   readonly showAs?: readonly ShowAs[];
+  // What else changes it in the page, under that row (Rename…)
+  readonly page?: readonly Item[];
   // The ways of opening it (a new tab, a side panel, enlarged)
   readonly open?: readonly Item[];
   // What is done with the file itself: a copy, a download, its preview made again
@@ -30,9 +33,12 @@ export type MoreMenu = {
 export const popupOf = (menu: MoreMenu): PopupMenu => ({
   title: menu.title,
   sections: [
-    menu.showAs?.length
-      ? [{ kind: "segmented", label: "Show as", options: menu.showAs.map(({ icon, title, active, disabled, run }) => ({ icon, title, active, ...(disabled ? { disabled } : {}), run })) }]
-      : [],
+    [
+      ...(menu.showAs?.length
+        ? [{ kind: "segmented" as const, label: "Show as", options: menu.showAs.map(({ icon, title, active, disabled, run }) => ({ icon, title, active, ...(disabled ? { disabled } : {}), run })) }]
+        : []),
+      ...(menu.page ?? []),
+    ],
     menu.open ?? [],
     menu.file ?? [],
     // (In the danger colour, the trash before it)

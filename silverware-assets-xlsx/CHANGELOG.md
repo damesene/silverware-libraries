@@ -5,5 +5,5 @@
 First release.
 
 - With Silverware Assets, an Excel workbook's (.xlsx) preview is its first sheet's first cells.
-- A workbook shown as the original, in the side panel or enlarged is a reader of every sheet as a spreadsheet shows it (fonts, colours, borders, merged cells, frozen rows and columns), with a tab for each sheet and zoom.
+- A workbook shown full, in the side panel or enlarged is a reader of every sheet as a spreadsheet shows it (fonts, colours, borders, merged cells, frozen rows and columns), with a tab for each sheet and zoom.
 - ExcelJS comes with the library: it works offline.

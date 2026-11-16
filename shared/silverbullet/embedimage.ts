@@ -13,7 +13,7 @@ const WEB = /^https?:\/\//i;
  * page), an embedded image where it draws none (not installed, not started yet)
  */
 export function withImages(own: FieldDrawing | undefined, page: string): FieldDrawing {
-  return { embed: (markdown) => own?.embed?.(markdown) ?? imageEmbed(markdown, page), ...(own?.linkIcon ? { linkIcon: own.linkIcon } : {}) };
+  return { embed: (markdown) => own?.embed?.(markdown) ?? imageEmbed(markdown, page), ...(own?.linkIcon ? { linkIcon: own.linkIcon } : {}), ...(own?.linkAfter ? { linkAfter: own.linkAfter } : {}) };
 }
 
 /** An image embed of `markdown` (a page's embed, its target resolved against `page`) drawn; none for another file */

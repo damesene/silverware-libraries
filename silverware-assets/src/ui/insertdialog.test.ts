@@ -19,8 +19,8 @@ function host(existing: string[] = [], more: Partial<InsertDialogHost> = {}): In
       file.type.startsWith("image/")
         ? { name: "image", icon: "<svg></svg>", can: () => true, configured: "preview", insertAs: "shown", costly: false }
         : file.name.endsWith(".docx")
-          ? { name: "docx", icon: "<svg></svg>", can: () => true, configured: "embed", insertAs: "shown", costly: true }
-          : { name: "zip", icon: "<svg></svg>", can: (view) => view === "icon", configured: "embed", insertAs: "link", costly: false },
+          ? { name: "docx", icon: "<svg></svg>", can: () => true, configured: "full", insertAs: "shown", costly: true }
+          : { name: "zip", icon: "<svg></svg>", can: (view) => view === "card", configured: "full", insertAs: "link", costly: false },
     drawSample: (container, _file, path, view) => {
       drawn.push([path, view]);
       container.textContent = `${view}: ${path}`;
@@ -52,14 +52,14 @@ describe("the insert dialog", () => {
     expect(rows().map((row) => row.querySelector<HTMLInputElement>(".swa-insert-path")!.value)).toEqual(["Notes/2026-11-15_13-09-48.png", "Notes/Report.zip"]);
     // (As shown: the image's view as set; the zip a link, as its setting says; its views it cannot be drawn in off)
     expect(rows().map((row) => row.querySelector('[aria-checked="true"]')!.textContent)).toEqual(["Preview", "Link"]);
-    expect(choice(rows()[1]!, "Original").getAttribute("aria-disabled")).toBe("true");
+    expect(choice(rows()[1]!, "Full").getAttribute("aria-disabled")).toBe("true");
     // (Drawn as it comes, again once the names taken are known: under its name then)
     expect(given.drawn.at(-1)).toEqual(["Notes/2026-11-15_13-09-48.png", "preview"]);
     expect(rows()[1]!.querySelector(".swa-insert-link")!.textContent).toBe("Notes/Report.zip");
     button("Insert").click();
     expect(await result).toEqual([
       { file: expect.any(File), path: "Notes/2026-11-15_13-09-48.png", as: "preview", configured: "preview" },
-      { file: expect.any(File), path: "Notes/Report.zip", as: "link", configured: "embed" },
+      { file: expect.any(File), path: "Notes/Report.zip", as: "link", configured: "full" },
     ]);
   });
 
@@ -143,22 +143,22 @@ describe("the insert dialog", () => {
     // (The large document held: drawn on a click)
     expect(rows()[2]!.querySelector(".swa-insert-held")).not.toBeNull();
     rows()[2]!.querySelector<HTMLButtonElement>(".swa-insert-held button")!.click();
-    expect(given.drawn.at(-1)).toEqual(["Notes/big.docx", "embed"]);
+    expect(given.drawn.at(-1)).toEqual(["Notes/big.docx", "full"]);
     const all = document.querySelector<HTMLElement>(".swa-insert-all")!;
     const allChecked = () => all.querySelector('[aria-checked="true"]')?.textContent;
     expect(all.hidden).toBe(false);
-    // (The rows differ, the images' previews and the document's original: none chosen for all; all the same: that one)
+    // (The rows differ, the images' previews and the document shown full: none chosen for all; all the same: that one)
     expect(allChecked()).toBeUndefined();
     [...all.querySelectorAll<HTMLButtonElement>(".swa-insert-choice")].find((one) => one.textContent === "Card")!.click();
     expect(allChecked()).toBe("Card");
-    choice(rows()[1]!, "Original").click();
+    choice(rows()[1]!, "Full").click();
     expect(allChecked()).toBeUndefined();
     [...all.querySelectorAll<HTMLButtonElement>(".swa-insert-choice")].find((one) => one.textContent === "Card")!.click();
     button("Insert").click();
     expect((await result)!.map((one) => [one.path, one.as])).toEqual([
-      ["Notes/a.png", "icon"],
-      ["Notes/b.png", "icon"],
-      ["Notes/big.docx", "icon"],
+      ["Notes/a.png", "card"],
+      ["Notes/b.png", "card"],
+      ["Notes/big.docx", "card"],
     ]);
   });
 

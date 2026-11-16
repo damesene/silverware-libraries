@@ -14,6 +14,8 @@ import { el } from "../../../shared/elements.ts";
 import { ALIGN_CENTER, ALIGN_LEFT, ALIGN_RIGHT } from "../../../shared/glyphs.ts";
 import type { LayoutAlign, LayoutMenuEntry } from "../../../shared/layout.ts";
 import { type PopupMenu, showPopup } from "../../../shared/popupmenu.ts";
+import { COMPANION_ATTRIBUTE } from "../../../shared/editor.ts";
+import { composedTarget, deepElementFromPoint, inShadow } from "../../../shared/shadow.ts";
 import { ALIGN_NAMES, ALIGNS, type Guide } from "../model/settings.ts";
 import { draggedRoomWidth, draggedWidth, type LayoutAnchor, MIN_ROOM_WIDTH, MIN_WIDGET_WIDTH, PANE_GUTTER, roomTargets, type SnapTarget, snapped, snapTargets, type WidgetWidth, widestWidth, widthName } from "../core/widgetwidth.ts";
 import { GuideLines } from "./guidelines.ts";
@@ -141,11 +143,17 @@ export class WidthHandle<W> {
 
   private pointed(e: PointerEvent): void {
     if (this.drag || e.pointerType === "touch") return;
-    const target = e.target instanceof Element ? e.target : undefined;
+    // (What is under it in a shadow root too: a file in a grid's cell edited, its field's)
+    const target = composedTarget(e);
     if (!target) return;
     // (Its own and its menu's: the pointer on its way to an item, or resting on it, is not off the widget)
     if (this.box.contains(target) || target.closest(`.${POPUP.base}-popup`)) return this.stay();
-    const widget = this.shown(this.widgetAt(target) ?? this.besideEdge(e.clientX, e.clientY));
+    // (Beside the edge of a widget inside the one it is over, the inner one's: the way to its bar beside it crosses the
+    // outer one. Not one in a room, a grid's cell, whose bar is inside it: beside it is the grid's, its column's grip)
+    const over = this.widgetAt(target);
+    const beside = this.besideEdge(e.clientX, e.clientY);
+    const inner = beside && over && this.host.room?.(beside) === undefined && this.host.element(over) !== this.host.element(beside) && this.host.element(over).contains(this.host.element(beside));
+    const widget = this.shown(inner ? beside : (over ?? beside));
     if (widget) {
       this.stay();
       this.showFor(widget);
@@ -175,7 +183,7 @@ export class WidthHandle<W> {
   }
 
   private besideOne(x: number, y: number, side: "left" | "right"): W | undefined {
-    const near = this.doc.elementFromPoint(side === "right" ? x - EDGE_ZONE : x + EDGE_ZONE, y);
+    const near = deepElementFromPoint(this.doc, side === "right" ? x - EDGE_ZONE : x + EDGE_ZONE, y);
     const widget = near ? this.widgetAt(near) : undefined;
     if (!widget || (side === "left") !== (this.host.anchor?.(widget) === "end")) return undefined;
     const rect = this.host.element(widget).getBoundingClientRect();
@@ -185,7 +193,8 @@ export class WidthHandle<W> {
   /** A finger (or a pen) on the page, which has no hover: on a widget its handle shows, elsewhere it goes */
   private touched(e: PointerEvent): void {
     if (this.drag || e.pointerType === "mouse") return;
-    const target = e.target instanceof Element ? e.target : undefined;
+    // (What is under it in a shadow root too: a file in a grid's cell edited, its field's)
+    const target = composedTarget(e);
     // (Its own and its menu's: a finger on the menu is no touch beside the widget, which would close the menu first)
     if (!target || this.box.contains(target) || target.closest(`.${POPUP.base}-popup`)) return;
     const widget = this.shown(this.widgetAt(target));
@@ -210,6 +219,9 @@ export class WidthHandle<W> {
     // (Its menu is of the widget it was opened for: another closes it; the same, found again as a new reference, not)
     if (!this.widget || this.host.element(widget) !== this.host.element(this.widget)) this.closeMenu?.();
     this.widget = widget;
+    // (For a widget in an editor's field, a grid's cell edited: the handle acts on that editor, so a press on it, its
+    // menu, is not the field left: shared/editor.ts' companions)
+    this.box.toggleAttribute(COMPANION_ATTRIBUTE, inShadow(this.host.element(widget)));
     this.box.hidden = false;
     this.place();
     this.label();
@@ -228,7 +240,7 @@ export class WidthHandle<W> {
     let element = this.widget && this.host.element(this.widget);
     if (!element?.isConnected) {
       // Drawn anew (its plugin wrote it): the widget where it was, if one is there
-      const at = this.middle && this.doc.elementFromPoint(this.middle.x, this.middle.y);
+      const at = this.middle && deepElementFromPoint(this.doc, this.middle.x, this.middle.y);
       const again = at ? this.widgetAt(at) : undefined;
       if (!again) return this.hide();
       this.widget = again;
@@ -245,8 +257,14 @@ export class WidthHandle<W> {
     this.middle = { x: rect.left + rect.width / 2, y: top + Math.min((bottom - top) / 2, 20) };
     // (Held in the view: a sliver of a widget in view gets the least bar, not out over the top bar)
     const at = Math.min(Math.max(top + (bottom - top - height) / 2, view.top), view.bottom - height);
-    // (Beside its right edge; a widget at the end grows to the left: beside its left edge, the bar's width before it)
-    const left = this.anchorOf() === "end" ? rect.left - 6 - (this.box.offsetWidth || 12) : rect.right + 6;
+    // (Beside its right edge; a widget at the end grows to the left: beside its left edge, the bar's width before it. In
+    // a room, a grid's cell, within the widget at that edge: beside it, it stood on the grip between the grid's columns,
+    // alike, neither told from the other: docs/silverware-layout-room-handles.md)
+    const bar = this.box.offsetWidth || 12;
+    const inside = this.roomOf() !== undefined;
+    const end = this.anchorOf() === "end";
+    const left = inside ? (end ? rect.left + 4 : rect.right - 4 - bar) : end ? rect.left - 6 - bar : rect.right + 6;
+    this.box.classList.toggle(`${BASE}-inside`, inside);
     Object.assign(this.box.style, { left: `${Math.round(left)}px`, top: `${Math.round(at)}px`, height: `${Math.round(height)}px` });
     // (A widget not widened: its bar for its menu alone)
     this.box.classList.toggle(`${BASE}-menu-only`, !this.resizable());

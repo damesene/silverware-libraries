@@ -15,8 +15,9 @@ The page's parts keep their owners in a field:
   markdown link's from the page's folder, its section kept; a URL in a tab of its own; a new tab by its address). The
   peek closes first, as its Open does; a cell is left as by a press elsewhere. An Alt+press puts the caret there, its
   markdown shown, as on an embed. Without `openLink` a press puts the caret, as before.
-- **A file's icon and menu are Silverware Assets'**: drawn before a link to a file of the space, as `decorateLinks`
-  draws them in the page (its type's icon, the setting off a marker), its menu the page's (Show as, open, copy, Delete
+- **A file's icon and menu are Silverware Assets'**: its type's icon drawn before a link to a file of the space (a press
+  on it follows the link, as on its text: `swe-link-lead`) and its menu's arrow after it (`linkAfter`, since 2026-11-16),
+  as `decorateLinks` draws them in the page, its menu the page's (Show as, open, copy, Delete
   file…), what it changes written into the field's text (`EmbedEdit`). One method builds the menu for both
   (`linkMenu`), told how to write.
 - **An escape** (`\[`) is drawn without its backslash where the caret is not on it, as SilverBullet draws it.
@@ -24,7 +25,7 @@ The page's parts keep their owners in a field:
 ## One way through for what a plugin draws in a field
 
 Silverware Editor, Assets and `shared/rendered.ts` are not on `main` yet (2026-11-16), so their API is changed, not
-added to: what a plugin draws in another's field goes one way, `FieldDrawing` (shared/editor.ts: `embed`, `linkIcon`),
+added to: what a plugin draws in another's field goes one way, `FieldDrawing` (shared/editor.ts: `embed`, `linkIcon`, `linkAfter`),
 in place of the embed's alone:
 
 - `EditorOptions.drawing` (was `embed`);

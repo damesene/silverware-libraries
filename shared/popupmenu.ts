@@ -3,7 +3,7 @@
 // the plugin's base (`<base>-menu-item`…), in a box of the plugin's own (`<base>-popup <base>-menu`: its style page
 // places and draws it). What opens it takes the press as its own: what it is in (a link SilverBullet follows as a touch
 // on it ends, an editor moving its cursor) does not get it.
-import { COMPANION_ATTRIBUTE } from "./editor.ts";
+import { COMPANION_ATTRIBUTE, inCompanion } from "./editor.ts";
 import { el } from "./elements.ts";
 import { layerVariable } from "./layers.ts";
 import { focusMenu, type MenuEntry, menuItem, menuSegmented, menuSeparator, onMenuClose, renderMenu } from "./menu.ts";
@@ -36,9 +36,11 @@ export type PopupMenu = { readonly title: string; readonly sections: readonly (r
 export function showPopup(doc: Document, look: PopupLook, at: HTMLElement, shown: PopupMenu, closed?: () => void): () => void {
   const LOOK = { base: look.base };
   let holder: HTMLElement | undefined;
-  // Opened from a field's shadow root (an editor's): the focus given back there as it closes, so the field is not left
-  // for nothing (a grid's cell written and closed under what was chosen)
-  const inField = at.getRootNode() instanceof (doc.defaultView?.ShadowRoot ?? ShadowRoot);
+  // Opened from a field's shadow root (an editor's), or from an element acting on one (a companion: Silverware Layout's
+  // handle of a file in a grid's cell edited): the focus given back there as it closes, so the field is not left for
+  // nothing (a grid's cell written and closed under what was chosen)
+  const inShadow = at.getRootNode() instanceof (doc.defaultView?.ShadowRoot ?? ShadowRoot);
+  const inField = inShadow || inCompanion(at);
   const focusedBefore = inField ? deepFocus(doc) : undefined;
   const close = () => {
     if (!holder) return;
@@ -78,7 +80,7 @@ export function showPopup(doc: Document, look: PopupLook, at: HTMLElement, shown
   // the focus coming to it is not the field left (shared/editor.ts' companions); opened from what shows over the window
   // (a database's peek), over it, as its own panels are
   if (inField) holder.setAttribute(COMPANION_ATTRIBUTE, "");
-  if (overWindowOf(inField ? (at.getRootNode() as ShadowRoot).host : at))
+  if (overWindowOf(inShadow ? (at.getRootNode() as ShadowRoot).host : at))
     holder.style.zIndex = `calc(var(${layerVariable("sheetPanel")}) + 1)`;
   const box = at.getBoundingClientRect();
   holder.style.top = `${box.bottom + 4}px`;

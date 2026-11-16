@@ -25,7 +25,7 @@ export function gridProvider(grids: Grids): LayoutProvider {
       return grids.writeAttributes(grid, changes);
     },
     kinds: [{ id: "grid", name: "Grid", align: "center" }],
-    // Its handle's menu: the grid's columns, borders, a column at the end, the grid taken apart (docs/silverware-layout-grid-handles.md)
+    // Its handle's menu: the grid's columns, borders, a cell at the end, the grid taken apart (docs/silverware-layout-grid-handles.md)
     menu: (element) => {
       const grid = gridIn(element);
       return grid ? grids.menuOf(grid) : [];

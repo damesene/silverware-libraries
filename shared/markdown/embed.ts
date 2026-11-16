@@ -261,6 +261,16 @@ export function linkAsEmbed(link: Link): string {
   return `!${link.text}`;
 }
 
+/**
+ * A link written with another text it shows (a wiki link's alias, a markdown link's text), its target as it is: none, a
+ * wiki link its target alone (`[[a.pdf]]`), a markdown link its file's name (it shows nothing without one)
+ */
+export function linkWithText(link: Link, text: string): string {
+  if (link.style === "wiki") return `[[${link.target}${text ? `|${text}` : ""}]]`;
+  // (Its brackets' text replaced, the rest as written: its target, a title after it)
+  return `[${text || escapedText(fileNameOf(link.target, link.style))}${link.text.slice(1 + link.alias.length)}`;
+}
+
 /** A link written as the text it shows: its alias (a markdown link's text), else its target's file name (`[[Docs/a.pdf]]`: `a.pdf`) */
 export function linkAsText(link: Link): string {
   // (A markdown link's text is markdown already; a wiki link's alias and a file's name are words, written so)

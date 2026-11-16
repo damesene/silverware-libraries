@@ -166,7 +166,7 @@ test("Preview held on the Guides tab: the guides as typed on the page (one added
   await dialog.getByRole("tab", { name: "Guides" }).click();
   await dialog.getByRole("button", { name: "+ Add guide" }).click();
   await page.keyboard.type("1000");
-  const preview = dialog.getByRole("button", { name: "Preview" });
+  const preview = dialog.getByRole("button", { name: "Hold to preview" });
   const box = (await preview.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();

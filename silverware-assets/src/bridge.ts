@@ -46,8 +46,11 @@ export type Bridge = {
   // (a grid's cell) a file is pasted or dropped into (shared/editor.ts `surfaceOf`)
   readonly editor?: unknown;
   // Optional: a plug's function run (`system.invokeFunction`): SilverBullet's own *File: Upload* where Silverware
-  // Assets' is turned off
+  // Assets' is turned off; its *Document: Rename* for a file renamed from its menu (`index.renameDocumentCommand`)
   readonly invokeFunction?: (name: string, ...args: unknown[]) => unknown;
+  // Optional: the page open read again from the space (`editor.reloadPage`): a file renamed from its menu, SilverBullet
+  // having rewritten the page's links to it on disk, which the editor would not show (and would save over)
+  readonly reloadPage?: () => unknown;
 };
 
 /** The bridge's functions Silverware Assets cannot work without, missing from what the init page gave */

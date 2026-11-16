@@ -258,8 +258,8 @@ describe("a grid's width, as Silverware Layout's widget", () => {
   });
 });
 
-describe("a grid's menus: a column's by its grip, the grid's in its handle's", () => {
-  it("moves a column by its grip's menu, sets the grid's columns and borders and takes it apart by its handle's, each through the host", async () => {
+describe("a grid's menus: a cell's by its grip, the grid's in its handle's", () => {
+  it("moves a cell by its grip's menu, sets the grid's columns and borders and takes it apart by its handle's, each through the host", async () => {
     const { state, gridHost } = host(`<grid>\n${body}\n</grid>\n`);
     const changes: unknown[] = [];
     const asked: string[] = [];
@@ -270,33 +270,33 @@ describe("a grid's menus: a column's by its grip, the grid's in its handle's", (
     const frame = Object.assign(document.createElement("div"), { className: "swl-grid-widget" });
     frame.append(grid);
     document.body.append(frame);
-    const columnMenu = (cell: number) => {
-      grid.querySelectorAll<HTMLElement>(".swl-grid-column-grip")[cell]!.click();
+    const cellMenu = (cell: number) => {
+      grid.querySelectorAll<HTMLElement>(".swl-grid-cell-grip")[cell]!.click();
       return [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")];
     };
     const pick = async (cell: number, label: string) => {
-      columnMenu(cell).find((item) => item.textContent?.trim() === label)!.click();
+      cellMenu(cell).find((item) => item.textContent?.trim() === label)!.click();
       await new Promise((resolve) => setTimeout(resolve, 0));
     };
-    // A column's: what is done with it alone
-    expect(columnMenu(0).map((item) => item.textContent?.trim())).toEqual(["Edit markdown (Alt+click)", "Move left", "Move right", "Add a column after it", "Move out of the grid", "Clear column…", "Delete column…"]);
+    // A cell's: what is done with it alone
+    expect(cellMenu(0).map((item) => item.textContent?.trim())).toEqual(["Edit markdown (Alt+click)", "Move left", "Move right", "Add a cell after it", "Move out of the grid", "Clear cell…", "Delete cell…"]);
     // (Deleting: in the danger colour, its trash before it)
     const remove = [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")].at(-1)!;
     expect(remove.classList.contains("swl-danger")).toBe(true);
     expect(remove.querySelector("svg")).not.toBeNull();
     // (Closed again by its grip)
-    grid.querySelector<HTMLElement>(".swl-grid-column-grip")!.click();
+    grid.querySelector<HTMLElement>(".swl-grid-cell-grip")!.click();
     await pick(0, "Move right");
     await pick(1, "Move out of the grid");
     expect(changes).toEqual([{ kind: "move", cell: 0, by: 1 }, { kind: "takeOut", cell: 1 }]);
-    // A column deleted: asked first; declined, nothing; confirmed, deleted with its content
+    // A cell deleted: asked first; declined, nothing; confirmed, deleted with its content
     asked.length = 0;
     answer = false;
-    await pick(1, "Delete column…");
-    expect(asked).toEqual(["Delete column 2 and everything in it? Ctrl+Z brings it back."]);
+    await pick(1, "Delete cell…");
+    expect(asked).toEqual(["Delete cell 2 and everything in it? Ctrl+Z brings it back."]);
     expect(changes).toHaveLength(2);
     answer = true;
-    await pick(1, "Delete column…");
+    await pick(1, "Delete cell…");
     expect(changes.at(-1)).toEqual({ kind: "remove", cell: 1 });
     // The grid's: in its handle's menu, through its provider
     const gridItems = () => gridProvider(grids).menu!(frame).flat();
@@ -306,7 +306,7 @@ describe("a grid's menus: a column's by its grip, the grid's in its handle's", (
     expect(columns.label).toBe("Columns");
     expect(columns.options.map((option) => option.icon)).toEqual(["Auto", "2", "3", "4", "5", "6", "7", "8"]);
     expect(columns.options.filter((option) => option.active).map((option) => option.icon)).toEqual(["2"]);
-    expect(gridItems().map((item) => item.label)).toEqual(["Columns", "Borders", "Add a column at the end", "Unwrap grid"]);
+    expect(gridItems().map((item) => item.label)).toEqual(["Columns", "Borders", "Add a cell at the end", "Unwrap grid"]);
     const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
     const run = async (label: string) => {
       const item = gridItems().find((one) => one.label === label)!;
@@ -318,7 +318,7 @@ describe("a grid's menus: a column's by its grip, the grid's in its handle's", (
     expect(changes.at(-1)).toEqual({ kind: "ungrid" });
     columns.options[2]!.run();
     await settled();
-    expect(state.attributeWrites.map((write) => write.attributes)).toEqual([{ columns: "3", min: null }]);
+    expect(state.attributeWrites.map((write) => write.attributes)).toEqual([{ columns: "3", "min-width": null }]);
     expect(grid.style.getPropertyValue("--swl-grid-columns")).toBe("repeat(3, minmax(0, 1fr))");
     // Its borders, a row of two: all (as HTML's table has them), the cells' alone, shown at once; chosen again, off
     const borders = () => {
@@ -345,7 +345,7 @@ describe("a grid's menus: a column's by its grip, the grid's in its handle's", (
     expect(grid.hasAttribute("data-swl-fit")).toBe(true);
     expect(grid.style.getPropertyValue("--swl-grid-columns")).toBe("repeat(auto-fit, minmax(min(240px, 100%), 1fr))");
     // (Its own sections: the columns and their min width, then the rest)
-    expect(gridProvider(grids).menu!(frame).map((section) => section.map((item) => item.label))).toEqual([["Columns", "Min width"], ["Borders", "Add a column at the end"], ["Unwrap grid"]]);
+    expect(gridProvider(grids).menu!(frame).map((section) => section.map((item) => item.label))).toEqual([["Columns", "Min width"], ["Borders", "Add a cell at the end"], ["Unwrap grid"]]);
     const minRow = () => {
       const row = gridItems()[1]!;
       if (!("kind" in row)) throw new Error("no row of min widths");
@@ -354,26 +354,26 @@ describe("a grid's menus: a column's by its grip, the grid's in its handle's", (
     expect(minRow().options.map((option) => [option.icon, !!option.active])).toEqual([["XS", false], ["S", false], ["M", true], ["L", false], ["px…", false]]);
     minRow().options[1]!.run();
     await settled();
-    expect(state.attributeWrites.at(-1)!.attributes).toEqual({ min: "s" });
+    expect(state.attributeWrites.at(-1)!.attributes).toEqual({ "min-width": "s" });
     expect(grid.style.getPropertyValue("--swl-grid-columns")).toBe("repeat(auto-fit, minmax(min(160px, 100%), 1fr))");
     // Its own px: the row's last choice, asked; the one set shown there
     minRow().options[4]!.run();
     await settled();
-    expect(state.attributeWrites.at(-1)!.attributes).toEqual({ min: "180" });
+    expect(state.attributeWrites.at(-1)!.attributes).toEqual({ "min-width": "180" });
     expect(minRow().options.map((option) => [option.icon, !!option.active]).at(-1)).toEqual(["180px", true]);
-    // A column cleared (last: its write changes the page): asked first; declined, nothing; confirmed, its content
-    // written empty, the column kept
+    // A cell cleared (last: its write changes the page): asked first; declined, nothing; confirmed, its content
+    // written empty, the cell kept
     asked.length = 0;
     answer = false;
-    await pick(0, "Clear column…");
-    expect(asked).toEqual(["Clear column 1? Everything in it goes, the column stays. Ctrl+Z brings it back."]);
+    await pick(0, "Clear cell…");
+    expect(asked).toEqual(["Clear cell 1? Everything in it goes, the cell stays. Ctrl+Z brings it back."]);
     expect(state.writes).toHaveLength(0);
     answer = true;
-    await pick(0, "Clear column…");
+    await pick(0, "Clear cell…");
     expect(state.writes.map((write) => [write.cell, write.content])).toEqual([[0, ""]]);
   });
 
-  it("opens the grid's own menu from a column's by Grid… where no handle is shown (a narrow pane), deleting the column last", async () => {
+  it("opens the grid's own menu from a cell's by Grid… where no handle is shown (a narrow pane), deleting the cell last", async () => {
     const { gridHost } = host(`<grid>\n${body}\n</grid>\n`);
     const grids = new Grids(document, { ...gridHost, changeCells: async () => undefined });
     let hidden = true;
@@ -381,19 +381,19 @@ describe("a grid's menus: a column's by its grip, the grid's in its handle's", (
     const grid = await grids.render(body);
     document.body.append(grid);
     const items = () => [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")];
-    grid.querySelector<HTMLElement>(".swl-grid-column-grip")!.click();
-    expect(items().map((item) => item.textContent?.trim())).toEqual(["Edit markdown (Alt+click)", "Move left", "Move right", "Add a column after it", "Move out of the grid", "Grid…", "Clear column…", "Delete column…"]);
+    grid.querySelector<HTMLElement>(".swl-grid-cell-grip")!.click();
+    expect(items().map((item) => item.textContent?.trim())).toEqual(["Edit markdown (Alt+click)", "Move left", "Move right", "Add a cell after it", "Move out of the grid", "Grid…", "Clear cell…", "Delete cell…"]);
     items().find((item) => item.textContent?.trim() === "Grid…")!.click();
     expect(document.querySelector(".swl-popup .swl-menu-title")?.textContent ?? document.querySelector(".swl-popup")!.textContent).toContain("Grid");
-    expect(items().map((item) => item.textContent?.trim())).toEqual(["Add a column at the end", "Unwrap grid"]);
+    expect(items().map((item) => item.textContent?.trim())).toEqual(["Add a cell at the end", "Unwrap grid"]);
     expect([...document.querySelectorAll(".swl-popup .swl-menu-segmented .swl-label")].map((label) => label.textContent)).toEqual(["Columns", "Borders"]);
     expect(document.querySelector(".swl-popup .swl-menu-segmented")?.textContent).toContain("Columns");
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     // Its handle shown: no Grid… (its menu the handle's)
     hidden = false;
-    grid.querySelector<HTMLElement>(".swl-grid-column-grip")!.click();
+    grid.querySelector<HTMLElement>(".swl-grid-cell-grip")!.click();
     expect(items().map((item) => item.textContent?.trim())).not.toContain("Grid…");
-    grid.querySelector<HTMLElement>(".swl-grid-column-grip")!.click();
+    grid.querySelector<HTMLElement>(".swl-grid-cell-grip")!.click();
   });
 
   it("draws a grid's borders as its border attribute says: all, or the lines between its cells alone", async () => {

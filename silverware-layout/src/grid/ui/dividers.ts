@@ -1,11 +1,11 @@
-// The dividers between a grid's columns (docs/silverware-layout-grid.md, *Column widths*): a quiet line in the gap
-// between two columns, plain as the pointer is over it, dragged to change the two columns' shares (their sum kept, the
+// The dividers between a grid's columns (docs/silverware-layout-grid.md, *Column widths*): a line in the gap between
+// two columns, lit as the pointer is over it (no grip: docs/silverware-layout-room-handles.md *Column dividers*), dragged to change the two columns' shares (their sum kept, the
 // others as they are), snapping to the usual ratios (model/columns.ts), each ratio's place a quiet dashed guide in the
 // grid while it is dragged (the one snapped to plain), the ratio or the shares said by the divider as it moves; a double click makes the two even. What is dragged is shown at once (the grid's column template); written
 // as the `columns` attribute on release. Where the columns are is read from the grid as laid out (its computed template
 // and gap), so any `columns` (a count, shares, %, px) and any number of rows are taken alike. A grid of one column (a
-// narrow pane stacks its cells) has none. The grips (and the label of a divider dragged) ride in the middle of the part
-// of the grid in view, as a widget's handle does: a tall grid's are seen wherever it is scrolled to.
+// narrow pane stacks its cells) has none. The knobs (a touch screen's) and the label of a divider dragged ride in the
+// middle of the part of the grid in view, as a widget's handle does: a tall grid's are seen wherever it is scrolled to.
 import { el } from "../../../../shared/elements.ts";
 import { columnsOf, dividedWidths, type DividerPlace, ratioPlaces, templateOf, withinShares } from "../model/columns.ts";
 import { showColumns, shownFit } from "./view.ts";
@@ -29,8 +29,8 @@ function laidOut(grid: HTMLElement): { readonly widths: number[]; readonly gap: 
   return { widths, gap };
 }
 
-// The grip's height (px, the style page's as it is pointed at) and the room kept above and below it within the grid
-const GRIP = 40;
+// The knob's height (px, the style page's: a touch screen's) and the room kept above and below it within the grid
+const GRIP = 12;
 const GRIP_ROOM = 6;
 // The variable the grips' place is in (px from the grid's top)
 const GRIP_Y = "--swl-grip-y";
@@ -85,7 +85,7 @@ export function addColumnDividers(
   view?: () => { readonly top: number; readonly bottom: number } | undefined,
 ): void {
   let dividers: HTMLElement[] = [];
-  /** The grips placed in the part of the grid in view */
+  /** The knobs (and a dragged divider's label) placed in the part of the grid in view */
   const placeGrips = () => {
     const rect = grid.getBoundingClientRect();
     const seen = view?.() ?? { top: 0, bottom: doc.defaultView?.innerHeight ?? rect.bottom };

@@ -1,12 +1,12 @@
-// Silverware Assets DOCX in SilverBullet, with Silverware Assets: a Word document's preview its first page drawn smaller, its
-// original a reader of the whole document (in the page and in Assets' side panel), a file it cannot read said so.
+// Silverware Assets DOCX in SilverBullet, with Silverware Assets: a Word document's preview its first page drawn smaller,
+// shown full a reader of the whole document (in the page and in Assets' side panel), a file it cannot read said so.
 import { docxOf, expect, test } from "./helpers.ts";
 
 const PAGES = [["The first page's words."], ["The second page's words."]];
 
 test("a document's preview is its first page drawn smaller, as high as a preview, its frame as wide; its click the preview's", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/doc.docx|||{ view: preview }]]\n\nAfter\n` }, "Page", { "doc.docx": await docxOf(PAGES) });
-  const preview = page.locator("#sb-main [data-swa-asset='docx'][data-swa-view='preview']");
+  const preview = page.locator("#sb-main [data-swa-type='docx'][data-swa-view='preview']");
   const shown = preview.locator(".swa-docx-preview[data-swa-docx-state='page'] .swa-docx-preview-page");
   await expect(shown).toBeVisible();
   await expect(shown.locator("section.swa-docx-docx")).toHaveCount(1);
@@ -30,7 +30,7 @@ test("a document's preview is its first page drawn smaller, as high as a preview
 
 test("a document's preview grows with the content's scale (files zoomed with the font: 150 %) at once, nothing drawn again", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/doc.docx|||{ view: preview }]]\n\nAfter\n` }, "Page", { "doc.docx": await docxOf(PAGES) });
-  const shown = page.locator("#sb-main [data-swa-asset='docx'][data-swa-view='preview'] .swa-docx-preview[data-swa-docx-state='page'] .swa-docx-preview-page");
+  const shown = page.locator("#sb-main [data-swa-type='docx'][data-swa-view='preview'] .swa-docx-preview[data-swa-docx-state='page'] .swa-docx-preview-page");
   await expect(shown).toBeVisible();
   expect(Math.round((await shown.boundingBox())!.height)).toBe(160);
   // (As Silverware Layout sets it where the files zoom with the font: shared/contentscale.ts)
@@ -52,7 +52,7 @@ test("a document's preview kept in the space as HTML once drawn, shown from ther
 
 ![[${space.folder}/doc.docx|||{ view: preview }]]
 ` }, "Page", { "doc.docx": await docxOf(PAGES) });
-  const preview = page.locator("#sb-main [data-swa-asset='docx'][data-swa-view='preview']");
+  const preview = page.locator("#sb-main [data-swa-type='docx'][data-swa-view='preview']");
   await expect(preview.locator(".swa-docx-preview[data-swa-docx-state='page'] section.swa-docx-docx")).toContainText("The first page's words.");
   await expect.poll(() => space.kept("doc.docx.html")).toContain("The first page's words.");
   // What is kept shown after, made safe as it is read (anyone who can write the space can write it)
@@ -65,9 +65,9 @@ test("a document's preview kept in the space as HTML once drawn, shown from ther
   expect(await page.evaluate(() => (window as unknown as { ran?: number }).ran)).toBeUndefined();
 });
 
-test("a document shown as the original is a reader of its pages in a box of the embed's height, fitted to its width, the page in view said, zoomed", async ({ page, space }) => {
-  await space.open({ Page: `# Page\n\n![[${space.folder}/doc.docx|Doc||{ view: embed }]]\n\nAfter\n` }, "Page", { "doc.docx": await docxOf(PAGES) });
-  const reader = page.locator("#sb-main [data-swa-asset='docx'] .swa-docx-reader[data-swa-docx-state='pages']");
+test("a document shown full is a reader of its pages in a box of the embed's height, fitted to its width, the page in view said, zoomed", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/doc.docx|Doc||{ view: full }]]\n\nAfter\n` }, "Page", { "doc.docx": await docxOf(PAGES) });
+  const reader = page.locator("#sb-main [data-swa-type='docx'] .swa-docx-reader[data-swa-docx-state='pages']");
   await expect(reader).toBeVisible();
   expect(Math.round((await reader.boundingBox())!.height)).toBe(480);
   const pages = reader.locator("section.swa-docx-docx");
@@ -90,7 +90,7 @@ test("a document shown as the original is a reader of its pages in a box of the 
 
 test("a document in the side panel is the reader filling it", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/doc.docx|Doc||{ view: preview }]]\n\nAfter\n` }, "Page", { "doc.docx": await docxOf(PAGES) });
-  const preview = page.locator("#sb-main [data-swa-asset='docx']");
+  const preview = page.locator("#sb-main [data-swa-type='docx']");
   await expect(preview.locator(".swa-docx-preview[data-swa-docx-state='page']")).toBeVisible();
   await preview.hover();
   await preview.locator(".swa-more").click();
@@ -109,8 +109,8 @@ test("a document in the side panel is the reader filling it", async ({ page, spa
 });
 
 test("a file docx-preview cannot read: its preview its icon and name, its reader saying so", async ({ page, space }) => {
-  await space.open({ Page: `# Page\n\n![[${space.folder}/bad.docx|||{ view: preview }]]\n\n![[${space.folder}/bad.docx|Bad||{ view: embed }]]\n` }, "Page", { "bad.docx": "not a document" });
-  const [preview, original] = [page.locator("#sb-main [data-swa-asset='docx'][data-swa-view='preview']"), page.locator("#sb-main [data-swa-asset='docx'][data-swa-view='embed']")];
+  await space.open({ Page: `# Page\n\n![[${space.folder}/bad.docx|||{ view: preview }]]\n\n![[${space.folder}/bad.docx|Bad||{ view: full }]]\n` }, "Page", { "bad.docx": "not a document" });
+  const [preview, full] = [page.locator("#sb-main [data-swa-type='docx'][data-swa-view='preview']"), page.locator("#sb-main [data-swa-type='docx'][data-swa-view='full']")];
   await expect(preview.locator(".swa-docx-preview[data-swa-docx-state='failed'] .swa-docx-preview-name")).toHaveText("bad.docx");
-  await expect(original.locator(".swa-docx-reader[data-swa-docx-state='failed'] .swa-docx-reader-failed")).toContainText("This document cannot be shown here");
+  await expect(full.locator(".swa-docx-reader[data-swa-docx-state='failed'] .swa-docx-reader-failed")).toContainText("This document cannot be shown here");
 });

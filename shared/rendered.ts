@@ -29,7 +29,7 @@ export type RenderedRange = { readonly from: number; readonly to: number };
 
 /**
  * What a plugin draws in an editor of markdown rendered outside the page's (a grid's cell edited), for the page it is
- * in (its targets resolved from it): an embed, a link's icon (shared/editor.ts `FieldDrawing`)
+ * in (its targets resolved from it): an embed, a link's icon and what follows it (shared/editor.ts `FieldDrawing`)
  */
 export type FieldDrawer = (page: string) => FieldDrawing;
 

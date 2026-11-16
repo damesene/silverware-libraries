@@ -1031,8 +1031,10 @@ test("in the peek's editor a file's link has its icon and menu as in the page, a
     await expect(body.locator(".cm-content")).toBeVisible({ timeout: 1000 });
   }).toPass({ timeout: 20_000 });
   await expect.poll(() => fieldReady(body)).toBe(true);
-  // The file's link: Silverware Assets' icon before it, its menu as in the page; the escape's backslash hidden
-  const icon = body.locator(".swa-link-icon");
+  // The file's link: Silverware Assets' icon before it, its menu by the arrow after it as in the page; the escape's
+  // backslash hidden
+  await expect(body.locator(".swa-link-icon")).toHaveCount(1);
+  const icon = body.locator(".swa-link-marker");
   await expect(icon).toHaveCount(1);
   await expect(body.locator(".cm-line", { hasText: "estimate" })).toContainText("about [estimate: 5]");
   await icon.click();
@@ -1040,6 +1042,11 @@ test("in the peek's editor a file's link has its icon and menu as in the page, a
   await expect(page.locator(".swa-popup .swa-segment")).not.toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.locator(".swa-popup")).toHaveCount(0);
+  // What the arrow's menu chooses written into the field: the link an embed shown as a card (the arrow drawn after the
+  // link's markdown, which its edit finds before it)
+  await icon.click();
+  await page.locator('.swa-popup .swa-segment[aria-label^="Card"]').click();
+  await expect.poll(() => fieldText(body)).toContain(`See ![[${space.folder}/photo.png|||{ view: card }]] about`);
   // A page's link pressed: followed, the peek closed first
   await body.locator(".swe-wiki-link", { hasText: "the docs" }).click();
   await expect(page.locator(".swd-peek")).toHaveCount(0);
@@ -1098,7 +1105,7 @@ test("in the peek's editor an item's images are drawn as the page draws them, an
   await frame.hover();
   await frame.locator(".swa-more").click();
   await page.locator('.swa-popup .swa-segment[aria-label^="Card"]').click();
-  await expect.poll(() => fieldText(body)).toContain(`![||{ view: icon }](${url})`);
+  await expect.poll(() => fieldText(body)).toContain(`![||{ view: card }](${url})`);
   await expect(page.locator(".swd-peek")).toBeVisible();
   // A word selected: the toolbar over the peek, its action written into the item's content
   await body.locator(".cm-line", { hasText: "First words here" }).dblclick({ position: { x: 4, y: 6 } });

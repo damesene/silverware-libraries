@@ -29,7 +29,7 @@ export function cardEditor(doc: Document, card: readonly CardField[], icon: stri
   const sample = sampleFile("pdf");
   const off = el(doc, "div", { attrs: { "data-swa-place": "off", role: "list", "aria-label": "Not shown" } });
   const stage = el(doc, "div", "swa-sample-card-holder");
-  const element = editorFrame(doc, "swa-card-edit", stage, off, "Click a hidden part to show it, × to hide one. The icon (or the arrow, if the icon is hidden) opens the file's menu.");
+  const element = editorFrame(doc, "swa-card-edit", stage, off, "Click a hidden part to show it, × to hide one. The arrow after the name opens the file's menu.");
   const tell = () => {
     changed(cardFields(on));
     element.dispatchEvent(new Event("change", { bubbles: true }));
@@ -67,7 +67,7 @@ export function cardEditor(doc: Document, card: readonly CardField[], icon: stri
       return sampleItem(doc, {
         field: "marker",
         name: "Menu",
-        hint: "A small arrow after a card's name, its menu's way in where its icon is hidden; it cannot be hidden itself",
+        hint: "A small arrow after a card's name, its menu's way in; it cannot be hidden",
         content: one,
         selected: selected === "marker",
         choose: (chosen) => {
@@ -77,7 +77,7 @@ export function cardEditor(doc: Document, card: readonly CardField[], icon: stri
         },
       });
     };
-    stage.replaceChildren(el(doc, "div", "swa-card swa-sample-card", ...(on.has("icon") ? [itemOf("icon", iconElement(doc, icon))] : []), text, ...(on.has("icon") ? [] : [marker()])));
+    stage.replaceChildren(el(doc, "div", "swa-card swa-sample-card", ...(on.has("icon") ? [itemOf("icon", iconElement(doc, icon))] : []), text, marker()));
     off.replaceChildren(
       ...CARD_PARTS.filter((part) => !on.has(part)).map((part) =>
         sampleChip(doc, {
@@ -99,19 +99,19 @@ export function cardEditor(doc: Document, card: readonly CardField[], icon: stri
 }
 
 /**
- * A link's editor: a sentence with a link to a file (a PDF's), its icon shown or hidden; hidden, the small arrow after
- * the link is shown in its place (the menu's way in, which cannot be hidden)
+ * A link's editor: a sentence with a link to a file (a PDF's), its icon shown or hidden; the small arrow after the link
+ * always (the menu's way in, which cannot be hidden)
  */
 export function linkEditor(doc: Document, shown: boolean, icon: string, changed: (shown: boolean) => void): HTMLElement {
   let on = shown;
-  let selected = false;
+  let selected: "icon" | "marker" | undefined;
   const sample = sampleFile("pdf");
   const off = el(doc, "div", { attrs: { "data-swa-place": "off", role: "list", "aria-label": "Not shown" } });
   const stage = el(doc, "p", "swa-sample-sentence");
-  const element = editorFrame(doc, "swa-link-edit", stage, off, "The icon (or the arrow, if the icon is hidden) opens the file's menu. × hides the icon.");
+  const element = editorFrame(doc, "swa-link-edit", stage, off, "× hides the icon. The arrow after the link opens the file's menu.");
   const set = (to: boolean) => {
     on = to;
-    selected = false;
+    selected = undefined;
     draw();
     changed(on);
     element.dispatchEvent(new Event("change", { bubbles: true }));
@@ -129,36 +129,34 @@ export function linkEditor(doc: Document, shown: boolean, icon: string, changed:
         sampleItem(doc, {
           field: "icon",
           name: "Icon",
-          hint: "The file type's icon before a link to a file (its menu on the page). × to hide it",
+          hint: "The file type's icon before a link to a file. × to hide it",
           content: iconOf(),
-          selected,
+          selected: selected === "icon",
           hide: () => set(false),
           choose: (chosen) => {
-            selected = chosen;
+            selected = chosen ? "icon" : undefined;
             draw();
             element.querySelector<HTMLElement>('.swa-sample-item[data-swa-field="icon"]')?.focus();
           },
         }),
       );
     link.append(sample.name);
-    if (!on) {
-      const marker = menuMarker(doc, "link");
-      marker.setAttribute("aria-hidden", "true");
-      link.append(
-        sampleItem(doc, {
-          field: "marker",
-          name: "Menu",
-          hint: "A small arrow after a link to a file, its menu's way in where the icon is hidden; it cannot be hidden itself",
-          content: marker,
-          selected,
-          choose: (chosen) => {
-            selected = chosen;
-            draw();
-            element.querySelector<HTMLElement>('.swa-sample-item[data-swa-field="marker"]')?.focus();
-          },
-        }),
-      );
-    }
+    const marker = menuMarker(doc, "link");
+    marker.setAttribute("aria-hidden", "true");
+    link.append(
+      sampleItem(doc, {
+        field: "marker",
+        name: "Menu",
+        hint: "A small arrow after a link to a file, its menu's way in; it cannot be hidden",
+        content: marker,
+        selected: selected === "marker",
+        choose: (chosen) => {
+          selected = chosen ? "marker" : undefined;
+          draw();
+          element.querySelector<HTMLElement>('.swa-sample-item[data-swa-field="marker"]')?.focus();
+        },
+      }),
+    );
     stage.replaceChildren("See ", link, " for the numbers.");
     off.replaceChildren(...(on ? [] : [sampleChip(doc, { field: "icon", name: "Icon", hint: "The file type's icon before a link to a file. Click to show it", show: () => set(true) })]));
   };

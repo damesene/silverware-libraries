@@ -1,5 +1,5 @@
 // The Alignment tab of the settings dialog (docs/silverware-layout-align.md): where each kind of widget stands where
-// it says nothing itself, a row per kind of the providers registered (a medium's preview and original, a table, a
+// it says nothing itself, a row per kind of the providers registered (a medium's preview and a file shown full, a table, a
 // chart), each a pick list, its kind's own default named. A widget's own (its handle's menu) wins. Saved on Save, as
 // every tab.
 import type { LayoutAlign, LayoutKind } from "../../../shared/layout.ts";

@@ -21,8 +21,8 @@ afterEach(() => {
 describe("the asset's panels", () => {
   it("fit an asset drawn larger than its card", () => {
     const asset = context().asset;
-    expect(peek.fits(asset, { views: ["icon", "embed"] })).toBe(true);
-    expect(popover.fits(asset, { views: ["icon"] })).toBe(false);
+    expect(peek.fits(asset, { views: ["card", "full"] })).toBe(true);
+    expect(popover.fits(asset, { views: ["card"] })).toBe(false);
     expect(assetName(asset)).toBe("report.pdf");
   });
 

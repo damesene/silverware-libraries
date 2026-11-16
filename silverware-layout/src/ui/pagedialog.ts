@@ -10,8 +10,9 @@
 //   (on a phone the dialog takes the screen).
 //   What is set shows on the page at once (the dialog held at the window's top, the page seen under it).
 // - Guides: the widths a drag snaps to (a widget's bar, these sliders), each typed in its own row, in px or % of the
-//   pane (the same switch as a width's), or by its slider, which held shows them on the page as it moves; Full width a
-//   box. Preview, held, shows them on the page as typed, the dialog all but gone meanwhile; Restore defaults puts the
+//   pane (the same switch as a width's), or by its slider, which held shows them on the page as it moves; Full width
+//   the list's last row, a box. A line on top says what guides are, the list with none says so. Preview, held,
+//   shows them on the page as typed, the dialog all but gone meanwhile; Restore defaults puts the
 //   default ones back, once confirmed (saved, as all, on Save). Ascending as the tab is drawn, left in the order typed
 //   until it is drawn again.
 // Save writes what changed (the page's into its frontmatter, the default, the guides and the font into CONFIG), Cancel
@@ -169,6 +170,9 @@ export class PageDialog {
   private guideRows: GuideRow[] = [];
   private guideList: HTMLElement | undefined;
   private full: HTMLInputElement | undefined;
+  // Full width's row, the list's last (the guides typed go before it); what the list says with no guide at all
+  private fullRow: HTMLElement | undefined;
+  private noGuides: HTMLElement | undefined;
   private resetGuides: HTMLButtonElement | undefined;
   private saveButton: HTMLButtonElement | undefined;
   private note: HTMLElement | undefined;
@@ -240,11 +244,20 @@ export class PageDialog {
     if (!store.canSaveSettings) fontRow!.classList.add(`${BASE}-readonly`);
     const fontPanel = el(doc, "div", `${BASE}-widths`, fontRow!, deviceRow!);
 
-    // The guides: each its row, ascending as drawn; Full width a box of its own
-    this.guideList = el(doc, "div", { class: `${BASE}-guide-list`, attrs: { role: "list" } });
-    const add = el(doc, "button", { class: `${BASE}-add`, text: "+ Add guide", run: () => this.addGuide("", "px", true) });
+    // The guides: each its row, ascending as drawn; Full width the list's last row (the widest, the whole pane), a box
+    // for its number
     this.full = el(doc, "input", { attrs: { type: "checkbox" } });
     this.full.addEventListener("change", () => this.update());
+    this.fullRow = el(
+      doc,
+      "div",
+      { class: `${BASE}-full-row`, attrs: { role: "listitem" } },
+      el(doc, "label", `${BASE}-full`, this.full, "Full width", el(doc, "span", `${BASE}-full-note`, "(the whole pane)")),
+    );
+    this.guideList = el(doc, "div", { class: `${BASE}-guide-list`, attrs: { role: "list" } }, this.fullRow);
+    // (No numbered guides and Full width off: no guide at all, said where the list is)
+    this.noGuides = el(doc, "p", `${BASE}-guides-empty`, "No guides: a drag does not snap.");
+    const add = el(doc, "button", { class: `${BASE}-add`, text: "+ Add guide", run: () => this.addGuide("", "px", true) });
     this.showGuides(store.guides);
     // Restore defaults: the default ones back in the rows, once confirmed (the user's own would go); saved on Save
     this.resetGuides = el(doc, "button", {
@@ -254,10 +267,10 @@ export class PageDialog {
       run: () => void this.defaultGuides(),
     });
     this.resetGuides.append("Restore defaults");
-    const fullRow = el(doc, "label", `${BASE}-full`, this.full, "Full width");
-    // Preview: held (a press, a finger, Space or Enter), the guides as typed on the page, the dialog all but gone
+    // Preview: held (a press, a finger, Space or Enter), the guides as typed on the page, the dialog all but gone; its
+    // text says it is held (a click alone shows nothing)
     const preview = el(doc, "button", { class: `${BASE}-preview`, html: ICONS.eye, attrs: { title: "Hold to see the guides on the page" } });
-    preview.append("Preview");
+    preview.append("Hold to preview");
     const previewBox = el(doc, "div", `${BASE}-preview-box`, preview);
     const startPreview = (byKey: boolean) => this.hold(previewBox, store.previewGuides(this.currentGuides()), byKey);
     preview.addEventListener("pointerdown", (e) => {
@@ -271,8 +284,9 @@ export class PageDialog {
     });
     // (Preview held shows its own box alone: Restore defaults beside it, not in it)
     const actions = el(doc, "div", `${BASE}-guide-actions`, previewBox, this.resetGuides);
-    // (Preview and Restore defaults first, over the list: found at once, not under a list of any length)
-    const guidesPanel = el(doc, "div", `${BASE}-guides`, actions, this.guideList, add, fullRow);
+    // (What guides are on top; Preview and Restore defaults over the list: found at once, not under a list of any length)
+    const lead = el(doc, "p", `${BASE}-guides-lead`, "Widths a table, a file or a grid snaps to as you drag its width, marked under the width's slider too.");
+    const guidesPanel = el(doc, "div", `${BASE}-guides`, lead, actions, this.noGuides, this.guideList, add);
     // Settings that cannot be saved here cannot be changed either (Save would leave them as they are); Preview still shows
     if (!store.canSaveSettings) {
       guidesPanel.classList.add(`${BASE}-readonly`);
@@ -342,7 +356,8 @@ export class PageDialog {
   private showGuides(guides: readonly Guide[]): void {
     const pane = this.store!.paneWidth();
     this.guideRows = [];
-    this.guideList?.replaceChildren();
+    // (Full width kept, the list's last row)
+    if (this.fullRow) this.guideList?.replaceChildren(this.fullRow);
     // (Ascending as shown in the pane now: pixels and percents among each other)
     const rows = guides.filter((guide) => guide !== "full").sort((a, b) => guidePixels(a, pane) - guidePixels(b, pane));
     for (const guide of rows) this.addGuide(typeof guide === "string" ? String(percentOf(guide)) : String(guide), typeof guide === "string" ? "%" : "px", false);
@@ -718,7 +733,8 @@ export class PageDialog {
     });
     row.element.append(el(doc, "div", `${BASE}-guide-slider-box`, slider), input, units.element, remove);
     this.guideRows.push(row);
-    this.guideList?.append(row.element);
+    // (Before Full width, the widest, the list's last row)
+    this.guideList?.insertBefore(row.element, this.fullRow ?? null);
     if (focus) input.focus();
     this.update();
   }
@@ -733,6 +749,8 @@ export class PageDialog {
     if (this.resetGuides) this.resetGuides.disabled = !this.editable(this.resetGuides) || (guides.length === DEFAULT_GUIDES.length && DEFAULT_GUIDES.every((guide) => guides.includes(guide)));
     const badGuide = this.guideRows.find((row) => !!rowProblem(row));
     for (const row of this.guideRows) row.input.classList.toggle(`${BASE}-invalid`, !!rowProblem(row));
+    // (A row being typed in is a guide on its way: said only with no row and Full width off)
+    if (this.noGuides) this.noGuides.hidden = this.guideRows.length > 0 || !!this.full?.checked;
     this.fitGuideSliders();
     // The rows following another shown as what they follow now (This page the width of all pages, This device the
     // font's size), as that one changes

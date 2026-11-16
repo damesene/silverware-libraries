@@ -72,7 +72,7 @@ export const test = base.extend<{ space: Space }>({
     await page.close();
     await rm(join(server().space, folder), { recursive: true, force: true });
     // (Previews Silverware Assets kept of its files: silverware-assets/src/core/stored.ts)
-    await rm(join(server().space, "_silverware-asset-preview", folder), { recursive: true, force: true });
+    await rm(join(server().space, "_silverware-assets-previews", folder), { recursive: true, force: true });
     if (configBefore === undefined) await rm(configPath, { force: true });
     else await writeFile(configPath, configBefore);
   },

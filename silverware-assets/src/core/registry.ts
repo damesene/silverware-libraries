@@ -14,8 +14,9 @@ export function validateAssetType(type: unknown): string | undefined {
   if (typeof t.name !== "string" || !t.name.trim()) return "a type has no name";
   if (!t.match || !Array.isArray(t.match.kind) || !t.match.kind.length) return `the type ${t.name} matches no kind of asset`;
   if (typeof t.icon !== "string") return `the type ${t.name} has no icon`;
+  if (t.label !== undefined && (typeof t.label !== "string" || !t.label.trim())) return `the type ${t.name} has a label that is no text`;
   for (const [view, renderer] of Object.entries(t.views ?? {})) {
-    if (view !== "preview" && view !== "embed") return `the type ${t.name} renders a view "${view}" (preview or embed only)`;
+    if (view !== "preview" && view !== "full") return `the type ${t.name} renders a view "${view}" (preview or full only)`;
     if (typeof renderer !== "function") return `the type ${t.name}'s ${view} is no function`;
   }
   return undefined;

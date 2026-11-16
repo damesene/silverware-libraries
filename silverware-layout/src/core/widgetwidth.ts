@@ -86,7 +86,9 @@ export function snapTargets(textWidth: number, guides: readonly Guide[], pane: n
     const width = shownWidgetWidth(guide, pane);
     if (width < MIN_WIDGET_WIDTH || widths.has(Math.round(width))) continue;
     widths.add(Math.round(width));
-    targets.push({ width, kept: guide, name: guideName(guide) });
+    // (A widget of its own size, a file, keeps a guide's width as its pixels: a share of the pane is none of a file's,
+    // whose own sizes are SilverBullet's pixels; a share of a room is: roomTargets)
+    targets.push({ width, kept: unsized === "own" ? Math.round(width) : guide, name: guideName(guide) });
   }
   return targets;
 }
@@ -98,9 +100,13 @@ export const MIN_ROOM_WIDTH = 40;
 export const draggedRoomWidth = (start: number, moved: number, room: number, anchor: LayoutAnchor = "center"): number =>
   Math.max(Math.min(MIN_ROOM_WIDTH, room), Math.min(room, start + (anchor === "center" ? 2 : 1) * moved));
 
-/** The snap targets in a room of a widget's own (a cell): its quarters, each kept as its pixels */
+/**
+ * The snap targets in a room of a widget's own (a cell): its quarters, each kept as its share (`50%`), so the widget
+ * follows its room as it changes (a grid's columns, the window: docs/silverware-layout-room-handles.md); a width not
+ * snapped, its pixels
+ */
 export function roomTargets(room: number): SnapTarget[] {
-  return [25, 50, 75, 100].map((share) => ({ width: Math.round((room * share) / 100), share })).filter(({ width }) => width >= MIN_ROOM_WIDTH).map(({ width, share }) => ({ width, kept: width, name: `${share} %` }));
+  return [25, 50, 75, 100].map((share) => ({ width: Math.round((room * share) / 100), share })).filter(({ width }) => width >= MIN_ROOM_WIDTH).map(({ width, share }) => ({ width, kept: `${share}%` as Percent, name: `${share} %` }));
 }
 
 /** A width dragged to: the target it came within SNAP_DISTANCE of (the nearest), else its own pixels */

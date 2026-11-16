@@ -4,6 +4,11 @@ Agreed with the user 2026-11-15 and built the same day. A grid's menus move from
 a phone's above all, where it is always shown) to handles, one for each level of the grid, as Layout's handle already
 is for any widget's width. Files (Silverware Assets) keep their "…" as it is: the user's choice, it works well there.
 
+Since 2026-11-16 (docs/silverware-assets-names.md) the interface says "cell" where one cell is meant: a cell's grip
+(`.swl-grid-cell-grip`) and its menu (*Cell n of m*: Add a cell after it, Clear cell…, Delete cell…), the grid's *Add a
+cell at the end*; "column" only where columns are meant (`columns`, the dividers between them). Auto's least width is
+`min-width` (was `min`). Below, the text keeps the names it was written with.
+
 ## Now (2026-11-15)
 
 - **A cell's "…"** (`src/grid/ui/cellmenu.ts`), at its top right as the pointer is over it, always on a touch screen.

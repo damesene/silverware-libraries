@@ -1,6 +1,6 @@
 // The dialog files are inserted by (docs/silverware-assets-insert.md): a row each, its path (in the page's folder, the
 // name offered: SilverBullet's rules, taken apart from the batch's and the space's), how it is inserted (a link, a card,
-// a preview, the original), the file drawn as it will be; with several, a choice for all of them. Opened empty to
+// a preview, the file in full), the file drawn as it will be; with several, a choice for all of them. Opened empty to
 // upload, with Files and (on a touch screen) Camera. An image of the web (copied from a page, dragged from one) may be
 // linked at its address instead of kept in the space (its row's *Kept*, linked by default; one too large for the space
 // linked alone).
@@ -49,8 +49,8 @@ export type InsertDialogHost = {
 };
 
 // What each choice is called
-const AS_NAMES: Readonly<Record<Exclude<InsertAs, "shown">, string>> = { link: "Link", icon: "Card", preview: "Preview", embed: "Original" };
-const CHOICES: readonly Exclude<InsertAs, "shown">[] = ["link", "icon", "preview", "embed"];
+const AS_NAMES: Readonly<Record<Exclude<InsertAs, "shown">, string>> = { link: "Link", card: "Card", preview: "Preview", full: "Full" };
+const CHOICES: readonly Exclude<InsertAs, "shown">[] = ["link", "card", "preview", "full"];
 // A file of a costly type larger than this is drawn on a click alone (bytes)
 export const COSTLY_BYTES = 20 * 1024 * 1024;
 const BASE = "swa-insert";
@@ -125,7 +125,7 @@ type Row = {
 function firstChoice(type: InsertType): Exclude<InsertAs, "shown"> {
   const wanted: Exclude<InsertAs, "shown"> = type.insertAs === "shown" ? type.configured : type.insertAs;
   if (wanted === "link" || type.can(wanted)) return wanted;
-  return (["embed", "preview", "icon"] as const).find((view) => type.can(view)) ?? "icon";
+  return (["full", "preview", "card"] as const).find((view) => type.can(view)) ?? "card";
 }
 
 /**
@@ -247,7 +247,7 @@ export function openInsertDialog(
       row.sample.append(link);
       return;
     }
-    if (row.type.costly && row.as !== "icon" && row.file.size > COSTLY_BYTES) {
+    if (row.type.costly && row.as !== "card" && row.file.size > COSTLY_BYTES) {
       row.sample.append(
         el(doc, "div", `${BASE}-held`, `A large ${row.type.name} file: drawn here on a click. It is inserted as chosen either way. `, el(doc, "button", { text: "Show here", attrs: { type: "button" }, run: () => host.drawSample(row.sample, row.file, path, row.as as View, control.signal) })),
       );

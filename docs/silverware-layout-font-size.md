@@ -76,8 +76,8 @@ shows them at theirs; previews not made again (a raster preview is drawn larger,
 - **The scale** (`shared/contentscale.ts`): a CSS variable on the root, `--sw-content-scale`, set by Silverware Layout
   alone (`app.ts` `showWith`, the setting `fontZoom.scaleFiles`), none at 1; a contract of the plugins', as the layers
   are, so Silverware Assets follows it without knowing Layout.
-- **Silverware Assets**: its sizes in px written times the scale (`scaledPx`: a preview's height and width, an
-  original document's height); the host's medium (`swa-medium`: its image, video) of an original of its own size (no
+- **Silverware Assets**: its sizes in px written times the scale (`scaledPx`: a preview's height and width, a
+  full document's height); the host's medium (`swa-medium`: its image, video) of a file shown full at its own size (no
   width laid out) and of a preview zoomed (CSS `zoom`), its limits in px divided by the scale (counted once), a
   percentage left as it is (zoom leaves the room's percentages: never wider than its room); the medium alone, so its
   frame's "…" and label keep theirs and no picture a type draws in its own (a document's) is zoomed. **A type's

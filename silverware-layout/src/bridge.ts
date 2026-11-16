@@ -18,7 +18,7 @@ export type Bridge = {
   readonly getConfig?: (path: string, defaultValue: unknown) => unknown;
   // Optional, for the dialog: asks before closing it with changes (else the browser's confirm)
   readonly confirm?: (message: string) => boolean | Promise<boolean>;
-  // Optional, for a grid's column deleted: asked in SilverBullet's dialog, its OK button the danger's
+  // Optional, for a grid's cell deleted: asked in SilverBullet's dialog, its OK button the danger's
   // (`editor.confirm(message, { destructive = true })`)
   readonly confirmDelete?: (message: string) => boolean | Promise<boolean>;
   // Optional, for a value asked (a grid's min width in px): SilverBullet's prompt, `value` its field's text; none where
@@ -34,7 +34,7 @@ export type Bridge = {
   readonly moveCursor?: (at: number, center?: boolean) => unknown;
   // Optional, for `/grid`: where the cursor is, an offset of the page's text (`editor.getCursor`)
   readonly getCursor?: () => unknown;
-  // Optional, for Wrap in new grid: the selection (`editor.getSelection`: `{ from, to }`) and a pick of one of options
+  // Optional, for Wrap in grid: the selection (`editor.getSelection`: `{ from, to }`) and a pick of one of options
   // (`editor.filterBox`, the option picked given back, its `index` as given)
   readonly getSelection?: () => unknown;
   readonly filterBox?: (label: string, options: readonly { readonly name: string; readonly description: string; readonly index: number }[]) => unknown;

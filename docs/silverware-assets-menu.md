@@ -107,3 +107,14 @@ Delete file…                                 (danger colour; a file of the spa
 
 Built so: the menu above less its Align row; the copies first in the file's section (Copy image, Copy markdown),
 then Download, Regenerate preview.
+
+## The arrow (2026-11-16)
+
+The user's decision: a link's and a card's icon opened the file's menu (the arrow after the text only where the icon
+was hidden), which made sense once known and was found by nobody new. Now the type's icon is a picture alone and the
+small arrow (`swa-link-marker`, `swa-card-marker`) is always drawn after a link's text and after a card's name, and it
+alone opens the menu. A click on a link's icon is the link's (it follows it, as its text does, in a field of another
+plugin too: the editor's `swe-link-lead`); on a card's icon, the card's action. In another plugin's field the arrow is
+drawn after the link through `FieldDrawing.linkAfter` (shared/editor.ts), its edit finding the link's markdown before
+it. Hiding the icon (Appearance, Link or Card) no longer touches the menu. A link to an image offers a preview in its
+Show as, as an embed of it does (the browser's drawing, smaller): it had offered one only where the type drew its own.

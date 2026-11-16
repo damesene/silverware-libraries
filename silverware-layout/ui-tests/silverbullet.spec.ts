@@ -105,7 +105,7 @@ test("a widget dragged wider than the editor is held at the editor's width less 
   await page.keyboard.press("Escape");
 });
 
-test("the box SilverBullet draws a grid in lets out what lies outside the grid: its column grips' upper halves above it whole (the style page's `.swl-grid-widget :has(> .swl-grid)`)", async ({ page, space }) => {
+test("the box SilverBullet draws a grid in lets out what lies outside the grid: its cell grips' upper halves above it whole (the style page's `.swl-grid-widget :has(> .swl-grid)`)", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nAbove\n\n<grid>\n<cell>\n\nLeft\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n\nBelow\n" }, "Page");
   await gridsDrawn(page);
   // Every box between SilverBullet's frame and the grid shows what lies outside it: none of them scrolls it away (a
@@ -122,7 +122,7 @@ test("the box SilverBullet draws a grid in lets out what lies outside the grid: 
   expect(clipping).toEqual([]);
   const cell = page.locator("#sb-main .swl-grid-cell").first();
   await cell.hover();
-  const grip = cell.locator(".swl-grid-column-grip");
+  const grip = cell.locator(".swl-grid-cell-grip");
   await expect(grip).toHaveCSS("opacity", "1");
   expect(await grip.evaluate((element) => {
     const box = element.getBoundingClientRect();

@@ -230,7 +230,41 @@ describe("the CodeMirror editor's live preview", () => {
     editor.destroy();
   });
 
+  it("draws after a link's text what the plugin draws there (a file's menu's arrow), its markdown the link's to edit", () => {
+    const linkAfter = (markdown: string) =>
+      markdown.includes(".pdf")
+        ? {
+            key: `${markdown}\nafter`,
+            interactive: true,
+            draw: (container: HTMLElement, _signal: AbortSignal, edit?: { replace(markdown: string): boolean }) => {
+              const arrow = Object.assign(container.ownerDocument.createElement("span"), { className: "test-after", textContent: "▾" });
+              arrow.addEventListener("click", () => edit?.replace("![[a.pdf]]"));
+              container.append(arrow);
+            },
+          }
+        : undefined;
+    const editor = parsedEditor(cm, document, { text: "x\n[[a.pdf]] and [[Page]]", selection: 0, drawing: { linkAfter } }, { made: () => undefined, gone: () => undefined });
+    const root = editor.element.shadowRoot!;
+    expect(root.querySelectorAll(".test-after")).toHaveLength(1);
+    // (After the link's text, before what follows it)
+    expect(root.querySelectorAll(".cm-line")[1]!.textContent).toBe("a.pdf▾ and Page");
+    // Its edit: the link's markdown, the one before the widget, replaced
+    root.querySelector<HTMLElement>(".test-after")!.click();
+    expect(editor.getText()).toBe("x\n![[a.pdf]] and [[Page]]");
+    editor.destroy();
+  });
+
   // (An Alt+press is left to CodeMirror, which places the caret by the pointer: jsdom lays nothing out, the UI tests hold it)
+  it("follows a link by what is drawn before it as a part of it (a file's icon, no presses of its own), as by its text", () => {
+    const opened: string[] = [];
+    const linkIcon = (markdown: string) => ({ key: markdown, draw: (container: HTMLElement) => void container.append(Object.assign(container.ownerDocument.createElement("span"), { className: "test-icon", textContent: "▣" })) });
+    const editor = parsedEditor(cm, document, { text: "x\n[[a.pdf]] and more", selection: 0, drawing: { linkIcon }, openLink: (markdown) => opened.push(markdown) }, { made: () => undefined, gone: () => undefined });
+    const root = editor.element.shadowRoot!;
+    root.querySelector(".test-icon")!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
+    expect([opened, editor.getSelection().from]).toEqual([["[[a.pdf]]"], 0]);
+    editor.destroy();
+  });
+
   it("follows a link pressed where its user does (a new tab by Ctrl or the middle button), the caret not moved", () => {
     const opened: [string, boolean][] = [];
     const editor = parsedEditor(cm, document, { text: "x\n[[Notes|My notes]] and [site](https://example.com)", selection: 0, openLink: (markdown, how) => opened.push([markdown, how.newTab]) }, { made: () => undefined, gone: () => undefined });

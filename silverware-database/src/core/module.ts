@@ -107,7 +107,7 @@ export type ModuleHost = DocumentsHost & MentionsHost & {
   editorLook?(): Readonly<Record<string, string>> | undefined;
   /** A key a panel of a module's kept from the page (it stops every key), told where it is a shortcut of the host's that does nothing there (none: nothing told) */
   keyKept?(event: KeyboardEvent): void;
-  /** What an item's content field draws as the page draws it (shared/editor.ts `FieldDrawing`: an embed, a file's link's icon; targets resolved against the item's document); none: its markdown shown */
+  /** What an item's content field draws as the page draws it (shared/editor.ts `FieldDrawing`: an embed, a file's link's icon and its menu's arrow; targets resolved against the item's document); none: its markdown shown */
   fieldDrawing?(item: Item): FieldDrawing;
   /** A link pressed in an item's content followed as the page follows one, from the item's document (in a new tab or in place); none: a press puts the caret there */
   followLink?(markdown: string, item: Item, how: LinkOpening): void;

@@ -7,7 +7,7 @@
 // would be registered the same way, its types added to `PageChange` and
 // `PageSections` (TypeScript's interface merging for the latter).
 import { validateAttributeName, writeAttributes } from "../markdown/attributes.ts";
-import { embedAsLink, type EmbedChanges, linkAsEmbed, linkAsText, readEmbeds, readLinks, writeEmbed } from "../markdown/embed.ts";
+import { embedAsLink, type EmbedChanges, linkAsEmbed, linkAsText, linkWithText, readEmbeds, readLinks, writeEmbed } from "../markdown/embed.ts";
 import { readGrids } from "../markdown/grid.ts";
 import { blocksIn, type GridColumns, type GridMode, gridOfBlocks, type GridPlace, type MoveMode, movedIntoGrid, ungridded } from "../markdown/gridbuild.ts";
 import { codeBlocksOf, sameBody } from "./blocks.ts";
@@ -84,7 +84,9 @@ export type PageChange =
   | { readonly kind: "embedToLink"; readonly text: string; readonly occurrence: number; readonly of?: number }
   | { readonly kind: "removeEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number }
   | { readonly kind: "linkToEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number; readonly changes?: EmbedChanges }
-  | { readonly kind: "linkToText"; readonly text: string; readonly occurrence: number; readonly of?: number };
+  | { readonly kind: "linkToText"; readonly text: string; readonly occurrence: number; readonly of?: number }
+  // A link given another text it shows (a wiki link's alias, a markdown link's text): found as `linkToText` finds it
+  | { readonly kind: "setLinkText"; readonly text: string; readonly occurrence: number; readonly of?: number; readonly shown: string };
 
 /** The builder's sections, one per part of a page's content (their parts below make them); every method gives the page's builder back */
 export interface PageSections {
@@ -181,6 +183,8 @@ export interface PageSections {
     toEmbed(text: string, where?: { readonly occurrence?: number; readonly of?: number }, changes?: EmbedChanges): PageBuilder;
     /** A link written as the text it shows (its alias, else its file's name: its file deleted, the sentence kept), found as `toEmbed` finds it */
     toText(text: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+    /** A link given another text it shows, `shown` (none: a wiki link its target alone), found as `toEmbed` finds it */
+    setText(text: string, shown: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
   };
 }
 
@@ -584,19 +588,24 @@ export const PARTS: readonly Part[] = [
     },
   }),
   part({
-    kinds: ["linkToEmbed", "linkToText"],
+    kinds: ["linkToEmbed", "linkToText", "setLinkText"],
     section: {
       name: "links",
       make: (add) => ({
         toEmbed: (text, where = {}, changes) =>
           add({ kind: "linkToEmbed", text, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }), ...(changes ? { changes: structuredClone(changes) } : {}) }),
         toText: (text, where = {}) => add({ kind: "linkToText", text, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+        setText: (text, shown, where = {}) => add({ kind: "setLinkText", text, shown, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
       }),
     },
     write: (text, change) => {
       const alike = readLinks(text).filter((link) => link.text === change.text);
       const link = alike[change.occurrence];
       if (!link || (change.of !== undefined && alike.length !== change.of)) return { text, changes: 0, problem: "its link changed since it was read: left alone" };
+      if (change.kind === "setLinkText") {
+        const written = linkWithText(link, change.shown);
+        return written === link.text ? { text, changes: 0 } : { text: text.slice(0, link.from) + written + text.slice(link.to), changes: 1 };
+      }
       const embed = linkAsEmbed(link);
       const written = change.kind === "linkToText" ? linkAsText(link) : change.changes ? writeEmbed(readEmbeds(embed)[0]!, change.changes) : embed;
       return { text: text.slice(0, link.from) + written + text.slice(link.to), changes: 1 };

@@ -1,5 +1,5 @@
 // Silverware Assets' settings window ("Silverware Assets: Settings"): its tabs (Files, Appearance: ui/mediatab.ts;
-// Markdown: what happens while SilverBullet shows the markdown as written), saved together on Save. Cancel closes without asking; Esc, × or a press beside it ask where changes would be lost. The
+// Markdown: what changes SilverBullet's own behaviour, its plain markdown view), saved together on Save. Cancel closes without asking; Esc, × or a press beside it ask where changes would be lost. The
 // shared dialog and tabs (shared/), classes `swa-dialog-*`.
 import { Dialogs } from "../../../shared/dialog.ts";
 import { el } from "../../../shared/elements.ts";
@@ -20,14 +20,23 @@ export function markdownTab(doc: Document, settings: SyntaxModeSettings, save: (
   };
   const hide = box(settings.hideAssets);
   const current = (): SyntaxModeSettings => ({ hideAssets: hide.checked });
+  // (docs/silverware-assets-files-tab.md: that it changes SilverBullet's own behaviour said first, the view it applies
+  // in told, the box what we do, Off what SilverBullet does)
   const panel = el(
     doc,
     "div",
     "swa-settings-markdown",
-    el(doc, "p", "swa-settings-intro", "When SilverBullet shows the page's markdown as written (Editor: Toggle Markdown Syntax Rendering):"),
-    el(doc, "label", "swa-settings-check", hide, "Show embedded files as markdown only"),
-    // (What it does said: the mode was not known by the name alone, the user found)
-    el(doc, "p", "swa-settings-note", "Off: SilverBullet draws the file under the markdown too."),
+    el(doc, "p", "swa-settings-intro", "This setting changes how SilverBullet itself behaves. Turn it off to get SilverBullet's own behaviour back."),
+    el(
+      doc,
+      "section",
+      "swa-settings-section",
+      el(doc, "div", "swa-settings-heading", "Plain markdown view"),
+      el(doc, "p", "swa-settings-note", "SilverBullet can show a page as plain markdown, without formatting (command Editor: Toggle Markdown Syntax Rendering). It still draws embedded files there, under their markdown."),
+      el(doc, "label", "swa-settings-check", hide, "Hide embedded files in this view"),
+      el(doc, "p", "swa-settings-note", "On: ![[photo.png]] stays plain text, like the rest of the page."),
+      el(doc, "p", "swa-settings-note", "Off (SilverBullet's own): the photo is drawn under its line."),
+    ),
   );
   return {
     id: "markdown",
@@ -68,7 +77,8 @@ export class SettingsWindow {
     for (const tab of list) for (const type of ["change", "input"]) tab.panel.addEventListener(type, update);
     // (Settings that cannot be saved: shown, their fields still, Save off; the Appearance tab's switch and samples left
     // to look at, as nothing they change is kept)
-    if (!store.canSave) for (const control of content.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select")) control.disabled = true;
+    // (A type's Reset, a button, off too)
+    if (!store.canSave) for (const control of content.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLButtonElement>("input, select, .swa-type-reset button")) control.disabled = true;
     const cancel = el(doc, "button", { class: `${BASE}-cancel`, text: "Cancel", run: () => void (saving || dialog.close()) });
     const footer = doc.createDocumentFragment();
     footer.append(note, cancel, saveButton);

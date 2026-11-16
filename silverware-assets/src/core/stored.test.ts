@@ -23,17 +23,17 @@ function filesOf(facts: Record<string, FileFacts>) {
 
 const PDF = { modified: 50, size: 7 };
 // The previews' folder, the settings' default
-const F = "_silverware-asset-preview";
+const F = "_silverware-assets-previews";
 
 describe("previews kept in the space", () => {
   it("are kept in one folder at the space's top, the file's path under it, its version and kind in the name", () => {
-    expect(previewPath(F, "Projects/Report.pdf", "50-7", "image/webp")).toBe("_silverware-asset-preview/Projects/Report.pdf.50-7.webp");
-    expect(previewPath(F, "a.docx", "1-2", "text/html")).toBe("_silverware-asset-preview/a.docx.1-2.html");
+    expect(previewPath(F, "Projects/Report.pdf", "50-7", "image/webp")).toBe("_silverware-assets-previews/Projects/Report.pdf.50-7.webp");
+    expect(previewPath(F, "a.docx", "1-2", "text/html")).toBe("_silverware-assets-previews/a.docx.1-2.html");
     expect(previewPath(F, "a.pdf", "1-2", "image/gif")).toBeUndefined();
   });
 
   it("is read for the file's version alone: replaced, whatever its time, none", async () => {
-    const { files, state } = filesOf({ "a.pdf": PDF, "_silverware-asset-preview/a.pdf.50-7.webp": { modified: 60, size: 1 } });
+    const { files, state } = filesOf({ "a.pdf": PDF, "_silverware-assets-previews/a.pdf.50-7.webp": { modified: 60, size: 1 } });
     const stored = storedPreview(files, F, "a.pdf");
     expect((await stored.read("image/webp"))?.type).toBe("image/webp");
     expect(await stored.read("image/png")).toBeUndefined();
@@ -45,7 +45,7 @@ describe("previews kept in the space", () => {
   it("is written for the file's version by its blob's kind, a kind not kept refused, a file not known neither", async () => {
     const { files, state } = filesOf({ "a.pdf": PDF });
     expect(await storedPreview(files, F, "a.pdf").write(new Blob(["x"], { type: "image/png" }))).toBeUndefined();
-    expect(state.data.has("_silverware-asset-preview/a.pdf.50-7.png")).toBe(true);
+    expect(state.data.has("_silverware-assets-previews/a.pdf.50-7.png")).toBe(true);
     expect(await storedPreview(files, F, "a.pdf").write(new Blob(["x"], { type: "image/gif" }))).toMatch(/not kept/);
     expect(await storedPreview(files, F, "gone.pdf").write(new Blob(["x"], { type: "image/png" }))).toMatch(/not known/);
   });
@@ -70,7 +70,7 @@ describe("previews kept in the space", () => {
   });
 
   it("asked anew reads nothing kept; forgotten, none of its kinds is left", async () => {
-    const { files, state } = filesOf({ "a.pdf": PDF, "_silverware-asset-preview/a.pdf.50-7.webp": PDF, "_silverware-asset-preview/a.pdf.50-7.html": PDF });
+    const { files, state } = filesOf({ "a.pdf": PDF, "_silverware-assets-previews/a.pdf.50-7.webp": PDF, "_silverware-assets-previews/a.pdf.50-7.html": PDF });
     const anew = storedPreview(files, F, "a.pdf", true);
     expect(anew.anew).toBe(true);
     expect(await anew.read("image/webp")).toBeUndefined();

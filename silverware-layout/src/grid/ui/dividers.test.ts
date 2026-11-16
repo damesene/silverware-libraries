@@ -17,7 +17,7 @@ describe("a divider's grip", () => {
   });
 
   it("is held within the grid near its edges, and at its middle where none of it is in view or it is short", () => {
-    expect(gripAt({ top: 830, bottom: 2000 }, VIEW)).toBe(26);
+    expect(gripAt({ top: 830, bottom: 2000 }, VIEW)).toBe(12);
     expect(gripAt({ top: -2000, bottom: -100 }, VIEW)).toBe(950);
     expect(gripAt({ top: 100, bottom: 140 }, VIEW)).toBe(20);
   });

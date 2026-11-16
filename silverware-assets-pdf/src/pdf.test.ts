@@ -55,7 +55,7 @@ describe("Silverware Assets PDF", () => {
     expect(() => init({})).not.toThrow();
   });
 
-  it("draws a preview only where it has room and a URL, and no original of its own (the browser's viewer, Assets')", () => {
+  it("draws a preview only where it has room and a URL, and no full view of its own (the browser's viewer, Assets')", () => {
     const registered: AssetType[] = [];
     init({ assets: { version: ASSETS_VERSION, types: { register: (type: AssetType) => (registered.push(type), () => undefined) }, actions: { register: () => () => undefined } } });
     expect(registered).toHaveLength(1);
@@ -69,6 +69,6 @@ describe("Silverware Assets PDF", () => {
     });
     expect(type.views!.preview!(context(20))).toBeNull();
     expect((type.views!.preview!(context(300)) as HTMLElement).className).toBe("swa-pdf-preview");
-    expect(type.views!.embed).toBeUndefined();
+    expect(type.views!.full).toBeUndefined();
   });
 });

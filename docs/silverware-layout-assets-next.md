@@ -5,7 +5,7 @@ Written 2026-11-14 so that a new session can start from here. Branch `docs/layou
 ## Done on the branch (in short)
 
 - **Silverware Layout**: the grid (`<grid>`/`<cell>`, a cell edited in place, its caret and selection carried, Ctrl+Z, tasks, `/grid`, Put into grid with its modes, a cell's "…" menu, embedded pages' grids, indexing); column widths dragged by a divider between columns, snapping to ratios and to the page text's edges, guides shown; a grid's edges dragged alone (its place kept as `shift` beside `width`; Alt: both ways) in place of the width handle's bar; grips for every handle (the user's choice); blank lines of a cell kept as the editor shows them, a click on one placing the caret there; an empty cell a line high; Put into grid taking a paragraph's lines as blocks each.
-- **Silverware Assets** (new plugin, prefix `swa-`, `silverware.assets`, command `Silverware Assets: Settings`): embedded files as the original, a preview or a card; links to files with their icon and menu; link ↔ embed; side panel and enlarged views; the settings window (Assets, Markdown tabs; a preview's size for all files and per type; an original PDF's height); the markdown-as-written mode (`shared/syntaxmode.ts`); which embed a widget of the editor is (SilverBullet's `posAtDOM` first, marked `SILVERBULLET-INTERNAL`, `src/host/silverbullet/editorposition.ts`; else the text around it; else the run of widgets drawn).
+- **Silverware Assets** (new plugin, prefix `swa-`, `silverware.assets`, command `Silverware Assets: Settings`): embedded files shown full, as a preview or a card; links to files with their icon and menu; link ↔ embed; side panel and enlarged views; the settings window (Assets, Markdown tabs; a preview's size for all files and per type; a full PDF's height); the markdown-as-written mode (`shared/syntaxmode.ts`); which embed a widget of the editor is (SilverBullet's `posAtDOM` first, marked `SILVERBULLET-INTERNAL`, `src/host/silverbullet/editorposition.ts`; else the text around it; else the run of widgets drawn).
 - A review of the whole branch (2026-11-14) and its findings fixed; the isolation tests check Assets' layers and its use of Layout through its API alone.
 
 ## Left before the merge
@@ -25,7 +25,7 @@ Written 2026-11-14 so that a new session can start from here. Branch `docs/layou
 ## Proposed, not started (the user's word needed)
 
 - **`posAtDOM` for the other plugins** (after this branch's merge, a branch of its own; the grid could come here): Silverware Chart writes the first of two identical charts (a bug), Silverware Database refuses a block written twice with one out of view, Silverware Table's `data-pos` goes stale; the helper moved to `shared/silverbullet/` (marked `SILVERBULLET-INTERNAL`, the same comment), each plugin's host using it first, its answer checked against the text.
-- **A PDF's page**: `![[doc.pdf|||{ page: 3 }]]`, the viewer's URL given `#page=3` (Chrome, Edge, Firefox), in the original and the preview; a menu item "Show page…". Not on a phone without a PDF viewer (a card there).
+- **A PDF's page**: `![[doc.pdf|||{ page: 3 }]]`, the viewer's URL given `#page=3` (Chrome, Edge, Firefox), in the full view and the preview; a menu item "Show page…". Not on a phone without a PDF viewer (a card there).
 
 ## Decided, not to do now
 

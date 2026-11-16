@@ -3,7 +3,7 @@
 // once).
 import type { LayoutAlign } from "../../shared/layout.ts";
 import type { Registry } from "./core/registry.ts";
-import { paneWidth } from "./host/marks.ts";
+import { paneWidth, textWidthOf } from "./host/marks.ts";
 import type { PageHost } from "./host/page.ts";
 import { type Widget, Widgets } from "./host/widgets.ts";
 import type { Guide } from "./model/settings.ts";
@@ -54,7 +54,8 @@ export function layOutWidgets(doc: Document, page: PageHost, registry: Registry,
     title: (widget) => widgets.title(widget),
     room: (widget) => {
       const room = widgets.room(widget);
-      return room ? room.getBoundingClientRect().width : undefined;
+      // (Less its padding: what a share of it is of, as the style page's 100 %)
+      return room instanceof HTMLElement ? textWidthOf(room) : room ? room.getBoundingClientRect().width : undefined;
     },
   });
   return { widgets, handle };

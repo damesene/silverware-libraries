@@ -1,7 +1,7 @@
-// A grid's column grips (docs/silverware-layout-grid-handles.md): a small grip at the middle of each column's top edge,
-// half above it, shown as the pointer is over the column (on a touch screen while the grid has the focus), its click
-// the column's menu: its markdown, moved, a column added after it, moved out of the grid. What acts on the whole grid
-// (its columns, its borders, a column at the end, the grid taken apart) is the grid's handle's (`gridMenu`, the grid's
+// A grid's cell grips (docs/silverware-layout-grid-handles.md): a small grip at the middle of each cell's top edge,
+// half above it, shown as the pointer is over the cell (on a touch screen while the grid has the focus), its click
+// the cell's menu: its markdown, moved, a cell added after it, moved out of the grid. What acts on the whole grid
+// (its columns, its borders, a cell at the end, the grid taken apart) is the grid's handle's (`gridMenu`, the grid's
 // provider: src/grid/provider.ts). The actions are carried out by the grids (`CellAction`), as they were from a cell's
 // "…" before.
 import { el } from "../../../../shared/elements.ts";
@@ -14,7 +14,7 @@ import type { BorderStyle } from "../model/border.ts";
 // The popup menu's classes: Silverware Layout's
 const POPUP = { base: "swl" } as const;
 
-/** What a column's menu or the grid's does */
+/** What a cell's menu or the grid's does */
 export type CellAction =
   | { readonly kind: "move"; readonly by: -1 | 1 }
   | { readonly kind: "addAfter" }
@@ -23,9 +23,9 @@ export type CellAction =
   | { readonly kind: "clear" }
   | { readonly kind: "columns"; readonly columns: string | null }
   // A grid of columns as many as fit: the narrowest its columns may be (a name, or px), or asked in px
-  | { readonly kind: "min"; readonly min: MinWidthName }
-  | { readonly kind: "askMin" }
-  | { readonly kind: "addColumn" }
+  | { readonly kind: "minWidth"; readonly minWidth: MinWidthName }
+  | { readonly kind: "askMinWidth" }
+  | { readonly kind: "addCell" }
   | { readonly kind: "border"; readonly style: BorderStyle }
   | { readonly kind: "ungrid" }
   | { readonly kind: "source" };
@@ -33,24 +33,24 @@ export type CellAction =
 /** An item of a grid's menus (shared/popupmenu.ts' `PopupItem`) */
 export type GridMenuItem = PopupItem;
 
-/** A grid as its menus show it: its columns attribute (and `min`, where they are as many as fit), its borders, its number of cells */
-export type GridMenuState = { readonly columns: string | undefined; readonly min?: string | undefined; readonly border: BorderStyle; readonly cells: number };
+/** A grid as its menus show it: its columns attribute (and `min-width`, where they are as many as fit), its borders, its number of cells */
+export type GridMenuState = { readonly columns: string | undefined; readonly minWidth?: string | undefined; readonly border: BorderStyle; readonly cells: number };
 
-/** The column's menu: its sections, for the cell at `index` */
-export function columnMenu(index: number, now: GridMenuState, act: (action: CellAction) => void): GridMenuItem[][] {
+/** The cell's menu: its sections, for the cell at `index` */
+export function cellMenu(index: number, now: GridMenuState, act: (action: CellAction) => void): GridMenuItem[][] {
   const item = (label: string, action: CellAction, disabled?: string): GridMenuItem => ({ label, run: () => act(action), ...(disabled ? { disabled } : {}) });
   return [
     [item("Edit markdown (Alt+click)", { kind: "source" })],
     [
       item("Move left", { kind: "move", by: -1 }, index === 0 ? "It is the first" : undefined),
       item("Move right", { kind: "move", by: 1 }, index === now.cells - 1 ? "It is the last" : undefined),
-      item("Add a column after it", { kind: "addAfter" }),
+      item("Add a cell after it", { kind: "addAfter" }),
     ],
     [item("Move out of the grid", { kind: "takeOut" })],
-    // (Its content emptied, the column kept; or deleted, its content with it: each asked first, the grids' `cellAction`)
+    // (Its content emptied, the cell kept; or deleted, its content with it: each asked first, the grids' `cellAction`)
     [
-      { label: "Clear column…", danger: true, icon: ERASER, run: () => act({ kind: "clear" }) },
-      { label: "Delete column…", danger: true, icon: TRASH, run: () => act({ kind: "remove" }) },
+      { label: "Clear cell…", danger: true, icon: ERASER, run: () => act({ kind: "clear" }) },
+      { label: "Delete cell…", danger: true, icon: TRASH, run: () => act({ kind: "remove" }) },
     ],
   ];
 }
@@ -76,7 +76,7 @@ export function gridMenu(now: GridMenuState, act: (action: CellAction) => Promis
   };
   const sized: LayoutMenuEntry[] = [];
   if (fit) {
-    const min = minWidthChoice(now.min);
+    const min = minWidthChoice(now.minWidth);
     // (Its own width in px the row's last choice: asked, or the one set shown)
     sized.push({
       kind: "segmented",
@@ -86,9 +86,9 @@ export function gridMenu(now: GridMenuState, act: (action: CellAction) => Promis
           icon: name.toUpperCase(),
           title: `Columns at least ${MIN_WIDTHS[name]} px wide`,
           active: "name" in min && min.name === name,
-          run: () => act({ kind: "min", min: name }),
+          run: () => act({ kind: "minWidth", minWidth: name }),
         })),
-        { icon: "custom" in min ? `${min.custom}px` : "px…", title: "Columns at least as wide as you give, in px", active: "custom" in min, run: () => act({ kind: "askMin" }) },
+        { icon: "custom" in min ? `${min.custom}px` : "px…", title: "Columns at least as wide as you give, in px", active: "custom" in min, run: () => act({ kind: "askMinWidth" }) },
       ],
     });
   }
@@ -106,7 +106,7 @@ export function gridMenu(now: GridMenuState, act: (action: CellAction) => Promis
           ] as const
         ).map(([style, icon, title]) => ({ icon, title, active: now.border === style, run: () => act({ kind: "border", style: now.border === style ? "none" : style }) })),
       },
-      { label: "Add a column at the end", run: () => act({ kind: "addColumn" }) },
+      { label: "Add a cell at the end", run: () => act({ kind: "addCell" }) },
     ],
     [{ label: "Unwrap grid", run: () => act({ kind: "ungrid" }) }],
   ];
@@ -132,11 +132,11 @@ function showGridMenu(doc: Document, at: HTMLElement, sections: () => readonly (
 }
 
 /**
- * A grip on each column of a grid drawn: `state` the grid as now, `act` what is chosen in a column's menu; `gridSections`
- * the grid's own sections where its handle is not shown (none where it is), a "Grid…" of the column's menu opening them
- * (the column's own actions alone in it, deleting it last)
+ * A grip on each cell of a grid drawn: `state` the grid as now, `act` what is chosen in a cell's menu; `gridSections`
+ * the grid's own sections where its handle is not shown (none where it is), a "Grid…" of the cell's menu opening them
+ * (the cell's own actions alone in it, deleting it last)
  */
-export function addColumnGrips(
+export function addCellGrips(
   doc: Document,
   grid: HTMLElement,
   state: () => GridMenuState,
@@ -144,12 +144,12 @@ export function addColumnGrips(
   gridSections: () => readonly (readonly LayoutMenuEntry[])[] = () => [],
 ): void {
   grid.querySelectorAll<HTMLElement>(":scope > .swl-grid-cell").forEach((cell, index) => {
-    const grip = el(doc, "button", { class: "swl-grid-column-grip", title: "Column…", attrs: { type: "button", "aria-label": `Column ${index + 1}: its menu` } });
+    const grip = el(doc, "button", { class: "swl-grid-cell-grip", title: "Cell…", attrs: { type: "button", "aria-label": `Cell ${index + 1}: its menu` } });
     opensMenu(doc, POPUP, grip, (): PopupMenu => {
       const now = state();
-      const sections: GridMenuItem[][] = columnMenu(index, now, (action) => act(index, action));
+      const sections: GridMenuItem[][] = cellMenu(index, now, (action) => act(index, action));
       if (gridSections().length) sections.splice(sections.length - 1, 0, [{ label: "Grid…", run: () => showGridMenu(doc, grip, gridSections) }]);
-      return { title: `Column ${index + 1} of ${now.cells}`, sections };
+      return { title: `Cell ${index + 1} of ${now.cells}`, sections };
     });
     cell.append(grip);
   });

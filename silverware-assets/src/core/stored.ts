@@ -2,7 +2,7 @@
 // one folder, the settings' (`previewFolder`; by default at the space's top, its name starting with `_`:
 // SilverBullet's pickers, space tree and completion leave such a path out, 2.12.1: a cache, not the user's content),
 // the files' paths kept under it, each preview named by the version of its file it was made of, its time
-// of change and size (`_silverware-asset-preview/Projects/Report.pdf.1731600000000-48213.webp`): a file replaced is another
+// of change and size (`_silverware-assets-previews/Projects/Report.pdf.1731600000000-48213.webp`): a file replaced is another
 // version, whose preview is made again (whatever its time: a copy that keeps an older one too). Previews of versions
 // gone, and of files gone, are taken away by Clean up previews (`orphanedPreviews`).
 import type { StoredPreview } from "../../../shared/assets.ts";

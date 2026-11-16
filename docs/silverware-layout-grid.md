@@ -18,12 +18,12 @@ HTML-like tags, each on a line of its own; the configuration is the tags' attrib
 <grid>
 <cell>
 
-Column 1
+Cell 1
 
 </cell>
 <cell>
 
-Column 2
+Cell 2
 
 </cell>
 </grid>
@@ -31,13 +31,13 @@ Column 2
 
 - `<grid …>` opens, `</grid>` closes; `<cell>` … `</cell>` is one cell. Attributes later: `<grid columns="1fr 2fr" gap="16">`, `<cell span="2" align="center">`, a width for Silverware Layout's handle.
 - **Cells flow**: they fill the columns left to right and wrap, so a matrix of images is `<grid columns="3">` and nine `<cell>`s. A `<cell>` is a cell, not a whole column of the grid: it was named `<column>` until 2026-11-15, renamed (the user's choice) as Auto and more cells than columns made the name read wrongly; no grid was written with it yet, so `<column>` is not read any more.
-- **Blank lines around a column's content**: by CommonMark an HTML block runs to the next blank line and its content is not read as markdown. With the blank lines every renderer reads a column's content as markdown (lists, images, links), the columns shown one under another; without them the whole grid is one raw HTML block, its markdown shown as text and its lines run together. `/grid` inserts the form with blank lines and the widget keeps them as it writes a cell; the compact form typed by hand is read too. Spaces at a line's end are ignored.
+- **Blank lines around a cell's content**: by CommonMark an HTML block runs to the next blank line and its content is not read as markdown. With the blank lines every renderer reads a cell's content as markdown (lists, images, links), the cells shown one under another; without them the whole grid is one raw HTML block, its markdown shown as text and its lines run together. `/grid` inserts the form with blank lines and the widget keeps them as it writes a cell; the compact form typed by hand is read too. Spaces at a line's end are ignored.
 - Not `<col>`: a real HTML element (a table's, void: a browser drops it outside a table) and a CommonMark type-6 block tag.
 - Not `<div class="grid">`: SilverBullet renders known block tags as HTML, so the grid would look different in SilverBullet without the plugin than in plain markdown.
 
 ### Without the plugin
 
-- **Another renderer**: the tag lines are empty unknown elements (GitHub strips unknown tags); the columns' content renders as normal markdown, one column under another.
+- **Another renderer**: the tag lines are empty unknown elements (GitHub strips unknown tags); the cells' content renders as normal markdown, one cell under another.
 - **SilverBullet**: only known block tags (`div`, `details`, …: `blockTagRe` in `client/markdown_parser/html_block.ts`) become structured HTML blocks. A `<grid>` or `<cell>` line is a flat HTML block of lezer's own parser, which SilverBullet's renderer (`markdown_render.ts`, case `HTMLBlock`) shows as text: the tags are visible, the content below them is markdown, stacked. As readable as plain markdown, and accepted (2026-11-12).
 - **Plain markdown**: text with a few tag lines.
 
@@ -56,8 +56,8 @@ Column 2
 - `startMarker` a regex for the opening line (`^<grid(\s[^>]*)?>\s*$`), `endMarker` for the closing line (`^</grid>\s*$`); `renderWidget(body, pageName)` gives the widget of the live preview, `renderHtml(body, pageName)` the HTML of an export.
 - Its block parser is placed before `HorizontalRule`, so before lezer's HTML block and SilverBullet's own (`before: "HTMLBlock"`): the whole `<grid>…</grid>` is ours, SilverBullet's HTML preview does not touch it. The cells are read by our own code from the body.
 - The region is replaced by the widget (a `LuaWidget`, the same as a code widget's) while the cursor is outside it; with the cursor inside SilverBullet shows the raw text.
-- **SilverBullet's widget menu is hidden** on the grid (decided 2026-11-13), as Silverware Chart and Database hide it on theirs: the widget gets the grid's class by `renderClass`, and the style page hides `.button-bar` (2.12.1), `.sb-widget-menu-bar` (main) and the touch screen's forced path within it; the grid's own menus are the ones (its columns' grips, its handle's: docs/silverware-layout-grid-handles.md). `silverbullet.spec.ts` checks it stays hidden.
-- **The end is the first line matching `endMarker`**: the parser counts no nesting, so a grid in a grid would close at the inner `</grid>` (no nesting in the first version), and a `</grid>` line inside a column's fenced code block would end the grid early (documented).
+- **SilverBullet's widget menu is hidden** on the grid (decided 2026-11-13), as Silverware Chart and Database hide it on theirs: the widget gets the grid's class by `renderClass`, and the style page hides `.button-bar` (2.12.1), `.sb-widget-menu-bar` (main) and the touch screen's forced path within it; the grid's own menus are the ones (its cells' grips, its handle's: docs/silverware-layout-grid-handles.md). `silverbullet.spec.ts` checks it stays hidden.
+- **The end is the first line matching `endMarker`**: the parser counts no nesting, so a grid in a grid would close at the inner `</grid>` (no nesting in the first version), and a `</grid>` line inside a cell's fenced code block would end the grid early (documented).
 - A new definition is active after the editor's state is rebuilt (a page reload).
 - **Not in the index**: the region's body node has no children (`markdown.parseMarkdown`, which the index uses, takes the user's syntax extensions), so links, hashtags and embeds inside a grid are not indexed. Without the plugin they would be. See *Indexing*: not only backlinks are lost.
 - **Experimental API**: may change in a SilverBullet release; `ui-tests/silverbullet.spec.ts` gets a check of it, failing by name.
@@ -110,22 +110,24 @@ A part of Silverware Layout (decided 2026-11-12): it is the page's layout, it us
 
 ## The slash command and the menu
 
-- `/grid` (`slashCommand.define`) inserts two columns in the form with blank lines, the cursor in the first column's content (in the raw text: the widget shows once the cursor leaves).
-- A "…" menu on each cell: built (*Building a grid from the page* below); replaced 2026-11-15 by a grip on each column and the grid's handle's menu (docs/silverware-layout-grid-handles.md).
+- `/grid` (`slashCommand.define`) inserts two cells in the form with blank lines, the cursor in the first cell's content (in the raw text: the widget shows once the cursor leaves).
+- A "…" menu on each cell: built (*Building a grid from the page* below); replaced 2026-11-15 by a grip on each cell and the grid's handle's menu (docs/silverware-layout-grid-handles.md).
 
 ## Building a grid from the page (planned 2026-11-13; built 2026-11-13)
 
 Agreed with the user: a grid is made and taken apart without typing its tags, with the mouse or a finger, for any markdown, not only images. The grid gets the effort (a row of images by CSS alone was weighed and dropped: SilverBullet draws each embed as a block, and the grid is the more general tool).
 
-### The command: Wrap in new grid
+### The command: Wrap in grid
 
 The commands were named *Put into grid* and *Move into grid* until 2026-11-15; renamed by the user's choice, as the two
 said apart only by their verb what matters, a grid made or one there: *Wrap in new grid* and *Move into existing grid*
 (on Silverware Toolbar *Wrap in grid* and *Move to grid*, the actions `layoutWrapInNewGrid` and
 `layoutMoveIntoExistingGrid`; the old names among their keywords); the grid menu's *Remove the grid, its content kept* became
-*Unwrap grid*. Below, the older text keeps the names it was written with.
+*Unwrap grid*. On 2026-11-16 the commands took the toolbar's names, one name for each thing
+(docs/silverware-assets-names.md): `Silverware Layout: Wrap in grid` and `Silverware Layout: Move to grid`, the actions
+`layoutWrapInGrid` and `layoutMoveToGrid`. Below, the older text keeps the names it was written with.
 
-- **One command, `Silverware Layout: Wrap in new grid`**, over the blocks the selection touches (none selected: the block at the cursor). Not `/grid` over a selection: typing `/` replaces the selection. Named for the grid, not for columns: both modes make a grid, and a later way of filling one is one more mode, not another command.
+- **One command, `Silverware Layout: Wrap in grid`**, over the blocks the selection touches (none selected: the block at the cursor). Not `/grid` over a selection: typing `/` replaces the selection. Named for the grid, not for columns: both modes make a grid, and a later way of filling one is one more mode, not another command.
 - **A block**: a paragraph, each item of a list (a task too), an image's embed, a heading, a table, a fenced code block, a quote; read by `shared/markdown/` (`readBlocks`/`parseBlocks`), never by lines.
 - **It asks** the mode, then the number of columns (2 to 8 since 2026-11-15, as the grid's menu offers; 2, 3, 4 before; a gallery Auto first), each a pick list as SilverBullet's palette shows one (`editor.filterBox`), on a phone too.
 - **Modes**:
@@ -156,7 +158,7 @@ said apart only by their verb what matters, a grid made or one there: *Wrap in n
 
 Asked by the user (2026-11-15): the selection moved into a grid the page has, all in one cell or a cell each, at a place clicked in the grid, the place shown well as it is pointed at; built on Claude's recommendations, to be iterated.
 
-- **The command `Silverware Layout: Move into existing grid`** (and Silverware Toolbar's action `layoutMoveIntoExistingGrid`, its parameter *Mode*: Ask, Together, A cell each): the blocks the selection touches (`blocksIn`, as Put into grid; none selected: the block at the cursor). Refused where none, where the run of them takes in a grid (their lines are taken out whole: the grid would go with them), or where the page's text has no grid (Put into grid makes one; one not drawn yet, far down the page, is picked once scrolled to).
+- **The command `Silverware Layout: Move to grid`** (and Silverware Toolbar's action `layoutMoveToGrid`, its parameter *Mode*: Ask, Together, A cell each): the blocks the selection touches (`blocksIn`, as Put into grid; none selected: the block at the cursor). Refused where none, where the run of them takes in a grid (their lines are taken out whole: the grid would go with them), or where the page's text has no grid (Put into grid makes one; one not drawn yet, far down the page, is picked once scrolled to).
 - **Modes**, asked by the filter box only where there are several blocks: **Together** (one cell of them, joined as they were apart: a line break where one was) and **A cell each** (Gallery's cells). One block: Together, nothing asked.
 - **The place, picked by a click** (`src/grid/ui/placepicker.ts`, what a point picks pure in `src/grid/core/placepick.ts`): the grids outlined; the nearest grid within 16 px of the pointer and its nearest cell decide. New cells go before or after it by the half the pointer is in (side by side: left or right; one under another, a narrow pane: above or below), a line in the gap with a dot at each end and a label (*New cell*, *3 new cells*). With Together, only within 32 px of the cell's edge (a quarter of it at most); elsewhere in it the text goes **into the cell**: the cell outlined and tinted, a line where its blocks meet nearest the pointer (before its first, between two, after its last; its top-level rendered elements and their `data-pos`), labelled *Into this cell* on the outline's top edge. A bar at the window's top says what to do, with Cancel; Esc, Cancel or a click away from the grids gives up (that click the page's as ever). Every press over a grid is the picker's (taken at the window's capture: no cell opened, no divider dragged); the grids' own controls (grips, dividers, the width's handle) hidden meanwhile. **On a touch screen** a tap shows the line and a second tap on the same place of the same grid picks it (no hover to show it before); a scroll takes the line away. A page opened meanwhile gives the pick up.
 - **Written as one edit** (the page writer's `grids.moveInto`, `movedIntoGrid` in shared/markdown/gridbuild.ts): the blocks' lines taken out (what was round them runs on, a line break, only where it did and the lines on both sides and the first taken out are of one kind, lines of text or a list's items: a paragraph's line or an item taken out of it; else a blank line, as a heading taken from between a paragraph's line and a grid left the grid unread, found in review), an indented code block from its line's start (its indent kept), the cells added before the cell picked (the grid's last: after it), or the content added to a cell at the start of the block picked (its end: after it), a blank line between; the range as read, the grid by its body and a cell added to by its content as drawn (its offset that content's), else left alone. Two lists a block apart become one list once it is taken out, as markdown reads them (kept so). In turn with the cells' writes (`Grids.moveInto`). A text holding a `<grid>` or `<cell>` line of its own is refused.

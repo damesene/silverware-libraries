@@ -597,6 +597,7 @@ export class PeekPanel {
               drawing: {
                 embed: (markdown: string) => drawing(shown.item).embed?.(markdown),
                 linkIcon: (markdown: string) => drawing(shown.item).linkIcon?.(markdown),
+                linkAfter: (markdown: string) => drawing(shown.item).linkAfter?.(markdown),
               },
             }
           : {}),

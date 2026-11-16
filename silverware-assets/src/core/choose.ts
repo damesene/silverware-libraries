@@ -65,10 +65,10 @@ export function typeFor(types: readonly AssetType[], asset: Asset): AssetType | 
  * cannot be drawn falls on in the order embed, preview, icon (the card always can)
  */
 export function viewFor(own: string | undefined, type: string | undefined, settings: AssetSettings, can: (view: View) => boolean): View {
-  const wanted = (own === "icon" || own === "preview" || own === "embed" ? own : undefined) ?? (type ? settings.views.types[type] : undefined) ?? settings.views.default;
-  const order: readonly View[] = ["embed", "preview", "icon"];
-  for (const view of order.slice(order.indexOf(wanted))) if (view === "icon" || can(view)) return view;
-  return "icon";
+  const wanted = (own === "card" || own === "preview" || own === "full" ? own : undefined) ?? (type ? settings.views.types[type] : undefined) ?? settings.views.default;
+  const order: readonly View[] = ["full", "preview", "card"];
+  for (const view of order.slice(order.indexOf(wanted))) if (view === "card" || can(view)) return view;
+  return "card";
 }
 
 /** The action a gesture runs on an asset: the user's for its type, else the user's default, where it fits; none: none */

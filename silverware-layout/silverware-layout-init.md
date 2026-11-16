@@ -66,8 +66,8 @@ config.define("silverware.layout", {
         hideGrids = {
           type = "boolean",
           default = true,
-          description = "When SilverBullet shows the page's markdown as written (Editor: Toggle Markdown Syntax Rendering), a grid shows as its markdown only, not drawn under it as SilverBullet draws it there.",
-          ui = { category = "Silverware Layout", label = "Markdown as written: grids as markdown only", priority = 0.6 },
+          description = "Changes SilverBullet's own behaviour. SilverBullet can show a page as plain markdown, without formatting (command Editor: Toggle Markdown Syntax Rendering). It still draws grids there, under their markdown. On: <grid> and <cell> stay plain text, like the rest of the page. Off (SilverBullet's own): the grid is drawn under its markdown.",
+          ui = { category = "Silverware Layout", label = "Plain markdown view: hide grids", priority = 0.6 },
         },
       },
     },
@@ -78,8 +78,8 @@ config.define("silverware.layout", {
         clickPlacesCursor = {
           type = "boolean",
           default = true,
-          description = "A click on a link shown as its markdown (the cursor in it, or all links while SilverBullet shows the markdown as written) only places the cursor; Ctrl+click opens it.",
-          ui = { category = "Silverware Layout", label = "Clicking a link shown as markdown places the cursor", priority = 0.59 },
+          description = "Changes SilverBullet's own behaviour. A link shows as markdown while the cursor is in it, and in the plain markdown view. SilverBullet opens it on a click there too, which makes it hard to edit. On: a click only places the cursor; Ctrl+click opens the link. Off (SilverBullet's own): a click opens it.",
+          ui = { category = "Silverware Layout", label = "Links shown as markdown: a click only places the cursor; Ctrl+click opens the link", priority = 0.59 },
         },
       },
     },
@@ -114,7 +114,7 @@ if js and js.window then
     confirm = editor.confirm,
     -- A grid's min width in px asked
     prompt = editor.prompt,
-    -- A grid's column deleted: asked in SilverBullet's dialog, its OK button the danger's
+    -- A grid's cell deleted: asked in SilverBullet's dialog, its OK button the danger's
     confirmDelete = function(message)
       return editor.confirm(message, { destructive = true })
     end,
@@ -126,7 +126,7 @@ if js and js.window then
     -- A grid's Alt+click: the cursor where the click was in its markdown; /grid: where the cursor is
     moveCursor = editor.moveCursor,
     getCursor = editor.getCursor,
-    -- Wrap in new grid: the selection, and a pick (its mode, its number of columns)
+    -- Wrap in grid: the selection, and a pick (its mode, its number of columns)
     getSelection = editor.getSelection,
     filterBox = function(label, options)
       return editor.filterBox(label, options, "", "Type to filter")
@@ -163,7 +163,7 @@ if js and js.window then
       end,
     })
   end
-  -- Wrap in new grid and Move into existing grid as buttons of Silverware Toolbar, their mode a parameter (through its public API, where it is installed)
+  -- Wrap in grid and Move to grid as buttons of Silverware Toolbar, their mode a parameter (through its public API, where it is installed)
   if silverware.toolbar and silverware.toolbar.defineActions then
     silverware.toolbar.defineActions(silverwareLayoutJs.toolbarActions)
   end

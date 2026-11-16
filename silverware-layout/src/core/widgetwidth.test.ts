@@ -65,6 +65,8 @@ describe("A widget's width", () => {
   it("keeps the text's width as its pixels for a widget of its own size without one (a medium: none would shrink it back)", () => {
     expect(snapTargets(760.4, guides, 1600, "own")[0]).toEqual({ width: 760.4, kept: 760, name: "Page width" });
     expect(snapped(765, snapTargets(760, guides, 1600, "own"))).toEqual({ width: 760, kept: 760, name: "Page width" });
+    // (Its guides too, a share of the pane and Full width as the pixels they show: a share is a file's of its own box)
+    expect(snapTargets(760, guides, 1000, "own").filter((t) => t.name !== "Page width").map((t) => [t.name, t.kept])).toEqual([["80 %", 800], ["Full width", 960]]);
   });
 
   it("only the guides a drag reaches: none of pixels wider than the pane, none under the narrowest a drag makes", () => {
@@ -85,15 +87,17 @@ describe("A widget's width", () => {
     expect([undefined, 1200, "80%" as const, "full" as const].map(widthName)).toEqual(["Page width", "1200 px", "80 %", "Full width"]);
   });
 
-  it("in a room of its own (a cell): snapped to its quarters as pixels, dragged within it, not under the least", () => {
+  it("in a room of its own (a cell): snapped to its quarters kept as shares (following the room), dragged within it, not under the least", () => {
     expect(roomTargets(400)).toEqual([
-      { width: 100, kept: 100, name: "25 %" },
-      { width: 200, kept: 200, name: "50 %" },
-      { width: 300, kept: 300, name: "75 %" },
-      { width: 400, kept: 400, name: "100 %" },
+      { width: 100, kept: "25%", name: "25 %" },
+      { width: 200, kept: "50%", name: "50 %" },
+      { width: 300, kept: "75%", name: "75 %" },
+      { width: 400, kept: "100%", name: "100 %" },
     ]);
     expect(roomTargets(120).map((t) => t.name)).toEqual(["50 %", "75 %", "100 %"]);
-    expect(snapped(296, roomTargets(400))).toEqual({ width: 300, kept: 300, name: "75 %" });
+    expect(snapped(296, roomTargets(400))).toEqual({ width: 300, kept: "75%", name: "75 %" });
+    // (Not snapped: its pixels)
+    expect(snapped(260, roomTargets(400))).toEqual({ width: 260, kept: 260 });
     expect(draggedRoomWidth(120, 500, 400, "start")).toBe(400);
     expect(draggedRoomWidth(120, -500, 400, "start")).toBe(40);
     expect(draggedRoomWidth(120, 30, 400, "center")).toBe(180);

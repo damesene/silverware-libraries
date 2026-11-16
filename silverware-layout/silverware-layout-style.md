@@ -23,14 +23,14 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
 }
 /* A widget staying at the text's start (its provider's say: an embedded medium): it grows to the right alone,
    as far as the pane's right edge less half the gutter (the text centred in the pane, 100% its width) */
-:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-anchor="start"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-align="left"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
   width: min(var(--swl-shown), calc((var(--swl-pane-width, 100vw) + 100%) / 2 - 20px)) !important;
   margin-left: 0 !important;
   margin-right: auto !important;
 }
 /* A widget staying at the text's end (its provider's say: a medium aligned right): it grows to the left alone, as far
    as the pane's left edge less half the gutter */
-:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-anchor="end"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-align="right"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
   --swl-end-shown: min(var(--swl-shown), calc((var(--swl-pane-width, 100vw) + 100%) / 2 - 20px));
   width: var(--swl-end-shown) !important;
   /* (Its left margin what is left of the line, below none once it is wider: an auto one went to none then, and the
@@ -46,34 +46,52 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   margin-left: auto !important;
   margin-right: auto !important;
 }
-:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-in-room][data-swl-anchor="start"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-in-room][data-swl-align="left"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
   margin-left: 0 !important;
 }
-:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-in-room][data-swl-anchor="end"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-in-room][data-swl-align="right"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
   margin-right: 0 !important;
 }
-/* Where a widget stands (data-swl-anchor, its provider's say: a medium aligned), with or without a width laid out, a
-   narrow pane too: centred or at the text's end (of its room, a cell). The inline box the host draws such a widget in
-   (marked data-swl-anchor-holder by the code: its parent alone, and only an inline one) the whole line then, so the
-   widget has room to stand in; a widget in a room a block of its own width. Important over the host's own margins (SilverBullet's by an id); the rules of a width laid out, above, more
-   particular, place it as wide as it is */
-[data-swl-content] [data-swl-anchor="center"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+/* A widget in another plugin's editor field (a file in a grid's cell edited: a shadow root, which the rules of the
+   content do not reach; the field puts the page's rules naming swl- in it): within its room as in the cell drawn,
+   standing where it stands there */
+[data-swl-in-shadow][data-swl-width]:not([data-silverware-over-window]) {
+  width: min(var(--swl-width), 100%) !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+[data-swl-in-shadow]:is([data-swl-align="center"], [data-swl-align="right"]):not([data-silverware-over-window]) {
+  display: block !important;
+  width: fit-content;
   margin-left: auto !important;
   margin-right: auto !important;
 }
-[data-swl-content] [data-swl-anchor="end"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+[data-swl-in-shadow][data-swl-align="right"]:not([data-silverware-over-window]) {
+  margin-right: 0 !important;
+}
+/* Where a widget stands (data-swl-align, its provider's say: a medium aligned), with or without a width laid out, a
+   narrow pane too: centred or at the text's end (of its room, a cell). The inline box the host draws such a widget in
+   (marked data-swl-align-holder by the code: its parent alone, and only an inline one) the whole line then, so the
+   widget has room to stand in; a widget in a room a block of its own width. Important over the host's own margins (SilverBullet's by an id); the rules of a width laid out, above, more
+   particular, place it as wide as it is */
+[data-swl-content] [data-swl-align="center"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+[data-swl-content] [data-swl-align="right"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
   margin-left: auto !important;
   margin-right: 0 !important;
 }
 /* (An inline block as wide as the line, as the host itself has its widgets' boxes: a block in the line made a row of
    its own of what the line has round it besides (the editor's caret anchors), an empty line's height above and below
    the widget, the caret there looking like a blank line where there is none) */
-[data-swl-content] [data-swl-anchor-holder]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+/* (Not by the content around it: in an editor's field, a shadow root, too; the code marks none elsewhere) */
+[data-swl-align-holder]:not([data-silverware-over-window], [data-silverware-over-window] *) {
   display: inline-block !important;
   width: 100%;
   vertical-align: top;
 }
-[data-swl-content] [data-swl-in-room]:is([data-swl-anchor="center"], [data-swl-anchor="end"]):not([data-silverware-over-window]) {
+[data-swl-content] [data-swl-in-room]:is([data-swl-align="center"], [data-swl-align="right"]):not([data-silverware-over-window]) {
   display: block !important;
   width: fit-content;
 }
@@ -173,6 +191,22 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
     inset: -6px -12px;
   }
 }
+/* In a grid's cell, within the widget at its edge (docs/silverware-layout-room-handles.md): over what it shows (an
+   image), so a light grip outlined, read on a dark picture and a light one alike, unlike the grey grip between the
+   grid's columns */
+.swl-handle.swl-handle-inside .swl-handle-bar::after {
+  width: 6px;
+  background: color-mix(in srgb, var(--root-background-color, #fff) 92%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--root-color) 45%, transparent), 0 1px 3px rgb(0 0 0 / 25%);
+  /* (A little see-through until pointed at: less of the picture hidden; the user's wish, 2026-11-16) */
+  opacity: 0.7;
+  transition: background-color 0.12s, height 0.12s, opacity 0.12s;
+}
+.swl-handle.swl-handle-inside .swl-handle-bar:is(:hover, :focus-visible)::after,
+.swl-handle-dragging.swl-handle-inside .swl-handle-bar::after {
+  background: var(--ui-accent-color, #464cfc);
+  opacity: 1;
+}
 /* A widget not widened (a preview; any in a pane too narrow to lay widths out): its bar the grip of its menu alone
    (where it stands), pressed as a button; the drag's line kept, plainly off (the user's wish, 2026-11-14: seen to be
    no width's at a glance): faint, neither growing nor taking the accent as it is pointed at, a little stronger alone */
@@ -186,6 +220,17 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
 }
 .swl-handle.swl-handle-menu-only .swl-handle-bar:is(:hover, :focus-visible)::after {
   background: color-mix(in srgb, var(--root-color) 40%, transparent);
+}
+/* (Within a widget in a cell, its menu's grip alone plainly off as beside one outside a grid: grey, fainter, no accent
+   nor growth as pointed at, a little stronger alone; outlined still, read over what it shows) */
+.swl-handle.swl-handle-inside.swl-handle-menu-only .swl-handle-bar::after {
+  background: color-mix(in srgb, var(--root-background-color, #fff) 70%, var(--root-color) 30%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--root-color) 25%, transparent);
+  opacity: 0.55;
+}
+.swl-handle.swl-handle-inside.swl-handle-menu-only .swl-handle-bar:is(:hover, :focus-visible)::after {
+  background: color-mix(in srgb, var(--root-background-color, #fff) 45%, var(--root-color) 55%);
+  opacity: 0.9;
 }
 /* The guides of a drag: a quiet dashed line each side for the text's width and each guide, over the whole height the
    page is seen in and under its widgets (in CodeMirror's scroller, z-index -1, as Confluence's), named at its top; the
@@ -522,12 +567,33 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
 .swl-dialog-add:hover {
   border-color: var(--ui-accent-color);
 }
+/* Full width: the list's last row (the widest), a box for its number, as tall as a guide's row */
+.swl-dialog-full-row {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+}
 .swl-dialog-full {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 4px;
   cursor: pointer;
+}
+.swl-dialog-full-note {
+  opacity: 0.6;
+}
+/* What guides are, on top; the list with none says so, quiet */
+.swl-dialog-guides-lead {
+  margin: 0;
+  opacity: 0.8;
+}
+.swl-dialog-guides-empty {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.6;
+}
+.swl-dialog-guides-empty[hidden] {
+  display: none;
 }
 /* What the Page width tab says on a screen too narrow for widths (a phone): quiet, an icon and a line */
 .swl-dialog-notice {
@@ -784,16 +850,19 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   --swl-grid-row-gap: 0.5em;
   --swl-grid-column-gap: 1.5em;
   gap: var(--swl-grid-row-gap) var(--swl-grid-column-gap);
-  /* (Each cell as tall as its row: a shorter column clicked anywhere, under its text too, is edited) */
+  /* (Each cell as tall as its row: a shorter cell clicked anywhere, under its text too, is edited) */
   align-items: stretch;
 }
 /* (A grid of columns as many as fit keeps them: a gallery on a phone, as many as its narrowest width lets in) */
 :root[data-swl-narrow] .swl-grid:not([data-swl-fit]) {
   grid-template-columns: minmax(0, 1fr);
 }
-/* The dividers between a grid's columns (src/grid/ui/dividers.ts): in each gap, a quiet line as the pointer is over
-   the grid, plain over the divider or while it is dragged; a finger's target wider than the line. Out of the grid's
-   flow (placed by the code at each gap's middle), none in a narrow pane (one column) */
+/* The dividers between a grid's columns (src/grid/ui/dividers.ts): a boundary is a line, so a line is all it draws, as
+   a table's column border is (the user's choice 2026-11-16, docs/silverware-layout-room-handles.md *Column dividers*): none
+   at rest, the line over the grid's height lit as the pointer is over the divider or it is dragged, the column's cursor.
+   No grip: a grip is a widget's width (the handle beside a grid, inside a file in a cell), told apart at a glance. On a
+   touch screen, while the grid has the focus, the line faint with a knob a finger takes. Out of the grid's flow (placed
+   by the code at each gap's middle), none in a narrow pane (one column) */
 .swl-grid {
   position: relative;
 }
@@ -812,43 +881,43 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   content: "";
   position: absolute;
   left: 50%;
-  transition: opacity 0.12s, background-color 0.12s, height 0.12s;
+  transition: opacity 0.12s;
 }
 /* The line over the grid's height, on the pointer */
 .swl-grid-divider::before {
   top: 0;
   bottom: 0;
-  width: 1px;
+  width: 2px;
   transform: translateX(-50%);
   background: var(--ui-accent-color, #4a90e2);
   opacity: 0;
 }
-/* The grip, in the gap's middle, as the pointer is over the grid: at the middle of the part of the grid in view
-   (src/grid/ui/dividers.ts sets --swl-grip-y), a tall grid's seen wherever it is scrolled to */
+/* A finger's knob, on a touch screen alone: at the middle of the part of the grid in view (src/grid/ui/dividers.ts
+   sets --swl-grip-y), a tall grid's seen wherever it is scrolled to */
 .swl-grid-divider::after {
   top: var(--swl-grip-y, 50%);
-  width: 4px;
-  height: 28px;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
   transform: translate(-50%, -50%);
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--root-color) 35%, transparent);
+  border-radius: 50%;
+  border: 2px solid var(--ui-accent-color, #4a90e2);
+  background: var(--root-background-color, #fff);
   opacity: 0;
-}
-.swl-grid:hover > .swl-grid-divider::after {
-  opacity: 1;
 }
 .swl-grid-divider:hover::before,
 .swl-grid-divider[data-swl-dragging]::before {
   opacity: 1;
 }
-.swl-grid-divider:hover::after,
-.swl-grid-divider[data-swl-dragging]::after {
-  opacity: 1;
-  height: 40px;
-  background: var(--ui-accent-color, #4a90e2);
-}
 @media (hover: none) {
-  .swl-grid-divider::after {
+  .swl-grid:focus-within > .swl-grid-divider::before {
+    opacity: 0.45;
+  }
+  .swl-grid:focus-within > .swl-grid-divider::after,
+  .swl-grid-divider[data-swl-dragging]::after {
+    opacity: 1;
+  }
+  .swl-grid-divider[data-swl-dragging]::before {
     opacity: 1;
   }
 }
@@ -892,8 +961,8 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
 /* What a divider dragged says: the ratio snapped to, else the two columns' shares */
 .swl-grid-divider-label {
   position: absolute;
-  /* (Over the grip, which rides in the part of the grid in view) */
-  top: calc(var(--swl-grip-y, 50%) - 20px - 1.8em);
+  /* (Over the knob's place, which rides in the part of the grid in view) */
+  top: calc(var(--swl-grip-y, 50%) - 12px - 1.8em);
   left: 50%;
   transform: translateX(-50%);
   padding: 1px 6px;
@@ -942,7 +1011,9 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   padding: 0.5em 0.75em;
   box-shadow: 1px 0 0 var(--swl-grid-line), 0 1px 0 var(--swl-grid-line);
 }
+/* (Its line the border's own pixel, lit: no wider, not into the next cell) */
 .swl-grid[data-swl-border] > .swl-grid-divider::before {
+  width: 1px;
   transform: none;
 }
 .swl-grid[data-swl-border] > .swl-grid-divider::after {
@@ -1058,8 +1129,8 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   outline: 2px dashed color-mix(in srgb, var(--ui-accent-color, #464cfc) 60%, transparent);
   outline-offset: -2px;
 }
-/* Move into existing grid: a place being picked (src/grid/ui/placepicker.ts). The grids outlined as what can be picked, the
-   pointer a copy's over them, their own controls (a column's grip, a divider, the width's handle) away meanwhile */
+/* Move to grid: a place being picked (src/grid/ui/placepicker.ts). The grids outlined as what can be picked, the
+   pointer a copy's over them, their own controls (a cell's grip, a divider, the width's handle) away meanwhile */
 :root[data-swl-picking] .swl-grid {
   outline: 2px dashed color-mix(in srgb, var(--ui-accent-color, #464cfc) 45%, transparent);
   outline-offset: 6px;
@@ -1070,7 +1141,7 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
 :root[data-swl-picking] .swl-grid * {
   cursor: copy !important;
 }
-:root[data-swl-picking] :is(.swl-grid-column-grip, .swl-grid-divider, .swl-handle) {
+:root[data-swl-picking] :is(.swl-grid-cell-grip, .swl-grid-divider, .swl-handle) {
   display: none !important;
 }
 /* The cell the text would go into, tinted */
@@ -1574,14 +1645,14 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   height: 22px;
 }
 /* </shared-menu> */
-/* A grid's column grip (src/grid/ui/columngrips.ts, docs/silverware-layout-grid-handles.md): a short grey grip lying
-   at the middle of the column's top edge, half above it (the line above a grid is kept free), as a divider's grip turned
-   on its side; shown as the pointer is over the column, lit and longer as it is pointed at, its click the column's
+/* A grid's cell grip (src/grid/ui/columngrips.ts, docs/silverware-layout-grid-handles.md): a short grey grip lying
+   at the middle of the cell's top edge, half above it (the line above a grid is kept free), as a divider's grip turned
+   on its side; shown as the pointer is over the cell, lit and longer as it is pointed at, its click the cell's
    menu. Its target larger than what is drawn (a finger's larger still) */
 /* (The box the host draws a grid in let out: it scrolls what lies outside it away, so the grips' upper halves were
    cut off. The grid then cuts off itself what lies outside it but above: its cells' lines the pixel after the last
    column and row, as the box did (the grid's borders drawn within it), a cell's content too wide; above it, in the
-   line kept free, the column grips' upper halves and a divider's label stay seen) */
+   line kept free, the cell grips' upper halves and a divider's label stay seen) */
 .swl-grid-widget :has(> .swl-grid) {
   overflow: visible !important;
 }
@@ -1591,7 +1662,7 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
 .swl-grid-cell {
   position: relative;
 }
-.swl-grid-column-grip {
+.swl-grid-cell-grip {
   position: absolute;
   top: 0;
   left: 50%;
@@ -1609,7 +1680,7 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   cursor: pointer;
   touch-action: none;
 }
-.swl-grid-column-grip::after {
+.swl-grid-cell-grip::after {
   content: "";
   position: absolute;
   top: 50%;
@@ -1621,22 +1692,22 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   transform: translate(-50%, -50%);
   transition: background-color 0.12s, width 0.12s;
 }
-.swl-grid-cell:hover > .swl-grid-column-grip,
-.swl-grid-column-grip:focus-visible,
-.swl-grid-column-grip[aria-expanded="true"] {
+.swl-grid-cell:hover > .swl-grid-cell-grip,
+.swl-grid-cell-grip:focus-visible,
+.swl-grid-cell-grip[aria-expanded="true"] {
   opacity: 1;
   pointer-events: auto;
 }
-.swl-grid-column-grip:hover::after,
-.swl-grid-column-grip:focus-visible::after,
-.swl-grid-column-grip[aria-expanded="true"]::after {
+.swl-grid-cell-grip:hover::after,
+.swl-grid-cell-grip:focus-visible::after,
+.swl-grid-cell-grip[aria-expanded="true"]::after {
   width: 40px;
   background: var(--ui-accent-color, #4a90e2);
 }
 /* A touch screen: no pointer over anything; a grid's grips shown while it has the focus (a tap in it gives it), a
    finger's target */
 @media (hover: none) {
-  .swl-grid:focus-within > .swl-grid-cell > .swl-grid-column-grip {
+  .swl-grid:focus-within > .swl-grid-cell > .swl-grid-cell-grip {
     opacity: 1;
     pointer-events: auto;
   }
@@ -1644,7 +1715,7 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
 @media (pointer: coarse) {
   /* (A finger's target, wider, its height half above the edge, in the gap between rows, half in its cell's top: not
      over the cell above's text, nor a short cell's middle, whose tap is the cell's) */
-  .swl-grid-column-grip {
+  .swl-grid-cell-grip {
     width: 56px;
     height: 16px;
   }
@@ -1686,20 +1757,40 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
 .swl-align-select {
   font: inherit;
 }
-/* The Markdown tab: its boxes one under another */
+/* The Markdown tab: a line on top, then a section a setting, each headed as the other tabs name their rows: what
+   SilverBullet does, the box, what on and off give (quiet, as a row's note) */
 .swl-syntax {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px;
+}
+.swl-syntax-lead {
+  margin: 0;
+  opacity: 0.8;
+}
+.swl-syntax-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.swl-syntax-heading {
+  margin: 0;
+  padding: 0;
+  font-size: inherit;
+}
+.swl-syntax-text {
+  margin: 0;
 }
 .swl-syntax-note {
-  margin: 0 0 4px;
-  opacity: 0.8;
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.6;
 }
 .swl-syntax-check {
   display: flex;
   align-items: center;
   gap: 6px;
+  cursor: pointer;
 }
 /* A cell's markdown that could not be rendered, and a grid drawn before Silverware Layout started: as typed */
 .swl-grid-plain {

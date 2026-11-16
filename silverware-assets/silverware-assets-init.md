@@ -18,16 +18,15 @@ config.define("silverware.assets", {
   description = "Silverware Assets settings",
   type = "object",
   properties = {
-    views = { type = "object", description = "How a file is shown (icon, preview or embed): a default, and one per type." },
-    actions = { type = "object", description = "What a click and a Shift+click on a file do (an action's name): a default, and one per type." },
-    card = { type = "array", description = "What a file's card shows: icon, name, size, modified.", items = { type = "string" } },
-    heights = { type = "object", description = "A preview's and an embed's height where nothing gives one (px)." },
-    previews = { type = "object", description = "A preview's width for all files (width, px; none: as wide as it fits) and alignment (align: left, center or right), and per type its width, height and alignment (types)." },
-    linkIcons = { type = "boolean", description = "A link to a file of the space shows its type's icon before its text." },
-    previewFolder = { type = "string", description = "The folder previews are kept in, from the space's top (by default _silverware-asset-preview: a name starting with _ is hidden from SilverBullet's pickers). Changed in the settings window, the previews kept are moved there." },
-    storePreviews = { type = "boolean", description = "A preview slow to make (a PDF's page) is kept in the space once made (_silverware-asset-preview); off, made each time it is shown, no Regenerate preview." },
-    labels = { type = "object", description = "A preview's label: for all files (default) and per type (types), each { above = {...}, below = {...} }, a list of { field = icon, alt, name, size or modified, on = true or false }." },
-    originalLabels = { type = "object", description = "An original's label, alike (none shown unless one is turned on)." },
+    views = { type = "object", description = "How a file is shown (card, preview or full): a default, and one per type." },
+    actions = { type = "object", description = "What a click and a Shift+click on a file do (an action's name: open-tab, open-panel, open-enlarged, download, copy-image): a default, and one per type." },
+    insert = { type = "object", description = "Files pasted, dropped and uploaded through Silverware Assets' dialog (enabled) and how each is inserted (as: shown, link, card, preview or full): a default, and one per type." },
+    preview = { type = "object", description = "A preview: its width (px; none: as wide as it fits) and height for all files, per type its width and height (types), its label (labels: for all files, default, and per type, types; each { above = {...}, below = {...} }, a list of { field = icon, alt, name, size or modified, on = true or false })." },
+    full = { type = "object", description = "A file shown full: its height where nothing gives one (a PDF's, px) and its label (labels, as a preview's; none shown unless one is turned on)." },
+    card = { type = "object", description = "What a file's card shows (fields: icon, name, size, modified)." },
+    link = { type = "object", description = "What a link to a file of the space shows besides its text (fields: icon, its type's icon; none: a small arrow after it)." },
+    previewFolder = { type = "string", description = "The folder previews are kept in, from the space's top (by default _silverware-assets-previews: a name starting with _ is hidden from SilverBullet's pickers). Changed in the settings window, the previews kept are moved there." },
+    storePreviews = { type = "boolean", description = "A preview slow to make (a PDF's page) is kept in the space once made (_silverware-assets-previews); off, made each time it is shown, no Regenerate preview." },
     syntaxMode = {
       type = "object",
       additionalProperties = false,
@@ -35,8 +34,8 @@ config.define("silverware.assets", {
         hideAssets = {
           type = "boolean",
           default = true,
-          description = "When SilverBullet shows the page's markdown as written (Editor: Toggle Markdown Syntax Rendering), an embedded file shows as its markdown only, not drawn under it as SilverBullet draws it there.",
-          ui = { category = "Silverware Assets", label = "Markdown as written: embedded files as markdown only", priority = 0.6 },
+          description = "Changes SilverBullet's own behaviour. In the plain markdown view (Editor: Toggle Markdown Syntax Rendering) SilverBullet still draws embedded files under their markdown; on, they stay plain text like the rest of the page. Off: SilverBullet's own.",
+          ui = { category = "Silverware Assets", label = "Plain markdown view: hide embedded files", priority = 0.6 },
         },
       },
     },
@@ -68,7 +67,7 @@ if js and js.window then
     -- A file's Delete (in its menu, once confirmed): the document deleted from the space, asked first in SilverBullet's
     -- dialog, its OK button the danger's
     deleteDocument = space.deleteDocument,
-    -- Previews kept in the space (in _silverware-asset-preview/, made once): a file's time of change, a document read and written
+    -- Previews kept in the space (in _silverware-assets-previews/, made once): a file's time of change, a document read and written
     fileMeta = space.getFileMeta,
     readDocument = space.readDocument,
     writeDocument = space.writeDocument,
@@ -97,6 +96,8 @@ if js and js.window then
     editor = silverware.editor and silverware.editor.api,
     -- File: Upload turned off in the settings: SilverBullet's own, its plug's function
     invokeFunction = system.invokeFunction,
+    -- A file renamed from its menu: the page read again, SilverBullet's rename having rewritten its links on disk
+    reloadPage = editor.reloadPage,
   })
   -- File: Upload (the toolbar's paperclip, /upload, the File menu's Insert File…) through Silverware Assets' dialog
   -- (docs/silverware-assets-insert.md): a command of Space Lua replaces SilverBullet's of the same name. Turned off in

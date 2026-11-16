@@ -206,7 +206,7 @@ const webUrl = (url: string): string => url.replace(/[\s()<>]/g, (char) => `%${c
 
 /**
  * The markdown of a file of the web linked, not kept in the space: a link (`[name](url)`), or an image's embed
- * (`![](url)`), its view in its metadata where it is not the one *Show as* gives its type (`![||{ view: icon }](url)`:
+ * (`![](url)`), its view in its metadata where it is not the one *Show as* gives its type (`![||{ view: card }](url)`:
  * SilverBullet reads the first two segments as the alt text and the size)
  */
 export function webMarkdownOf(url: string, name: string, as: Exclude<InsertAs, "shown">, configured: View): string {

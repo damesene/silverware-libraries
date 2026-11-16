@@ -15,9 +15,9 @@ files:
 A PDF's preview, drawn by [pdf.js](https://mozilla.github.io/pdf.js/) (Mozilla's PDF reader, the one Firefox shows PDFs with) as an image of its first page, in place of the browser's own PDF viewer made small. It needs [Silverware Assets](https://github.com/damesene/silverware-libraries/blob/main/silverware-assets/silverware-assets.md), which shows your embedded files: Silverware Assets PDF draws how a PDF looks there.
 
 - **A preview** (`![[report.pdf|||{ view: preview }]]`, or previews chosen in Silverware Assets' settings) is the PDF's first page as a small image, as high as your previews are. A click on it does what Silverware Assets' settings say (open it in a new tab, in a side panel, enlarged).
-- **The original** (`{ view: embed }`), **the side panel and the enlarged view** (a file's menu: *Show in a side panel*, *Show enlarged*) stay the browser's own PDF viewer, which already reads every page.
+- **Full** (`{ view: full }`), **the side panel and the enlarged view** (a file's menu: *Open in side panel*, *Open enlarged*) stay the browser's own PDF viewer, which already reads every page.
 
-pdf.js comes with this library (installed beside it), so it works offline, and on a phone, where the browser often has no PDF viewer of its own (the preview shows there; the original needs the browser's viewer). It is loaded the first time a preview is shown, not before. A preview is drawn once and kept in your space (Silverware Assets' `_silverware-asset-preview` folder): shown from there after, pdf.js not needed again until the PDF changes.
+pdf.js comes with this library (installed beside it), so it works offline, and on a phone, where the browser often has no PDF viewer of its own (the preview shows there; a PDF shown full needs the browser's viewer). It is loaded the first time a preview is shown, not before. A preview is drawn once and kept in your space (Silverware Assets' `_silverware-assets-previews` folder): shown from there after, pdf.js not needed again until the PDF changes.
 
 ## Good to know
 

@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { blocksOf, takeOver } from "./takeover.ts";
 
-const CONTROLS = ".swl-grid-column-grip";
+const CONTROLS = ".swl-grid-cell-grip";
 
 /** A grid drawn of cells' HTML, each cell marked with its index as the grids draw one */
 function grid(...cells: string[]): HTMLElement {
@@ -59,8 +59,8 @@ describe("taking over a drawing", () => {
   });
 
   it("takes a cell of the same markdown whole, wherever it was, each drawing keeping its own controls", () => {
-    const old = grid('<span class="p">Left</span><button class="swl-grid-column-grip"></button>', '<span class="p">Right</span><button class="swl-grid-column-grip"></button>');
-    const fresh = grid('<span class="p">Right</span><button class="swl-grid-column-grip"></button>', '<span class="p">Left typed</span><button class="swl-grid-column-grip"></button>');
+    const old = grid('<span class="p">Left</span><button class="swl-grid-cell-grip"></button>', '<span class="p">Right</span><button class="swl-grid-cell-grip"></button>');
+    const fresh = grid('<span class="p">Right</span><button class="swl-grid-cell-grip"></button>', '<span class="p">Left typed</span><button class="swl-grid-cell-grip"></button>');
     const right = old.querySelectorAll(".p")[1]!;
     const grip = fresh.querySelector(CONTROLS)!;
     takeOver({ element: fresh, contents: ["Right", "Left typed"], drawn: [] }, { element: old, contents: ["Left", "Right"], drawn: [] }, CONTROLS);

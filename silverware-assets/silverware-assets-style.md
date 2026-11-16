@@ -11,8 +11,8 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 /* SilverBullet showing the markdown as written (Editor: Toggle Markdown Syntax Rendering): the embedded files it still
    draws there hidden, their markdown alone shown; the host's box round each too (an empty one is a line's height). A
    file in markdown rendered outside the editor (a grid's cell, in a frame of Silverware Assets' own) is its drawer's */
-:root[data-swa-syntax-shown] [data-swa-asset]:not(.swa-frame),
-:root[data-swa-syntax-shown] :has(> [data-swa-asset]:not(.swa-frame)) {
+:root[data-swa-syntax-shown] [data-swa-type]:not(.swa-frame),
+:root[data-swa-syntax-shown] :has(> [data-swa-type]:not(.swa-frame)) {
   display: none !important;
 }
 /* A file's "…" button, at its frame's top right as the pointer is over it (always on a touch screen), its menu
@@ -39,7 +39,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   opacity: 0;
   cursor: pointer;
 }
-[data-swa-asset]:hover > .swa-more,
+[data-swa-type]:hover > .swa-more,
 .swa-more:focus-visible,
 .swa-more[aria-expanded="true"] {
   opacity: 1;
@@ -70,6 +70,90 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 /* The settings window as tall on each tab: switching tabs does not move it */
 .swa-dialog.swa-settings-window {
   height: min(600px, calc(var(--sw-view-height, 100dvh) - 32px));
+}
+/* A file's Rename (src/ui/renamedialog.ts): its title and its file's name, each a field with its note; the name's folder
+   and extension beside its field, not in it */
+.swa-dialog.swa-rename-window {
+  min-height: 0;
+  width: min(460px, calc(100vw - 32px));
+}
+.swa-rename {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.swa-rename-label {
+  font-weight: 600;
+}
+.swa-rename-label:not(:first-child) {
+  margin-top: 10px;
+}
+.swa-rename-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.swa-rename-field {
+  flex: 1;
+  min-width: 140px;
+  padding: 5px 8px;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swa-dialog-line);
+  border-radius: 6px;
+}
+.swa-rename-field[aria-invalid] {
+  border-color: var(--danger-color, #c62828);
+}
+/* (A long folder cut short, its whole path in its title: the name's field keeps its room) */
+.swa-rename-fixed {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+.swa-rename-clear {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--swa-dialog-line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swa-rename-clear[hidden] {
+  display: none;
+}
+.swa-rename-from-title {
+  align-self: flex-start;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ui-accent-color);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.swa-rename-from-title:disabled {
+  opacity: 0.45;
+  text-decoration: none;
+  cursor: default;
+}
+.swa-rename-note {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.85;
+}
+.swa-rename-note.swa-rename-problem {
+  color: var(--danger-color, #c62828);
+  opacity: 1;
 }
 /* The insert dialog (src/ui/insertdialog.ts): a row per file (its icon and path, its note, how it is inserted, the
    file as it will be, at most 320 px high); with several, a row for all of them above; picked in it to upload */
@@ -220,9 +304,9 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 .swa-insert-sample > .swa-frame {
   max-width: 100%;
 }
-/* The original of an image or a video fitted whole (the dialog is outside the editor, whose rules size them in the
+/* An image or a video shown full, fitted whole (the dialog is outside the editor, whose rules size them in the
    page: a photo of the camera showed at its own size, its corner alone in view) */
-.swa-insert-sample [data-swa-view="embed"] :is(img, video):not(.swa-icon img) {
+.swa-insert-sample [data-swa-view="full"] :is(img, video):not(.swa-icon img) {
   display: block;
   width: auto;
   height: auto;
@@ -394,40 +478,64 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   font-size: 0.85em;
   color: color-mix(in srgb, var(--root-color) 65%, transparent);
 }
-.swa-settings-grid {
+/* The Files tab (docs/silverware-assets-files-tab.md): a setting a line, its name then its control (all files', an
+   open type's), the insert dialog's box under Inserted as; a type's row closed says what it sets of its own */
+.swa-files-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.swa-files-line {
   display: grid;
-  gap: 4px 8px;
+  grid-template-columns: 110px minmax(0, 1fr);
   align-items: center;
+  gap: 4px 12px;
 }
-.swa-settings-grid-files {
-  grid-template-columns: minmax(80px, max-content) repeat(4, minmax(0, 1fr));
+.swa-files-name {
+  color: color-mix(in srgb, var(--root-color) 75%, transparent);
 }
-.swa-settings-row {
-  display: contents;
+.swa-files-line > .swa-settings-select {
+  justify-self: start;
+  max-width: 100%;
 }
-.swa-settings-head > span {
-  font-size: 0.85em;
-  color: color-mix(in srgb, var(--root-color) 65%, transparent);
+/* (Under Inserted as, in its control's column: the name column's width and the gap) */
+.swa-files-under {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding-left: 122px;
 }
-/* (All files' row set apart from the types' under it) */
-.swa-settings-all-row > .swa-settings-type-name {
-  font-weight: 600;
+.swa-file-types .swa-type-details {
+  padding-top: 6px;
 }
-.swa-settings-divider {
-  grid-column: 1 / -1;
-  height: 1px;
-  margin: 3px 0;
-  background: color-mix(in srgb, var(--root-color) 12%, transparent);
-}
-.swa-settings-type-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.swa-type-summary {
+  flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9em;
+  text-align: right;
 }
-.swa-settings-type-name .swa-icon {
-  width: 16px;
-  height: 16px;
+.swa-type-summary-none {
+  color: color-mix(in srgb, var(--root-color) 55%, transparent);
+}
+/* Saved previews: the folder and the clean-up under the box they belong to */
+.swa-settings-indent {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 26px;
+}
+.swa-settings-action {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.swa-settings-folder:disabled {
+  opacity: 0.5;
 }
 .swa-settings-select {
   min-width: 0;
@@ -866,7 +974,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   visibility: hidden;
 }
 /* Embedded media (docs/silverware-assets.md), marked by Silverware Assets on the host's frame of each
-   (data-swa-asset: its type, data-swa-view: icon, preview or embed): the host's own drawing hidden where Silverware
+   (data-swa-type: its type, data-swa-view: card, preview or full): the host's own drawing hidden where Silverware
    Assets draws instead; a preview of the host's drawing kept small; a card; the mark of a render that failed */
 .swa-native-hidden {
   display: none !important;
@@ -888,48 +996,48 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 /* The frame as wide as what is shown in it, without the host's border round a widget: its "…" at the medium's corner,
    not the page's (a card's at the text's right). A PDF's viewer, as wide as its room, keeps the text's width */
-[data-swa-asset] {
+[data-swa-type] {
   position: relative;
   width: fit-content;
   max-width: 100%;
   border: none !important;
 }
-[data-swa-asset]:has(object:not(.swa-native-hidden, .swa-native-hidden *), .swa-pdf) {
+[data-swa-type]:has(object:not(.swa-native-hidden, .swa-native-hidden *), .swa-pdf) {
   display: block;
   width: auto;
 }
 /* A PDF's preview of a width the settings give: its frame as wide as the preview, its "…" at the preview's corner
    (none given: as wide as the text, the frame too) */
-[data-swa-asset][data-swa-view="preview"][data-swa-preview-width]:has(object:not(.swa-native-hidden, .swa-native-hidden *), .swa-pdf) {
+[data-swa-type][data-swa-view="preview"][data-swa-preview-width]:has(object:not(.swa-native-hidden, .swa-native-hidden *), .swa-pdf) {
   width: fit-content;
   max-width: 100%;
 }
-/* The host's PDF viewer as the original, without a size of its own: as wide as its frame (the text's), so the frame's
+/* The host's PDF viewer shown full, without a size of its own: as wide as its frame (the text's), so the frame's
    edge, and Silverware Layout's handle beside it, is the viewer's (SilverBullet 2.12.1 draws it 300 px wide, its
    style `max-width: 100%;`; one with a size, `width: 200px` after it, keeps it) */
-[data-swa-asset][data-swa-view="embed"] object:not(.swa-icon *, [style*="; width"]) {
+[data-swa-type][data-swa-view="full"] object:not(.swa-icon *, [style*="; width"]) {
   width: 100% !important;
   max-width: 100% !important;
 }
-/* Its height: the original's setting (`heights.embed`, 480 px), or its embed's own (`|600x800`): SilverBullet gives
+/* Its height: a full file's setting (`full.height`, 480 px, or its type's own: `full.types`), or its embed's own (`|600x800`): SilverBullet gives
    the viewer none, so the browser's 150 px of an object showed it as small as a preview */
-[data-swa-asset][data-swa-view="embed"] object:not(.swa-icon *) {
+[data-swa-type][data-swa-view="full"] object:not(.swa-icon *) {
   height: var(--swa-height, 480px) !important;
 }
 /* A card's frame: the card alone in it (its menu's way in within the card: its icon, else an arrow after its name) */
-[data-swa-view="icon"] {
+[data-swa-view="card"] {
   display: flex !important;
   align-items: center;
   gap: 4px;
 }
-.swa-frame[data-swa-view="icon"] {
+.swa-frame[data-swa-view="card"] {
   display: inline-flex !important;
 }
-/* An original of its own size (an image, a video; no width laid out by Silverware Layout's handle, which follows the
+/* A file shown full at its own size (an image, a video; no width laid out by Silverware Layout's handle, which follows the
    scale itself): as large as the content's scale makes it (shared/contentscale.ts, this device's font zoom where the
    files zoom with it), never wider than its room (a percentage is the room's, which zoom leaves as it is). The host's
    medium alone, not its frame (its "…" and label keep their size) nor a picture a type draws in its own */
-[data-swa-asset][data-swa-view="embed"]:not([data-swl-width]) :is(img, video).swa-medium {
+[data-swa-type][data-swa-view="full"]:not([data-swl-width]) :is(img, video).swa-medium {
   zoom: var(--sw-content-scale, 1);
   max-width: 100%;
 }
@@ -941,7 +1049,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 /* Laid out by the handle (its width on the frame, data-swl-width): the host's medium fills the frame, its height by
    its ratio, so a drag shows at once what the width written will draw */
-[data-swa-asset][data-swl-width]:not([data-swa-view="preview"]) :is(img, video, object):not(.swa-icon img) {
+[data-swa-type][data-swl-width]:not([data-swa-view="preview"]) :is(img, video, object):not(.swa-icon img) {
   width: 100% !important;
   max-width: 100% !important;
   height: auto;
@@ -1123,7 +1231,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 /* A type's reader as wide as its line (shared/assets.ts, ASSET_WIDE_ATTRIBUTE: a document's, read at any width): its
    frame the line's width, not its content's; in a panel the panel's room, its height too */
-[data-swa-asset]:has(> [data-asset-wide]) {
+[data-swa-type]:has(> [data-asset-wide]) {
   display: block;
   width: auto;
 }
@@ -1142,7 +1250,8 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   width: 85vw !important;
   height: calc(92vh - 70px) !important;
 }
-/* A link to a file of the space: its type's icon before its text, as large as the text */
+/* A link to a file of the space: its type's icon before its text, as large as the text; a picture alone (its menu is
+   the arrow's after the text) */
 .swa-link-icon {
   display: inline-flex;
   width: 1em;
@@ -1151,23 +1260,9 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   /* (A 1em box from just under the baseline to the capitals' height: centred on the text's letters; `middle`, the
      lowercase letters' middle, sat it visibly lower, measured 2026-11-14) */
   vertical-align: -0.125em;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.12s, transform 0.12s;
 }
-/* On a touch screen it takes a finger: its box larger than the icon, not the text's */
-@media (pointer: coarse) {
-  .swa-link-icon {
-    position: relative;
-  }
-  .swa-link-icon::after {
-    content: "";
-    position: absolute;
-    inset: -10px -6px;
-  }
-}
-/* A menu's marker where a file's icon is hidden (docs/silverware-assets-label.md, *A link's marker*): a small arrow
-   after a link, or after a card's name within the card, its menu's way in. Quiet (the text's colour, faded) so it reads
+/* A menu's marker (docs/silverware-assets-label.md, *A link's marker*; always, since 2026-11-16, the icon no way in):
+   a small arrow after a link, or after a card's name within the card, its menu's way in. Quiet (the text's colour, faded) so it reads
    as part of what it follows, not a stray mark; lit as pointed at or its menu open. It takes more than it draws, around
    it, but of the text a few px at most */
 .swa-menu-marker {
@@ -1213,23 +1308,6 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 .swa-card > .swa-menu-marker {
   margin-left: 0;
 }
-/* An icon opening its asset's menu (a link's, a card's): pointed at (or its menu open), it shows plainly it is a
-   button of its own, apart from the text beside it: filled, a little larger */
-.swa-menu-icon {
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.12s, transform 0.12s;
-}
-.swa-menu-icon:hover,
-.swa-menu-icon[aria-expanded="true"] {
-  background: color-mix(in srgb, currentColor 22%, transparent);
-  transform: scale(1.2);
-}
-@media (prefers-reduced-motion: reduce) {
-  .swa-menu-icon {
-    transition: none;
-  }
-}
 /* A preview's label (docs/silverware-assets-label.md): a line above it and one under it, as wide as the preview (they
    give the frame no width of their own but a least one), cut with "…"; the name and the alt text in the text's colour, the size and
    the date quieter; a click on them the preview's. Its line above moves the "…" (and the mark of a render that failed)
@@ -1258,9 +1336,14 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   content: " · ";
   color: color-mix(in srgb, var(--root-color) 40%, transparent);
 }
+/* (After the type's icon no dot, the next property beside it, as a card and the settings' sample draw it) */
+.swa-label-line > .swa-label-icon + span::before {
+  content: none;
+}
 /* The type's icon: as high as the text, no dot after it */
 .swa-label-icon {
   display: inline-flex;
+  margin-right: 0.35em;
   vertical-align: -0.2em;
   color: color-mix(in srgb, var(--root-color) 70%, transparent);
 }
@@ -1504,15 +1587,14 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
     align-items: center;
     justify-content: center;
   }
-  .swa-settings-grid-files {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* (A setting's name over its control: the dialog as narrow as the phone) */
+  .swa-files-line {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .swa-settings-grid-files .swa-settings-type-name {
-    grid-column: 1 / -1;
-    margin-top: 6px;
+  .swa-files-under {
+    padding-left: 0;
   }
-  /* (The head's first cell, over the names, has no column of its own there) */
-  .swa-settings-grid-files .swa-settings-head > span:first-child {
+  .swa-type-summary {
     display: none;
   }
   .swa-settings-select,

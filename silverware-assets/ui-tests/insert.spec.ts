@@ -69,11 +69,11 @@ test("an image pasted: the dialog, its name the time's in the page's folder, ins
   await rows(page).first().locator(".swa-insert-choice", { hasText: "Card" }).click();
   await dialog(page).getByRole("button", { name: "Insert" }).click();
   await expect(dialog(page)).toHaveCount(0);
-  await expect.poll(() => space.saved("Page")).toContain(`![[${path}|||{ view: icon }]]`);
+  await expect.poll(() => space.saved("Page")).toContain(`![[${path}|||{ view: card }]]`);
   expect(space.hasFile(path.slice(space.folder.length + 1))).toBe(true);
 });
 
-test("a large photo's original fitted whole in the dialog, not drawn at its own size", async ({ page, space }) => {
+test("a large photo shown full, fitted whole in the dialog, not drawn at its own size", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nBefore\n" }, "Page");
   await cursorAfter(page, "Before");
   // (A camera's photo: 3000 × 2000 px, made in the page)
@@ -88,7 +88,7 @@ test("a large photo's original fitted whole in the dialog, not drawn at its own 
     element.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true, composed: true }));
   });
   await expect(dialog(page)).toBeVisible();
-  await rows(page).first().locator(".swa-insert-choice", { hasText: "Original" }).click();
+  await rows(page).first().locator(".swa-insert-choice", { hasText: "Full" }).click();
   const image = rows(page).first().locator(".swa-insert-sample img");
   await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBe(3000);
   const sample = (await rows(page).first().locator(".swa-insert-sample").boundingBox())!;
@@ -182,8 +182,8 @@ test("files dropped on a line: inserted where dropped, a batch's names apart, a 
   await expect(rows(page)).toHaveCount(2);
   await expect(rows(page).first().locator(".swa-insert-row-note")).toContainText(`inserted as “${space.folder}/photo-1.png”`);
   await expect(rows(page).nth(1).locator(".swa-insert-row-note")).toContainText(`inserted as “${space.folder}/photo-2.png”`);
-  // All as the original, written as none: Show as gives images the original by default
-  await dialog(page).locator(".swa-insert-all .swa-insert-choice", { hasText: "Original" }).click();
+  // All full, written as none: Show as gives images full by default
+  await dialog(page).locator(".swa-insert-all .swa-insert-choice", { hasText: "Full" }).click();
   await dialog(page).getByRole("button", { name: "Insert" }).click();
   await expect.poll(() => space.saved("Page")).toContain(`Last line ![[${space.folder}/photo-1.png]] ![[${space.folder}/photo-2.png]]`);
   expect(space.hasFile("photo-1.png") && space.hasFile("photo-2.png")).toBe(true);

@@ -205,7 +205,7 @@ function settleGridFrames(doc: Document): void {
 }
 const watched = new WeakSet<Document>();
 
-/** What Wrap in new grid asks of SilverBullet (src/grid/build.ts' `PutHost`): its selection, its filter box, the page writer */
+/** What Wrap in grid asks of SilverBullet (src/grid/build.ts' `PutHost`): its selection, its filter box, the page writer */
 export function silverBulletPutHost(bridge: Bridge, writer: PageWriter) {
   return {
     selection: async (): Promise<{ readonly from: number; readonly to: number }> => {

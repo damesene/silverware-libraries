@@ -19,7 +19,7 @@ describe("an embed's size and metadata", () => {
   });
 
   it("writes metadata back, quoting what needs it", () => {
-    expect(writeMetadata({ view: "icon", caption: "a, b" })).toBe('{ view: icon, caption: "a, b" }');
+    expect(writeMetadata({ view: "card", caption: "a, b" })).toBe('{ view: card, caption: "a, b" }');
     expect(writeMetadata({})).toBe("");
     expect(readMetadata(writeMetadata({ a: " spaced ", b: "x" }))).toEqual({ a: " spaced ", b: "x" });
   });
@@ -28,12 +28,12 @@ describe("an embed's size and metadata", () => {
 describe("readEmbeds", () => {
   it("reads wiki and markdown embeds: target, alt, size, metadata, as SilverBullet reads the first two segments", () => {
     const text = [
-      "![[cat.png|A cat|200|{ view: preview }]] and ![A cat|150x80|{ view: icon }](Pics/cat.png)",
+      "![[cat.png|A cat|200|{ view: preview }]] and ![A cat|150x80|{ view: card }](Pics/cat.png)",
       "![[cat.png]] ![[cat.png|300]] ![[cat.png|Only alt]] ![](cat.png)",
     ].join("\n");
     expect(readEmbeds(text).map(({ style, target, alt, width, height, metadata }) => ({ style, target, alt, width, height, metadata }))).toEqual([
       { style: "wiki", target: "cat.png", alt: "A cat", width: "200", height: undefined, metadata: { view: "preview" } },
-      { style: "markdown", target: "Pics/cat.png", alt: "A cat", width: "150", height: "80", metadata: { view: "icon" } },
+      { style: "markdown", target: "Pics/cat.png", alt: "A cat", width: "150", height: "80", metadata: { view: "card" } },
       { style: "wiki", target: "cat.png", alt: "", width: undefined, height: undefined, metadata: {} },
       { style: "wiki", target: "cat.png", alt: "", width: "300", height: undefined, metadata: {} },
       { style: "wiki", target: "cat.png", alt: "Only alt", width: undefined, height: undefined, metadata: {} },
@@ -63,8 +63,8 @@ describe("writeEmbed", () => {
   });
 
   it("writes three segments where it has metadata, empty ones kept", () => {
-    expect(writeEmbed(plain!, { metadata: { view: "icon" } })).toBe("![[cat.png|||{ view: icon }]]");
-    expect(writeEmbed(md!, { metadata: { view: "icon" } })).toBe("![Md|150|{ view: icon }](cat.png)");
+    expect(writeEmbed(plain!, { metadata: { view: "card" } })).toBe("![[cat.png|||{ view: card }]]");
+    expect(writeEmbed(md!, { metadata: { view: "card" } })).toBe("![Md|150|{ view: card }](cat.png)");
     expect(writeEmbed(wiki!, { width: "300", height: "100" })).toBe("![[cat.png|A cat|300x100|{ view: preview }]]");
   });
 
@@ -96,7 +96,7 @@ describe("links and embeds written as each other", () => {
   it("writes a link as an embed, and an embed as a link keeping its alt text, not its size and metadata", () => {
     const [wiki, md] = readLinks("[[a.pdf|Doc]] [x](b%20c.zip)");
     expect([linkAsEmbed(wiki!), linkAsEmbed(md!)]).toEqual(["![[a.pdf|Doc]]", "![x](b%20c.zip)"]);
-    const embeds = readEmbeds("![[cat.png|Cat|300|{ view: icon }]] ![[dog.png]] ![|200](Pics/my%20cat.png) ![A cat](cat.png)");
+    const embeds = readEmbeds("![[cat.png|Cat|300|{ view: card }]] ![[dog.png]] ![|200](Pics/my%20cat.png) ![A cat](cat.png)");
     expect(embeds.map(embedAsLink)).toEqual(["[[cat.png|Cat]]", "[[dog.png]]", "[my cat.png](Pics/my%20cat.png)", "[A cat](cat.png)"]);
   });
 });

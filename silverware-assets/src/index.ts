@@ -26,6 +26,7 @@ import { Dialogs } from "../../shared/dialog.ts";
 import { type EditingSurface, editorsOf } from "../../shared/editor.ts";
 import { folderOf } from "./core/insert.ts";
 import { insertChosen, type InsertTarget, uploadBy, watchInserts } from "./host/silverbullet/insert.ts";
+import { DIALOG_LOOK } from "./ui/dialoglook.ts";
 import { type InsertChoice, type InsertFile, openInsertDialog } from "./ui/insertdialog.ts";
 import { showUploadProgress } from "./ui/uploadprogress.ts";
 
@@ -67,6 +68,7 @@ export const api: Assets = {
   fieldDrawing: (page) => ({
     embed: (markdown) => decorator?.fieldDrawing(page).embed?.(markdown),
     linkIcon: (markdown) => decorator?.fieldDrawing(page).linkIcon?.(markdown),
+    linkAfter: (markdown) => decorator?.fieldDrawing(page).linkAfter?.(markdown),
   }),
 };
 
@@ -120,7 +122,7 @@ async function openInsert(files: readonly InsertFile[], target: InsertTarget): P
   const settings = heldOr(readAssetSettings(bridge.getConfig ? await bridge.getConfig(ASSETS_PATH, undefined) : undefined).settings);
   const mib = Number(bridge.getConfig ? await bridge.getConfig("maximumDocumentSize", MAX_DOCUMENT_MIB) : MAX_DOCUMENT_MIB) || MAX_DOCUMENT_MIB;
   const page = target.kind === "page" ? target.page : (lastPage ?? "");
-  insertDialogs ??= new Dialogs(document, { base: "swa-dialog", closeIcon: '<svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg>' });
+  insertDialogs ??= new Dialogs(document, DIALOG_LOOK);
   openInsertDialog(
     document,
     insertDialogs,
@@ -357,9 +359,11 @@ async function openSettings(): Promise<void> {
   const [settings, syntax] = await Promise.all([readAssetSettings(bridge.getConfig ? await bridge.getConfig(ASSETS_PATH, undefined) : undefined).settings, readSyntaxSettings(bridge)]);
   const input = {
     settings,
-    types: registry.types.all.map(({ name, icon }) => ({ name, icon })),
+    types: registry.types.all.map(({ name, label, icon, document, storesPreview }) => ({ name, label: label ?? name, icon, document: !!document, storesPreview: !!storesPreview })),
     // (Those of a gesture: a menu's own, a copy, no click's)
     actions: registry.actions.all.filter((action) => action.gesture !== false).map(({ name, label }) => ({ name, ...(label ? { label } : {}) })),
+    // (The command's own clean-up, from the Files tab's Saved previews)
+    cleanUp: async (): Promise<void> => void (await cleanUpPreviews().catch((error: unknown) => current?.flash(`Silverware Assets: previews not cleaned up: ${error instanceof Error ? error.message : String(error)}`, "error"))),
   };
   settingsWindow ??= new SettingsWindow(document);
   settingsWindow.open(

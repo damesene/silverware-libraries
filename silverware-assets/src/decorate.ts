@@ -4,24 +4,28 @@
 // the type renders none of), replaced by the type's rendering, or by the card. A click on a card or a preview runs the
 // action the user set for it. A render that fails shows the host's drawing (else the card) with an error mark.
 import { type ActionContext, type Asset, assetName, type AssetType, type Capabilities, type RenderContext, type Viewport } from "../../shared/assets.ts";
-import { type Embed, type EmbedChanges, embedAsLink, isFileTarget, linkAsEmbed, linkAsText, readEmbeds, readLinks, writeEmbed } from "../../shared/markdown/embed.ts";
+import { type Embed, type EmbedChanges, embedAsLink, isFileTarget, type Link, linkAsEmbed, linkAsText, linkWithText, readEmbeds, readLinks, writeEmbed } from "../../shared/markdown/embed.ts";
+import { renamable } from "./core/rename.ts";
 import { actionFor, mimeOf, typeFor, viewFor } from "./core/choose.ts";
 import { closestContext, embedAt, type LineContext, linkAt, outside, placeAmong, type Placed, type Range, sameTarget, writtenContext } from "./core/locate.ts";
 import { metadataOf } from "./core/metadata.ts";
 import { forgetPreviews, type PreviewFiles, storedPreview } from "./core/stored.ts";
 import type { AssetRegistry } from "./core/registry.ts";
-import { type AssetSettings, type Gesture, insertAsFor, labelFor, previewSize, type View, VIEWS } from "./model/settings.ts";
+import { type AssetSettings, fullHeight, type Gesture, insertAsFor, labelFor, previewSize, type View, VIEWS } from "./model/settings.ts";
 import { addCardFields, dateText, drawCard, iconElement, markFailed, menuMarker, sizeText } from "./ui/card.ts";
 import { drawLabelLine, labelTexts, type LabelValues } from "./ui/label.ts";
 import { opensMenu } from "../../shared/popupmenu.ts";
 import { writeClipboard, writeClipboardLater } from "../../shared/clipboard.ts";
 import { addMoreButton, type MoreMenu, popupOf, type ShowAs } from "./ui/moremenu.ts";
-import { VIEW_CARD, VIEW_LINK, VIEW_ORIGINAL, VIEW_PREVIEW } from "../../shared/glyphs.ts";
+import { VIEW_CARD, VIEW_FULL, VIEW_LINK, VIEW_PREVIEW } from "../../shared/glyphs.ts";
 import type { EditorEmbed, EmbedEdit, FieldDrawing } from "../../shared/editor.ts";
 import { CONTENT_SCALE, scaledPx } from "../../shared/contentscale.ts";
 import { hasPlainMedium, plainMedium } from "./ui/plainmedium.ts";
 import type { InsertType } from "./ui/insertdialog.ts";
 import type { SheetArea } from "../../shared/sheetarea.ts";
+import { Dialogs } from "../../shared/dialog.ts";
+import { DIALOG_LOOK } from "./ui/dialoglook.ts";
+import { openRenameDialog } from "./ui/renamedialog.ts";
 
 // The popup menu's classes: Silverware Assets'
 const POPUP = { base: "swa" } as const;
@@ -32,8 +36,8 @@ const SAMPLE_HEIGHT = 320;
 /** An item of a file's menu */
 type MenuItem = { readonly label: string; readonly run: () => void };
 // How a file can be shown, as a file's menu names and draws each (docs/silverware-assets-menu.md)
-const VIEW_NAMES: Readonly<Record<View, string>> = { icon: "Card", preview: "Preview", embed: "Original" };
-const VIEW_ICONS: Readonly<Record<View, string>> = { icon: VIEW_CARD, preview: VIEW_PREVIEW, embed: VIEW_ORIGINAL };
+const VIEW_NAMES: Readonly<Record<View, string>> = { card: "Card", preview: "Preview", full: "Full" };
+const VIEW_ICONS: Readonly<Record<View, string>> = { card: VIEW_CARD, preview: VIEW_PREVIEW, full: VIEW_FULL };
 
 /** An embed as the host drew it: its frame, its target as drawn (a path of the space or a URL), its own media element */
 export type DrawnEmbed = {
@@ -103,6 +107,15 @@ export type AssetHost = {
   deleteFile?(path: string): Promise<string | undefined>;
   removeEmbed?(write: FormWrite): Promise<string | undefined>;
   linkToText?(write: FormWrite): Promise<string | undefined>;
+  /** A link given another text it shows (`shown`), found as `linkToText` finds it (none: a link in the page has no Rename) */
+  writeLinkText?(write: FormWrite & { readonly shown: string }): Promise<string | undefined>;
+  /**
+   * A file of the space renamed, the links to it in every page written anew (SilverBullet's own rename of a document);
+   * none: Rename sets a title alone. Why not, as text
+   */
+  renameFile?(from: string, to: string): Promise<string | undefined>;
+  /** The space's files' paths (a name another file has, refused by Rename) */
+  filePaths?(): Promise<readonly string[]>;
   confirm?(question: string): Promise<boolean>;
   /** The space's files a preview is kept in (core/stored.ts; none: previews made each time) */
   previewFiles?: PreviewFiles;
@@ -135,6 +148,8 @@ type LinkWrites = {
   readonly markdown: () => Promise<string>;
   // The file deleted, asked first, the link written as its text after; none: no Delete
   readonly deleteFile?: (asset: Asset & { readonly kind: "file" }) => void;
+  // Rename…: its text and its file's name, asked; none: no Rename
+  readonly rename?: () => void;
 };
 
 export class AssetDecorator {
@@ -144,6 +159,8 @@ export class AssetDecorator {
   private readonly sizes = new WeakMap<HTMLElement, FramePlace>();
   // Each frame decorated, as the host drew it (decorated again as the settings change)
   private readonly drawn = new WeakMap<HTMLElement, DrawnEmbed>();
+  // Embeds drawn in an editor's field that gives their markdown to edit (a grid's cell edited): no frame of the page's
+  private readonly fieldDrawn = new WeakMap<HTMLElement, DrawnEmbed>();
   // The links decorated (decorated again as the settings change; those gone from the page left out then)
   private readonly links = new Set<DrawnLink>();
   // Each link's menu: what ends it (its icon drawn again, or the link gone)
@@ -172,7 +189,7 @@ export class AssetDecorator {
     this.host.watchLinks?.((links) => void this.decorateLinks(links));
   }
 
-  /** Links drawn: each to a file of the space given its type's icon before its text (the setting off: a small arrow after it), which opens its menu */
+  /** Links drawn: each to a file of the space given its type's icon before its text (where the user shows it) and a small arrow after it, which opens its menu */
   async decorateLinks(links: readonly DrawnLink[]): Promise<void> {
     if (!links.length || !this.host.linkAsset) return;
     const [page, settings] = await Promise.all([this.host.pageName(), this.host.settings()]);
@@ -188,12 +205,13 @@ export class AssetDecorator {
       const asset = this.host.linkAsset(link, page);
       const type = asset && typeFor(this.registry.types.all, asset);
       if (!type) continue;
-      // Its way into its menu: its type's icon before it, else (the setting off) a small arrow after it
-      const icon = this.linkIconOf(type, asset, settings);
-      if (settings.linkIcons) link.element.prepend(icon);
-      else link.element.append(icon);
+      // Its type's icon before it (where the user shows it), a picture alone; its menu's way in a small arrow after it,
+      // always (an icon that opened the menu was found by nobody new: docs/silverware-assets-menu.md, *The arrow*)
+      if (settings.link.fields.includes("icon")) link.element.prepend(this.linkIcon(type));
+      const marker = this.linkMarker(asset);
+      link.element.append(marker);
       link.element.setAttribute("data-swa-link", type.name);
-      // Its menu: what can be done with the file (a press on the icon the menu's, the link's text still the host's),
+      // Its menu: what can be done with the file (a press on the arrow the menu's, the link's text still the host's),
       // what it changes written into the page, the link found there as it is now
       const control = new AbortController();
       this.linkMenus.set(link.element, control);
@@ -206,24 +224,26 @@ export class AssetDecorator {
               return found.link.text;
             }),
           ...(this.deletable(asset, "link") ? { deleteFile: (file: Asset & { readonly kind: "file" }) => void this.deleteLinked(link, file) } : {}),
+          ...(this.host.writeLinkText ? { rename: () => void this.renameLinked(link, asset) } : {}),
         });
-      opensMenu(this.doc, POPUP, icon, () => popupOf(menu()), control.signal);
+      opensMenu(this.doc, POPUP, marker, () => popupOf(menu()), control.signal);
     }
   }
 
-  /** A link's way into its file's menu: its type's icon (drawn before it), else, the setting off, a small arrow (after it) */
-  private linkIconOf(type: AssetType, asset: Asset, settings: AssetSettings): HTMLElement {
-    let icon: HTMLElement;
-    if (settings.linkIcons) {
-      icon = iconElement(this.doc, type.icon);
-      icon.classList.add(LINK_ICON, "swa-menu-icon");
-    } else {
-      icon = menuMarker(this.doc, "link");
-      icon.setAttribute("aria-label", `${assetName(asset)}: its menu`);
-    }
-    icon.title = "Show…";
-    icon.setAttribute("role", "button");
+  /** A link's type's icon, drawn before its text: a picture alone (its menu is the arrow's) */
+  private linkIcon(type: AssetType): HTMLElement {
+    const icon = iconElement(this.doc, type.icon);
+    icon.classList.add(LINK_ICON);
     return icon;
+  }
+
+  /** A link's way into its file's menu: a small arrow, drawn after its text */
+  private linkMarker(asset: Asset): HTMLElement {
+    const marker = menuMarker(this.doc, "link");
+    marker.setAttribute("aria-label", `${assetName(asset)}: its menu`);
+    marker.title = "Show…";
+    marker.setAttribute("role", "button");
+    return marker;
   }
 
   /**
@@ -232,8 +252,10 @@ export class AssetDecorator {
    * markdown copied, the file deleted; what changes the link written where it is (`writes`: the page's, a field's)
    */
   private linkMenu(asset: Asset, type: AssetType, settings: AssetSettings, signal: AbortSignal, writes: LinkWrites): MoreMenu {
-    const drawn = !!type.views?.embed || !!plainMedium(this.doc, asset, mimeOf(asset));
-    const capabilities: Capabilities = { views: ["icon", ...(type.views?.preview ? (["preview"] as const) : []), ...(drawn ? (["embed"] as const) : [])] };
+    // (What it can be shown as, as an embed of it can: a view its type draws, or any where the browser draws the file, a
+    // preview its drawing smaller; an image of the space has no preview of its type's own, and still has one)
+    const native = !!plainMedium(this.doc, asset, mimeOf(asset));
+    const capabilities: Capabilities = { views: ["card", ...(type.views?.preview || native ? (["preview"] as const) : []), ...(type.views?.full || native ? (["full"] as const) : [])] };
     const actions = this.actionItems(asset, capabilities, (container, as) => this.drawInto(container, as, type, asset, settings, signal));
     const settled = settings.views.types[type.name] ?? settings.views.default;
     const { toEmbed, deleteFile } = writes;
@@ -244,6 +266,7 @@ export class AssetDecorator {
             if (to !== "link") toEmbed(to === settled ? undefined : to);
           })
         : [],
+      page: writes.rename ? [{ label: "Rename…", run: writes.rename }] : [],
       open: actions.open,
       file: [
         ...actions.copy,
@@ -337,6 +360,152 @@ export class AssetDecorator {
     if (left) this.host.problem(`Silverware Assets: the file was deleted, its link left in the page: ${left}`);
   }
 
+  /** Its dialogs (Rename), made as the first opens */
+  private dialogsMade?: Dialogs;
+  private get dialogs(): Dialogs {
+    return (this.dialogsMade ??= new Dialogs(this.doc, DIALOG_LOOK));
+  }
+
+  /**
+   * Rename… (docs/silverware-assets-rename.md): the dialog asked, then what changed written. The title alone: written
+   * where the embed or the link is (`writeTitle`). The file's name: the file renamed first (SilverBullet saves the page
+   * and rewrites every reference to it by its index, which a title written just before could have outrun), its previews
+   * kept taken away (of the old path's version), then the title written to the same reference once the page refers to
+   * the new path (`inPage.titleAt`). In a field (none `inPage`) the title alone: the field holds its own text meanwhile,
+   * which SilverBullet's rewrite of the page would not reach
+   */
+  private rename(asset: Asset, renaming: Renaming): void {
+    const { of, title, inPage } = renaming;
+    const { alt: _alt, ...bare } = asset;
+    const why =
+      asset.kind !== "file"
+        ? "A file of the web: its name is the site's."
+        : !inPage
+          ? "Its file is renamed from its menu in the page, not while this is edited."
+          : !this.host.renameFile
+            ? "This SilverBullet gives no way to rename a file here."
+            : !renamable(asset.path)
+              ? "SilverBullet renames no file without an extension of letters and digits."
+              : undefined;
+    const file = asset.kind === "file" && !why ? { path: asset.path, paths: async () => (await this.host.filePaths?.()) ?? [] } : undefined;
+    const said = (problem: string) => this.host.problem(`Silverware Assets: ${problem}`);
+    const what = of === "link" ? "text" : "title";
+    openRenameDialog(this.doc, this.dialogs, { of, title, untitled: assetName(bare as Asset), ...(file ? { file } : { why: why! }), companion: !!renaming.companion }, (result) => {
+      if (!result) return;
+      void (async () => {
+        const titled = result.title !== title.trim();
+        if (!result.path || asset.kind !== "file" || !inPage) {
+          const problem = titled ? await renaming.writeTitle(result.title) : undefined;
+          return problem && said(`the ${what} was not written: ${problem}`);
+        }
+        // (Its place among the references to its file, found before they are rewritten)
+        const order = titled ? await inPage.order() : undefined;
+        if (titled && order === undefined) return said(`nothing was renamed: this ${of} was not found in the page`);
+        const files = this.host.previewFiles;
+        const facts = files ? await files.facts(asset.path).catch(() => undefined) : undefined;
+        const problem = await this.host.renameFile!(asset.path, result.path);
+        if (problem) return said(`the file was not renamed: ${problem}`);
+        if (files && facts) await forgetPreviews(files, (await this.host.settings()).previewFolder, asset.path, facts);
+        const left = titled ? await inPage.titleAt(result.path, order!, result.title) : undefined;
+        if (left) said(`the file was renamed, its ${what} not written: ${left}`);
+      })().catch((error: unknown) => said(message(error)));
+    });
+  }
+
+  /**
+   * The `order`-th reference to a file (`refs`: its embeds, or its links) once the page refers to it by `path`, its
+   * new path: read again until SilverBullet's rename has rewritten them (at most RENAMED_WAIT_MS), `write` given it and
+   * the page's text then
+   */
+  private async atRenamed<T>(refs: (text: string, page: string) => readonly T[], order: number, write: (one: T, text: string) => Promise<string | undefined>): Promise<string | undefined> {
+    const until = Date.now() + RENAMED_WAIT_MS;
+    for (;;) {
+      const [text, page] = await Promise.all([this.host.pageText(), this.host.pageName()]);
+      const one = refs(text, page)[order];
+      if (one) return write(one, text);
+      if (Date.now() > until) return "the page did not refer to it by its new name in time";
+      await new Promise((resolve) => setTimeout(resolve, RENAMED_POLL_MS));
+    }
+  }
+
+  /** A page's embeds of a file, in their order */
+  private embedsOf(text: string, page: string, path: string): Embed[] {
+    return readEmbeds(text).filter((one) => this.host.resolved(one, page) === path);
+  }
+
+  /** A page's links to a file, in their order (resolved as `link`, a link drawn, is) */
+  private linksOf(text: string, page: string, path: string, link: DrawnLink): Link[] {
+    return readLinks(text).filter((one) => {
+      const asset = this.host.linkAsset?.({ element: link.element, target: one.target, style: one.style }, page);
+      return asset?.kind === "file" && asset.path === path;
+    });
+  }
+
+  /** Rename… of an embed: its title written where it is (`write`: in the page, or in a field, where its file is not renamed) */
+  private renameEmbedded(drawn: DrawnEmbed, found: Found, asset: Asset, write: (changes: EmbedChanges) => Promise<string | undefined>, fieldEdit?: EmbedEdit): void {
+    const alt = (title: string): EmbedChanges => ({ alt: title || null });
+    this.rename(asset, {
+      of: "embed",
+      title: found.embed.alt,
+      writeTitle: (title) => write(alt(title)),
+      companion: !!fieldEdit,
+      ...(!fieldEdit && asset.kind === "file"
+        ? {
+            inPage: {
+              order: async () => {
+                const now = await this.locateNow(drawn);
+                if (!now) return undefined;
+                const [text, page] = await Promise.all([this.host.pageText(), this.host.pageName()]);
+                const at = this.embedsOf(text, page, asset.path).findIndex((one) => one.from === now.embed.from);
+                return at < 0 ? undefined : at;
+              },
+              titleAt: (path, order, title) =>
+                this.atRenamed(
+                  (text, page) => this.embedsOf(text, page, path),
+                  order,
+                  (one, text) => {
+                    const alike = readEmbeds(text).filter((other) => other.text === one.text);
+                    return this.host.writeEmbed({ text: one.text, occurrence: alike.findIndex((other) => other.from === one.from), of: alike.length, changes: alt(title) });
+                  },
+                ),
+            },
+          }
+        : {}),
+    });
+  }
+
+  /** Rename… of a link in the page: its text as written now, written back where the link is then */
+  private async renameLinked(link: DrawnLink, asset: Asset): Promise<void> {
+    const found = await this.linkInPage(link);
+    if (!found) return this.host.problem("Silverware Assets: this link was not found in the page");
+    const write = (one: Link, text: string, shown: string) => {
+      const alike = readLinks(text).filter((other) => other.text === one.text);
+      return this.host.writeLinkText!({ text: one.text, occurrence: alike.findIndex((other) => other.from === one.from), of: alike.length, shown });
+    };
+    this.rename(asset, {
+      of: "link",
+      title: found.link.alias,
+      writeTitle: async (shown) => {
+        const now = await this.linkInPage(link);
+        return now ? this.host.writeLinkText!({ text: now.link.text, occurrence: now.occurrence, of: now.of, shown }) : "this link was not found in the page";
+      },
+      ...(asset.kind === "file"
+        ? {
+            inPage: {
+              order: async () => {
+                const now = await this.linkInPage(link);
+                if (!now) return undefined;
+                const [text, page] = await Promise.all([this.host.pageText(), this.host.pageName()]);
+                const at = this.linksOf(text, page, asset.path, link).findIndex((one) => one.from === now.link.from);
+                return at < 0 ? undefined : at;
+              },
+              titleAt: (path, order, shown) => this.atRenamed((text, page) => this.linksOf(text, page, path, link), order, (one, text) => write(one, text, shown)),
+            },
+          }
+        : {}),
+    });
+  }
+
   /** A link written as an embed of its file: found in the page by its place, else by its target and its order among the links drawn of it */
   private async toEmbed(link: DrawnLink, view?: View): Promise<void> {
     const found = await this.linkInPage(link);
@@ -384,7 +553,7 @@ export class AssetDecorator {
   private actionItems(
     asset: Asset,
     can: Capabilities,
-    render: (container: HTMLElement, as: "preview" | "embed") => Promise<void>,
+    render: (container: HTMLElement, as: "preview" | "full") => Promise<void>,
   ): { readonly open: MenuItem[]; readonly copy: MenuItem[]; readonly file: MenuItem[] } {
     const items = this.registry.actions.all
       .filter((action) => action.fits(asset, can))
@@ -410,7 +579,7 @@ export class AssetDecorator {
 
   /**
    * How a file can be shown in the page, as the menu's row (docs/silverware-assets-menu.md): a link (where the host
-   * writes one), a card, a preview, the original; the one shown active, the settings' own named "(default)", one it
+   * writes one), a card, a preview, the file shown full; the one shown active, the settings' own named "(default)", one it
    * cannot be shown as disabled. `choose` writes the one chosen (a view: the settings' own as none)
    */
   private showAs(shown: View | "link", settled: View, can: (view: View) => boolean, linkable: boolean, choose: (to: View | "link") => void): ShowAs[] {
@@ -426,13 +595,13 @@ export class AssetDecorator {
   }
 
   /** A link's asset drawn into a container of an action's: its type's view, else the plain medium of its kind, else its card */
-  private async drawInto(container: HTMLElement, as: "preview" | "embed", type: AssetType, asset: Asset, settings: AssetSettings, signal: AbortSignal): Promise<void> {
+  private async drawInto(container: HTMLElement, as: "preview" | "full", type: AssetType, asset: Asset, settings: AssetSettings, signal: AbortSignal): Promise<void> {
     const viewport: Viewport = {
       get width() {
         return container.clientWidth;
       },
       get height() {
-        return settings.heights[as];
+        return settings[as].height;
       },
       onChange: () => undefined,
     };
@@ -442,10 +611,10 @@ export class AssetDecorator {
 
   /**
    * What is drawn in an editor's field of a page's markdown (a grid's cell edited: shared/rendered.ts `FieldDrawer`; a
-   * database's peek: the API's `fieldDrawing`), as the page draws it: its embeds, its file links' icons
+   * database's peek: the API's `fieldDrawing`), as the page draws it: its embeds, its file links' icons and arrows
    */
   fieldDrawing(page: string): FieldDrawing {
-    return { embed: (markdown) => this.editorEmbed(markdown, page), linkIcon: (markdown) => this.editorLinkIcon(markdown, page) };
+    return { embed: (markdown) => this.editorEmbed(markdown, page), linkIcon: (markdown) => this.editorLinkIcon(markdown, page), linkAfter: (markdown) => this.editorLinkMarker(markdown, page) };
   }
 
   /**
@@ -478,7 +647,9 @@ export class AssetDecorator {
           frame.append(native);
         }
         container.append(frame);
-        const drawn: DrawnEmbed = { frame, target: this.host.resolved(embed, page), native };
+        // (Its room the block it is drawn in, the field's line: its width a share of it, as in the cell drawn)
+        const drawn: DrawnEmbed = { frame, target: this.host.resolved(embed, page), native, room: () => blockAround(frame) };
+        if (edit) this.fieldDrawn.set(frame, drawn);
         // Drawn by the type that takes it now: again as the types change (another plugin's registered after the field
         // was opened, Silverware Assets PDF's in place of the built-in one), a moment after a burst of them
         const draw = () =>
@@ -487,6 +658,8 @@ export class AssetDecorator {
             .then((settings) => {
               if (signal.aborted) return;
               this.render(drawn, { embed, occurrence: 0, of: 1 }, asset, typeFor(this.registry.types.all, asset) ?? type, settings, signal, edit);
+              // (Its width and alignment Silverware Layout's to show, now that they are known: read as it lays out again)
+              if (edit) this.onDecorated?.();
             })
             .catch(() => undefined);
         draw();
@@ -501,13 +674,11 @@ export class AssetDecorator {
   }
 
   /**
-   * A link to a file in an editor of a page's markdown: its way into the file's menu as the page draws it (its type's
-   * icon, the setting off a small arrow), the editor drawing it before the link's text. Where the editor gives it the
-   * link's markdown to edit, the menu as in the page, what it changes written into the editor's text (an embed in its
-   * place, the link as its text once its file is deleted); else the icon alone. None for markdown that is not one link
-   * alone, or not to a file a type takes (a page's)
+   * A link to a file in an editor of a page's markdown (none for markdown that is not one link alone, or not to a file a
+   * type takes: a page's): what the page draws of it, its type's icon before its text (where the user shows it) and its
+   * menu's way in after it, a small arrow
    */
-  editorLinkIcon(markdown: string, page: string): EditorEmbed | undefined {
+  private fieldLink(markdown: string, page: string) {
     const links = readLinks(markdown);
     const link = links[0];
     if (links.length !== 1 || !link || link.from !== 0 || link.to !== markdown.length || !isFileTarget(link.target)) return undefined;
@@ -517,8 +688,37 @@ export class AssetDecorator {
     const asset = this.host.assetOf(embed, page);
     const type = typeFor(this.registry.types.all, asset);
     if (!type) return undefined;
+    return { link, embed, asset, type };
+  }
+
+  /** A link's type's icon in an editor, before its text, where the user shows it: a picture alone */
+  editorLinkIcon(markdown: string, page: string): EditorEmbed | undefined {
+    const found = this.fieldLink(markdown, page);
+    if (!found) return undefined;
     return {
       key: `${page}\n${markdown}`,
+      draw: (container, signal) =>
+        void this.host
+          .settings()
+          .then((settings) => {
+            if (signal.aborted || !settings.link.fields.includes("icon")) return;
+            container.append(this.linkIcon(typeFor(this.registry.types.all, found.asset) ?? found.type));
+          })
+          .catch(() => undefined),
+    };
+  }
+
+  /**
+   * A link's way into its file's menu in an editor, after its text: a small arrow. Where the editor gives it the link's
+   * markdown to edit, the menu as in the page, what it changes written into the editor's text (an embed in its place,
+   * the link as its text once its file is deleted); else the arrow alone
+   */
+  editorLinkMarker(markdown: string, page: string): EditorEmbed | undefined {
+    const found = this.fieldLink(markdown, page);
+    if (!found) return undefined;
+    const { link, embed, asset, type } = found;
+    return {
+      key: `${page}\n${markdown}\nmenu`,
       interactive: true,
       draw: (container, signal, edit) =>
         void this.host
@@ -526,8 +726,8 @@ export class AssetDecorator {
           .then((settings) => {
             if (signal.aborted) return;
             const now = typeFor(this.registry.types.all, asset) ?? type;
-            const icon = this.linkIconOf(now, asset, settings);
-            container.append(icon);
+            const marker = this.linkMarker(asset);
+            container.append(marker);
             if (!edit) return;
             const inField = (written: string) => (edit.replace(written) ? undefined : NOT_FOUND);
             const notWritten = (problem: string | undefined) => problem && this.host.problem(`Silverware Assets: not written: ${problem}`);
@@ -536,8 +736,10 @@ export class AssetDecorator {
                 toEmbed: (view) => notWritten(inField(view ? writeEmbed(embed, { metadata: { view } }) : embed.text)),
                 markdown: async () => markdown,
                 ...(this.deletableInField(asset) ? { deleteFile: (file: Asset & { readonly kind: "file" }) => void this.deleteInField(file, "link", () => inField(linkAsText(link))) } : {}),
+                // (Its text alone: in a field its file is not renamed)
+                rename: () => this.rename(asset, { of: "link", title: link.alias, writeTitle: (shown) => inField(linkWithText(link, shown)), companion: true }),
               });
-            opensMenu(this.doc, POPUP, icon, () => popupOf(menu()), signal);
+            opensMenu(this.doc, POPUP, marker, () => popupOf(menu()), signal);
           })
           .catch(() => undefined),
     };
@@ -555,7 +757,7 @@ export class AssetDecorator {
     return {
       name,
       icon: type?.icon ?? "",
-      can: (view) => view === "icon" || (!!type && (!!type.views?.[view as "preview" | "embed"] || native)),
+      can: (view) => view === "card" || (!!type && (!!type.views?.[view as "preview" | "full"] || native)),
       configured: settings.views.types[name] ?? settings.views.default,
       insertAs: insertAsFor(settings, name),
       costly: !!type?.costly,
@@ -589,8 +791,8 @@ export class AssetDecorator {
         // (No preview kept in the space for a file not written: its settings say none is; no view higher than the
         // dialog's room for it)
         const low = (height: number | undefined) => (height === undefined ? undefined : Math.min(height, SAMPLE_HEIGHT));
-        const types = Object.fromEntries(Object.entries(settings.previews.types).map(([name, size]) => [name, { ...size, ...(size.height === undefined ? {} : { height: low(size.height)! }) }]));
-        const sample: AssetSettings = { ...settings, storePreviews: false, heights: { preview: low(settings.heights.preview)!, embed: low(settings.heights.embed)! }, previews: { ...settings.previews, types } };
+        const types = Object.fromEntries(Object.entries(settings.preview.types).map(([name, size]) => [name, { ...size, ...(size.height === undefined ? {} : { height: low(size.height)! }) }]));
+        const sample: AssetSettings = { ...settings, storePreviews: false, preview: { ...settings.preview, height: low(settings.preview.height)!, types }, full: { ...settings.full, height: low(settings.full.height)!, types: Object.fromEntries(Object.entries(settings.full.types).map(([name, own]) => [name, own.height === undefined ? own : { height: low(own.height)! }])) } };
         this.render(drawn, { embed, occurrence: 0, of: 1 }, asset, type, sample, signal);
       })
       .catch(() => undefined);
@@ -668,7 +870,7 @@ export class AssetDecorator {
 
   /** A frame decorated: the box it is drawn in, where it is not the page's text (a grid's cell) */
   roomOf(frame: HTMLElement): HTMLElement | undefined {
-    return this.drawn.get(frame)?.room?.();
+    return (this.drawn.get(frame) ?? this.fieldDrawn.get(frame))?.room?.();
   }
 
   /** A frame decorated: its width and its alignment as its embed keeps them (each none: none) */
@@ -691,7 +893,7 @@ export class AssetDecorator {
   /**
    * One embed drawn as its view says; `readOnly`: in an editor's field, drawn until it ends: no menu, no click, nothing
    * written, unless the field gives `fieldEdit` (its markdown replaced there: its menu and click as in the page, what
-   * they change written into the field's text; no width or alignment, the handle's)
+   * they change written into the field's text, its width and alignment by Silverware Layout's handle too)
    */
   private render(drawn: DrawnEmbed, found: Found, asset: Asset, type: AssetType, settings: AssetSettings, readOnly?: AbortSignal, fieldEdit?: EmbedEdit): void {
     // (Its menu and click: in the page, or in a field that gives its markdown to edit)
@@ -710,15 +912,15 @@ export class AssetDecorator {
     const hostOwn = [...frame.children].filter((child) => !child.classList.contains("swa-own"));
     for (const child of hostOwn) child.classList.remove(NATIVE_HIDDEN);
     const hideHost = () => hostOwn.forEach((child) => child.classList.add(NATIVE_HIDDEN));
-    const can = (view: View) => view === "icon" || !!type.views?.[view as "preview" | "embed"] || !!native;
+    const can = (view: View) => view === "card" || !!type.views?.[view as "preview" | "full"] || !!native;
     const view = viewFor(found.embed.metadata.view, type.name, settings, can);
-    frame.setAttribute("data-swa-asset", type.name);
+    frame.setAttribute("data-swa-type", type.name);
     frame.setAttribute("data-swa-view", view);
-    // Its height: its embed's own, else the setting's for its view (a preview's; the original's for a viewer of the
+    // Its height: its embed's own, else the setting's for its view (a preview's; a full file's for a viewer of the
     // host's that has no height of its own, a PDF's: the style page's rules read it)
     const preview = previewSize(settings, type.name);
     // (In px times the content's scale: as large as the text makes it, where the files zoom with it: shared/contentscale.ts)
-    frame.style.setProperty("--swa-height", scaledPx(Number(found.embed.height) || (view === "embed" ? settings.heights.embed : preview.height)));
+    frame.style.setProperty("--swa-height", scaledPx(Number(found.embed.height) || (view === "full" ? fullHeight(settings, type.name) : preview.height)));
     // A preview's width (none: as wide as it fits)
     const sized = view === "preview" && preview.width !== undefined;
     if (sized) frame.style.setProperty("--swa-preview-width", scaledPx(preview.width!));
@@ -736,7 +938,8 @@ export class AssetDecorator {
     // kept in its embed, its width as SilverBullet's size (the height taken off so the ratio holds), its alignment in its
     // metadata (`{ align: right }`)
     const own = found.embed.metadata.align;
-    if (!readOnly)
+    // (In a field that gives its markdown to edit too, written into its text: Silverware Layout's handle there)
+    if (!readOnly || fieldEdit)
       this.sizes.set(frame, {
       width: found.embed.width,
       align: typeof own === "string" ? own : undefined,
@@ -748,15 +951,15 @@ export class AssetDecorator {
     const stored = files && asset.kind === "file" && view === "preview" ? storedPreview(files, settings.previewFolder, asset.path, this.anew.delete(frame)) : undefined;
     const context: RenderContext = {
       asset,
-      viewport: viewportOf(frame, found.embed, view, settings, control.signal, sized ? preview.width : undefined, view === "preview" ? preview.height : undefined),
+      viewport: viewportOf(frame, found.embed, view, settings, control.signal, sized ? preview.width : undefined, view === "preview" ? preview.height : view === "full" ? fullHeight(settings, type.name) : undefined),
       metadata: metadataOf(found.embed.metadata, (changes) => write({ metadata: changes })),
       signal: control.signal,
       placement: "block",
       ...(stored ? { stored } : {}),
     };
-    const capabilities = { views: (["icon", "preview", "embed"] as const).filter(can) };
+    const capabilities = { views: (["card", "preview", "full"] as const).filter(can) };
     // The asset drawn into a container of an action's (a panel): its type's view, else a copy of the host's drawing, else its card
-    const renderInto = async (as: "preview" | "embed", container: HTMLElement) => {
+    const renderInto = async (as: "preview" | "full", container: HTMLElement) => {
       const element = await type.views?.[as]?.({ ...context, viewport: viewportOf(container, found.embed, as, settings, control.signal), fills: true });
       container.replaceChildren(element ?? shownCopy(native) ?? this.card(type, asset, settings));
     };
@@ -783,6 +986,8 @@ export class AssetDecorator {
                 .then(notWritten);
             else void write({ metadata: { view: to === settled ? null : to } }).then(notWritten);
           }),
+          // Its title (its alt text) and its file's name
+          page: acts ? [{ label: "Rename…", run: () => this.renameEmbedded(drawn, found, asset, write, fieldEdit) }] : [],
           open: actions.open,
           file: [
             ...actions.copy,
@@ -832,7 +1037,7 @@ export class AssetDecorator {
         { signal: control.signal },
       );
     // A preview showing a document of its own (a PDF's viewer: the page told of no click on it) given a layer over it
-    // that takes its click, as an image's preview does (the original's viewer left to be read)
+    // that takes its click, as an image's preview does (a full file's viewer left to be read)
     const shielded = () => {
       if (!frame.querySelector(DOCUMENT_VIEWERS)) return clicked(frame);
       const shield = this.doc.createElement("div");
@@ -842,8 +1047,8 @@ export class AssetDecorator {
     };
     // A preview's label (docs/silverware-assets-label.md): its lines above and under what is drawn, a click on them the
     // preview's; drawn at once with what is known, again as the host tells the file's size and date
-    // (A view's label: a preview's, an original's; a click on a preview's the preview's action, an original's text alone)
-    const labelled = (as: "preview" | "embed" = "preview") => {
+    // (A view's label: a preview's, a full file's; a click on a preview's the preview's action, a full file's text alone)
+    const labelled = (as: "preview" | "full" = "preview") => {
       const label = labelFor(settings, type.name, as);
       const { alt, ...bare } = asset;
       const known: LabelValues = { name: assetName(bare as Asset), icon: type.icon, ...(alt ? { alt } : {}) };
@@ -896,22 +1101,18 @@ export class AssetDecorator {
       labelled();
     };
 
-    if (view === "icon") {
+    if (view === "card") {
       const card = this.card(type, asset, settings, drawn.info);
       card.classList.add("swa-own");
       clicked(card);
       hideHost();
       frame.append(card);
       if (!acts) return;
-      // Its menu's way in: its icon; a card without it (as the user shows cards), a small arrow after its name, within
-      // the card as a link's after its text (a "…" beside it was cut off where the card filled its line)
-      let opener = card.querySelector<HTMLElement>(".swa-icon");
-      if (opener) opener.classList.add("swa-menu-icon");
-      else {
-        opener = menuMarker(this.doc, "card");
-        opener.setAttribute("aria-label", `${assetName(asset)}: its menu`);
-        card.append(opener);
-      }
+      // Its menu's way in: a small arrow after its name, within the card as a link's after its text, always (its icon a
+      // picture alone; a "…" beside it was cut off where the card filled its line)
+      const opener = menuMarker(this.doc, "card");
+      opener.setAttribute("aria-label", `${assetName(asset)}: its menu`);
+      card.append(opener);
       opener.title = "Show…";
       opener.setAttribute("role", "button");
       opensMenu(this.doc, POPUP, opener, () => popupOf(menu()), control.signal);
@@ -922,7 +1123,7 @@ export class AssetDecorator {
     if (!renderer) {
       // The host's own drawing: a preview of it is the same, smaller (the style page's rule by the view's mark)
       if (view === "preview") previewDone();
-      else labelled("embed");
+      else labelled("full");
       return;
     }
     void Promise.resolve()
@@ -931,14 +1132,14 @@ export class AssetDecorator {
         if (control.signal.aborted) return;
         if (!element) {
           if (view === "preview") previewDone();
-          else labelled("embed");
+          else labelled("full");
           return;
         }
         element.classList.add("swa-own");
         hideHost();
         frame.append(element);
         if (view === "preview") previewDone(element);
-        else labelled("embed");
+        else labelled("full");
       })
       .catch((error: unknown) => {
         if (control.signal.aborted) return;
@@ -955,9 +1156,9 @@ export class AssetDecorator {
   /** The card of an asset: its type's icon and the fields the user shows (a file's size and date as the host tells them, a moment later) */
   private card(type: AssetType, asset: Asset, settings: AssetSettings, info?: FileInfo): HTMLElement {
     const name = assetName(asset);
-    const fields = settings.card.filter((field) => field === "name").map((field) => ({ name: field, text: name }));
-    const card = drawCard(this.doc, settings.card.includes("icon") ? type.icon : undefined, fields, name);
-    const wanted = settings.card.filter((field) => field === "size" || field === "modified");
+    const fields = settings.card.fields.filter((field) => field === "name").map((field) => ({ name: field, text: name }));
+    const card = drawCard(this.doc, settings.card.fields.includes("icon") ? type.icon : undefined, fields, name);
+    const wanted = settings.card.fields.filter((field) => field === "size" || field === "modified");
     // (A file not written yet: its own size and date, not those of a file of its name in the space)
     if (wanted.length && (info || this.host.fileInfo)) {
       void (info ? Promise.resolve(info) : this.host.fileInfo!(asset))
@@ -973,6 +1174,13 @@ export class AssetDecorator {
     }
     return card;
   }
+}
+
+/** The block an element is drawn in (the nearest around it not drawn inline): what a percent of its width is of */
+function blockAround(element: HTMLElement): HTMLElement | undefined {
+  const win = element.ownerDocument.defaultView;
+  for (let at = element.parentElement; at; at = at.parentElement) if (!(win?.getComputedStyle(at).display ?? "").startsWith("inline")) return at;
+  return undefined;
 }
 
 /** A copy of the host's drawing to show elsewhere (a panel): shown, though it is hidden where it is (a card shown there) */
@@ -992,7 +1200,7 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
  */
 function viewportOf(element: HTMLElement, embed: Embed, view: View, settings: AssetSettings, signal: AbortSignal, width?: number, ownHeight?: number): Viewport {
   // (A preview's: its type's own where it has one, as the frame's --swa-height says, else all files')
-  const height = () => Number(embed.height) || ownHeight || (view === "icon" ? 0 : settings.heights[view]);
+  const height = () => Number(embed.height) || ownHeight || (view === "card" ? 0 : settings[view].height);
   return {
     // (A preview of a width the settings give: that width its room, the frame taking its width from what is drawn)
     // (Measured on the screen: given back at the scale of 1, as the type multiplies it again; the scale the element's
@@ -1020,6 +1228,26 @@ function viewportOf(element: HTMLElement, embed: Embed, view: View, settings: As
 
 /** An embed of the page and its place among those of its text, which the page writer finds it by */
 type Found = { readonly embed: Embed; readonly occurrence: number; readonly of: number };
+
+/** What a Rename… is of: its title as written, how it is written where it is, and (in the page) how it is found again once its file is renamed */
+type Renaming = {
+  readonly of: "embed" | "link";
+  readonly title: string;
+  readonly writeTitle: (title: string) => Promise<string | undefined> | string | undefined;
+  // In the page: its place among the references to its file, and the title written to the reference of that place once
+  // they refer to the new path; none (a field): its file not renamed there
+  readonly inPage?: {
+    readonly order: () => Promise<number | undefined>;
+    readonly titleAt: (path: string, order: number, title: string) => Promise<string | undefined>;
+  };
+  // Opened from another plugin's field: the dialog that editor's companion
+  readonly companion?: boolean;
+};
+
+// How long a title waits for the page to refer to its file by the new name SilverBullet's rename gave it, and how often
+// it looks (its rewrite of the page: written, then drawn in the editor)
+const RENAMED_WAIT_MS = 10_000;
+const RENAMED_POLL_MS = 200;
 
 // Why a frame's embed was not written: not found in the page as it is now; drawn in an editor's field
 const NOT_FOUND = "this file was not found in the page";

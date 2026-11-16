@@ -55,13 +55,13 @@ describe("Widgets", () => {
     widgets.start();
     const element = document.querySelector<HTMLElement>(".w")!;
     expect(element.getAttribute("data-swl-width")).toBe("300");
-    expect(element.getAttribute("data-swl-anchor")).toBe("start");
+    expect(element.getAttribute("data-swl-align")).toBe("left");
     // (Shown another way by its plugin, which its selector leaves out, then laid out again on its word)
     element.dataset.view = "card";
     widgets.layOutAll();
     expect(element.hasAttribute("data-swl-width")).toBe(false);
     expect(element.style.getPropertyValue("--swl-width")).toBe("");
-    expect(element.hasAttribute("data-swl-anchor")).toBe(false);
+    expect(element.hasAttribute("data-swl-align")).toBe(false);
   });
 
   it("marks the inline box a widget centred or at the end stands in (a line's width then), never a list's item", () => {
@@ -70,7 +70,7 @@ describe("Widgets", () => {
     registry.register({ name: "test", selector: ".w", read: (element) => ({ align: (element as HTMLElement).dataset.at! }), write: async () => undefined });
     const widgets = new Widgets(document, page, registry, () => undefined);
     widgets.start();
-    const holder = (selector: string) => document.querySelector(selector)!.hasAttribute("data-swl-anchor-holder");
+    const holder = (selector: string) => document.querySelector(selector)!.hasAttribute("data-swl-align-holder");
     expect([holder(".box"), holder("li"), holder(".box2")]).toEqual([true, false, false]);
     // (Aligned at the start again: its box as it was)
     document.querySelector<HTMLElement>(".box .w")!.dataset.at = "left";
@@ -91,6 +91,33 @@ describe("Widgets", () => {
     expect(document.querySelector(".inner")!.hasAttribute("data-swl-in-room")).toBe(true);
     expect(document.querySelector(".outer")!.hasAttribute("data-swl-in-room")).toBe(false);
     expect(widgets.widgetAt(document.querySelector(".room")!)?.provider.name).toBe("outer");
+  });
+
+  it("lays out a widget drawn in a shadow root in the content (an editor's field), as it comes; finds it from a node in it", async () => {
+    document.body.innerHTML = `<div class="content"><div class="outer"><div class="cell"></div></div></div>`;
+    const registry = new Registry(() => undefined);
+    registry.register({ name: "outer", selector: ".outer", read: () => ({}), write: async () => undefined });
+    registry.register({ name: "inner", selector: ".inner", read: () => ({ width: "50%" }), write: async () => undefined, room: (element) => element.parentElement?.parentElement ?? undefined });
+    const widgets = new Widgets(document, page, registry, () => undefined);
+    widgets.start();
+    // A field put into a cell, its shadow root drawn into after
+    const field = document.createElement("div");
+    const shadow = field.attachShadow({ mode: "open" });
+    document.querySelector(".cell")!.append(field);
+    await flush();
+    const line = document.createElement("div");
+    line.innerHTML = `<span class="holder"><span class="inner"><img></span></span>`;
+    shadow.append(line);
+    await flush();
+    const inner = shadow.querySelector<HTMLElement>(".inner")!;
+    expect(inner.getAttribute("data-swl-width")).toBe("50%");
+    expect(inner.hasAttribute("data-swl-in-shadow")).toBe(true);
+    expect(inner.style.getPropertyValue("--swl-width")).toBe("50%");
+    // (Its inline box the line's width: a share of the line)
+    expect(shadow.querySelector(".holder")!.hasAttribute("data-swl-align-holder")).toBe(true);
+    expect(widgets.widgetAt(shadow.querySelector("img")!)?.provider.name).toBe("inner");
+    // (The field itself, as the document has a press in it: the grid's)
+    expect(widgets.widgetAt(field)?.provider.name).toBe("outer");
   });
 });
 

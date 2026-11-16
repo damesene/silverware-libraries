@@ -15,14 +15,14 @@ export const onSilverBullet = process.env.SW_TARGET === "silverbullet";
 const server = () => silverbulletServer(test.info().parallelIndex, process.env.SW_SB_SPACE ?? "");
 const FOLDER = "UiPdf";
 // Where Silverware Assets keeps previews (silverware-assets/src/core/stored.ts)
-const PREVIEWS = "_silverware-asset-preview";
+const PREVIEWS = "_silverware-assets-previews";
 
 export type Space = {
   /** The folder of this test's pages in the space (`UiPdf/<test>`) */
   readonly folder: string;
   /** Pages written (by their names under the folder), and files beside them, the page `open` of them opened, Silverware Assets and PDF started */
   open(pages: Readonly<Record<string, string>>, open: string, files?: Readonly<Record<string, Uint8Array | string>>): Promise<void>;
-  /** When a file's preview kept by Silverware Assets (`_silverware-asset-preview/<folder>/<name>`) was written, in ms; none: not kept */
+  /** When a file's preview kept by Silverware Assets (`_silverware-assets-previews/<folder>/<name>`) was written, in ms; none: not kept */
   kept(name: string): Promise<number | undefined>;
 };
 

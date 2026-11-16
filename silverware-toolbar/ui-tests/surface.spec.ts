@@ -69,8 +69,8 @@ test("other plugins' actions in a grid's cell: Upload file puts the file into th
   await page.keyboard.press("Control+Shift+Q");
   await expect(popup(page)).toBeVisible();
   await popup(page).locator(".swb-search-field").fill("grid");
-  await expect(popup(page).locator('[data-swb-action="actions.layoutWrapInNewGrid"]')).toHaveAttribute("aria-disabled", "true");
-  await expect(popup(page).locator('[data-swb-action="actions.layoutMoveIntoExistingGrid"]')).toHaveAttribute("aria-disabled", "true");
+  await expect(popup(page).locator('[data-swb-action="actions.layoutWrapInGrid"]')).toHaveAttribute("aria-disabled", "true");
+  await expect(popup(page).locator('[data-swb-action="actions.layoutMoveToGrid"]')).toHaveAttribute("aria-disabled", "true");
   // Upload file: the files' dialog, the file picked put into the cell
   await popup(page).locator(".swb-search-field").fill("upload file");
   const chooser = page.waitForEvent("filechooser");

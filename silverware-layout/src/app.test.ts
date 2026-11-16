@@ -281,6 +281,38 @@ describe("Silverware Layout's app over a page of no host's", () => {
     await expect.poll(() => store.saved).toEqual(["guides 900 1200 full"]);
   });
 
+  it("the Guides tab: Full width the list's last row, + Add guide under it, a guide added before it; with no guide at all, the list says so", async () => {
+    const { page } = plainPage();
+    const { api } = memoryStore({ Page: undefined }, { guides: ["full"] });
+    const app = new LayoutApp(document, page, new Registry(() => undefined));
+    await app.start(api);
+    await app.openDialog();
+    const panel = document.querySelector(".swl-dialog-guides")!;
+    const list = panel.querySelector(".swl-dialog-guide-list")!;
+    const full = list.querySelector<HTMLInputElement>(".swl-dialog-full input")!;
+    const empty = panel.querySelector<HTMLElement>(".swl-dialog-guides-empty")!;
+    const kinds = () => [...list.children].map((row) => (row.classList.contains("swl-dialog-full-row") ? "full" : "guide"));
+    expect(panel.querySelector(".swl-dialog-guides-lead")!.textContent).toBe("Widths a table, a file or a grid snaps to as you drag its width, marked under the width's slider too.");
+    expect(panel.querySelector(".swl-dialog-preview")!.textContent).toBe("Hold to preview");
+    expect(list.querySelector(".swl-dialog-full")!.textContent).toBe("Full width(the whole pane)");
+    expect(kinds()).toEqual(["full"]);
+    expect(list.nextElementSibling!.textContent).toBe("+ Add guide");
+    // Full width on: a guide, nothing said; off: none at all, said
+    expect(full.checked).toBe(true);
+    expect(empty.hidden).toBe(true);
+    full.checked = false;
+    full.dispatchEvent(new Event("change"));
+    expect(empty.hidden).toBe(false);
+    expect(empty.textContent).toBe("No guides: a drag does not snap.");
+    // A guide added: before Full width, the note gone
+    panel.querySelector<HTMLButtonElement>(".swl-dialog-add")!.click();
+    expect(kinds()).toEqual(["guide", "full"]);
+    expect(empty.hidden).toBe(true);
+    // Restore defaults: the rows drawn again, Full width still the last
+    panel.querySelector<HTMLButtonElement>(".swl-dialog-guides-reset")!.click();
+    await expect.poll(kinds).toEqual(["guide", "guide", "full"]);
+  });
+
   it("where settings cannot be saved, the guides, all pages' width and the Ctrl + scroll box cannot be changed; Preview still shows", async () => {
     const { page } = plainPage();
     const { api } = memoryStore({ Page: undefined });

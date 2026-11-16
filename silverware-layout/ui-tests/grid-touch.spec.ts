@@ -21,12 +21,12 @@ test("a tap in a cell edits it, a tap back in the page's text leaves it and writ
   await expect.poll(() => space.saved("Page")).toContain("\nAftertyped\n");
 });
 
-test("a grid's column grips shown on a phone while the grid has the focus (a tap in it), gone as a tap in the page's text takes it; a grip's tap its column's menu, the grid's own by its Grid… (no handle beside a grid as wide as the screen)", async ({ page, space }) => {
+test("a grid's cell grips shown on a phone while the grid has the focus (a tap in it), gone as a tap in the page's text takes it; a grip's tap its cell's menu, the grid's own by its Grid… (no handle beside a grid as wide as the screen)", async ({ page, space }) => {
   const text = "# Page\n\n<grid>\n<cell>\n\nLeft text\n\n</cell>\n<cell>\n\nRight text\n\n</cell>\n</grid>\n\nAfter\n";
   await space.open({ Page: text }, "Page");
   await gridsDrawn(page);
-  // (The column tapped into, edited: its own grip, kept while its field is open)
-  const grip = page.locator("#sb-main .swl-grid-cell").first().locator(".swl-grid-column-grip");
+  // (The cell tapped into, edited: its own grip, kept while its field is open)
+  const grip = page.locator("#sb-main .swl-grid-cell").first().locator(".swl-grid-cell-grip");
   await expect(grip).toHaveCSS("opacity", "0");
   await page.locator("#sb-main .swl-grid-cell").first().tap();
   await expect(cellField(page)).toBeVisible();
@@ -34,7 +34,7 @@ test("a grid's column grips shown on a phone while the grid has the focus (a tap
   await grip.tap();
   const items = page.locator(".swl-popup .swl-menu-item");
   await expect(items.first()).toHaveText("Edit markdown (Alt+click)");
-  await expect(items.last()).toHaveText("Delete column…");
+  await expect(items.last()).toHaveText("Delete cell…");
   await expect(items.filter({ hasText: "Grid…" })).toHaveCount(1);
   await page.keyboard.press("Escape");
   await page.locator("#sb-main .cm-line", { hasText: "After" }).tap();
@@ -42,13 +42,13 @@ test("a grid's column grips shown on a phone while the grid has the focus (a tap
   await expect(grip).toHaveCSS("opacity", "0");
 });
 
-test("a grid's menu on a phone (by a column's Grid…) whole in the window, its rows of choices within it (eight columns' buttons on lines of their own); a tap on a column's count sets it", async ({ page, space }) => {
+test("a grid's menu on a phone (by a cell's Grid…) whole in the window, its rows of choices within it (eight columns' buttons on lines of their own); a tap on a column's count sets it", async ({ page, space }) => {
   const text = "# Page\n\n<grid columns=\"auto\">\n<cell>\n\nLeft text\n\n</cell>\n<cell>\n\nRight text\n\n</cell>\n</grid>\n\nAfter\n";
   await space.open({ Page: text }, "Page");
   await gridsDrawn(page);
   await page.locator("#sb-main .swl-grid-cell").first().tap();
   await expect(cellField(page)).toBeVisible();
-  await page.locator("#sb-main .swl-grid-cell").first().locator(".swl-grid-column-grip").tap();
+  await page.locator("#sb-main .swl-grid-cell").first().locator(".swl-grid-cell-grip").tap();
   await page.locator(".swl-popup .swl-menu-item", { hasText: "Grid…" }).tap();
   const menu = page.locator(".swl-popup");
   await expect(menu.locator(".swl-menu-segmented", { hasText: "Min width" })).toBeVisible();
@@ -67,7 +67,7 @@ test("a grid's menu on a phone (by a column's Grid…) whole in the window, its 
   await expect.poll(() => space.saved("Page")).toContain('<grid columns="3">');
 });
 
-test("Move into existing grid on a phone: a tap shows where (cells one under another: a line across), a second tap on it moves the text there", async ({ page, space }) => {
+test("Move to grid on a phone: a tap shows where (cells one under another: a line across), a second tap on it moves the text there", async ({ page, space }) => {
   const text = "# Page\n\n<grid>\n<cell>\n\nLeft text\n\n</cell>\n<cell>\n\nRight text\n\n</cell>\n</grid>\n\nAfter\n";
   await space.open({ Page: text }, "Page");
   await gridsDrawn(page);
@@ -76,7 +76,7 @@ test("Move into existing grid on a phone: a tap shows where (cells one under ano
     const at = view.state.doc.toString().indexOf("After");
     view.dispatch({ selection: { anchor: at, head: at + 5 } });
   });
-  void runCommand(page, "Silverware Layout: Move into existing grid");
+  void runCommand(page, "Silverware Layout: Move to grid");
   await expect(page.locator(".swl-pick-bar")).toContainText("Tap again to confirm");
   const second = (await page.locator("#sb-main .swl-grid-cell").nth(1).boundingBox())!;
   await page.touchscreen.tap(second.x + second.width / 2, second.y + 4);

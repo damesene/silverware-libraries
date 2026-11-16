@@ -75,9 +75,9 @@ export const test = base.extend<{ space: Space }>({
         await commandDefined(page, ASSETS_SETTINGS);
         await commandDefined(page, LAYOUT_SETTINGS);
       },
-      kept: async (name, root = "_silverware-asset-preview") => !!(await stat(join(server().space, root, folder, name)).catch(() => undefined)) || !!(await keptPath(join(server().space, root, folder), name)),
+      kept: async (name, root = "_silverware-assets-previews") => !!(await stat(join(server().space, root, folder, name)).catch(() => undefined)) || !!(await keptPath(join(server().space, root, folder), name)),
       writeKept: async (name, content) => {
-        const file = join(server().space, "_silverware-asset-preview", folder, name);
+        const file = join(server().space, "_silverware-assets-previews", folder, name);
         await mkdir(dirname(file), { recursive: true });
         await writeFile(file, content);
       },
@@ -89,7 +89,7 @@ export const test = base.extend<{ space: Space }>({
     await page.close();
     await rm(join(server().space, folder), { recursive: true, force: true });
     // (Previews Silverware Assets kept of its files: silverware-assets/src/core/stored.ts)
-    await rm(join(server().space, "_silverware-asset-preview", folder), { recursive: true, force: true });
+    await rm(join(server().space, "_silverware-assets-previews", folder), { recursive: true, force: true });
     await rm(join(server().space, MOVED_PREVIEWS, folder), { recursive: true, force: true });
     if (configBefore === undefined) await rm(configPath, { force: true });
     else await writeFile(configPath, configBefore);

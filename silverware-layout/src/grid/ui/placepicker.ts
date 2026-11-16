@@ -1,4 +1,4 @@
-// The place in a grid text moved into it goes, picked by the user (Move into existing grid, docs/silverware-layout-grid.md
+// The place in a grid text moved into it goes, picked by the user (Move to grid, docs/silverware-layout-grid.md
 // *Moving text into a grid*): the grids outlined, a mark following the pointer where it would go (a line between cells
 // for new cells, labelled with how many; a line in a cell where its blocks meet, the cell outlined, to add it there),
 // a bar saying what to do with Cancel. A click picks; on a touch screen a tap shows the mark and a second tap on the
@@ -32,7 +32,7 @@ const PICKING = "data-swl-picking";
 // A cell the text would go into
 const TARGET_CELL = "swl-grid-pick-cell";
 // What a cell draws that is no block of its markdown
-const NOT_BLOCK = ".swl-grid-column-grip, .swl-grid-blank, br";
+const NOT_BLOCK = ".swl-grid-cell-grip, .swl-grid-blank, br";
 
 /** A grid as drawn now, measured */
 function shapeOf(grid: HTMLElement): GridShape {

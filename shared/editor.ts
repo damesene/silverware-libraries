@@ -36,13 +36,15 @@ export type EditorEmbed = {
 
 /**
  * What a plugin draws in another's editor field, as the page draws it (Silverware Assets' files): an embed in place of
- * its markdown (`![[photo.png|Alt|200]]`, `![Alt](photo.png)`), an icon before a link's text (`[[report.pdf]]`,
- * `[the report](report.pdf)`: its menu); each none for markdown it does not draw, which the editor shows as it does
- * without it. Its drawing's `edit` replaces the whole markdown it was given (a link's icon: the link's)
+ * its markdown (`![[photo.png|Alt|200]]`, `![Alt](photo.png)`), something before a link's text and after it
+ * (`[[report.pdf]]`, `[the report](report.pdf)`: a file's icon before, its menu's arrow after); each none for markdown
+ * it does not draw, which the editor shows as it does without it. Its drawing's `edit` replaces the whole markdown it
+ * was given (a link's drawing: the link's)
  */
 export type FieldDrawing = {
   readonly embed?: (markdown: string) => EditorEmbed | undefined;
   readonly linkIcon?: (markdown: string) => EditorEmbed | undefined;
+  readonly linkAfter?: (markdown: string) => EditorEmbed | undefined;
 };
 
 /** How a link pressed in an editor is to be followed: in a new tab (Ctrl, Cmd or the middle button) or in place */

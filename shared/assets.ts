@@ -22,8 +22,8 @@ export type Asset = { readonly alt?: string } & (
   | { readonly kind: "page"; readonly page: string; readonly section?: string }
 );
 
-/** How an asset is shown: a card with its icon, a small preview, or itself (a player, a viewer) */
-export type AssetView = "icon" | "preview" | "embed";
+/** How an asset is shown: a card with its icon, a small preview, or itself in full (a player, a viewer) */
+export type AssetView = "card" | "preview" | "full";
 
 /** Where an asset is rendered: in place of an embed, or (later) by a link in a line */
 export type Placement = "block" | "inline";
@@ -87,11 +87,16 @@ export type AssetMatch = {
 /** A type of asset, as registered */
 export type AssetType = {
   readonly name: string;
+  // What its files are called where people read it (a settings' row: "Images", "Word (DOCX)"); none: its name
+  readonly label?: string;
+  // Whether it is a document drawn full in a box of a height the settings give (a PDF's viewer, a reader of Word or
+  // Excel: no height of its own), its height set per type; none: its files have their own size (an image, a video)
+  readonly document?: boolean;
   readonly match: AssetMatch;
   // A plain image: a URL (drawn as <img>) or SVG text (inlined: currentColor follows the theme)
   readonly icon: string;
-  // A view left out is drawn by the host where it can (Silverware Assets draws the card, `icon`, for every type)
-  readonly views?: { readonly preview?: Renderer; readonly embed?: Renderer };
+  // A view left out is drawn by the host where it can (Silverware Assets draws the card for every type)
+  readonly views?: { readonly preview?: Renderer; readonly full?: Renderer };
   // Where its renderers draw (none: in place of an embed alone)
   readonly placements?: readonly Placement[];
   // Fields it adds to its card (a PDF's pages)
@@ -109,7 +114,7 @@ export type AssetType = {
 export type ActionContext = {
   readonly asset: Asset;
   /** The asset rendered in a container of the action's (a panel, a popover), as Silverware Assets renders it */
-  render(view: Exclude<AssetView, "icon">, container: HTMLElement): Promise<void>;
+  render(view: Exclude<AssetView, "card">, container: HTMLElement): Promise<void>;
   /** A URL opened in a new tab of the browser */
   open(url: string): void;
   /** Where a panel beside the page goes, as the host gives it (none: the window) */

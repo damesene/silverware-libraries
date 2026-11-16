@@ -10,7 +10,7 @@ import { AssetRegistry } from "./core/registry.ts";
 import { AssetDecorator, type AssetHost, type DrawnEmbed, type EmbedWrite } from "./decorate.ts";
 import { type AssetSettings, readAssetSettings } from "./model/settings.ts";
 
-function setUp(text: string, settings: unknown = {}, own: Pick<AssetHost, "placeOf" | "contextOf" | "positionOf" | "deleteFile" | "removeEmbed" | "linkToText" | "confirm" | "previewFiles"> = {}) {
+function setUp(text: string, settings: unknown = {}, own: Pick<AssetHost, "placeOf" | "contextOf" | "positionOf" | "deleteFile" | "removeEmbed" | "linkToText" | "confirm" | "previewFiles" | "renameFile" | "filePaths" | "writeLinkText"> = {}) {
   const state = { text, opened: [] as string[], writes: [] as EmbedWrite[], forms: [] as string[], problems: [] as string[], ranges: [] as { from: number; to: number }[] };
   const host: AssetHost = {
     watch: () => undefined,
@@ -62,7 +62,7 @@ describe("a file drawn in an editor's field", () => {
     document.body.append(container);
     const control = new AbortController();
     decorator.editorEmbed("![[doc.pdf]]", "P")!.draw(container, control.signal);
-    await vi.waitFor(() => expect(container.querySelector("[data-swa-asset='pdf']")).not.toBeNull());
+    await vi.waitFor(() => expect(container.querySelector("[data-swa-type='pdf']")).not.toBeNull());
     expect(container.querySelector(".test-own-preview")).toBeNull();
     registry.types.register({
       name: "pdf",
@@ -102,11 +102,11 @@ describe("a file drawn in an editor's field", () => {
 
 describe("a link to a file in an editor's field", () => {
   /** A link's icon drawn into a container of the field's, its markdown edited by `replace` (none: read-only) */
-  const drawIcon = (decorator: AssetDecorator, markdown: string, replace?: (markdown: string) => boolean) => {
+  const drawIcon = (decorator: AssetDecorator, markdown: string, replace?: (markdown: string) => boolean, part: "linkIcon" | "linkAfter" = "linkIcon") => {
     const container = document.createElement("span");
     document.body.append(container);
     const control = new AbortController();
-    decorator.fieldDrawing("P").linkIcon!(markdown)!.draw(container, control.signal, replace ? { replace } : undefined);
+    decorator.fieldDrawing("P")[part]!(markdown)!.draw(container, control.signal, replace ? { replace } : undefined);
     return { container, control };
   };
 
@@ -116,21 +116,27 @@ describe("a link to a file in an editor's field", () => {
     expect(icon("[[Notes]]")).toBeUndefined();
     expect(icon("[[a.pdf]] and text")).toBeUndefined();
     expect(icon("[[a.pdf]]")!.key).toBe(icon("[[a.pdf]]")!.key);
-    // Read-only (no markdown to edit): the icon, no menu
-    const { container, control } = drawIcon(decorator, "[the doc](a.pdf)");
+    // A picture alone, given the markdown to edit or not: no menu from it (the arrow after the text has it)
+    const { container, control } = drawIcon(decorator, "[the doc](a.pdf)", () => true);
     await vi.waitFor(() => expect(container.querySelector(".swa-link-icon svg")).not.toBeNull());
     container.querySelector<HTMLElement>(".swa-link-icon")!.click();
     expect(document.querySelector(".swa-popup")).toBeNull();
     control.abort();
+    // Read-only (no markdown to edit): the arrow, no menu
+    const after = drawIcon(decorator, "[the doc](a.pdf)", undefined, "linkAfter");
+    await vi.waitFor(() => expect(after.container.querySelector(".swa-link-marker")).not.toBeNull());
+    after.container.querySelector<HTMLElement>(".swa-link-marker")!.click();
+    expect(document.querySelector(".swa-popup")).toBeNull();
+    after.control.abort();
   });
 
   it("opens its file's menu as in the page, what it changes written into the field: an embed of a view, its markdown copied, its file deleted and the link as its text", async () => {
     const deleted: string[] = [];
     const { decorator } = setUp("", {}, { deleteFile: async (path) => void deleted.push(path), confirm: async () => true });
     const written: string[] = [];
-    const { container, control } = drawIcon(decorator, "[[Docs/a.pdf|The doc]]", (markdown) => (written.push(markdown), true));
-    await vi.waitFor(() => expect(container.querySelector(".swa-link-icon")).not.toBeNull());
-    const open = () => container.querySelector<HTMLElement>(".swa-link-icon")!.click();
+    const { container, control } = drawIcon(decorator, "[[Docs/a.pdf|The doc]]", (markdown) => (written.push(markdown), true), "linkAfter");
+    await vi.waitFor(() => expect(container.querySelector(".swa-link-marker")).not.toBeNull());
+    const open = () => container.querySelector<HTMLElement>(".swa-link-marker")!.click();
     open();
     expect(showAsRow().find(([, checked]) => checked === "true")?.[0]).toBe("Link");
     chooseShowAs("Preview");
@@ -148,8 +154,8 @@ describe("embedded media decorated", () => {
     const { decorator } = setUp("![[cat.png|A cat|200]]");
     const one = frame("cat.png");
     await decorator.decorate([one]);
-    expect(one.frame.getAttribute("data-swa-asset")).toBe("image");
-    expect(one.frame.getAttribute("data-swa-view")).toBe("embed");
+    expect(one.frame.getAttribute("data-swa-type")).toBe("image");
+    expect(one.frame.getAttribute("data-swa-view")).toBe("full");
     expect(one.native!.classList.contains("swa-native-hidden")).toBe(false);
   });
 
@@ -157,7 +163,7 @@ describe("embedded media decorated", () => {
     const { state, decorator } = setUp("![[Docs/archive.zip]]");
     const one = frame("Docs/archive.zip", false);
     await decorator.decorate([one]);
-    expect(one.frame.getAttribute("data-swa-view")).toBe("icon");
+    expect(one.frame.getAttribute("data-swa-view")).toBe("card");
     const card = one.frame.querySelector<HTMLElement>(".swa-card")!;
     expect(card.textContent).toBe("archive.zip");
     expect(card.querySelector("svg")).not.toBeNull();
@@ -168,7 +174,7 @@ describe("embedded media decorated", () => {
   });
 
   it("shows a file's size and date on its card where the user shows them, as the host tells them", async () => {
-    const { decorator } = setUp("![[archive.zip]]", { card: ["icon", "name", "size", "modified"] });
+    const { decorator } = setUp("![[archive.zip]]", { card: { fields: ["icon", "name", "size", "modified"] } });
     const one = frame("archive.zip", false);
     await decorator.decorate([one]);
     await vi.waitFor(() => expect(one.frame.querySelector(".swa-card-meta")).not.toBeNull());
@@ -183,11 +189,11 @@ describe("embedded media decorated", () => {
   });
 
   it("takes the embed's own view, then the user's per type, the second of two alike by its order", async () => {
-    const { decorator } = setUp("![[cat.png]] ![[cat.png|||{ view: icon }]]", { views: { types: { image: "preview" } } });
+    const { decorator } = setUp("![[cat.png]] ![[cat.png|||{ view: card }]]", { views: { types: { image: "preview" } } });
     const [first, second] = [frame("cat.png"), frame("cat.png")];
     await decorator.decorate([first!, second!]);
     expect(first!.frame.getAttribute("data-swa-view")).toBe("preview");
-    expect(second!.frame.getAttribute("data-swa-view")).toBe("icon");
+    expect(second!.frame.getAttribute("data-swa-view")).toBe("card");
     expect(second!.native!.classList.contains("swa-native-hidden")).toBe(true);
   });
 
@@ -207,7 +213,7 @@ describe("embedded media decorated", () => {
   });
 
   it("gives a type's preview the height of its type's own preview where it has one, all files' else", async () => {
-    const { registry, decorator } = setUp("![[a.pdf|||{ view: preview }]] ![[b.thing|||{ view: preview }]]", { heights: { preview: 160 }, previews: { types: { pdf: { height: 300 } } } });
+    const { registry, decorator } = setUp("![[a.pdf|||{ view: preview }]] ![[b.thing|||{ view: preview }]]", { preview: { height: 160, types: { pdf: { height: 300 } } } });
     const heights: Record<string, number> = {};
     const renderer = (name: string) => (context: RenderContext) => ((heights[name] = context.viewport.height), document.createElement("div"));
     registry.types.register({ name: "pdf", match: { kind: ["file"], ext: ["pdf"] }, icon: "<svg/>", views: { preview: renderer("pdf") } } as AssetType);
@@ -237,10 +243,10 @@ describe("embedded media decorated", () => {
       match: { kind: ["file"], ext: ["thing"] },
       icon: "<svg/>",
       views: {
-        embed: (context) => {
+        full: (context) => {
           expect(context.metadata.number("zoom")).toBe(2);
           written = context.metadata.write({ zoom: 3 });
-          refused = context.metadata.write({ view: "icon" });
+          refused = context.metadata.write({ view: "card" });
           return document.createElement("canvas");
         },
       },
@@ -256,7 +262,7 @@ describe("embedded media decorated", () => {
 
 describe("an asset's menu", () => {
   it("hands a preview kept in the space to a type that keeps one; Regenerate preview takes it away and draws it anew", async () => {
-    const times: Record<string, number> = { "doc.pdf": 1, "_silverware-asset-preview/doc.pdf.1-1.webp": 2 };
+    const times: Record<string, number> = { "doc.pdf": 1, "_silverware-assets-previews/doc.pdf.1-1.webp": 2 };
     const previewFiles = {
       facts: async (path: string) => (path in times ? { modified: times[path]!, size: 1 } : undefined),
       read: async (path: string) => (path in times ? new Uint8Array([1]) : undefined),
@@ -283,7 +289,7 @@ describe("an asset's menu", () => {
     one.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
     [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")].find((item) => item.textContent?.trim() === "Regenerate preview")!.click();
     await vi.waitFor(() => expect(given).toEqual([{ kept: "image/webp" }, { anew: true, kept: "none" }]));
-    expect(times["_silverware-asset-preview/doc.pdf.1-1.webp"]).toBeUndefined();
+    expect(times["_silverware-assets-previews/doc.pdf.1-1.webp"]).toBeUndefined();
     // Previews not kept, as the settings say: none handed over, no Regenerate preview
     const { registry: offRegistry, decorator: off } = setUp("![[doc.pdf]]", { views: { types: { pdf: "preview" } }, storePreviews: false }, { previewFiles });
     const offGiven: string[] = [];
@@ -303,7 +309,7 @@ describe("an asset's menu", () => {
   });
 
   it("copies its embed's whole markdown, its metadata too, as the page has it", async () => {
-    const markdown = "![[cat.png|A cat|200|{ view: embed, align: right }]]";
+    const markdown = "![[cat.png|A cat|200|{ view: full, align: right }]]";
     const { decorator } = setUp(`# A\n\n${markdown}\n`);
     const one = frame("cat.png");
     await decorator.decorate([one]);
@@ -319,7 +325,7 @@ describe("an asset's menu", () => {
   });
 
   it("shows its views, the one shown checked, writes the one chosen, the settings' own as none", async () => {
-    const { state, decorator } = setUp("![[cat.png|A cat|200]]", { views: { types: { image: "embed" } } });
+    const { state, decorator } = setUp("![[cat.png|A cat|200]]", { views: { types: { image: "full" } } });
     const one = frame("cat.png");
     await decorator.decorate([one]);
     const more = one.frame.querySelector<HTMLButtonElement>(".swa-more")!;
@@ -329,10 +335,11 @@ describe("an asset's menu", () => {
       ["Link", "false"],
       ["Card", "false"],
       ["Preview", "false"],
-      ["Original (default)", "true"],
+      ["Full (default)", "true"],
     ]);
-    // Then opening it, then the file itself, its copies first
+    // Rename… with that row (it changes the page too), then opening it, then the file itself, its copies first
     expect([...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")].map((item) => item.textContent?.trim())).toEqual([
+      "Rename…",
       "Open in a new tab",
       "Open in side panel",
       "Open enlarged",
@@ -342,10 +349,10 @@ describe("an asset's menu", () => {
     ]);
     chooseShowAs("Card");
     await vi.waitFor(() => expect(state.writes).toHaveLength(1));
-    expect(state.writes[0]!.changes).toEqual({ metadata: { view: "icon" } });
+    expect(state.writes[0]!.changes).toEqual({ metadata: { view: "card" } });
     expect(document.querySelector(".swa-popup")).toBeNull();
     more.click();
-    chooseShowAs("Original");
+    chooseShowAs("Full");
     await vi.waitFor(() => expect(state.writes).toHaveLength(2));
     expect(state.writes[1]!.changes).toEqual({ metadata: { view: null } });
     // Shown as a link: the embed written as one
@@ -385,7 +392,7 @@ describe("a file deleted from its menu", () => {
   });
 
   it("deletes a file's previews kept in the space with it, of the version it had", async () => {
-    const kept: Record<string, true> = { "_silverware-asset-preview/report.pdf.5-3.webp": true, "_silverware-asset-preview/report.pdf.4-3.webp": true };
+    const kept: Record<string, true> = { "_silverware-assets-previews/report.pdf.5-3.webp": true, "_silverware-assets-previews/report.pdf.4-3.webp": true };
     let fileThere = true;
     const done: string[] = [];
     const { decorator } = setUp("![[report.pdf]]\n", {}, {
@@ -406,9 +413,9 @@ describe("a file deleted from its menu", () => {
     await decorator.decorate([one]);
     one.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
     [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")].find((element) => element.textContent?.trim() === "Delete file…")!.click();
-    await vi.waitFor(() => expect(done).toEqual(["deleted report.pdf", "removed _silverware-asset-preview/report.pdf.5-3.webp"]));
+    await vi.waitFor(() => expect(done).toEqual(["deleted report.pdf", "removed _silverware-assets-previews/report.pdf.5-3.webp"]));
     // (Another version's left to Clean up previews)
-    expect(Object.keys(kept)).toEqual(["_silverware-asset-preview/report.pdf.4-3.webp"]);
+    expect(Object.keys(kept)).toEqual(["_silverware-assets-previews/report.pdf.4-3.webp"]);
   });
 
   it("deletes nothing where its embed is no longer in the page: found before the file goes, as the host may draw it anew after", async () => {
@@ -442,30 +449,186 @@ describe("a file deleted from its menu", () => {
   });
 });
 
+describe("Rename… in a file's menu", () => {
+  /** The open menu's Rename…, pressed: its dialog */
+  const openRename = () => {
+    [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")].find((item) => item.textContent?.trim() === "Rename…")!.click();
+    return document.querySelector<HTMLElement>(".swa-rename-window")!;
+  };
+  const field = (dialog: HTMLElement, label: string) => dialog.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
+  const typed = (input: HTMLInputElement, value: string) => {
+    input.value = value;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  const save = (dialog: HTMLElement) => dialog.querySelector<HTMLButtonElement>(".swa-dialog-save")!.click();
+
+  it("renames an embed's file, its previews kept of its version taken away, then writes its title to the embed rewritten to the new name", async () => {
+    const kept: Record<string, true> = { "_silverware-assets-previews/Pics/cat.png.5-3.webp": true };
+    const done: string[] = [];
+    // (The page as SilverBullet's rename leaves it: every reference to the file rewritten; a later embed of it too)
+    const page = { text: "" };
+    const { state, decorator } = setUp("![[Pics/cat.png|A cat]] and ![[Pics/cat.png|Again]]\n", {}, {
+      renameFile: async (from, to) => {
+        done.push(`renamed ${from} to ${to}`);
+        page.text = page.text.replaceAll(from, to);
+      },
+      filePaths: async () => ["Pics/cat.png", "Pics/dog.png"],
+      previewFiles: {
+        facts: async (path) => (path === "Pics/cat.png" ? { modified: 5, size: 3 } : kept[path] ? { modified: 1, size: 1 } : undefined),
+        read: async () => undefined,
+        write: async () => undefined,
+        remove: async (path) => void (delete kept[path], done.push(`removed ${path}`)),
+      },
+    });
+    Object.defineProperty(page, "text", { get: () => state.text, set: (text: string) => void (state.text = text) });
+    const one = frame("Pics/cat.png");
+    await decorator.decorate([one]);
+    one.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
+    const dialog = openRename();
+    // Its title as written, its file's name without its folder and extension (shown beside it)
+    expect([field(dialog, "Title").value, field(dialog, "File name").value]).toEqual(["A cat", "cat"]);
+    expect([...dialog.querySelectorAll(".swa-rename-fixed")].map((one) => one.textContent)).toEqual(["Pics/", ".png"]);
+    // A name another file has: refused, said under it
+    typed(field(dialog, "File name"), "Dog");
+    await vi.waitFor(() => expect(dialog.textContent).toContain('"Pics/dog.png" is another file'));
+    expect(dialog.querySelector<HTMLButtonElement>(".swa-dialog-save")!.disabled).toBe(true);
+    // The name made of the title, by the link under the field
+    typed(field(dialog, "Title"), "Kočka: venku");
+    dialog.querySelector<HTMLButtonElement>(".swa-rename-from-title")!.click();
+    expect(field(dialog, "File name").value).toBe("Kočka venku");
+    save(dialog);
+    await vi.waitFor(() => expect(state.writes).toHaveLength(1));
+    expect(done).toEqual(["renamed Pics/cat.png to Pics/Kočka venku.png", "removed _silverware-assets-previews/Pics/cat.png.5-3.webp"]);
+    // (Its title written after: to the first embed of the file by its new name, the second left as it is)
+    expect(state.writes).toEqual([{ text: "![[Pics/Kočka venku.png|A cat]]", occurrence: 0, of: 1, changes: { alt: "Kočka: venku" } }]);
+    expect(document.querySelector(".swa-rename-window")).toBeNull();
+  });
+
+  it("writes nothing, its previews kept, where the file was not renamed", async () => {
+    const removed: string[] = [];
+    const { state, decorator } = setUp("![[cat.png|A cat]]\n", {}, {
+      renameFile: async () => "SilverBullet did not rename it (its notification says why)",
+      previewFiles: { facts: async () => ({ modified: 5, size: 3 }), read: async () => undefined, write: async () => undefined, remove: async (path) => void removed.push(path) },
+    });
+    const one = frame("cat.png");
+    await decorator.decorate([one]);
+    one.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
+    const dialog = openRename();
+    typed(field(dialog, "Title"), "A dog");
+    typed(field(dialog, "File name"), "dog");
+    await vi.waitFor(() => expect(dialog.querySelector<HTMLButtonElement>(".swa-dialog-save")!.disabled).toBe(false));
+    save(dialog);
+    await vi.waitFor(() => expect(state.problems).toEqual(["Silverware Assets: the file was not renamed: SilverBullet did not rename it (its notification says why)"]));
+    expect([state.writes, removed]).toEqual([[], []]);
+  });
+
+  it("in a field, sets an embed's title alone: its file is renamed from the page", async () => {
+    const renamed: string[] = [];
+    const { decorator } = setUp("", {}, { renameFile: async (from) => void renamed.push(from) });
+    const container = document.createElement("div");
+    document.body.append(container);
+    let text = "![[cat.png|A cat]]";
+    const control = new AbortController();
+    decorator.editorEmbed(text, "P")!.draw(container, control.signal, { replace: (markdown) => ((text = markdown), true) });
+    const more = await vi.waitFor(() => {
+      const button = container.querySelector<HTMLButtonElement>(".swa-more");
+      if (!button) throw new Error("not drawn yet");
+      return button;
+    });
+    more.click();
+    const dialog = openRename();
+    expect(field(dialog, "File name")).toBeNull();
+    expect(dialog.textContent).toContain("Its file is renamed from its menu in the page, not while this is edited.");
+    // (The field's companion: its focus there is not the field left)
+    expect(dialog.querySelector("[data-silverware-editor-companion]")).not.toBeNull();
+    typed(field(dialog, "Title"), "A dog");
+    save(dialog);
+    expect([text, renamed]).toEqual(["![[cat.png|A dog]]", []]);
+    control.abort();
+  });
+
+  it("takes an embed's title off, its file left as it is; Cancel writes nothing", async () => {
+    const renamed: string[] = [];
+    const { state, decorator } = setUp("![[cat.png|A cat]]\n", {}, { renameFile: async (from) => void renamed.push(from) });
+    const one = frame("cat.png");
+    await decorator.decorate([one]);
+    one.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
+    let dialog = openRename();
+    dialog.querySelector<HTMLButtonElement>(".swa-dialog-cancel")!.click();
+    expect(document.querySelector(".swa-rename-window")).toBeNull();
+    one.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
+    dialog = openRename();
+    dialog.querySelector<HTMLButtonElement>(".swa-rename-clear")!.click();
+    // (Its placeholder what shows without one: the file's name)
+    expect(field(dialog, "Title").placeholder).toBe("cat.png");
+    save(dialog);
+    await vi.waitFor(() => expect(state.writes.map((write) => write.changes)).toEqual([{ alt: null }]));
+    expect(renamed).toEqual([]);
+  });
+
+  it("sets a link's text in the page where its host writes one, its file's name beside", async () => {
+    const texts: string[] = [];
+    const { decorator } = setUp("See [[report.pdf|the report]] here.\n", {}, {
+      writeLinkText: async (write) => void texts.push(`${write.text} ${write.occurrence}/${write.of}: ${write.shown}`),
+      renameFile: async () => undefined,
+    });
+    const element = Object.assign(document.createElement("a"), { textContent: "the report", href: "report.pdf" });
+    document.body.append(element);
+    await decorator.decorateLinks([{ element, target: "report.pdf", style: "wiki" }]);
+    element.querySelector<HTMLElement>(".swa-link-marker")!.click();
+    [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")].find((item) => item.textContent?.trim() === "Rename…")!.click();
+    // (Opened once the link is found in the page, its text as written now)
+    const dialog = await vi.waitFor(() => {
+      const shown = document.querySelector<HTMLElement>(".swa-rename-window");
+      if (!shown) throw new Error("no Rename dialog yet");
+      return shown;
+    });
+    expect([field(dialog, "Text").value, field(dialog, "File name").value]).toEqual(["the report", "report"]);
+    typed(field(dialog, "Text"), "the numbers");
+    dialog.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await vi.waitFor(() => expect(texts).toEqual(["[[report.pdf|the report]] 0/1: the numbers"]));
+  });
+});
+
 describe("a link's menu", () => {
-  it("opens from its icon with what can be done with the file, the link's own click not followed", async () => {
+  it("offers an image's preview, as an embed of it has one (the browser's drawing, smaller), and writes the embed shown so", async () => {
+    const { state, decorator } = setUp("See [[cat.png]] here.\n");
+    const element = Object.assign(document.createElement("a"), { textContent: "cat.png", href: "cat.png" });
+    document.body.append(element);
+    await decorator.decorateLinks([{ element, target: "cat.png", style: "wiki" }]);
+    element.querySelector<HTMLElement>(".swa-link-marker")!.click();
+    const preview = [...document.querySelectorAll<HTMLButtonElement>(".swa-popup .swa-segment")].find((one) => one.getAttribute("aria-label")?.startsWith("Preview"))!;
+    expect(preview.getAttribute("aria-disabled")).not.toBe("true");
+    preview.click();
+    await vi.waitFor(() => expect(state.forms).toEqual(["embed [[cat.png]] 0/1"]));
+  });
+
+  it("opens from the arrow after it with what can be done with the file, the link's own click not followed; its icon a picture alone", async () => {
     const { state, decorator } = setUp("");
     const element = Object.assign(document.createElement("a"), { textContent: "report.pdf", href: "report.pdf" });
     let followed = 0;
     element.addEventListener("click", () => followed++);
     document.body.append(element);
     await decorator.decorateLinks([{ element, target: "report.pdf", style: "wiki" }]);
-    const icon = element.querySelector<HTMLElement>(".swa-link-icon")!;
-    icon.click();
-    expect(followed).toBe(0);
+    // (Its icon part of the link: a click on it follows the link, as on its text; no menu)
+    element.querySelector<HTMLElement>(".swa-link-icon")!.click();
+    expect([document.querySelector(".swa-popup"), followed]).toEqual([null, 1]);
+    const arrow = element.querySelector<HTMLElement>(".swa-link-marker")!;
+    arrow.click();
+    expect(followed).toBe(1);
     // Its row: a link the way it is shown, an embed of each view a choice
     expect(showAsRow()).toEqual([
       ["Link", "true"],
       ["Card", "false"],
       ["Preview", "false"],
-      ["Original (default)", "false"],
+      ["Full (default)", "false"],
     ]);
     const items = [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")];
     expect(items.map((item) => item.textContent?.trim())).toEqual(["Open in a new tab", "Open in side panel", "Open enlarged", "Copy markdown", "Download"]);
     items[0]!.click();
     expect(state.opened).toEqual([".fs/report.pdf"]);
     // Shown in the side panel: the file's viewer, as the browser draws a PDF
-    icon.click();
+    arrow.click();
     [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")][1]!.click();
     await vi.waitFor(() => expect(document.querySelector(".swa-peek object")?.getAttribute("data")).toBe(".fs/report.pdf"));
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
@@ -473,7 +636,7 @@ describe("a link's menu", () => {
 });
 
 describe("an asset's width, as Silverware Layout's widget", () => {
-  it("is read in pixels from its embed, written there (its height taken off)", async () => {
+  it("is read in pixels or a share from its embed, written there (its height taken off)", async () => {
     const { assetProvider } = await import("./provider.ts");
     const { state, decorator } = setUp("![[cat.png|A cat|200x100]] ![[b.png|B|50%]] ![[c.zip]]");
     const [cat, half, zip] = [frame("cat.png"), frame("b.png"), frame("c.zip", false)];
@@ -482,9 +645,13 @@ describe("an asset's width, as Silverware Layout's widget", () => {
     expect(cat!.frame.matches(provider.selector)).toBe(true);
     expect(zip!.frame.matches(provider.selector)).toBe(false);
     expect(provider.read(cat!.frame)).toEqual({ width: "200" });
+    // (A share, outside a grid's cell, left to SilverBullet as it reads it: no width of Layout's; in a cell, its own,
+    // read in the grid's test)
     expect(provider.read(half!.frame)).toEqual({});
     await provider.write(cat!.frame, { width: "320" });
     expect(state.writes.at(-1)!.changes).toEqual({ width: "320", height: null });
+    await provider.write(cat!.frame, { width: "75%" });
+    expect(state.writes.at(-1)!.changes).toEqual({ width: "75%", height: null });
     Object.defineProperty(cat!.frame, "getBoundingClientRect", { value: () => ({ width: 412.4 }) });
     await provider.write(cat!.frame, { width: "full" });
     expect(state.writes.at(-1)!.changes).toEqual({ width: "412", height: null });
@@ -492,22 +659,22 @@ describe("an asset's width, as Silverware Layout's widget", () => {
     expect(state.writes.at(-1)!.changes).toEqual({ width: null, height: null });
   });
 
-  it("keeps where it stands in its embed's metadata, Silverware Layout's entry: read, written, taken off; its kinds Preview and Original", async () => {
+  it("keeps where it stands in its embed's metadata, Silverware Layout's entry: read, written, taken off; its kinds Preview and Full", async () => {
     const { assetProvider } = await import("./provider.ts");
     const { state, decorator } = setUp("![[cat.png|||{ align: right }]]\n\n![[a.png|A|60x40|{ view: preview }]]");
     const [cat, a] = [frame("cat.png"), frame("a.png")];
     await decorator.decorate([cat, a]);
     const provider = assetProvider(decorator);
     expect(provider.read(cat.frame)).toEqual({ align: "right" });
-    expect(provider.kinds!.map((kind) => [kind.id, kind.align])).toEqual([["preview", "left"], ["original", "left"]]);
-    expect([provider.kindOf!(cat.frame), provider.kindOf!(a.frame)]).toEqual(["original", "preview"]);
+    expect(provider.kinds!.map((kind) => [kind.id, kind.align])).toEqual([["preview", "left"], ["full", "left"]]);
+    expect([provider.kindOf!(cat.frame), provider.kindOf!(a.frame)]).toEqual(["full", "preview"]);
     await provider.write(a.frame, { align: "center" });
     expect(state.writes.at(-1)!.changes).toEqual({ metadata: { align: "center" } });
     await provider.write(cat.frame, { align: null });
     expect(state.writes.at(-1)!.changes).toEqual({ metadata: { align: null } });
   });
 
-  it("gives Silverware Layout a preview to place, not to widen (its size the settings'), an original to widen; no card", async () => {
+  it("gives Silverware Layout a preview to place, not to widen (its size the settings'), a full file to widen; no card", async () => {
     const { assetProvider } = await import("./provider.ts");
     const { decorator } = setUp("![[a.png|A|60x40|{ view: preview }]]\n\n![[b.png|B|300]]\n\n![[c.zip]]");
     const [a, b, c] = [frame("a.png"), frame("b.png"), frame("c.zip", false)];
@@ -537,7 +704,7 @@ describe("the same file outside a grid and in it", () => {
     }
     await vi.waitFor(() => expect(state.writes).toHaveLength(2));
     expect(state.writes.map((write) => [write.occurrence, write.changes])).toEqual([
-      [1, { metadata: { view: "icon" } }],
+      [1, { metadata: { view: "card" } }],
       [0, { metadata: { view: "preview" } }],
     ]);
   });
@@ -597,7 +764,7 @@ describe("the same file outside a grid and in it", () => {
     const gridFrame = { ...frame("cat.png"), position: () => inGrid };
     const widget = frame("cat.png");
     await decorator.decorate([gridFrame, widget]);
-    state.text = before.replace("\n\n![[cat.png]]\n\n</cell>", "\n\n![[cat.png|||{ view: icon }]]\n\n</cell>");
+    state.text = before.replace("\n\n![[cat.png]]\n\n</cell>", "\n\n![[cat.png|||{ view: card }]]\n\n</cell>");
     widget.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
     chooseShowAs("Preview");
     await vi.waitFor(() => expect(state.writes).toHaveLength(1));
@@ -610,7 +777,7 @@ describe("the same file outside a grid and in it", () => {
     const { decorator } = setUp("![[cat.png]]");
     const unplaced = { ...frame("cat.png"), position: () => undefined };
     await decorator.decorate([unplaced]);
-    expect(unplaced.frame.hasAttribute("data-swa-asset")).toBe(false);
+    expect(unplaced.frame.hasAttribute("data-swa-type")).toBe(false);
   });
 });
 
@@ -621,18 +788,19 @@ describe("links to files decorated", () => {
     return { element, target, style: "wiki" as const };
   };
 
-  it("give a link to a file its type's icon before its text, once, none to a page; where the user hides it, a small arrow after it, once", async () => {
+  it("give a link to a file its type's icon before its text and its menu's arrow after it, once each, none to a page; the icon hidden where the user hides it", async () => {
     const { decorator } = setUp("");
     const pdf = link("report.pdf");
     const page = link("Notes");
     await decorator.decorateLinks([pdf, page]);
     expect(pdf.element.getAttribute("data-swa-link")).toBe("pdf");
     expect(pdf.element.firstElementChild?.classList.contains("swa-link-icon")).toBe(true);
+    expect(pdf.element.lastElementChild?.classList.contains("swa-link-marker")).toBe(true);
     expect(pdf.element.textContent).toBe("report.pdf");
     expect(page.element.querySelector(".swa-link-icon")).toBeNull();
     await decorator.decorateLinks([pdf]);
     expect(pdf.element.querySelectorAll(".swa-link-icon")).toHaveLength(1);
-    const { decorator: off } = setUp("", { linkIcons: false });
+    const { decorator: off } = setUp("", { link: { fields: [] } });
     const plain = link("report.pdf");
     await off.decorateLinks([plain]);
     expect(plain.element.querySelector(".swa-link-icon")).toBeNull();
@@ -653,7 +821,7 @@ describe("a link shown as embedded", () => {
   // (The link's menu, a view chosen in its row: an embed of the settings' own, as Show as embedded wrote)
   const showAsEmbedded = (icon: HTMLElement) => {
     icon.click();
-    chooseShowAs("Original");
+    chooseShowAs("Full");
   };
 
   it("writes the link it is: one in the editor by its order among those drawn of its target, outside what is rendered outside the editor", async () => {
@@ -666,7 +834,7 @@ describe("a link shown as embedded", () => {
       return { element, target: "a.pdf", style: "wiki" as const };
     });
     await decorator.decorateLinks(drawn);
-    showAsEmbedded(drawn[1]!.element.querySelector(".swa-link-icon")!);
+    showAsEmbedded(drawn[1]!.element.querySelector(".swa-link-marker")!);
     // The second drawn in the editor: the page's third link (the grid's is none of the editor's)
     await vi.waitFor(() => expect(state.forms).toEqual(["embed [[a.pdf]] 2/3"]));
   });
@@ -677,25 +845,29 @@ describe("a link shown as embedded", () => {
     const element = Object.assign(document.createElement("a"), { textContent: "a.pdf" });
     document.body.append(element);
     await decorator.decorateLinks([{ element, target: "a.pdf", style: "wiki", position: () => text.lastIndexOf("[[") }]);
-    showAsEmbedded(element.querySelector(".swa-link-icon")!);
+    showAsEmbedded(element.querySelector(".swa-link-marker")!);
     await vi.waitFor(() => expect(state.forms).toEqual(["embed [[a.pdf]] 1/2"]));
   });
 });
 
 
 describe("a card's menu", () => {
-  it("opens from the card's icon, no \"…\" over it; a click on the card still runs its action", async () => {
+  it("opens from a small arrow after the card's name, no \"…\" over it, its icon a picture alone; a click on the card still runs its action", async () => {
     const { state, decorator } = setUp("![[archive.zip]]");
     const one = frame("archive.zip", false);
     await decorator.decorate([one]);
     expect(one.frame.querySelector(".swa-more")).toBeNull();
-    const icon = one.frame.querySelector<HTMLElement>(".swa-card .swa-icon")!;
+    // (Its icon's click the card's own: the file opened, no menu)
+    one.frame.querySelector<HTMLElement>(".swa-card .swa-icon")!.click();
+    expect([document.querySelector(".swa-popup"), state.opened]).toEqual([null, [".fs/archive.zip"]]);
+    state.opened.length = 0;
+    const icon = one.frame.querySelector<HTMLElement>(".swa-card > .swa-menu-marker:last-child")!;
     icon.click();
-    // (Its row: a card the way it is shown; the original, which a zip has none of, not to be chosen)
-    expect(showAsRow().map(([name, on]) => `${name} ${on}`)).toEqual(["Link false", "Card true", "Preview false", "Original (default) false"]);
+    // (Its row: a card the way it is shown; full, which a zip has none of, not to be chosen)
+    expect(showAsRow().map(([name, on]) => `${name} ${on}`)).toEqual(["Link false", "Card true", "Preview false", "Full (default) false"]);
     expect([...document.querySelectorAll<HTMLButtonElement>(".swa-popup .swa-segment")].at(-1)!.getAttribute("aria-disabled")).toBe("true");
     expect([...document.querySelectorAll(".swa-popup .swa-menu-item")].map((item) => item.textContent?.trim())).toContain("Open in a new tab");
-    // (The icon's click the menu's alone: no file opened by it)
+    // (The arrow's click the menu's alone: no file opened by it)
     expect(state.opened).toEqual([]);
     icon.click();
     one.frame.querySelector<HTMLElement>(".swa-card-name")!.click();
@@ -703,7 +875,7 @@ describe("a card's menu", () => {
   });
 
   it("opens, where the card shows no icon, from a small arrow after its name within the card (no \"…\" beside it, cut off where the card fills its line)", async () => {
-    const { state, decorator } = setUp("![[archive.zip]]", { card: ["name"] });
+    const { state, decorator } = setUp("![[archive.zip]]", { card: { fields: ["name"] } });
     const one = frame("archive.zip", false);
     await decorator.decorate([one]);
     expect(one.frame.querySelector(".swa-more")).toBeNull();

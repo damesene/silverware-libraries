@@ -1,7 +1,7 @@
 // How much the content of a page is zoomed beyond its default: this device's font zoom, where its user asked the files
 // to follow it (Silverware Layout's setting `fontZoom.scaleFiles`, docs/silverware-layout-font-size.md *Files zoomed*).
 // A CSS variable on the document's root, set by Silverware Layout alone (none: 1); what draws content of a size of its
-// own (Silverware Assets' previews and originals, a width laid out by Layout's handle) multiplies its sizes by it, so
+// own (Silverware Assets' previews and files shown full, a width laid out by Layout's handle) multiplies its sizes by it, so
 // it grows and shrinks with the text, as the browser's zoom would make it. Controls (a "…", a handle, a menu) do not:
 // they are no content.
 

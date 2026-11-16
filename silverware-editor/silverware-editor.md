@@ -2,7 +2,7 @@
 name: Library/damesene/silverware-editor
 tags: meta/library
 version: 1.0.0
-description: "Silverware Editor: a markdown editor for the other Silverware plugins where they let you write (a grid's column, a database item's content): markdown highlighted, lists continued on Enter, brackets closed, links to your pages completed. Without it they keep a plain text field."
+description: "Silverware Editor: a markdown editor for the other Silverware plugins where they let you write (a grid's cell, a database item's content): markdown highlighted, lists continued on Enter, brackets closed, links to your pages completed. Without it they keep a plain text field."
 files:
 - silverware-editor.js
 - silverware-editor-api.md
@@ -18,7 +18,7 @@ A markdown editor for the other Silverware plugins, where they let you write mar
 - **Lists and tasks continued** as you press Enter, indented with Tab.
 - **Brackets closed** as you type them.
 - **Links to your pages completed**: type `[[` and pick a page.
-- **Links followed** where the library using it says so (a grid's column, a database item's content): click a link to open its page or file (Ctrl+click or the middle button: in a new tab); Alt+click to put your cursor in it and edit it.
+- **Links followed** where the library using it says so (a grid's cell, a database item's content): click a link to open its page or file (Ctrl+click or the middle button: in a new tab); Alt+click to put your cursor in it and edit it.
 - **Its own undo and redo** (Ctrl+Z, Ctrl+Y) while you write in it; what you wrote goes into the page as one change, undone at once by SilverBullet's undo.
 - **[Silverware Toolbar](https://github.com/damesene/silverware-libraries/blob/main/silverware-toolbar/silverware-toolbar.md) over it**: select text in it, and the toolbar shows over it as in the page.
 

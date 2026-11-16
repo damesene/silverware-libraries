@@ -196,15 +196,19 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
     constructor(
       readonly drawn: EditorEmbed,
       readonly markdown: string,
+      // Which end of its markdown it is drawn at: an embed's and a link's icon at its start, what follows a link at its end
+      readonly at: "start" | "end" = "start",
+      // Drawn before a link's text as a part of it (a file's icon): a press on it follows the link, as on its text
+      readonly lead = false,
     ) {
       super();
     }
     override eq(other: Embed): boolean {
-      return other.drawn.key === this.drawn.key && other.markdown === this.markdown;
+      return other.drawn.key === this.drawn.key && other.markdown === this.markdown && other.at === this.at && other.lead === this.lead;
     }
     toDOM(view: EditorView): HTMLElement {
       const container = view.dom.ownerDocument.createElement("span");
-      container.className = "swe-embed";
+      container.className = this.lead ? "swe-embed swe-link-lead" : "swe-embed";
       const control = new AbortController();
       Embed.ends.set(container, control);
       // (Its height known as it is drawn, perhaps later: the editor measures its lines again)
@@ -218,15 +222,18 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
       try {
         // (Its markdown replaced where it is now: found by its element, checked against the text as it was drawn)
         const markdown = this.markdown;
+        const atEnd = this.at === "end";
         const edit = {
           replace: (to: string): boolean => {
             if (view.state.readOnly) return false;
             let from: number;
             try {
-              from = view.posAtDOM(container);
+              // (Drawn after its markdown: that markdown ends where the widget is)
+              from = view.posAtDOM(container) - (atEnd ? markdown.length : 0);
             } catch {
               return false;
             }
+            if (from < 0) return false;
             if (view.state.sliceDoc(from, from + markdown.length) !== markdown) return false;
             // (Taken out where it is its line alone: the line with it)
             const line = view.state.doc.lineAt(from);
@@ -356,11 +363,14 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
     // (Shown where the selection touches it, its ends too: a caret beside a mark shows it, as it is about to be typed in)
     const shown = (from: number, to: number) => !state.readOnly && state.selection.ranges.some((range) => range.from <= to && from <= range.to);
     const hide = (from: number, to: number) => from < to && out.push(hidden.range(from, to));
-    // A link's icon before its text where the plugin draws one (a file's: its menu), its markdown the link's
+    // What the plugin draws before a link's text and after it, where it draws something (a file's icon, its menu's
+    // arrow), its markdown the link's
     const linkIcon = (from: number, to: number) => {
       const markdown = state.sliceDoc(from, to);
-      const drawn = drawing?.linkIcon?.(markdown);
-      if (drawn) out.push(cm.Decoration.widget({ widget: new Embed(drawn, markdown), side: -1 }).range(from));
+      const before = drawing?.linkIcon?.(markdown);
+      if (before) out.push(cm.Decoration.widget({ widget: new Embed(before, markdown, "start", true), side: -1 }).range(from));
+      const after = drawing?.linkAfter?.(markdown);
+      if (after) out.push(cm.Decoration.widget({ widget: new Embed(after, markdown, "end"), side: 1 }).range(to));
     };
     const children = (node: SyntaxNode) => {
       const all: SyntaxNode[] = [];
@@ -467,7 +477,8 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
   const follow = cm.EditorView.domEventHandlers({
     mousedown: (event, view) => {
       if (event.altKey || (event.button !== 0 && event.button !== 1) || (mac && event.ctrlKey)) return false;
-      const text = event.target instanceof Element ? event.target.closest(LINK_TEXT) : null;
+      // (Its text, or what is drawn before it as a part of it: a file's icon, as in the page)
+      const text = event.target instanceof Element ? event.target.closest(`${LINK_TEXT}, .swe-link-lead`) : null;
       const markdown = text && view.contentDOM.contains(text) ? linkAt(view.state, cm.syntaxTree(view.state), view.posAtDOM(text)) : undefined;
       if (!markdown) return false;
       event.preventDefault();

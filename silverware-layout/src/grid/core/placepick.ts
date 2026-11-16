@@ -1,4 +1,4 @@
-// Where a point over a grid puts what is moved into it (Move into existing grid, docs/silverware-layout-grid.md *Moving text
+// Where a point over a grid puts what is moved into it (Move to grid, docs/silverware-layout-grid.md *Moving text
 // into a grid*): new cells before or after the cell nearest it (the half it is in; only near the cell's edge where the
 // text may go into the cell too), or into that cell where its blocks meet (the boundary nearest it). Pure, on boxes
 // measured by the picker (ui/placepicker.ts): what is put where, and where its mark is drawn.

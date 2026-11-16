@@ -21,7 +21,7 @@ export type Space = {
   readonly folder: string;
   /** Pages written (by their names under the folder), and files beside them, the page `open` of them opened, Silverware Assets and DOCX started */
   open(pages: Readonly<Record<string, string>>, open: string, files?: Readonly<Record<string, Uint8Array | string>>): Promise<void>;
-  /** A file's preview as Silverware Assets keeps it (`_silverware-asset-preview/<folder>/<name>`): its text, none where none is kept */
+  /** A file's preview as Silverware Assets keeps it (`_silverware-assets-previews/<folder>/<name>`): its text, none where none is kept */
   kept(name: string): Promise<string | undefined>;
   /** A file's kept preview written over (as anyone who can write the space can) */
   writeKept(name: string, text: string): Promise<void>;
@@ -66,11 +66,11 @@ export const test = base.extend<{ space: Space }>({
         await commandDefined(page, ASSETS_SETTINGS);
       },
       kept: async (name) => {
-        const path = await keptPath(join(server().space, "_silverware-asset-preview", folder), name);
+        const path = await keptPath(join(server().space, "_silverware-assets-previews", folder), name);
         return path ? readFile(path, "utf8") : undefined;
       },
       writeKept: async (name, text) => {
-        const path = await keptPath(join(server().space, "_silverware-asset-preview", folder), name);
+        const path = await keptPath(join(server().space, "_silverware-assets-previews", folder), name);
         if (!path) throw new Error(`no preview kept as ${name}`);
         await writeFile(path, text);
       },
@@ -78,7 +78,7 @@ export const test = base.extend<{ space: Space }>({
     await page.close();
     await rm(join(server().space, folder), { recursive: true, force: true });
     // (Previews Silverware Assets kept of its files: silverware-assets/src/core/stored.ts)
-    await rm(join(server().space, "_silverware-asset-preview", folder), { recursive: true, force: true });
+    await rm(join(server().space, "_silverware-assets-previews", folder), { recursive: true, force: true });
     if (configBefore === undefined) await rm(configPath, { force: true });
     else await writeFile(configPath, configBefore);
   },

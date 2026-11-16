@@ -75,6 +75,7 @@ npm test               # vitest: unit tests and jsdom UI tests
 npm run verify         # before a commit: TypeScript, vitest, and each bundle matches its sources
 npm run test:ui        # interaction tests in Chrome against the playground (test:ui:open: in Playwright's window)
 npm run test:ui:sb     # the same tests against a real SilverBullet in Docker (scripts/silverbullet/Dockerfile's version, the plugins deployed)
+npm run test:ui:sb:edge  # the same against SilverBullet's edge build (its next release)
 npm run deploy -- <space folder>   # copy the plugins into a local space's Library/damesene/
 npm run playground     # try Silverware Table without SilverBullet, on mock data: http://localhost:8000/
 ```

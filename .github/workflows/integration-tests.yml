@@ -14,6 +14,7 @@
 # every group's does.
 # Run by hand (Actions > Integration tests > Run workflow), the target and the
 # image can be chosen (the playground, or another SilverBullet: ghcr.io/silverbulletmd/silverbullet:latest-slim).
+# edge-tests.yml calls it with SilverBullet's edge build.
 # Each group's job summary has the counts and the tests that failed; its HTML
 # report (each test's error, screenshot, trace and browser console) and
 # SilverBullet's log are artifacts of the run, by the group's name.
@@ -33,12 +34,20 @@ on:
       image:
         description: Another SilverBullet image than scripts/silverbullet/Dockerfile names (target silverbullet)
         default: ""
+  # The same tests against another SilverBullet, from another workflow (edge-tests.yml: SilverBullet's edge build)
+  workflow_call:
+    inputs:
+      image:
+        description: The SilverBullet image
+        type: string
+        required: true
 
 permissions:
   contents: read
 
+# (The image in it: a workflow calling this one has its event and ref, and would cancel the run of its own)
 concurrency:
-  group: integration-tests-${{ github.ref }}-${{ github.event_name }}
+  group: integration-tests-${{ github.ref }}-${{ github.event_name }}-${{ inputs.image }}
   cancel-in-progress: true
 
 jobs:

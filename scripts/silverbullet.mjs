@@ -7,7 +7,9 @@
 //   SB_BIN    a silverbullet binary to run instead of Docker
 // On Windows without SB_BIN: SilverBullet's own release of the image's version
 // for Windows instead of Docker (none needed, nothing installed): downloaded
-// once into .cache/silverbullet/<version>/ (git ignores it), run from there.
+// once into .cache/silverbullet/<version>/ (git ignores it), run from there;
+// the edge image's (npm run test:ui:sb:edge) the release `edge`, downloaded
+// again whenever it was rebuilt.
 //   SW_SB_SERVERS  the servers, a JSON list of { port, space } (set by playwright.config.ts
 //             from scripts/silverbullet-servers.ts)
 //   SW_SB_LOGS  a folder each server's output is written to as well, server-<port>.log
@@ -30,6 +32,15 @@ if (!servers.length) {
 }
 const binary = process.env.SB_BIN || (process.platform === "win32" ? await releaseBinary(image) : undefined);
 if (logs) mkdirSync(logs, { recursive: true });
+// Edge's tag moves as it is rebuilt, and Docker runs the build it pulled first: pulled each time (a version's tag
+// stays). Not pulled (offline): the one there, or docker run's pull fails as it would
+if (!binary && /:edge(-|$)/.test(image)) {
+  try {
+    execFileSync("docker", ["pull", "--quiet", image], { stdio: "ignore" });
+  } catch {
+    out(`SilverBullet ${image}: not pulled, the image there is taken\n`);
+  }
+}
 
 out(
   binary
@@ -107,27 +118,62 @@ function start({ port, space }) {
 }
 
 /**
- * SilverBullet's release for Windows of the image's version (its tag, `2.12.1-slim` → 2.12.1), the same SilverBullet as
- * the tests run in Docker elsewhere: downloaded once from its GitHub release into .cache/silverbullet/<version>/, then
- * taken from there. Windows' own tar (System32) reads the zip; Git's on the PATH would not
+ * SilverBullet's release for Windows of the image's version (its tag, `2.12.1-slim` → 2.12.1; `edge-slim` → the release
+ * `edge`), the same SilverBullet as the tests run in Docker elsewhere: downloaded from its GitHub release into
+ * .cache/silverbullet/<release>/, then taken from there. A version's once; edge's again whenever its release was rebuilt
+ * since (its file's time, kept beside it), else the one there (offline too). Windows' own tar (System32) reads the zip;
+ * Git's on the PATH would not
  */
 async function releaseBinary(of) {
-  const version = /:(\d+\.\d+\.\d+)/.exec(of)?.[1];
-  if (!version) throw new Error(`No release of SilverBullet for the image ${of} (its tag is no version): set SB_BIN to a binary`);
-  const folder = join(import.meta.dirname, "..", ".cache", "silverbullet", version);
+  const tag = /:([^:@/]+)(?:@|$)/.exec(of)?.[1] ?? "";
+  const release = /^\d+\.\d+\.\d+/.exec(tag)?.[0] ?? (/^edge(-|$)/.test(tag) ? "edge" : undefined);
+  if (!release) throw new Error(`No release of SilverBullet for the image ${of} (its tag is no version, nor edge): set SB_BIN to a binary`);
+  const folder = join(import.meta.dirname, "..", ".cache", "silverbullet", release);
   const exe = join(folder, "silverbullet.exe");
-  if (existsSync(exe)) return exe;
+  const asset = "silverbullet-server-windows-x86_64.zip";
+  const built = release === "edge" ? await edgeBuilt(asset) : undefined;
+  const builtFile = join(folder, "built");
+  const had = existsSync(exe);
+  if (had && (!built || (existsSync(builtFile) && readFileSync(builtFile, "utf8") === built))) return exe;
   mkdirSync(folder, { recursive: true });
-  const url = `https://github.com/silverbulletmd/silverbullet/releases/download/${version}/silverbullet-server-windows-x86_64.zip`;
-  out(`SilverBullet ${version}: downloading ${url}\n`);
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`SilverBullet ${version} could not be downloaded (${response.status}): set SB_BIN to a binary`);
+  const url = `https://github.com/silverbulletmd/silverbullet/releases/download/${release}/${asset}`;
+  out(`SilverBullet ${release}${built ? ` (built ${built})` : ""}: downloading ${url}\n`);
   const zip = join(folder, "server.zip");
-  writeFileSync(zip, Buffer.from(await response.arrayBuffer()));
-  execFileSync(join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe"), ["-xf", zip, "-C", folder]);
-  rmSync(zip, { force: true });
-  if (!existsSync(exe)) throw new Error(`SilverBullet ${version}'s release holds no silverbullet.exe: set SB_BIN to a binary`);
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`SilverBullet ${release} could not be downloaded (${response.status})`);
+    writeFileSync(zip, Buffer.from(await response.arrayBuffer()));
+    execFileSync(join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe"), ["-xf", zip, "-C", folder]);
+  } catch (error) {
+    // An edge rebuilt that could not be had (its file being uploaded again, say): the build there before
+    if (!had) throw new Error(`${error.message}: set SB_BIN to a binary`);
+    out(`SilverBullet ${release}: not updated (${error.message}), the build downloaded before is taken\n`);
+    return exe;
+  } finally {
+    rmSync(zip, { force: true });
+  }
+  if (!existsSync(exe)) throw new Error(`SilverBullet ${release}'s release holds no silverbullet.exe: set SB_BIN to a binary`);
+  if (built) writeFileSync(builtFile, built);
   return exe;
+}
+
+/**
+ * When the release `edge`'s file was last built (GitHub's time of the asset), or undefined where GitHub does not
+ * answer: then the build already downloaded is taken, if there is one
+ */
+async function edgeBuilt(asset) {
+  try {
+    const response = await fetch("https://api.github.com/repos/silverbulletmd/silverbullet/releases/tags/edge", {
+      headers: { accept: "application/vnd.github+json" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) throw new Error(String(response.status));
+    const { assets } = await response.json();
+    return assets.find(({ name }) => name === asset)?.updated_at;
+  } catch (error) {
+    out(`SilverBullet edge: GitHub did not say whether it was rebuilt (${error.message}), the build downloaded before is taken\n`);
+    return undefined;
+  }
 }
 
 /** Waits for a server to answer its ping */

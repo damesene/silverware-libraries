@@ -13,6 +13,7 @@
     "test:ui": "playwright test",
     "test:ui:open": "playwright test --ui",
     "test:ui:sb": "node scripts/ui-tests.mjs silverbullet",
+    "test:ui:sb:edge": "node scripts/ui-tests.mjs edge",
     "test:ui:install": "playwright install chromium",
     "playground": "node scripts/playground.mjs"
   },

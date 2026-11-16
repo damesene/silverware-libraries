@@ -1,0 +1,124 @@
+# The interaction tests (integration-tests.yml, the same groups, reports and logs) against SilverBullet's edge build
+# (scripts/silverbullet/edge.mjs), to learn early what its next release breaks. Not a check main's rule requires: edge
+# red blocks no pull request, nor a Dependabot one.
+# Run as main or edge changes: on a push to main, and each day for edge (it changes without a commit of ours, and
+# Dependabot follows releases alone). A pair of main's commit and edge's build tested before is not tested again,
+# passed or failed (its result kept in Actions' cache, which keeps an entry a week from its last use): the run ends
+# as the tests did, red while they failed. Run by hand (Actions > Edge tests > Run workflow), the tests run whatever
+# was tested: a failure of the runner's own (a pull refused, say) is tested again so.
+# The tests failing on main: an issue labelled silverbullet-edge, the repository's owner assigned (GitHub tells them),
+# each later failure a comment in it; passing again, it is closed. GitHub runs a schedule only from main, and stops it
+# after 60 days without activity in the repository.
+name: Edge tests
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A run under way is not cancelled (a push would keep cancelling the day's run): the next waits for it. GitHub keeps
+# one waiting: a later one replaces it, its commit then tested with the later's
+concurrency:
+  group: edge-tests-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    name: Edge or main changed
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.edge.outputs.image }}
+      key: ${{ steps.edge.outputs.key }}
+      run: ${{ github.event_name == 'workflow_dispatch' || steps.tested.outputs.cache-matched-key == '' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Edge's build by its digest, so the tests run on the build this run looked at, whatever is pushed meanwhile
+      - id: edge
+        run: |
+          edge=$(node --input-type=module -e 'import { EDGE_IMAGE } from "./scripts/silverbullet/edge.mjs"; console.log(EDGE_IMAGE)')
+          digest=$(docker buildx imagetools inspect "$edge" --format '{{.Manifest.Digest}}')
+          echo "image=$edge@$digest" >> "$GITHUB_OUTPUT"
+          echo "key=edge-tested-$GITHUB_SHA-$digest" >> "$GITHUB_OUTPUT"
+          echo "Edge: \`$edge@$digest\`, main: \`$GITHUB_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # The pair's latest result: each run's kept under a key of its own (an entry is never overwritten, and a run by
+      # hand must replace a result), the key a prefix of them, matching the newest
+      - name: Tested before
+        id: tested
+        uses: actions/cache/restore@v6
+        with:
+          path: .edge-tested
+          key: ${{ steps.edge.outputs.key }}
+          restore-keys: ${{ steps.edge.outputs.key }}-
+
+      # Its result again, so the run (and the badge of main's last) stays red while edge fails, though nothing ran
+      - name: Nothing changed
+        if: github.event_name != 'workflow_dispatch' && steps.tested.outputs.cache-matched-key != ''
+        run: |
+          result=$(cat .edge-tested)
+          echo "This commit of main was tested against this edge build before ($result): no tests run" >> "$GITHUB_STEP_SUMMARY"
+          test "$result" = "success"
+
+  tests:
+    name: Edge
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    uses: ./.github/workflows/integration-tests.yml
+    with:
+      image: ${{ needs.changes.outputs.image }}
+    # What integration-tests.yml's jobs ask for (its last one, for Dependabot's pull requests, which never come here)
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+
+  outcome:
+    name: Outcome kept and told
+    needs: [changes, tests]
+    if: ${{ always() && needs.changes.outputs.run == 'true' && (needs.tests.result == 'success' || needs.tests.result == 'failure') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RESULT: ${{ needs.tests.result }}
+      IMAGE: ${{ needs.changes.outputs.image }}
+      OWNER: ${{ github.repository_owner }}
+      RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      LABEL: silverbullet-edge
+    steps:
+      # One issue open at a time, found by its label (a label's listing is current, a search's may lag). Main's alone:
+      # a branch run by hand tells nothing of main
+      - name: The issue opened, commented or closed
+        if: github.ref == 'refs/heads/main'
+        run: |
+          issue=$(gh issue list --label "$LABEL" --state open --json number --jq '.[0].number // empty')
+          what="main \`$GITHUB_SHA\`, SilverBullet \`$IMAGE\`: $RUN (each group's report and SilverBullet's log are its artifacts)"
+          if [ "$RESULT" = "failure" ]; then
+            if [ -n "$issue" ]; then
+              gh issue comment "$issue" --body "Failing still, $what"
+            else
+              gh label create "$LABEL" --color D93F0B --description "The interaction tests fail against SilverBullet's edge build" --force
+              gh issue create --title "Interaction tests fail against SilverBullet edge" --label "$LABEL" --assignee "$OWNER" \
+                --body "The interaction tests fail against SilverBullet's edge build, which its next release will be: $what. Closed by itself once they pass."
+            fi
+          elif [ -n "$issue" ]; then
+            gh issue close "$issue" --comment "Passing again, $what"
+          fi
+
+      # Kept once told: an issue step that failed leaves the pair to be tested again
+      - name: The pair tested, kept
+        run: echo "$RESULT" > .edge-tested
+
+      - uses: actions/cache/save@v6
+        with:
+          path: .edge-tested
+          key: ${{ needs.changes.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}

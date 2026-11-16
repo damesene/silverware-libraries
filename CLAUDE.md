@@ -24,6 +24,7 @@ npm test             # vitest
 npm run test:ui:install  # once: Playwright's Chromium
 npm run test:ui      # Playwright against the playground (port 8010)
 npm run test:ui:sb   # the same tests against a real SilverBullet (Docker; on Windows its release downloaded into .cache/silverbullet/); options after -- (-g, --ui)
+npm run test:ui:sb:edge  # the same against SilverBullet's edge build (on Windows its release `edge`, downloaded again when rebuilt); CI runs it as main or edge changes (edge-tests.yml)
 npm run playground   # http://localhost:8000/ (table), /toolbar.html, /tags.html, /database.html, /icons.html; HOST=0.0.0.0 for a phone in the local network
 npm run deploy -- <space folder>   # copy every plugin into a local space's Library/damesene/
 ```

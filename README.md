@@ -1,8 +1,9 @@
 # Silverware
 
-| Tests | SilverBullet |
-| :--- | :--- |
-| [![unit](https://img.shields.io/github/actions/workflow/status/damesene/silverware-libraries/unit-tests.yml?branch=main&label=unit)](https://github.com/damesene/silverware-libraries/actions/workflows/unit-tests.yml) [![integration](https://img.shields.io/github/actions/workflow/status/damesene/silverware-libraries/integration-tests.yml?branch=main&label=integration)](https://github.com/damesene/silverware-libraries/actions/workflows/integration-tests.yml) | [![version](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdamesene%2Fsilverware-libraries%2Fmain%2Fscripts%2Fsilverbullet%2FDockerfile&search=silverbullet%3A(%5B%5E-%5Cs%5D%2B)&replace=%241&label=version)](https://github.com/damesene/silverware-libraries/blob/main/scripts/silverbullet/Dockerfile) [![bumped](https://img.shields.io/github/last-commit/damesene/silverware-libraries/main?path=scripts%2Fsilverbullet%2FDockerfile&label=bumped)](https://github.com/damesene/silverware-libraries/commits/main/scripts/silverbullet/Dockerfile) |
+| SilverBullet | Tests | Version |
+| :--- | :--- | :--- |
+| release | [![unit](https://img.shields.io/github/actions/workflow/status/damesene/silverware-libraries/unit-tests.yml?branch=main&label=unit)](https://github.com/damesene/silverware-libraries/actions/workflows/unit-tests.yml) [![integration](https://img.shields.io/github/actions/workflow/status/damesene/silverware-libraries/integration-tests.yml?branch=main&label=integration)](https://github.com/damesene/silverware-libraries/actions/workflows/integration-tests.yml) | [![version](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdamesene%2Fsilverware-libraries%2Fmain%2Fscripts%2Fsilverbullet%2FDockerfile&search=silverbullet%3A(%5B%5E-%5Cs%5D%2B)&replace=%241&label=version)](https://github.com/damesene/silverware-libraries/blob/main/scripts/silverbullet/Dockerfile) [![bumped](https://img.shields.io/github/last-commit/damesene/silverware-libraries/main?path=scripts%2Fsilverbullet%2FDockerfile&label=bumped)](https://github.com/damesene/silverware-libraries/commits/main/scripts/silverbullet/Dockerfile) |
+| edge | [![integration](https://img.shields.io/github/actions/workflow/status/damesene/silverware-libraries/edge-tests.yml?branch=main&label=integration)](https://github.com/damesene/silverware-libraries/actions/workflows/edge-tests.yml) | [![version](https://img.shields.io/badge/version-edge-blue)](https://github.com/silverbulletmd/silverbullet/releases/tag/edge) [![changed](https://img.shields.io/github/last-commit/silverbulletmd/silverbullet/main?label=changed)](https://github.com/silverbulletmd/silverbullet/commits/main) |
 
 Silverware is a collection of plugins (libraries) for [SilverBullet](https://silverbullet.md) by `damesene`.
 
@@ -75,6 +76,7 @@ npm test               # vitest: unit tests and jsdom UI tests
 npm run verify         # before a commit: TypeScript, vitest, and each bundle matches its sources
 npm run test:ui        # interaction tests in Chrome against the playground (test:ui:open: in Playwright's window)
 npm run test:ui:sb     # the same tests against a real SilverBullet in Docker (scripts/silverbullet/Dockerfile's version, the plugins deployed)
+npm run test:ui:sb:edge  # the same against SilverBullet's edge build (its next release)
 npm run deploy -- <space folder>   # copy the plugins into a local space's Library/damesene/
 npm run playground     # try Silverware Table without SilverBullet, on mock data: http://localhost:8000/
 ```

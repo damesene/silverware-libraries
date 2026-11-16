@@ -6,6 +6,11 @@
 // `init`, as Space Lua loads.
 import { applyLayers } from "../../shared/layers.ts";
 import { iconsOf } from "../../shared/icons.ts";
+import { editorsOf } from "../../shared/editor.ts";
+import { keptKeys } from "../../shared/silverbullet/keptkeys.ts";
+import { assetsOf } from "../../shared/assets.ts";
+import { withImages } from "../../shared/silverbullet/embedimage.ts";
+import { followLink } from "../../shared/silverbullet/links.ts";
 import { layoutOf } from "../../shared/layout.ts";
 import { linesOf, linesUnder } from "../../shared/markdown/lines.ts";
 import { type ConflictHost, openConflict } from "./core/conflictdialog.ts";
@@ -150,6 +155,7 @@ export function init(bridge: Bridge): void {
     {
       document,
       icons: iconsOf(platform.ui.icons),
+      editors: editorsOf(platform.ui.editors),
       core,
       types,
       ui,
@@ -174,6 +180,17 @@ export function init(bridge: Bridge): void {
             },
           }
         : {}),
+      // What an item's content draws in the peek's field: by Silverware Assets where it is installed (its files and their
+      // links as the page draws them), else an embedded image alone
+      fieldDrawing: (item) => {
+        const name = store.documentOf(item.key);
+        return name === undefined ? {} : withImages(assetsOf(bridge.assets).fieldDrawing?.(name), name);
+      },
+      // A link pressed in an item's content followed as SilverBullet follows one in the page, from the item's document
+      followLink: (markdown, item, how) => {
+        const name = store.documentOf(item.key);
+        if (name !== undefined) followLink(markdown, name, how, { navigate: (ref) => bridge.navigate(ref), openTab: (url) => void window.open(url, "_blank", "noopener") });
+      },
       showConflict: (conflict, done) =>
         openConflict(
           conflictHost(platform, () => {
@@ -187,6 +204,8 @@ export function init(bridge: Bridge): void {
       editorArea: () => editorArea(document),
       onEditorAreaChanged: (listener) => watchEditorArea(document, listener),
       editorLook: () => editorLook(document),
+      // SilverBullet's shortcuts a panel keeps from it, told in its notification (shared/silverbullet/keptkeys.ts)
+      keyKept: keptKeys(bridge.listCommands, (message) => bridge.flash(message, "info")),
       onChanged: (listener) => store.onChanged((change) => listener(change.database)),
       onDocumentOpened: (listener) => platform.editor.onOpened?.(listener) ?? (() => {}),
       refreshPlaces: (database) => {
@@ -243,6 +262,7 @@ function registerLayout(bridge: Bridge): void {
   layoutOf(bridge.layout).register({
     name: "silverware-database",
     selector: ".swd-place",
+    kinds: [{ id: "database", name: "Database", align: "center" }],
     read: (element) => {
       const shown = app?.shown.get(element as HTMLElement);
       return shown ? layoutEntries(shown.current) : {};

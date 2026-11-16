@@ -3,9 +3,19 @@
 // distance), snapped to the text's width and the guides, and named. Pure.
 import { type Guide, guideName, type Percent, percentOf } from "../model/settings.ts";
 import { readWidth } from "../model/width.ts";
+import type { LayoutAlign } from "../../../shared/layout.ts";
 
 /** A widget's width as kept: pixels, a percent of the editor's pane (snapped to a guide of one), or the whole pane */
 export type WidgetWidth = number | Percent | "full";
+
+/** Where a widget stays as its width changes: at the text's start (aligned left), centred, at its end (aligned right) */
+export type LayoutAnchor = "start" | "center" | "end";
+
+/** An alignment as the anchor a width is dragged from */
+export const anchorOf = (align: LayoutAlign): LayoutAnchor => (align === "left" ? "start" : align === "right" ? "end" : "center");
+
+/** An entry `align` read: left, center or right; anything else none */
+export { readAlign } from "../model/settings.ts";
 
 /** The narrowest a widget is made by a drag (px) */
 export const MIN_WIDGET_WIDTH = 200;
@@ -45,10 +55,22 @@ export const widthInPane = (width: WidgetWidth, pane: number): number => (width 
 /** What a width comes to in a pane: the pane less its gutter at most */
 export const shownWidgetWidth = (width: WidgetWidth, pane: number): number => Math.min(widthInPane(width, pane), pane - PANE_GUTTER);
 
-/** Where a drag may take a width to: not narrower than the least, nor wider than the pane less its gutter */
-export const draggedWidth = (start: number, moved: number, pane: number): number => Math.max(MIN_WIDGET_WIDTH, Math.min(pane - PANE_GUTTER, start + 2 * moved));
+/**
+ * Where a drag of its handle by `moved` (outwards: right of the right edge, left of a widget at the end's left edge)
+ * may take a width to: a centred widget grows on both sides (twice the move), one at the text's start or end on its
+ * one side alone; not narrower than the least, nor wider than the pane less its gutter
+ */
+export const draggedWidth = (start: number, moved: number, pane: number, anchor: LayoutAnchor = "center", text?: number): number =>
+  Math.max(MIN_WIDGET_WIDTH, Math.min(widestWidth(pane, anchor, text), start + (anchor === "center" ? 2 : 1) * moved));
 
-/** What a width may snap to: the text's (the widget then keeps no width), a guide (its own width) */
+/**
+ * The widest a widget is shown in a pane: the pane less its gutter, centred; one at the text's start or end (`text`
+ * its width, the text centred in the pane) as far as the pane's edge it grows to, less half the gutter
+ */
+export const widestWidth = (pane: number, anchor: LayoutAnchor = "center", text?: number): number =>
+  anchor !== "center" && text !== undefined ? Math.floor((pane + text) / 2 - PANE_GUTTER / 2) : pane - PANE_GUTTER;
+
+/** What a width may snap to: the text's (the widget then keeps no width, or its pixels where it is of its own size without one), a guide (its own width) */
 export type SnapTarget = { readonly width: number; readonly kept: WidgetWidth | undefined; readonly name: string };
 
 /**
@@ -56,17 +78,35 @@ export type SnapTarget = { readonly width: number; readonly kept: WidgetWidth | 
  * Only those a drag can reach (a guide of pixels wider than the pane, one under the narrowest a drag makes: none), and
  * one of a width (to the pixel): the first, so the line shown, the name said and the width kept are one guide's
  */
-export function snapTargets(textWidth: number, guides: readonly Guide[], pane: number): SnapTarget[] {
-  const targets: SnapTarget[] = [{ width: textWidth, kept: undefined, name: "Page width" }];
+export function snapTargets(textWidth: number, guides: readonly Guide[], pane: number, unsized: "text" | "own" = "text"): SnapTarget[] {
+  const targets: SnapTarget[] = [{ width: textWidth, kept: unsized === "own" ? Math.round(textWidth) : undefined, name: "Page width" }];
   const widths = new Set([Math.round(textWidth)]);
   for (const guide of guides) {
     if (typeof guide === "number" && guide > pane - PANE_GUTTER) continue;
     const width = shownWidgetWidth(guide, pane);
     if (width < MIN_WIDGET_WIDTH || widths.has(Math.round(width))) continue;
     widths.add(Math.round(width));
-    targets.push({ width, kept: guide, name: guideName(guide) });
+    // (A widget of its own size, a file, keeps a guide's width as its pixels: a share of the pane is none of a file's,
+    // whose own sizes are SilverBullet's pixels; a share of a room is: roomTargets)
+    targets.push({ width, kept: unsized === "own" ? Math.round(width) : guide, name: guideName(guide) });
   }
   return targets;
+}
+
+/** The narrowest a widget in a room of its own is made by a drag (px): a small image in a cell */
+export const MIN_ROOM_WIDTH = 40;
+
+/** Where a drag of the right edge by `moved` may take a width in a room (a cell): not narrower than the least, nor wider than the room */
+export const draggedRoomWidth = (start: number, moved: number, room: number, anchor: LayoutAnchor = "center"): number =>
+  Math.max(Math.min(MIN_ROOM_WIDTH, room), Math.min(room, start + (anchor === "center" ? 2 : 1) * moved));
+
+/**
+ * The snap targets in a room of a widget's own (a cell): its quarters, each kept as its share (`50%`), so the widget
+ * follows its room as it changes (a grid's columns, the window: docs/silverware-layout-room-handles.md); a width not
+ * snapped, its pixels
+ */
+export function roomTargets(room: number): SnapTarget[] {
+  return [25, 50, 75, 100].map((share) => ({ width: Math.round((room * share) / 100), share })).filter(({ width }) => width >= MIN_ROOM_WIDTH).map(({ width, share }) => ({ width, kept: `${share}%` as Percent, name: `${share} %` }));
 }
 
 /** A width dragged to: the target it came within SNAP_DISTANCE of (the nearest), else its own pixels */

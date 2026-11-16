@@ -1,4 +1,4 @@
-// The Page layout dialog (the command "Silverware Layout: Page layout"), three tabs, each row named by where it holds
+// The settings dialog (the command "Silverware Layout: Settings"), three tabs, each row named by where it holds
 // (this page, all pages, this device), the same in each: a slider, the value typed and ↺, and under them what it
 // follows while it has no value of its own (the field empty, that value its placeholder); moved or typed in, it is its
 // own, ↺ takes it back:
@@ -10,8 +10,9 @@
 //   (on a phone the dialog takes the screen).
 //   What is set shows on the page at once (the dialog held at the window's top, the page seen under it).
 // - Guides: the widths a drag snaps to (a widget's bar, these sliders), each typed in its own row, in px or % of the
-//   pane (the same switch as a width's), or by its slider, which held shows them on the page as it moves; Full width a
-//   box. Preview, held, shows them on the page as typed, the dialog all but gone meanwhile; Default guides puts the
+//   pane (the same switch as a width's), or by its slider, which held shows them on the page as it moves; Full width
+//   the list's last row, a box. A line on top says what guides are, the list with none says so. Preview, held,
+//   shows them on the page as typed, the dialog all but gone meanwhile; Restore defaults puts the
 //   default ones back, once confirmed (saved, as all, on Save). Ascending as the tab is drawn, left in the order typed
 //   until it is drawn again.
 // Save writes what changed (the page's into its frontmatter, the default, the guides and the font into CONFIG), Cancel
@@ -37,6 +38,19 @@ const UNITS = [
 ] as const;
 
 /** What the dialog shows and saves, and how it shows a width on the page meanwhile */
+/**
+ * A tab of the dialog of another part of Silverware Layout's (the media's): the dialog knows none by name; it shows
+ * its panel, asks whether it changed, and saves it with the rest on Save
+ */
+export type DialogTabPart = {
+  readonly id: string;
+  readonly title: string;
+  readonly panel: HTMLElement;
+  changed(): boolean;
+  // Saved; why not, as text
+  save(): Promise<string | undefined>;
+};
+
 export type PageDialogStore = {
   readonly page: string;
   // As saved now: the page's own width, the default, the guides
@@ -54,6 +68,9 @@ export type PageDialogStore = {
   // The editor's font size for every page (none: the theme's), whether Font zoom is on, this device's zoom (none: none)
   readonly fontSize: number | undefined;
   readonly fontZoom: boolean;
+  // Whether a pinch with two fingers zooms (the setting `fontZoom.pinch`), whether the files zoom with the font
+  readonly fontPinch: boolean;
+  readonly fontScaleFiles: boolean;
   readonly zoom: number | undefined;
   // The font size the theme gives (px)
   themeFontSize(): number;
@@ -64,13 +81,15 @@ export type PageDialogStore = {
   savePage(width: Width | undefined): Promise<string | undefined>;
   saveDefault(width: Width | undefined): Promise<string | undefined>;
   saveGuides(guides: readonly Guide[]): Promise<string | undefined>;
-  saveFont(fontSize: number | undefined, fontZoom: boolean): Promise<string | undefined>;
+  saveFont(font: { readonly fontSize: number | undefined; readonly fontZoom: boolean; readonly fontPinch: boolean; readonly fontScaleFiles: boolean }): Promise<string | undefined>;
   // This device's zoom kept (none: taken off)
   saveZoom(size: number | undefined): void;
   // The guides shown on the page as a drag shows them (the page's width with them), until the function given back
   previewGuides(guides: readonly Guide[]): () => void;
   confirm(question: string): Promise<boolean>;
   flash(message: string, type: "info" | "error"): void;
+  // Tabs of other parts, after its own (saved only where settings can be)
+  readonly tabs?: readonly DialogTabPart[];
 };
 
 /** What the page is shown with while the dialog is open */
@@ -79,6 +98,8 @@ export type Preview = {
   readonly defaultWidth: Width | undefined;
   readonly fontSize: number | undefined;
   readonly fontZoom: boolean;
+  // Whether the files zoom with the font (none said: no)
+  readonly scaleFiles?: boolean;
   readonly zoom: number | undefined;
 };
 
@@ -149,6 +170,9 @@ export class PageDialog {
   private guideRows: GuideRow[] = [];
   private guideList: HTMLElement | undefined;
   private full: HTMLInputElement | undefined;
+  // Full width's row, the list's last (the guides typed go before it); what the list says with no guide at all
+  private fullRow: HTMLElement | undefined;
+  private noGuides: HTMLElement | undefined;
   private resetGuides: HTMLButtonElement | undefined;
   private saveButton: HTMLButtonElement | undefined;
   private note: HTMLElement | undefined;
@@ -156,6 +180,8 @@ export class PageDialog {
   private fontField: FontField = { own: false, amount: "" };
   private device: FontField = { own: false, amount: "" };
   private fontZoom: HTMLInputElement | undefined;
+  private fontPinch: HTMLInputElement | undefined;
+  private fontScaleFiles: HTMLInputElement | undefined;
   // This device's row drawn again (its slider follows the font's size while it has no zoom of its own)
   private drawDevice: (() => void) | undefined;
   // How many of its controls are held now (a slider, Preview): the guides' sliders keep their room meanwhile
@@ -174,8 +200,8 @@ export class PageDialog {
    * device's row, as its slider does, kept on Save): whether Ctrl + scroll zooms, the size of all pages (none: the
    * theme's), this device's zoom (none: none)
    */
-  get font(): { readonly zooms: boolean; readonly size: number | undefined; readonly zoom: number | undefined } {
-    return { zooms: !!this.fontZoom?.checked, size: fontSizeOf(this.fontField).size, zoom: fontSizeOf(this.device).size };
+  get font(): { readonly zooms: boolean; readonly pinches: boolean; readonly size: number | undefined; readonly zoom: number | undefined } {
+    return { zooms: !!this.fontZoom?.checked, pinches: !!this.fontPinch?.checked, size: fontSizeOf(this.fontField).size, zoom: fontSizeOf(this.device).size };
   }
 
   /** This device's zoom set (none: the size of all pages again), as its row's slider sets it */
@@ -218,24 +244,33 @@ export class PageDialog {
     if (!store.canSaveSettings) fontRow!.classList.add(`${BASE}-readonly`);
     const fontPanel = el(doc, "div", `${BASE}-widths`, fontRow!, deviceRow!);
 
-    // The guides: each its row, ascending as drawn; Full width a box of its own
-    this.guideList = el(doc, "div", { class: `${BASE}-guide-list`, attrs: { role: "list" } });
-    const add = el(doc, "button", { class: `${BASE}-add`, text: "+ Add guide", run: () => this.addGuide("", "px", true) });
+    // The guides: each its row, ascending as drawn; Full width the list's last row (the widest, the whole pane), a box
+    // for its number
     this.full = el(doc, "input", { attrs: { type: "checkbox" } });
     this.full.addEventListener("change", () => this.update());
+    this.fullRow = el(
+      doc,
+      "div",
+      { class: `${BASE}-full-row`, attrs: { role: "listitem" } },
+      el(doc, "label", `${BASE}-full`, this.full, "Full width", el(doc, "span", `${BASE}-full-note`, "(the whole pane)")),
+    );
+    this.guideList = el(doc, "div", { class: `${BASE}-guide-list`, attrs: { role: "list" } }, this.fullRow);
+    // (No numbered guides and Full width off: no guide at all, said where the list is)
+    this.noGuides = el(doc, "p", `${BASE}-guides-empty`, "No guides: a drag does not snap.");
+    const add = el(doc, "button", { class: `${BASE}-add`, text: "+ Add guide", run: () => this.addGuide("", "px", true) });
     this.showGuides(store.guides);
-    // Default guides: the default ones back in the rows, once confirmed (the user's own would go); saved on Save
+    // Restore defaults: the default ones back in the rows, once confirmed (the user's own would go); saved on Save
     this.resetGuides = el(doc, "button", {
       class: `${BASE}-guides-reset`,
       html: ICONS.reset,
-      attrs: { title: `Put the default guides back: ${DEFAULT_GUIDES.map(guideName).join(", ")}` },
+      attrs: { title: `Restore the default guides: ${DEFAULT_GUIDES.map(guideName).join(", ")}` },
       run: () => void this.defaultGuides(),
     });
-    this.resetGuides.append("Default guides");
-    const fullRow = el(doc, "label", `${BASE}-full`, this.full, "Full width");
-    // Preview: held (a press, a finger, Space or Enter), the guides as typed on the page, the dialog all but gone
+    this.resetGuides.append("Restore defaults");
+    // Preview: held (a press, a finger, Space or Enter), the guides as typed on the page, the dialog all but gone; its
+    // text says it is held (a click alone shows nothing)
     const preview = el(doc, "button", { class: `${BASE}-preview`, html: ICONS.eye, attrs: { title: "Hold to see the guides on the page" } });
-    preview.append("Preview");
+    preview.append("Hold to preview");
     const previewBox = el(doc, "div", `${BASE}-preview-box`, preview);
     const startPreview = (byKey: boolean) => this.hold(previewBox, store.previewGuides(this.currentGuides()), byKey);
     preview.addEventListener("pointerdown", (e) => {
@@ -247,14 +282,15 @@ export class PageDialog {
       e.preventDefault();
       startPreview(true);
     });
-    // (Preview held shows its own box alone: Default guides beside it, not in it)
+    // (Preview held shows its own box alone: Restore defaults beside it, not in it)
     const actions = el(doc, "div", `${BASE}-guide-actions`, previewBox, this.resetGuides);
-    // (Preview and Default guides first, over the list: found at once, not under a list of any length)
-    const guidesPanel = el(doc, "div", `${BASE}-guides`, actions, this.guideList, add, fullRow);
+    // (What guides are on top; Preview and Restore defaults over the list: found at once, not under a list of any length)
+    const lead = el(doc, "p", `${BASE}-guides-lead`, "Widths a table, a file or a grid snaps to as you drag its width, marked under the width's slider too.");
+    const guidesPanel = el(doc, "div", `${BASE}-guides`, lead, actions, this.noGuides, this.guideList, add);
     // Settings that cannot be saved here cannot be changed either (Save would leave them as they are); Preview still shows
     if (!store.canSaveSettings) {
       guidesPanel.classList.add(`${BASE}-readonly`);
-      for (const part of [this.fallback.element, guidesPanel, this.fontZoom!]) {
+      for (const part of [this.fallback.element, guidesPanel, this.fontZoom!, this.fontPinch!, this.fontScaleFiles!]) {
         const controls = part instanceof HTMLInputElement ? [part] : part.querySelectorAll<HTMLInputElement | HTMLButtonElement>("input, button");
         for (const control of controls) if (control !== preview) control.disabled = true;
       }
@@ -267,7 +303,10 @@ export class PageDialog {
       { id: "page", title: "Page width", panel: pagePanel },
       { id: "font", title: "Font", panel: fontPanel },
       { id: "guides", title: "Guides", panel: guidesPanel },
+      ...(store.tabs ?? []).map(({ id, title, panel }) => ({ id, title, panel })),
     ]);
+    // (A tab of another part changed: Save and the note as for the dialog's own)
+    for (const tab of store.tabs ?? []) for (const type of ["change", "input"]) tab.panel.addEventListener(type, () => this.update());
     // (The sliders marked with the guides as typed, as the Page tab shows again)
     bar.addEventListener("click", () => {
       this.page?.show();
@@ -289,7 +328,7 @@ export class PageDialog {
     footer.append(this.note, cancel, this.saveButton);
 
     this.dialog = this.dialogs.open({
-      title: "Page layout",
+      title: "Silverware Layout",
       subtitle: store.page,
       bar,
       content,
@@ -317,18 +356,19 @@ export class PageDialog {
   private showGuides(guides: readonly Guide[]): void {
     const pane = this.store!.paneWidth();
     this.guideRows = [];
-    this.guideList?.replaceChildren();
+    // (Full width kept, the list's last row)
+    if (this.fullRow) this.guideList?.replaceChildren(this.fullRow);
     // (Ascending as shown in the pane now: pixels and percents among each other)
     const rows = guides.filter((guide) => guide !== "full").sort((a, b) => guidePixels(a, pane) - guidePixels(b, pane));
     for (const guide of rows) this.addGuide(typeof guide === "string" ? String(percentOf(guide)) : String(guide), typeof guide === "string" ? "%" : "px", false);
     if (this.full) this.full.checked = guides.includes("full");
   }
 
-  /** Default guides pressed: asked, then the default guides in the rows (the sliders marked with them), Save to keep */
+  /** Restore defaults pressed: asked, then the default guides in the rows (the sliders marked with them), Save to keep */
   private async defaultGuides(): Promise<void> {
     const store = this.store!;
     const names = DEFAULT_GUIDES.map(guideName).join(", ");
-    if (!(await store.confirm(`Put the default guides back (${names})? The guides you set here go; Save keeps the change.`))) return;
+    if (!(await store.confirm(`Replace your guides with the defaults (${names})? Nothing changes until you Save.`))) return;
     this.showGuides(DEFAULT_GUIDES);
     this.page?.show();
     this.fallback?.show();
@@ -520,7 +560,19 @@ export class PageDialog {
     this.fontZoom = el(doc, "input", { attrs: { type: "checkbox" } });
     this.fontZoom.checked = store.fontZoom;
     this.fontZoom.addEventListener("change", () => this.update());
-    const zoomBox = el(doc, "label", { class: `${BASE}-zoom`, attrs: { title: "Ctrl+0 puts the size of all pages back" } }, this.fontZoom, "Ctrl + scroll zooms here");
+    const zoomBox = el(doc, "label", { class: `${BASE}-zoom`, attrs: { title: "Ctrl+0 resets the zoom" } }, this.fontZoom, "Ctrl + scroll zooms the text");
+    // A pinch with two fingers zooms too, where asked (the host's own gesture of two fingers then held back, a tap of
+    // two fingers given back to it)
+    this.fontPinch = el(doc, "input", { attrs: { type: "checkbox" } });
+    this.fontPinch.checked = store.fontPinch;
+    this.fontPinch.addEventListener("change", () => this.update());
+    const pinchBox = el(doc, "label", { class: `${BASE}-zoom`, attrs: { title: "A two-finger tap still opens the page picker" } }, this.fontPinch, "Pinch with two fingers zooms the text");
+    // The files zoomed with it, where asked (images, previews, PDFs: their sizes times the zoom's share of the size of
+    // all pages), shown at once as the box is ticked
+    this.fontScaleFiles = el(doc, "input", { attrs: { type: "checkbox" } });
+    this.fontScaleFiles.checked = store.fontScaleFiles;
+    this.fontScaleFiles.addEventListener("change", () => this.update());
+    const scaleBox = el(doc, "label", { class: `${BASE}-zoom`, attrs: { title: "Images and previews grow and shrink with the text; sizes saved in your pages don't change" } }, this.fontScaleFiles, "Files zoom with the text");
     this.slides(zoomSlider);
     zoomSlider.addEventListener("input", () => {
       device.own = true;
@@ -532,7 +584,7 @@ export class PageDialog {
       device.amount = zoomAmount.value;
       this.update();
     });
-    const deviceRow = this.rowOf("This device", controls(zoomSlider, zoomAmount, zoomReset), zoomNote, zoomBox);
+    const deviceRow = this.rowOf("This device", controls(zoomSlider, zoomAmount, zoomReset), zoomNote, zoomBox, pinchBox, scaleBox);
     deviceRow.classList.add(`${BASE}-device`);
     // (Drawn again with every change: it follows the size of all pages while it has none of its own)
     this.drawDevice = () => {
@@ -681,7 +733,8 @@ export class PageDialog {
     });
     row.element.append(el(doc, "div", `${BASE}-guide-slider-box`, slider), input, units.element, remove);
     this.guideRows.push(row);
-    this.guideList?.append(row.element);
+    // (Before Full width, the widest, the list's last row)
+    this.guideList?.insertBefore(row.element, this.fullRow ?? null);
     if (focus) input.focus();
     this.update();
   }
@@ -696,6 +749,8 @@ export class PageDialog {
     if (this.resetGuides) this.resetGuides.disabled = !this.editable(this.resetGuides) || (guides.length === DEFAULT_GUIDES.length && DEFAULT_GUIDES.every((guide) => guides.includes(guide)));
     const badGuide = this.guideRows.find((row) => !!rowProblem(row));
     for (const row of this.guideRows) row.input.classList.toggle(`${BASE}-invalid`, !!rowProblem(row));
+    // (A row being typed in is a guide on its way: said only with no row and Full width off)
+    if (this.noGuides) this.noGuides.hidden = this.guideRows.length > 0 || !!this.full?.checked;
     this.fitGuideSliders();
     // The rows following another shown as what they follow now (This page the width of all pages, This device the
     // font's size), as that one changes
@@ -705,7 +760,7 @@ export class PageDialog {
     const zoom = fontSizeOf(this.device);
     const problem = page.problem ?? fallback.problem ?? font.problem ?? zoom.problem ?? (badGuide ? rowProblem(badGuide) : undefined);
     if (!page.problem && !fallback.problem && !font.problem && !zoom.problem) {
-      store.preview({ pageWidth: page.width, defaultWidth: fallback.width, fontSize: font.size, fontZoom: !!this.fontZoom?.checked, zoom: zoom.size });
+      store.preview({ pageWidth: page.width, defaultWidth: fallback.width, fontSize: font.size, fontZoom: !!this.fontZoom?.checked, scaleFiles: !!this.fontScaleFiles?.checked, zoom: zoom.size });
     }
     if (this.saveButton) {
       this.saveButton.textContent = this.saving ? "Saving…" : "Save";
@@ -722,13 +777,20 @@ export class PageDialog {
     if (!store || !this.page || !this.fallback) return false;
     const guides = this.currentGuides();
     const sameGuides = guides.length === store.guides.length && guides.every((guide) => store.guides.includes(guide));
-    return !sameWidth(widthOf(this.page.field).width, store.pageWidth) || !sameWidth(widthOf(this.fallback.field).width, store.defaultWidth) || !sameGuides || this.fontChanged() || this.zoomChanged();
+    return (
+      !sameWidth(widthOf(this.page.field).width, store.pageWidth) ||
+      !sameWidth(widthOf(this.fallback.field).width, store.defaultWidth) ||
+      !sameGuides ||
+      this.fontChanged() ||
+      this.zoomChanged() ||
+      (store.tabs ?? []).some((tab) => tab.changed())
+    );
   }
 
   /** Whether the font size or Font zoom differ from what is saved */
   private fontChanged(): boolean {
     const store = this.store!;
-    return fontSizeOf(this.fontField).size !== store.fontSize || !!this.fontZoom?.checked !== store.fontZoom;
+    return fontSizeOf(this.fontField).size !== store.fontSize || !!this.fontZoom?.checked !== store.fontZoom || !!this.fontPinch?.checked !== store.fontPinch || !!this.fontScaleFiles?.checked !== store.fontScaleFiles;
   }
 
   /** Whether this device's zoom is set otherwise than it is kept (its slider moved, typed, ↺) */
@@ -740,7 +802,7 @@ export class PageDialog {
   private async dismiss(): Promise<boolean> {
     if (this.saving) return false;
     if (!this.changed()) return true;
-    return this.store!.confirm("Close Page layout without saving your changes?");
+    return this.store!.confirm("Close the settings without saving your changes?");
   }
 
   close(): void {
@@ -770,10 +832,15 @@ export class PageDialog {
       if (problem) problems.push(`the default: ${problem}`);
     }
     if (this.fontChanged() && store.canSaveSettings) {
-      const problem = await store.saveFont(font.size, !!this.fontZoom?.checked).catch((e: unknown) => String(e));
+      const problem = await store.saveFont({ fontSize: font.size, fontZoom: !!this.fontZoom?.checked, fontPinch: !!this.fontPinch?.checked, fontScaleFiles: !!this.fontScaleFiles?.checked }).catch((e: unknown) => String(e));
       if (problem) problems.push(`the font size: ${problem}`);
     }
     if (this.zoomChanged()) store.saveZoom(fontSizeOf(this.device).size);
+    for (const tab of store.tabs ?? []) {
+      if (!tab.changed() || !store.canSaveSettings) continue;
+      const problem = await tab.save().catch((e: unknown) => String(e));
+      if (problem) problems.push(`${tab.title}: ${problem}`);
+    }
     if (!sameWidth(page.width, store.pageWidth)) {
       const problem = await store.savePage(page.width).catch((e: unknown) => String(e));
       if (problem) problems.push(`this page: ${problem}`);

@@ -9,6 +9,7 @@ import type { Line } from "../../../shared/markdown/lines.ts";
 import type { ItemKind } from "./items.ts";
 
 export type { Line } from "../../../shared/markdown/lines.ts";
+import type { EditingSurface } from "../../../shared/editor.ts";
 
 /** The selection an action works on, and the page around it */
 export type Context = {
@@ -18,6 +19,8 @@ export type Context = {
   readonly to: number;
   // The lines the selection touches, whole
   readonly lines: readonly Line[];
+  // Whether the selection is in another plugin's field (a grid's cell, a database's peek: its text, not the page's)
+  readonly inField?: boolean;
 };
 
 /** What an action that does something (`perform`) may use of the editor, through the core; each may be awaited */
@@ -37,6 +40,9 @@ export type ActionEditor = {
   // `completes`: whether it can be (the init page handed it over), asked before writing what it would complete
   startCompletion(): Promise<void>;
   readonly completes: boolean;
+  // The field it works in where it is another plugin's (a grid's cell, a database's peek; shared/editor.ts), none: the
+  // page's editor
+  readonly field?: EditingSurface;
 };
 
 /**

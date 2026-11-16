@@ -13,10 +13,14 @@
 // database in full screen: shared/overwindow.ts), no toolbar, popup or panel
 // shows, docked or not, and the page is not read for one; once it ends, a
 // toolbar shown always or while writing shows again (one by a selection, as
-// the next selection is made).
+// the next selection is made). Where the focus is in an editing surface
+// (Silverware Editor's editor in a grid's cell or a database's peek,
+// shared/editor.ts), the toolbar reads and writes it in place of the page.
+import { type EditingSurface, type Editors, editorsOf } from "../../../shared/editor.ts";
+import { keyMatches } from "../../../shared/keys.ts";
 import { type Icons, iconsOf } from "../../../shared/icons.ts";
-import { overWindowShown, watchOverWindow } from "../../../shared/overwindow.ts";
-import type { Bridge, Settings } from "../bridge.ts";
+import { overWindowOf, overWindowShown, watchOverWindow } from "../../../shared/overwindow.ts";
+import { type Bridge, readShortcut, type Settings } from "../bridge.ts";
 import { CONTENT_SELECTOR, inEditor, pageContentOf, viewTopOf } from "../dom.ts";
 import { ICONS } from "../icons.ts";
 import { type Action, type ActionEditor, type Change, type Context, NO_ARGS, withArgs } from "./action.ts";
@@ -35,6 +39,15 @@ import { Popup } from "./popup.ts";
 import { SelectionWatcher } from "./selection.ts";
 
 type State = { readonly active: boolean; readonly enabled: boolean };
+
+/** What the toolbar reads and writes: the page's editor (the bridge), or an editing surface */
+type Target = {
+  getSelection(): { readonly from: number; readonly to: number } | Promise<{ readonly from: number; readonly to: number }>;
+  getText(): string | Promise<string>;
+  setSelection(from: number, to: number): unknown;
+  replaceRange(from: number, to: number, text: string): unknown;
+  focus?(): unknown;
+};
 
 // After a read of the modules' actions failed, how long before it is tried again
 const RETRY_MS = 5000;
@@ -90,6 +103,11 @@ export class Controller {
   private retryAt = 0;
   // Watching for something shown over the whole window (shared/overwindow.ts), while started
   private stopWatchingWindow: (() => void) | undefined;
+  // The editing surface the toolbar acts on (where the focus last was in text: kept while the toolbar's own fields
+  // have it), none: the page's editor
+  private surface: EditingSurface | undefined;
+  // The key of every action (the command's, which the page's editor runs): taken here in a surface, which keeps keys from it
+  private shortcut: string | undefined;
 
   constructor(
     readonly doc: Document,
@@ -109,12 +127,15 @@ export class Controller {
     private readonly switched?: (toolbars: readonly Toolbar[]) => void,
     // What draws the favourites' own icons (Silverware Icons, or its stand-in: shared/icons.ts)
     private readonly icons: Icons = iconsOf(undefined),
+    // The editing surfaces besides the page (Silverware Editor's API, or the stand-in's none: shared/editor.ts)
+    private readonly editors: Editors = editorsOf(undefined),
   ) {
     this.watcher = new SelectionWatcher(
       doc,
       (range) => void this.selected(range),
       (node) => this.owns(node),
       (range) => void this.caretMoved(range),
+      (node) => this.surfaceAt(node),
     );
     this.bar = new Bar(doc, {
       run: (action) => void this.run(action),
@@ -130,6 +151,7 @@ export class Controller {
   start(): void {
     const win = this.doc.defaultView!;
     this.watcher.start();
+    void readShortcut(this.bridge).then((key) => (this.shortcut = key));
     win.addEventListener("keydown", this.onKey, true);
     win.addEventListener("mousedown", this.onPress, true);
     win.addEventListener("scroll", this.onScroll, { capture: true, passive: true });
@@ -170,12 +192,12 @@ export class Controller {
     // The popup in a panel's place (the toolbar's … or a list's button while it is open): the panel done
     this.panel.close(true);
     // (Not over what another plugin shows over the whole window)
-    if (overWindowShown(this.doc)) return;
+    if (this.standsBack()) return;
     // (Also where no toolbar shows: no selection, no caret)
     this.refreshIfStale();
     const context = await this.read();
     // (Shown over the window while it was read: nothing)
-    if (!context || this.stopped || overWindowShown(this.doc)) return;
+    if (!context || this.stopped || this.standsBack()) return;
     const range = this.watcher.current() ?? this.watcher.caret();
     this.shows++;
     this.atCaret = context.from === context.to;
@@ -277,13 +299,63 @@ export class Controller {
       this.showAsSet();
       return;
     }
+    // (Its field the one written in, in what shows over the window: shown there)
+    if (!this.standsBack()) return;
     this.shows++;
     this.popup.close(true);
     this.hideBar();
   };
 
+  /**
+   * Whether the toolbar stands back: while another plugin shows something over the whole window (a full screen, a
+   * database's peek), unless the field written in is in it (the peek's content): shown over it then, marked so on the
+   * root (`data-swb-over-sheet`: its layer over the sheet's)
+   */
+  private standsBack(): boolean {
+    const over = overWindowShown(this.doc);
+    let inside = false;
+    if (over) {
+      // (The field the focus is in now, as the target reads it)
+      this.target();
+      const surface = this.surface?.element.isConnected ? this.surface : undefined;
+      inside = !!surface && !!overWindowOf(surface.element);
+    }
+    this.doc.documentElement.toggleAttribute("data-swb-over-sheet", inside);
+    return over && !inside;
+  }
+
   private owns(node: Node): boolean {
     return this.bar.owns(node) || this.popup.owns(node) || this.panel.owns(node);
+  }
+
+  /** The editing surface a node is in (Silverware Editor's editor), none where it is in none */
+  private surfaceAt(node: Node | null): EditingSurface | undefined {
+    return node ? this.editors.surfaceOf(node) : undefined;
+  }
+
+  /** Whether a node is in text the toolbar acts on: the page's, or an editing surface's */
+  private inText(node: Node | null): boolean {
+    return !!pageContentOf(node) || !!this.surfaceAt(node);
+  }
+
+  /**
+   * What the toolbar reads and writes now: the surface the focus is in, or was last in text (the popup's search has it
+   * meanwhile), while it is in the page; else the page's editor
+   */
+  private target(): Target {
+    // (The focus in the toolbar's own fields, or in nothing (a press beside, the window's): the surface kept; anywhere
+    // else, the surface it is in, none (the page) where it is in none: not a surface the focus left for a field)
+    const active = this.doc.activeElement;
+    if (active && active !== this.doc.body && !this.owns(active)) this.surface = this.surfaceAt(active);
+    const surface = this.surface?.element.isConnected ? this.surface : undefined;
+    if (!surface) return this.bridge;
+    return {
+      getSelection: () => surface.getSelection(),
+      getText: () => surface.getText(),
+      setSelection: (from, to) => surface.setSelection(from, to),
+      replaceRange: (from, to, text) => surface.replaceRange(from, to, text),
+      focus: () => surface.focus(),
+    };
   }
 
   /** An action's state for a context; one whose own functions fail is off and not offered */
@@ -299,9 +371,10 @@ export class Controller {
   /** The selection's context, read anew (undefined: reading failed) */
   private async read(): Promise<Context | undefined> {
     try {
-      const selection = await this.bridge.getSelection();
-      const text = await this.bridge.getText();
-      return contextOf(text, selection.from, selection.to);
+      const target = this.target();
+      const selection = await target.getSelection();
+      const text = await target.getText();
+      return { ...contextOf(text, selection.from, selection.to), ...(target !== this.bridge ? { inField: true } : {}) };
     } catch (e) {
       console.error("Silverware Toolbar: could not read the selection", e);
       return undefined;
@@ -357,7 +430,7 @@ export class Controller {
   /** The toolbar shown for a context, by the selection or the caret */
   private showBar(context: Context, range: Range | undefined): void {
     // (None over what another plugin shows over the whole window)
-    if (overWindowShown(this.doc)) range = undefined;
+    if (this.standsBack()) range = undefined;
     this.range = range;
     if (!range) {
       this.bar.hide();
@@ -393,7 +466,7 @@ export class Controller {
       return;
     }
     this.atCaret = false;
-    if (this.popup.isOpen || overWindowShown(this.doc)) return;
+    if (this.popup.isOpen || this.standsBack()) return;
     const context = await this.read();
     if (!context || show !== this.shows || this.stopped) return;
     // The editor's selection is a caret (the page's selection is not its own, or was just changed): no toolbar
@@ -497,10 +570,13 @@ export class Controller {
     this.hideBar();
     this.focusEditor();
     const { bridge } = this;
+    const target = this.target();
+    // (SilverBullet's completion is its editor's alone)
+    const surface = target !== bridge;
     // The selection set again once the editor has the keyboard back (from the popup's search): a phone did not show
     // it selected again by itself, which an action done on it (the keyboard hidden) then lost
     await new Promise((resolve) => this.doc.defaultView!.requestAnimationFrame(resolve));
-    await bridge.setSelection(context.from, context.to);
+    await target.setSelection(context.from, context.to);
     const missing = (what: string) => new Error(`the init page did not hand over ${what}`);
     const editor: ActionEditor = {
       invokeCommand: async (name) => {
@@ -512,18 +588,24 @@ export class Controller {
         await bridge.navigate(page);
       },
       flash: (message, type) => void bridge.flash(message, type),
-      select: (from, to) => void bridge.setSelection(from, to),
+      select: (from, to) => void target.setSelection(from, to),
       // (The selection set again once the keyboard has gone: a phone may drop it as it goes)
-      hideKeyboard: () => hideKeyboard(pageContentOf(this.doc.activeElement) ?? this.doc.querySelector<HTMLElement>(CONTENT_SELECTOR), () => void bridge.setSelection(context.from, context.to)),
+      hideKeyboard: () =>
+        hideKeyboard(
+          (surface ? this.surface?.element : undefined) ?? pageContentOf(this.doc.activeElement) ?? this.doc.querySelector<HTMLElement>(CONTENT_SELECTOR),
+          () => void target.setSelection(context.from, context.to),
+        ),
       write: async (from, to, text) => {
-        await bridge.replaceRange(from, to, text);
-        await bridge.setSelection(from + text.length, from + text.length);
+        await target.replaceRange(from, to, text);
+        await target.setSelection(from + text.length, from + text.length);
       },
       startCompletion: async () => {
+        if (surface) throw new Error("completion is the page's editor's alone");
         if (!bridge.startCompletion) throw missing("startCompletion");
         await bridge.startCompletion();
       },
-      completes: !!bridge.startCompletion,
+      completes: !surface && !!bridge.startCompletion,
+      ...(surface && this.surface ? { field: this.surface } : {}),
     };
     try {
       await action.perform!(context, editor, NO_ARGS);
@@ -536,14 +618,15 @@ export class Controller {
   /** A change written, unless the page changed since it was read: one edit, the selection it marks (else its own, else the text inserted) set */
   private async write(change: Change, context: Context): Promise<void> {
     const { text, select: marks } = marked(change.insert);
-    if ((await this.bridge.getText()) !== context.text) {
+    const target = this.target();
+    if ((await target.getText()) !== context.text) {
       void this.bridge.flash("Silverware Toolbar: the page changed meanwhile, nothing was written: try again", "error");
       return;
     }
-    await this.bridge.replaceRange(change.from, change.to, text);
+    await target.replaceRange(change.from, change.to, text);
     const select = marks ? { from: change.from + marks.from, to: change.from + marks.to } : (change.select ?? { from: change.from, to: change.from + text.length });
-    await this.bridge.setSelection(select.from, select.to);
-    change.after?.({ select: (from, to) => void this.bridge.setSelection(from, to) }, text);
+    await target.setSelection(select.from, select.to);
+    change.after?.({ select: (from, to) => void target.setSelection(from, to) }, text);
   }
 
   /** The toolbar again after an action: by the selection, or at the caret where it was shown so */
@@ -559,7 +642,8 @@ export class Controller {
   }
 
   private focusEditor(): void {
-    if (this.bridge.focus) void this.bridge.focus();
+    const target = this.target();
+    if (target.focus) void target.focus();
     else this.doc.querySelector<HTMLElement>(CONTENT_SELECTOR)?.focus({ preventScroll: true });
   }
 
@@ -572,6 +656,14 @@ export class Controller {
 
   // Esc hides the toolbar (the popup's own Esc closes the popup first); shown at the caret, any key typed hides it
   private onKey = (e: KeyboardEvent): void => {
+    // The command's key in an editing surface: the surface keeps its keys from the page's editor (shared/editor.ts),
+    // so the page's command never gets it there
+    if (this.shortcut && e.target instanceof Node && this.surfaceAt(e.target) && keyMatches(this.shortcut, e)) {
+      e.preventDefault();
+      e.stopPropagation();
+      void this.showActions();
+      return;
+    }
     // (A panel's keys its own: its Esc closes it alone)
     if (this.popup.isOpen || this.panel.isOpen || !this.bar.shown) return;
     // (Shown always: it stays, Esc is the editor's)
@@ -584,7 +676,7 @@ export class Controller {
   private onPress = (e: MouseEvent): void => {
     if (!this.atCaret || !this.bar.shown || this.stays() || (e.target instanceof Node && this.owns(e.target))) return;
     // Shown always, a press in the page's text moves the caret it follows
-    if (this.persistent() && e.target instanceof Node && pageContentOf(e.target)) return;
+    if (this.persistent() && e.target instanceof Node && this.inText(e.target)) return;
     // (Docked, a press elsewhere in the editor, a table's: the room kept for it stays, the editor does not jump)
     this.hideBar(e.target instanceof Node && inEditor(e.target));
   };
@@ -601,7 +693,7 @@ export class Controller {
 
   /** Shown always: the toolbar at once, as the caret is (docked, also where the page's text has no focus) */
   private async showStaying(): Promise<void> {
-    if (!this.stays() || this.bar.shown || overWindowShown(this.doc)) return;
+    if (!this.stays() || this.bar.shown || this.standsBack()) return;
     const show = ++this.shows;
     const context = await this.read();
     if (!context || show !== this.shows || this.stopped || this.bar.shown) return;
@@ -618,12 +710,12 @@ export class Controller {
 
   /** Whether the page's text has the keyboard (its editor focused) */
   private writing(): boolean {
-    return !!pageContentOf(this.doc.activeElement);
+    return this.inText(this.doc.activeElement);
   }
 
   /** The caret moved (or came into the page's text): shown always, the toolbar goes with it, its buttons the formats around it */
   private async caretMoved(range: Range): Promise<void> {
-    if (!this.persistent() || !(this.writing() || this.stays()) || this.popup.isOpen || overWindowShown(this.doc)) return;
+    if (!this.persistent() || !(this.writing() || this.stays()) || this.popup.isOpen || this.standsBack()) return;
     const show = ++this.shows;
     const context = await this.read();
     if (!context || show !== this.shows || this.stopped || context.from !== context.to) return;
@@ -634,7 +726,7 @@ export class Controller {
   // The page's text focused: shown always, the toolbar at the caret
   private onFocus = (e: FocusEvent): void => {
     const caret = this.watcher.caret();
-    if (pageContentOf(e.target instanceof Node ? e.target : null) && caret) void this.caretMoved(caret);
+    if (this.inText(e.target instanceof Node ? e.target : null) && caret) void this.caretMoved(caret);
   };
 
   // The page's text left (not for the toolbar's own controls): shown while writing, it goes until the page has the
@@ -677,7 +769,7 @@ export class Controller {
       return;
     }
     const range = this.range;
-    if (!range || !pageContentOf(range.startContainer) || !this.bar.shown) return;
+    if (!range || !this.inText(range.startContainer) || !this.bar.shown) return;
     const viewTop = viewTopOf(range.startContainer);
     this.bar.place(rectOf(range), viewTop);
     if (this.popup.isOpen) this.popup.place(this.bar.rect(), viewTop);

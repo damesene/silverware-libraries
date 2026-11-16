@@ -1,6 +1,6 @@
 // Moving a table on the sheet: its handle dragged or clicked, Move table…, the whole table selected and dragged by its edge
 import type { Page } from "@playwright/test";
-import { cell, center, drag, expect, hoverCell, markdown, notification, setPage, table, tableIcon, test } from "../helpers.ts";
+import { cell, center, drag, expect, hoverCell, markdown, notification, setPage, startingOn, table, tableIcon, test } from "../helpers.ts";
 
 // a at A1 (its header and one row, two columns), b at D1
 const PAGE = "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| City |\n|---|\n| Brno |\n| <meta core.table core.name='b' sheet.name='Plan' sheet.at='D1'> |\n";
@@ -174,8 +174,7 @@ test.describe("Adding a table of the page to the sheet", () => {
     await expect(page.locator(".swt-menu")).toHaveCount(0);
   });
 
-  test("on a table alone's board, both go on a new sheet in one edit: it at A1, the one added at the cell", async ({ page }) => {
-    await setPage(page, `# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n${CODES}`);
+  test("on a table alone's board, both go on a new sheet in one edit: it at A1, the one added at the cell", startingOn(`# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n${CODES}`), async ({ page }) => {
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
     await hoverCell(page, cell(page, 1, 0));
     await (await tableIcon(page, "Sheet view")).click();

@@ -131,6 +131,8 @@ if js and js.window then
     -- Silverware Icons, where it is installed (its API page, priority 50, has run by now): the icons and emoji of
     -- the favourites drawn and picked
     icons = silverware.icons and silverware.icons.api,
+    -- Silverware Editor, where it is installed: the toolbar over its editors too (a grid's cell, a database's peek)
+    editor = silverware.editor and silverware.editor.api,
     -- The slash module: SilverBullet's completion started at the cursor (its slash commands after a "/")
     startCompletion = editor.startCompletion,
     -- Whether SilverBullet's keyboard bar is on (the settings offer to turn it off on a phone)

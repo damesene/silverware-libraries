@@ -1,4 +1,4 @@
-import { editorText, expect, item, root, runCommand, test, waitForIndex } from "./helpers.ts";
+import { editorText, expect, fieldReady, fieldText, item, root, runCommand, test, waitForIndex } from "./helpers.ts";
 
 // (The test's own view named: the built-in ones come first in the switcher)
 const BLOCK = "```silverware-database\nid: tasks\nview: names\n```\n";
@@ -1009,13 +1009,113 @@ test("the peek shows an item beside the page, its content written as it is left,
   await expect(page.locator(".swd-peek")).toBeVisible();
   await expect(page.locator(".swd-peek-name")).toHaveValue("Fix login");
   const body = page.locator(".swd-peek-body");
-  await expect(body).toBeEditable();
-  await body.fill("Steps to fix\n");
-  await body.press("Enter");
+  await expect.poll(() => fieldReady(body)).toBe(true);
+  await body.click();
+  await page.keyboard.press("Control+a");
+  await page.keyboard.insertText("Steps to fix\n");
+  await page.keyboard.press("Enter");
   await page.keyboard.press("Escape");
   await expect(page.locator(".swd-peek")).toHaveCount(0);
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("Steps to fix\n");
   expect(await space.saved("Page")).toBe("# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n");
+});
+
+test("in the peek's editor a file's link has its icon and menu as in the page, a link pressed is followed (the peek closed), an escape shows its character alone", async ({ page, space }) => {
+  const content = `${item("Todo", "a0")}\nSee [[${space.folder}/photo.png]] about \\[estimate: 5]\n\nThen [[${space.folder}/Page/db-tasks/Write docs|the docs]]\n`;
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS, "Page/db-tasks/Fix login": content }, "Page");
+  const body = page.locator(".swd-peek .swd-peek-body");
+  // (The editor is loaded once SilverBullet has started, when the browser is idle: a peek opened before has a plain field)
+  await expect(async () => {
+    if (await page.locator(".swd-peek").count()) await page.keyboard.press("Escape");
+    await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
+    await expect(body.locator(".cm-content")).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+  await expect.poll(() => fieldReady(body)).toBe(true);
+  // The file's link: Silverware Assets' icon before it, its menu by the arrow after it as in the page; the escape's
+  // backslash hidden
+  await expect(body.locator(".swa-link-icon")).toHaveCount(1);
+  const icon = body.locator(".swa-link-marker");
+  await expect(icon).toHaveCount(1);
+  await expect(body.locator(".cm-line", { hasText: "estimate" })).toContainText("about [estimate: 5]");
+  await icon.click();
+  await expect(page.locator(".swa-popup")).toBeVisible();
+  await expect(page.locator(".swa-popup .swa-segment")).not.toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".swa-popup")).toHaveCount(0);
+  // What the arrow's menu chooses written into the field: the link an embed shown as a card (the arrow drawn after the
+  // link's markdown, which its edit finds before it)
+  await icon.click();
+  await page.locator('.swa-popup .swa-segment[aria-label^="Card"]').click();
+  await expect.poll(() => fieldText(body)).toContain(`See ![[${space.folder}/photo.png|||{ view: card }]] about`);
+  // A page's link pressed: followed, the peek closed first
+  await body.locator(".swe-wiki-link", { hasText: "the docs" }).click();
+  await expect(page.locator(".swd-peek")).toHaveCount(0);
+  await expect(page).toHaveURL(/Write%20docs$|Write docs$/);
+});
+
+test("a shortcut of SilverBullet's pressed in the peek does nothing there and says so, the peek kept open", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS }, "Page");
+  await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
+  await expect(page.locator(".swd-peek")).toBeVisible();
+  await page.locator(".swd-peek-name").click();
+  await page.keyboard.press("Control+k");
+  await expect(page.locator(".sb-notifications")).toContainText("Navigate: Page Picker doesn't work here");
+  await expect(page.locator(".swd-peek")).toBeVisible();
+});
+
+test("with Silverware Editor installed, an item's content is edited in its editor in the peek: a list continued on Enter, Esc closing the peek, written", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS }, "Page");
+  const body = page.locator(".swd-peek .swd-peek-body");
+  // (The editor is loaded once SilverBullet has started, when the browser is idle: a peek opened before has a plain field)
+  await expect(async () => {
+    if (await page.locator(".swd-peek").count()) await page.keyboard.press("Escape");
+    await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
+    await expect(body.locator(".cm-content")).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+  await expect.poll(() => fieldReady(body)).toBe(true);
+  await body.locator(".cm-content").click();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type("- one");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("two");
+  await expect.poll(() => fieldText(body)).toContain("- one\n- two");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".swd-peek")).toHaveCount(0);
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("- one\n- two");
+  expect(await space.saved("Page")).toBe("# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n");
+});
+
+test("in the peek's editor an item's images are drawn as the page draws them, and Silverware Toolbar shows for its text", async ({ page, space }) => {
+  const url = "https://images.example.test/pics/cat.svg";
+  await page.route(url, (route) => route.fulfill({ status: 200, contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect width="300" height="200" fill="#888"/></svg>' }));
+  const content = `${item("Todo", "a0")}\nFirst words here\n\n![](${url})\n\nLast line\n`;
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS, "Page/db-tasks/Fix login": content }, "Page");
+  const body = page.locator(".swd-peek .swd-peek-body");
+  // (The editor is loaded once SilverBullet has started, when the browser is idle: a peek opened before has a plain field)
+  await expect(async () => {
+    if (await page.locator(".swd-peek").count()) await page.keyboard.press("Escape");
+    await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
+    await expect(body.locator(".cm-content")).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+  await expect.poll(() => fieldReady(body)).toBe(true);
+  // The image drawn in the field, by Silverware Assets (its frame), not its markdown
+  const frame = body.locator(".swa-frame", { has: page.locator(`img[src="${url}"]`) });
+  await expect(frame).toHaveCount(1);
+  // Its menu as in the page: Show as a card written into the item's content, the peek open
+  await frame.hover();
+  await frame.locator(".swa-more").click();
+  await page.locator('.swa-popup .swa-segment[aria-label^="Card"]').click();
+  await expect.poll(() => fieldText(body)).toContain(`![||{ view: card }](${url})`);
+  await expect(page.locator(".swd-peek")).toBeVisible();
+  // A word selected: the toolbar over the peek, its action written into the item's content
+  await body.locator(".cm-line", { hasText: "First words here" }).dblclick({ position: { x: 4, y: 6 } });
+  const bar = page.locator(".swb-bar.swb-visible");
+  await expect(bar).toBeVisible();
+  await bar.locator('[data-swb-action="formats.bold"]').click();
+  await expect.poll(() => fieldText(body)).toContain("**First** words here");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("**First** words here");
 });
 
 test("Delete database… in ⋯ deletes its pages and its blocks on every page once its name is typed; Undo brings them back", async ({ page, space }) => {
@@ -1064,7 +1164,7 @@ test("the peek stays as its content typed is written by a press beside its field
   const peek = page.locator(".swd-peek");
   await expect(peek).toBeVisible();
   const body = page.locator(".swd-peek-body");
-  await expect(body).toBeEditable();
+  await expect.poll(() => fieldReady(body)).toBe(true);
   await body.click();
   await page.keyboard.type("Typed in the peek");
   // A press in the peek beside its fields: the content written as it is left, the peek still there as SilverBullet indexes
@@ -1089,7 +1189,7 @@ test("the peek's properties scroll in their own box past a height, the content u
   await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
   const peek = page.locator(".swd-peek");
   const box = peek.locator(".swd-peek-props-box");
-  await expect(peek.locator(".swd-peek-body")).toHaveValue("The content\n");
+  await expect.poll(() => fieldText(peek.locator(".swd-peek-body"))).toBe("The content\n");
   // The content in the window, the properties' box scrolling (more in it than it shows)
   await expect(peek.locator(".swd-peek-body")).toBeInViewport();
   expect(await box.evaluate((one) => one.scrollHeight > one.clientHeight + 50)).toBe(true);

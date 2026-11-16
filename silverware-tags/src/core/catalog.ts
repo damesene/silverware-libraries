@@ -43,7 +43,7 @@ export async function readCatalog(space: Space, options: CatalogOptions = {}): P
 
 // How long a change waits for the index to have its pages as written, before the tags are read as they are
 const INDEX_WAIT_MS = 10_000;
-const INDEX_POLL_MS = 300;
+export const INDEX_POLL_MS = 300;
 
 /**
  * Waits until the index has the pages written as they are now (a space's

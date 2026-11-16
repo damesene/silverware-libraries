@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Editor, Space } from "../platform.ts";
-import { pageChanges } from "./changes.ts";
+import { type PageBuilder, pageChanges } from "./changes.ts";
 import { diffLines, minimalEdit } from "./diff.ts";
 import { PageHistory } from "./history.ts";
 import { PARTS } from "./parts.ts";
+import { readGrids } from "../markdown/grid.ts";
 import { pageWriter } from "./writer.ts";
 
 /** A space of pages in memory, `open` the page in its editor; `edits` what the editor was asked */
@@ -325,12 +326,219 @@ describe("the page writer", () => {
     const gone = await writer.plan(pageChanges().page("A", (p) => p.codeBlocks.remove("silverware-database", "id: other")).build());
     expect(gone.skipped.map((one) => one.reason)).toEqual(["its silverware-database block changed since it was read: left alone"]);
   });
+
+  it("writes a grid's cell with a blank line before and after its content, the grid of those alike asked, and leaves a grid changed", async () => {
+    const grid = "<grid>\n<cell>\nOld\n</cell>\n<cell>\n\nKeep\n\n</cell>\n</grid>";
+    const body = "<cell>\nOld\n</cell>\n<cell>\n\nKeep\n\n</cell>";
+    const { map, writer } = memory({ A: `# A\n\n${grid}\n\n${grid}\n`, Crlf: "<grid>\r\n<cell>\r\nx\r\n</cell>\r\n</grid>\r\n" });
+    const report = await writer.write(
+      pageChanges()
+        .page("A", (p) => p.grids.replaceCell(body, 0, "New\n- a", { occurrence: 1, of: 2 }))
+        .page("Crlf", (p) => p.grids.replaceCell("<cell>\r\nx\r\n</cell>", 0, "y\nz"))
+        .build(),
+    );
+    expect(report.skipped).toEqual([]);
+    expect(map.get("A")).toBe(`# A\n\n${grid}\n\n<grid>\n<cell>\n\nNew\n- a\n\n</cell>\n<cell>\n\nKeep\n\n</cell>\n</grid>\n`);
+    expect(map.get("Crlf")).toBe("<grid>\r\n<cell>\r\n\r\ny\r\nz\r\n\r\n</cell>\r\n</grid>\r\n");
+    // Its content as written already: nothing to write; emptied: one blank line left
+    const same = await writer.plan(pageChanges().page("A", (p) => p.grids.replaceCell(body, 1, "Keep")).build());
+    expect(same.pages).toEqual([]);
+    await writer.write(pageChanges().page("A", (p) => p.grids.replaceCell(body, 1, "")).build());
+    expect(map.get("A")!.startsWith(`# A\n\n<grid>\n<cell>\nOld\n</cell>\n<cell>\n\n</cell>\n</grid>`)).toBe(true);
+    // A grid changed since it was read, a cell not there, two alike counted where one is: left alone
+    const gone = await writer.plan(pageChanges().page("A", (p) => p.grids.replaceCell("<cell>\nOther\n</cell>", 0, "x")).build());
+    expect(gone.skipped.map((one) => one.reason)).toEqual(["its grid changed since it was read: left alone"]);
+    expect((await writer.plan(pageChanges().page("Crlf", (p) => p.grids.replaceCell("<cell>\r\ny\r\nz\r\n</cell>", 3, "x")).build())).skipped).toHaveLength(1);
+  });
+
+  it("moves text into a grid's cells as one edit: taken out of the page, or out of another cell of the grid, and left alone where it changed", async () => {
+    const body = "<cell>\n\nLeft **bold** text\n\n</cell>\n<cell>\n\nRight\n\n</cell>";
+    const page = `# A\n\nMoved here\n\n<grid>\n${body}\n</grid>\n`;
+    const { map, writer } = memory({ A: page });
+    // Out of the page into the second cell: one edit
+    const from = page.indexOf("Moved here");
+    const report = await writer.write(pageChanges().page("A", (p) => p.text.takeOut(from, from + "Moved here".length, "Moved here").grids.replaceCell(body, 1, "Right Moved here")).build());
+    expect(report.skipped).toEqual([]);
+    expect(map.get("A")).toBe(`# A\n\n\n\n<grid>\n<cell>\n\nLeft **bold** text\n\n</cell>\n<cell>\n\nRight Moved here\n\n</cell>\n</grid>\n`);
+    // Out of one cell into the other: both at once
+    const now = "<cell>\n\nLeft **bold** text\n\n</cell>\n<cell>\n\nRight Moved here\n\n</cell>";
+    await writer.write(pageChanges().page("A", (p) => p.grids.replaceCells(now, { 0: "Left text", 1: "**bold** Right Moved here" })).build());
+    expect(map.get("A")).toBe(`# A\n\n\n\n<grid>\n<cell>\n\nLeft text\n\n</cell>\n<cell>\n\n**bold** Right Moved here\n\n</cell>\n</grid>\n`);
+    // The text taken out changed since it was read: the page left alone
+    const gone = await writer.plan(pageChanges().page("A", (p) => p.text.takeOut(0, 3, "xyz")).build());
+    expect(gone.skipped.map((one) => one.reason)).toEqual(["the text changed since it was read: left alone"]);
+  });
+
+  it("sets a grid's attributes on its <grid> line, the others kept, one taken off, a name refused", async () => {
+    const body = "<cell>\nA\n</cell>";
+    const { map, writer } = memory({ A: `<grid columns="1fr 2fr">\r\n${body.replace(/\n/g, "\r\n")}\r\n</grid>\r\n` });
+    await writer.write(pageChanges().page("A", (p) => p.grids.setAttributes(body, { width: "1100" })).build());
+    expect(map.get("A")!.split("\r\n")[0]).toBe('<grid columns="1fr 2fr" width="1100">');
+    await writer.write(pageChanges().page("A", (p) => p.grids.setAttributes(body, { width: null, columns: "3" })).build());
+    expect(map.get("A")).toBe(`<grid columns="3">\r\n<cell>\r\nA\r\n</cell>\r\n</grid>\r\n`);
+    const same = await writer.plan(pageChanges().page("A", (p) => p.grids.setAttributes(body, { columns: "3" })).build());
+    expect(same.pages).toEqual([]);
+    const bad = await writer.plan(pageChanges().page("A", (p) => p.grids.setAttributes(body, { "a b": "x" })).build());
+    expect(bad.skipped.map((one) => one.reason)).toEqual(['"a b" is no attribute\'s name (letters, digits, -, _, : and . only, not first a digit)']);
+  });
+
+  it("writes an embed's size and metadata, the one of those alike asked, and leaves one changed", async () => {
+    const { map, writer } = memory({ A: "x ![[cat.png]] y ![[cat.png]]\n" });
+    await writer.write(pageChanges().page("A", (p) => p.embeds.set("![[cat.png]]", { width: "300", metadata: { view: "preview" } }, { occurrence: 1, of: 2 })).build());
+    expect(map.get("A")).toBe("x ![[cat.png]] y ![[cat.png||300|{ view: preview }]]\n");
+    const gone = await writer.plan(pageChanges().page("A", (p) => p.embeds.set("![[dog.png]]", { width: "1" })).build());
+    expect(gone.skipped.map((one) => one.reason)).toEqual(["its embed changed since it was read: left alone"]);
+    const same = await writer.plan(pageChanges().page("A", (p) => p.embeds.set("![[cat.png]]", {})).build());
+    expect(same.pages).toEqual([]);
+  });
+
+  it("writes an embed as a link and a link as an embed, the one of those alike asked", async () => {
+    const { map, writer } = memory({ A: "![[cat.png|Cat|300|{ view: card }]] and [[doc.pdf]] [[doc.pdf]]\n" });
+    await writer.write(pageChanges().page("A", (p) => p.embeds.toLink("![[cat.png|Cat|300|{ view: card }]]")).build());
+    expect(map.get("A")).toBe("[[cat.png|Cat]] and [[doc.pdf]] [[doc.pdf]]\n");
+    await writer.write(pageChanges().page("A", (p) => p.links.toEmbed("[[doc.pdf]]", { occurrence: 1, of: 2 })).build());
+    expect(map.get("A")).toBe("[[cat.png|Cat]] and [[doc.pdf]] ![[doc.pdf]]\n");
+    const gone = await writer.plan(pageChanges().page("A", (p) => p.links.toEmbed("[[nope.pdf]]")).build());
+    expect(gone.skipped.map((one) => one.reason)).toEqual(["its link changed since it was read: left alone"]);
+    // A link written as an embed of a view, at once (one edit)
+    await writer.write(pageChanges().page("A", (p) => p.links.toEmbed("[[doc.pdf]]", {}, { metadata: { view: "preview" } })).build());
+    expect(map.get("A")).toBe("[[cat.png|Cat]] and ![[doc.pdf|||{ view: preview }]] ![[doc.pdf]]\n");
+  });
+
+  it("puts a selection's blocks into a grid, the text as read alone", async () => {
+    const text = "Top\n\nOne\n\nTwo\n\nThree\n";
+    const { map, writer } = memory({ A: text });
+    const from = text.indexOf("One");
+    const to = text.indexOf("Three") + 5;
+    await writer.write(pageChanges().page("A", (p) => p.grids.put(from, to, text.slice(from, to), "split", 2)).build());
+    expect(map.get("A")).toBe("Top\n\n<grid>\n<cell>\n\nOne\n\nTwo\n\n</cell>\n<cell>\n\nThree\n\n</cell>\n</grid>\n");
+    const stale = await writer.plan(pageChanges().page("A", (p) => p.grids.put(from, to, "something else", "gallery", 3)).build());
+    expect(stale.skipped.map((one) => one.reason)).toEqual(["the text changed since it was read: left alone"]);
+  });
+
+  it("moves a selection's blocks into a grid as one edit, the text and the grid as read alone", async () => {
+    const grid = "<grid>\n<cell>\n\nA\n\n</cell>\n</grid>";
+    const text = `One\n\nTwo\n\n${grid}\n`;
+    const body = readGrids(text)[0]!.body;
+    const { map, writer } = memory({ A: text });
+    const to = text.indexOf("Two") + 3;
+    await writer.write(pageChanges().page("A", (p) => p.grids.moveInto(0, to, text.slice(0, to), body, "each", { kind: "cells", at: 1 })).build());
+    expect(map.get("A")).toBe("<grid>\n<cell>\n\nA\n\n</cell>\n<cell>\n\nOne\n\n</cell>\n<cell>\n\nTwo\n\n</cell>\n</grid>\n");
+    const stale = await writer.plan(pageChanges().page("A", (p) => p.grids.moveInto(0, 3, "Two", body, "each", { kind: "cells", at: 0 })).build());
+    expect(stale.skipped.map((one) => one.reason)).toEqual(["its grid changed since it was read: left alone"]);
+    // (A grid among the lines moved: left alone)
+    const around = `One\n\n${grid}\n\nTwo\n\n${grid}`;
+    const { writer: second } = memory({ B: around });
+    const across = await second.plan(pageChanges().page("B", (p) => p.grids.moveInto(0, around.indexOf("Two") + 3, around.slice(0, around.indexOf("Two") + 3), body, "each", { kind: "cells", at: 0 }, { occurrence: 1 })).build());
+    expect(across.skipped.map((one) => one.reason)).toEqual(["the text moved takes in a grid"]);
+  });
+
+  it("changes a grid's cells: one moved, one added, one taken out under it, all taken apart", async () => {
+    const grid = '<grid columns="3">\n<cell>\n\nA\n\n</cell>\n<cell>\n\nB\n\n</cell>\n</grid>';
+    const body = readGrids(grid)[0]!.body;
+    const { map, writer } = memory({ A: `${grid}\n\nAfter\n` });
+    const change = async (cells: Parameters<PageBuilder["grids"]["changeCells"]>[1]) => {
+      const now = readGrids(map.get("A")!)[0]!.body;
+      await writer.write(pageChanges().page("A", (p) => p.grids.changeCells(now, cells)).build());
+    };
+    await change({ kind: "move", cell: 0, by: 1 });
+    expect(map.get("A")).toBe('<grid columns="3">\n<cell>\n\nB\n\n</cell>\n<cell>\n\nA\n\n</cell>\n</grid>\n\nAfter\n');
+    await change({ kind: "add", after: 0 });
+    expect(readGrids(map.get("A")!)[0]!.cells.map((cell) => cell.content)).toEqual(["B", "", "A"]);
+    await change({ kind: "takeOut", cell: 2 });
+    expect(map.get("A")).toBe('<grid columns="3">\n<cell>\n\nB\n\n</cell>\n<cell>\n\n\n</cell>\n</grid>\n\nA\n\nAfter\n');
+    await change({ kind: "ungrid" });
+    expect(map.get("A")).toBe("B\n\nA\n\nAfter\n");
+    expect(body).toContain("<cell>");
+  });
+
+  it("moves, adds and takes out a cell whole: its column's attributes and what lies between the cells kept", async () => {
+    const page = '<grid>\n<cell span="2">\n\nA\n\n</cell>\nA note\n<cell>\n\nB\n\n</cell>\n</grid>\n';
+    const { map, writer } = memory({ A: page });
+    const change = async (cells: Parameters<PageBuilder["grids"]["changeCells"]>[1]) => {
+      const now = readGrids(map.get("A")!)[0]!.body;
+      await writer.write(pageChanges().page("A", (p) => p.grids.changeCells(now, cells)).build());
+    };
+    await change({ kind: "move", cell: 1, by: -1 });
+    expect(map.get("A")).toBe('<grid>\n<cell>\n\nB\n\n</cell>\nA note\n<cell span="2">\n\nA\n\n</cell>\n</grid>\n');
+    await change({ kind: "add", after: 1 });
+    expect(map.get("A")).toBe('<grid>\n<cell>\n\nB\n\n</cell>\nA note\n<cell span="2">\n\nA\n\n</cell>\n<cell>\n\n\n</cell>\n</grid>\n');
+    await change({ kind: "takeOut", cell: 0 });
+    expect(map.get("A")).toBe('<grid>\nA note\n<cell span="2">\n\nA\n\n</cell>\n<cell>\n\n\n</cell>\n</grid>\n\nB\n');
+    await change({ kind: "ungrid" });
+    // (The note and the cell each a line of text alone: a line break between)
+    expect(map.get("A")).toBe("A note\nA\n\nB\n");
+  });
+
+  it("deletes a cell, its content with it; the grid gone with its last cell", async () => {
+    const { map, writer } = memory({ A: "<grid>\n<cell>\n\nA\n\n</cell>\n<cell>\n\nB\n\n</cell>\n</grid>\n\nAfter\n" });
+    const change = async (cells: Parameters<PageBuilder["grids"]["changeCells"]>[1]) => {
+      const now = readGrids(map.get("A")!)[0]!.body;
+      await writer.write(pageChanges().page("A", (p) => p.grids.changeCells(now, cells)).build());
+    };
+    await change({ kind: "remove", cell: 0 });
+    expect(map.get("A")).toBe("<grid>\n<cell>\n\nB\n\n</cell>\n</grid>\n\nAfter\n");
+    await change({ kind: "remove", cell: 0 });
+    expect(map.get("A")).toBe("\n\nAfter\n");
+  });
+
+  it("moves a cell left open, closing it", async () => {
+    const { map, writer } = memory({ A: "<grid>\n<cell>\nA\n</cell>\n<cell>\nB\n</grid>" });
+    const now = readGrids(map.get("A")!)[0]!.body;
+    await writer.write(pageChanges().page("A", (p) => p.grids.changeCells(now, { kind: "move", cell: 1, by: -1 })).build());
+    expect(readGrids(map.get("A")!)[0]!.cells.map((cell) => [cell.content, cell.closed])).toEqual([
+      ["B", true],
+      ["A", true],
+    ]);
+  });
+
+  it("takes an embed out (its line where it was alone on it) and writes a link as its text, its file deleted", async () => {
+    const { map, writer } = memory({ A: "Top\n![[a.pdf]]\nSee ![[b.png|B]] here and [[Docs/c.zip]] or [the doc](d.pdf).\n" });
+    await writer.write(
+      pageChanges()
+        .page("A", (p) => p.embeds.remove("![[a.pdf]]").embeds.remove("![[b.png|B]]").links.toText("[[Docs/c.zip]]").links.toText("[the doc](d.pdf)"))
+        .build(),
+    );
+    expect(map.get("A")).toBe("Top\nSee  here and c.zip or the doc.\n");
+    // Alone between blank lines: one blank line left where it was
+    const { map: other, writer: otherWriter } = memory({ B: "# B\n\n![[a.pdf]]\n\nAfter\n" });
+    await otherWriter.write(pageChanges().page("B", (p) => p.embeds.remove("![[a.pdf]]")).build());
+    expect(other.get("B")).toBe("# B\n\nAfter\n");
+    // The only content of a list item, a task or a quote: its line with it, no empty marker left
+    const { map: list, writer: listWriter } = memory({ C: "- one\n- ![[a.pdf]]\n- [ ] ![[b.pdf]]\n> ![[c.png]]\n1. ![[d.zip]]\n- two\n" });
+    await listWriter.write(pageChanges().page("C", (p) => p.embeds.remove("![[a.pdf]]").embeds.remove("![[b.pdf]]").embeds.remove("![[c.png]]").embeds.remove("![[d.zip]]")).build());
+    expect(list.get("C")).toBe("- one\n- two\n");
+    // A link's file name written as words (its markdown marks escaped), a wiki link's alias too; a markdown link's text as it is
+    const { map: names, writer: namesWriter } = memory({ D: "[[_draft_.pdf]], [[a.pdf|*Notes*]], [**Bold**](b.pdf), [[50%20off.pdf]]\n" });
+    await namesWriter.write(
+      pageChanges()
+        .page("D", (p) => p.links.toText("[[_draft_.pdf]]").links.toText("[[a.pdf|*Notes*]]").links.toText("[**Bold**](b.pdf)").links.toText("[[50%20off.pdf]]"))
+        .build(),
+    );
+    expect(names.get("D")).toBe("\\_draft\\_.pdf, \\*Notes\\*, **Bold**, 50%20off.pdf\n");
+  });
+
+  it("gives a link another text it shows, its target as it is: none, a wiki link its target alone, a markdown link its file's name", async () => {
+    const { map, writer } = memory({ A: "[[a.pdf]], [[b.pdf|B]], [the c](Docs/c.pdf \"C\"), [the d](d.pdf), [[a.pdf]]\n" });
+    await writer.write(
+      pageChanges()
+        .page("A", (p) => p.links.setText("[[a.pdf]]", "The A", { occurrence: 1, of: 2 }).links.setText("[[b.pdf|B]]", "").links.setText('[the c](Docs/c.pdf "C")', "C, new").links.setText("[the d](d.pdf)", ""))
+        .build(),
+    );
+    expect(map.get("A")).toBe('[[a.pdf]], [[b.pdf]], [C, new](Docs/c.pdf "C"), [d.pdf](d.pdf), [[a.pdf|The A]]\n');
+  });
+
+  it("closes a grid's cell left open as it writes it", async () => {
+    const { map, writer } = memory({ A: "<grid>\n<cell>\nOpen\n</grid>" });
+    await writer.write(pageChanges().page("A", (p) => p.grids.replaceCell("<cell>\nOpen", 0, "Shut")).build());
+    expect(map.get("A")).toBe("<grid>\n<cell>\n\nShut\n\n</cell>\n</grid>");
+  });
 });
 
 describe("the builder", () => {
   it("has every section the parts make, each a part of its own", () => {
     const sections = PARTS.flatMap((one) => (one.section ? [one.section.name] : []));
-    expect(sections).toEqual(["properties", "tags", "codeBlocks"]);
+    expect(sections).toEqual(["text", "properties", "tags", "codeBlocks", "grids", "embeds", "links"]);
     pageChanges().page("A", (p) => {
       for (const name of sections) expect(Object.values(p[name]).every((method) => typeof method === "function"), name).toBe(true);
     });

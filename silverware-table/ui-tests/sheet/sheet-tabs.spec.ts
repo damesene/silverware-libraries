@@ -1,6 +1,6 @@
 // The sheets' tabs at the sheet view's bottom: going to another sheet, a new one, renaming and removing one
 import type { Page } from "@playwright/test";
-import { cell, expect, hoverCell, markdown, setPage, table, tableIcon, test } from "../helpers.ts";
+import { cell, expect, hoverCell, markdown, setPage, startingOn, table, tableIcon, test } from "../helpers.ts";
 
 const PAGE =
   "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1' sheet.width.A='120'> |\n\n" +
@@ -77,8 +77,7 @@ test.describe("The sheets' tabs", () => {
     await expect(drawn(page)).toContainText("X1");
   });
 
-  test("a table alone's board: its table's tab first, there to go back to from the page's sheets", async ({ page }) => {
-    await setPage(page, "# Test\n\n| Item |\n|---|\n| Pear |\n\n| Code |\n|---|\n| X1 |\n| <meta core.table core.name='c' sheet.name='Q3' sheet.at='B2'> |\n");
+  test("a table alone's board: its table's tab first, there to go back to from the page's sheets", startingOn("# Test\n\n| Item |\n|---|\n| Pear |\n\n| Code |\n|---|\n| X1 |\n| <meta core.table core.name='c' sheet.name='Q3' sheet.at='B2'> |\n"), async ({ page }) => {
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
     await hoverCell(page, cell(page, 1, 0));
     await (await tableIcon(page, "Sheet view")).click();

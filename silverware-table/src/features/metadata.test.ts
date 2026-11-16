@@ -1,12 +1,19 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { STORE_SORT_DELAY_MS } from "../controller.ts";
 import { parseTable } from "../markdown.ts";
 import { PAGE, bodyTexts, buttonLabel, cell, cellMenuItem, clickOn, controller, editor, flashes, flush, key, menuButtons, nameInMenu, setup, tableMenuItem, text, toolbarName, useTablePage } from "../testing/page.ts";
 
 describe("Table metadata", () => {
   useTablePage();
 
-  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  // The sorting stored once the clicks have settled, after the controller's delay: time moved on by the fake timers
+  // the test starts before its setup, not waited for; the write that follows run to its end (a test that nothing is
+  // written sees what would have been)
+  const sortStored = async () => {
+    await vi.advanceTimersByTimeAsync(STORE_SORT_DELAY_MS);
+    await flush();
+  };
   const META_PAGE = `| Name | Qty |\n|---|---|\n| Pear | 3 |\n| apple | 10 |\n| <meta core.table core.-c-qty.sort='desc'> |\n`;
 
   it("names a table from its toolbar, refusing a name that is taken or not valid", async () => {
@@ -82,24 +89,26 @@ describe("Table metadata", () => {
   });
 
   it("does not change the table when sorting with the setting off", async () => {
+    vi.useFakeTimers();
     await setup(PAGE);
     clickOn(cell(0, 0).querySelector(".swt-sort")!);
-    await wait(700);
+    await sortStored();
     expect(text).toBe(PAGE);
   });
 
   it("with the setting off, changes a sorting stored, but stores none in a table that has none (a name only)", async () => {
+    vi.useFakeTimers();
     const SORTED = `| Name | Qty |\n|---|---|\n| Pear | 3 |\n| apple | 10 |\n| <meta core.table core.-c-qty.sort='desc'> |\n`;
     await setup(SORTED);
     clickOn(cell(0, 0).querySelector(".swt-sort")!);
-    await wait(700);
+    await sortStored();
     expect(text).toContain("core.-c-name.sort='asc'");
     controller.stop();
     document.body.replaceChildren();
     const NAMED = `| Name | Qty |\n|---|---|\n| Pear | 3 |\n| apple | 10 |\n| <meta core.table core.name='fruit'> |\n`;
     await setup(NAMED);
     clickOn(cell(0, 0).querySelector(".swt-sort")!);
-    await wait(700);
+    await sortStored();
     expect(text).toBe(NAMED);
   });
 
@@ -119,15 +128,20 @@ describe("Table metadata", () => {
   });
 
   it("stores the sorting with the setting on, only where the clicks end", async () => {
+    vi.useFakeTimers();
     await setup(PAGE, { "silverware.table.metadata": true });
     clickOn(cell(0, 1).querySelector(".swt-sort")!); // Qty ascending
     clickOn(cell(0, 1).querySelector(".swt-sort")!); // Qty descending
-    await wait(700);
+    // Nothing stored before the clicks have settled: the delay counted from the last click
+    await vi.advanceTimersByTimeAsync(STORE_SORT_DELAY_MS - 1);
+    await flush();
+    expect(text).toBe(PAGE);
+    await sortStored();
     await controller.scan();
     expect(text).toBe(PAGE.replace("| Fig | 2 |\n", `| Fig | 2 |\n| <meta core.table core.-c-qty.sort='desc'> |\n`));
     expect(bodyTexts()).toEqual(["apple", "Pear", "Fig"]);
     clickOn(cell(0, 1).querySelector(".swt-sort")!); // back to the order as written
-    await wait(700);
+    await sortStored();
     expect(text).toBe(PAGE);
   });
 
@@ -139,9 +153,10 @@ describe("Table metadata", () => {
   });
 
   it("keeps updating a table's metadata with the setting off", async () => {
+    vi.useFakeTimers();
     await setup(META_PAGE); // the setting is off; the table stores Qty descending
     clickOn(cell(0, 1).querySelector(".swt-sort")!); // Qty: descending → the order as written
-    await wait(700);
+    await sortStored();
     // the stored sorting is cleared, and the row, now empty, goes
     expect(text).toBe("| Name | Qty |\n|---|---|\n| Pear | 3 |\n| apple | 10 |\n");
   });

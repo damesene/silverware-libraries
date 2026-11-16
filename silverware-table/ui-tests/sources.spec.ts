@@ -2,7 +2,7 @@
 // read in formulas as @name. The playground has fixed sources (tasks, projects),
 // SilverBullet those a script of the test defines alike; a query's source read anew
 // as a page is indexed: SilverBullet only.
-import { cell, defineSources, expect, hoverCell, markdown, reload, rendersAnew, setOtherPage, setPage, tableIcon, target, test } from "./helpers.ts";
+import { cell, defineSources, expect, hoverCell, markdown, reload, rendersAnew, setOtherPage, setPage, startingOn, tableIcon, target, test } from "./helpers.ts";
 
 const PAGE = "| Open | Note |\n|---|---|\n| | x |\n";
 
@@ -11,8 +11,7 @@ test.describe("Sources of the space", () => {
     await defineSources(page);
   });
 
-  test("@ offers the sources as a formula is typed, and their columns in their brackets; the formula reads them", async ({ page }) => {
-    await setPage(page, PAGE);
+  test("@ offers the sources as a formula is typed, and their columns in their brackets; the formula reads them", startingOn(PAGE), async ({ page }) => {
     await expect(cell(page, 1, 1)).toHaveText("x");
     const field = page.locator(".swt-cell-editor");
     const choices = page.locator(".swt-formula-choice code");
@@ -38,8 +37,7 @@ test.describe("Sources of the space", () => {
     expect(await markdown(page)).toContain(`3 <meta formulas.f='=COUNTIFS(@tasks[done], "FALSE")'>`);
   });
 
-  test("Insert pivot table… offers the space's sources as a group of their own, the pivot written of @tasks", async ({ page }) => {
-    await setPage(page, "# Pivots\n\n| Note |\n|---|\n| Tasks by page |\n");
+  test("Insert pivot table… offers the space's sources as a group of their own, the pivot written of @tasks", startingOn("# Pivots\n\n| Note |\n|---|\n| Tasks by page |\n"), async ({ page }) => {
     await expect(cell(page, 1, 0)).toHaveText("Tasks by page");
     await hoverCell(page, cell(page, 1, 0));
     await (await tableIcon(page, "Insert pivot table…")).click();

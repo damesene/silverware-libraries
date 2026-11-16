@@ -24,6 +24,10 @@ import { OWN_MARKER } from "../src/bridge.ts";
 import type { Favorites } from "../src/core/favorites.ts";
 import { SETTINGS_VERSION } from "../src/migrations/index.ts";
 
+import { boxOf } from "../../scripts/ui-test-helpers.ts";
+
+export { boxOf };
+
 export { expect };
 
 const target = process.env.SW_TARGET === "silverbullet" ? "silverbullet" : "playground";
@@ -77,7 +81,9 @@ export const test = base.extend<{ favorites: Favorites | null }>({
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => {
-      if (m.type() === "error") errors.push(m.text());
+      // (SilverBullet answers what it looks for and does not find with a 404, which the page logs: a file's preview kept
+      // in the space looked for by Silverware Assets, as Assets' own tests allow)
+      if (m.type() === "error" && !/404/.test(m.text())) errors.push(m.text());
     });
     const name = `UiToolbar/${testInfo.testId}`;
     const config = join(server().space, "CONFIG.md");
@@ -246,9 +252,3 @@ export async function addGesture(page: Page, tap: string, up: string | undefined
   await expect(gestureButton(page)).toBeVisible();
 }
 
-/** Where an element is once laid out: waited for (a write, a hover or a save may render it anew meanwhile; a box read at once may be none) */
-export async function boxOf(target: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
-  let box: { x: number; y: number; width: number; height: number } | null = null;
-  await expect.poll(async () => (box = await target.boundingBox()) !== null).toBe(true);
-  return box!;
-}

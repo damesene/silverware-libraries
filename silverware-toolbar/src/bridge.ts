@@ -9,6 +9,9 @@ import { migrate, VERSION_PATH } from "./migrations/index.ts";
 export type Bridge = {
   // Silverware Icons' API where it is installed (`silverware.icons.api`; shared/icons.ts `iconsOf` reads it)
   readonly icons?: unknown;
+  // Silverware Editor's API where it is installed (`silverware.editor.api`; shared/editor.ts `editorsOf` reads it): its
+  // editors (a grid's cell, a database's peek) acted on as the page is
+  readonly editor?: unknown;
   // The main selection: where it is in the page's text, and its text
   readonly getSelection: () => Selection | Promise<Selection>;
   readonly setSelection: (from: number, to: number) => unknown;

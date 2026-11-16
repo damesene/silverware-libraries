@@ -1,15 +1,15 @@
 /// <reference types="node" />
-// What the interaction tests share: the sample page opened, its tables and
-// cells, the page's markdown, waiting for a table rendered anew, and gestures
-// Playwright has no single call for.
+// What the interaction tests share: the page a test starts on opened (its own,
+// `startingOn`, else the sample page), its tables and cells, the page's markdown,
+// waiting for a table rendered anew, and gestures Playwright has no single call for.
 //
 // The tests run against one of two targets (SW_TARGET, set by playwright.config.ts):
 // - playground (npm run test:ui): the page that mocks SilverBullet. It bundles
 //   silverware-table/src and keeps its page in localStorage only: each test's
-//   browser context starts from the sample page.
+//   browser context starts from its page, put there before the playground loads.
 // - silverbullet (npm run test:ui:sb): a real SilverBullet with the committed
 //   silverware-table.js deployed (scripts/silverbullet.mjs). Each test gets a
-//   page of its own in its worker's space, the sample page written into it:
+//   page of its own in its worker's space, its start page written into it:
 //   each worker has a server of its own, as settings are a space's.
 // The tests do not know which: what differs is here (opening the page, writing
 // and reading its markdown, settings, loading the page anew). A test that only
@@ -22,6 +22,10 @@ import { test as base, expect, type Locator, type Page } from "@playwright/test"
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { LONG_PRESS_MS } from "../src/core/press.ts";
+
+import { boxOf } from "../../scripts/ui-test-helpers.ts";
+
+export { boxOf };
 
 export { expect };
 
@@ -56,16 +60,48 @@ type Setting = string | number | boolean;
 type Client = {
   editorView: {
     state: { doc: { length: number; toString(): string; lineAt(pos: number): { text: string } }; selection: { main: { head: number } } };
-    dispatch(spec: { changes: { from: number; to: number; insert: string }; selection?: { anchor: number } }): void;
+    dispatch(spec: { changes?: { from: number; to: number; insert: string }; selection?: { anchor: number } }): void;
   };
   ui: { viewState: { unsavedChanges: boolean } };
   clientSystem: { localSyscall(name: string, args: unknown[]): Promise<unknown> };
   widgetsReady?: Promise<unknown>;
 };
 
+// The page a test starts on, where it is not the sample page: its annotation's (`startingOn`), which names the page by
+// its first line and a hash of its text, the text itself kept here (a report shows an annotation's description whole)
+const START_PAGE = "start-page";
+const startPages = new Map<string, string>();
+// The playground's page as it keeps it, its first load in a test told apart from a reload (sessionStorage stays across one)
+const PLAYGROUND_TEXT = "silverwarePlayground.text";
+const PLAYGROUND_STARTED = "silverwareUiTests.started";
+
 /**
- * Tests get `page` open on the sample page, Silverware Table on its tables.
- * An error in the page (thrown or logged) fails the test; a test that fails
+ * A test (or a describe's tests) opened on a page of its own, `test("…", startingOn(PAGE), async …)`: it starts there,
+ * as SilverBullet opens a page, the sample page never drawn first. Its pages, a few lines each with what it tests, kept
+ * in ./pages.ts where tests share them. Opened as `setPage` leaves a page: the focus on nothing, in SilverBullet the
+ * cursor at its end. Without it, the sample page, for the tests that use its tables.
+ *
+ * An annotation rather than a fixture's option (`test.use`): an option is set for a file or a describe only, and most of
+ * these pages are a single test's. The spec files are loaded in every worker that runs their tests, so the page is
+ * known where its test runs
+ */
+export const startingOn = (text: string) => {
+  const label = `${text.split("\n", 1)[0]!.slice(0, 40)} (#${hashOf(text)})`;
+  if (startPages.has(label) && startPages.get(label) !== text) throw new Error(`Two start pages named alike: ${label}`);
+  startPages.set(label, text);
+  return { annotation: { type: START_PAGE, description: label } };
+};
+
+/** A short hash of a text, FNV-1a's 32 bits in hex: a start page told apart in a report */
+function hashOf(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 0x01000193);
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+/**
+ * Tests get `page` open on the sample page, Silverware Table on its tables (on their own page where they start on one:
+ * `startingOn`). An error in the page (thrown or logged) fails the test; a test that fails
  * gets what the browser's console said, attached to its report.
  */
 export const test = base.extend({
@@ -88,18 +124,33 @@ export const test = base.extend({
       errors.push(m.text());
     });
     const name = `${TEST_FOLDER}/${testInfo.testId}`;
+    // (The innermost one: a test's over its describe's)
+    const label = testInfo.annotations.findLast((one) => one.type === START_PAGE)?.description;
+    const start = label === undefined ? sample : startPages.get(label);
+    if (start === undefined) throw new Error(`No start page named ${label}`);
     let failed = false;
     try {
       if (target === "silverbullet") {
         await watchReloads(page);
-        await writePage(name, sample);
+        await writePage(name, start);
         // There before `setSettings` writes it: SilverBullet reads a page before writing it, a missing one a 404 in the console
         await writePage(SETTINGS_PAGE, "");
         await page.goto(`/${name}`);
       } else {
+        // The page put where the playground keeps its text before it loads, once: a reload later keeps what it holds then
+        await page.addInitScript(
+          ([key, started, text]) => {
+            if (sessionStorage.getItem(started)) return;
+            sessionStorage.setItem(started, "1");
+            localStorage.setItem(key, text);
+          },
+          [PLAYGROUND_TEXT, PLAYGROUND_STARTED, start] as const,
+        );
         await page.goto("/");
       }
       await ready(page);
+      // A page of its own left as `setPage` leaves one: the cursor at its end (SilverBullet), the focus on nothing
+      if (start !== sample) await leftAsSet(page);
       await use(page);
       expect(errors, "errors in the page").toEqual([]);
     } catch (e) {
@@ -120,6 +171,17 @@ export const test = base.extend({
   },
 });
 
+/** The page left as `setPage` leaves it: in SilverBullet the cursor at its end (in a table it would show its markdown), the focus on nothing */
+async function leftAsSet(page: Page): Promise<void> {
+  if (target === "silverbullet") {
+    await page.evaluate(() => {
+      const view = (window as unknown as { client: Client }).client.editorView;
+      view.dispatch({ selection: { anchor: view.state.doc.length } });
+    });
+  }
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+}
+
 /** Writes a page into SilverBullet's space, as an edit outside SilverBullet would */
 async function writePage(name: string, text: string): Promise<void> {
   const path = join(server().space, `${name}.md`);
@@ -127,14 +189,24 @@ async function writePage(name: string, text: string): Promise<void> {
   await writeFile(path, text);
 }
 
-/** Waits for the page loaded: in SilverBullet its editor and widgets, then (both) its first table enhanced */
+/**
+ * Waits for the page loaded: in SilverBullet its editor and widgets, then (both) its first table enhanced, where it has
+ * one. In SilverBullet, opened or loaded anew on a page starting with a table, its cursor put at the page's end, as
+ * `setPage` puts it: where SilverBullet puts it, at its start, it is in that table, which shows its markdown, not the
+ * table (on any other page left there: at the end of a long page the editor scrolls its first tables out of view)
+ */
 async function ready(page: Page): Promise<void> {
   if (target === "silverbullet") {
     await expect(page.locator("#sb-editor .cm-editor")).toBeVisible();
     await page.waitForFunction(() => !!(window as unknown as { client?: Client }).client);
     await loaded(page);
-  }
-  await expect(table(page)).toBeVisible();
+    await page.evaluate(() => {
+      const view = (window as unknown as { client: Client }).client.editorView;
+      const text = view.state.doc.toString();
+      if (/^\s*\|/.test(text.split("\n", 1)[0]!)) view.dispatch({ selection: { anchor: text.length } });
+    });
+  } else await expect(page.locator("#source")).toBeAttached();
+  if (/^\s*\|/m.test(await markdown(page))) await expect(table(page)).toBeVisible();
 }
 
 /**
@@ -413,12 +485,6 @@ export async function markTable(page: Page, index = 0): Promise<void> {
   await table(page, index).locator("table").evaluate((t) => t.setAttribute("data-test-old", ""));
 }
 
-/** Where an element is once laid out: waited for (a write, a hover or a save may render it anew meanwhile; a box read at once may be none) */
-export async function boxOf(target: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
-  let box: { x: number; y: number; width: number; height: number } | null = null;
-  await expect.poll(async () => (box = await target.boundingBox()) !== null).toBe(true);
-  return box!;
-}
 
 /**
  * Where an element rests: its box the same before and after two frames (what

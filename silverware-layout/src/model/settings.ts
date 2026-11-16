@@ -7,15 +7,42 @@ export const PATHS = {
   textWidth: "silverware.layout.textWidth",
   minPaneWidth: "silverware.layout.minPaneWidth",
   guides: "silverware.layout.guides",
+  alignments: "silverware.layout.alignments",
   fontSize: "silverware.layout.fontSize",
   fontZoom: "silverware.layout.fontZoom.enabled",
+  fontPinch: "silverware.layout.fontZoom.pinch",
+  fontScaleFiles: "silverware.layout.fontZoom.scaleFiles",
+  syntaxHides: "silverware.layout.syntaxMode.hideGrids",
+  linkClicks: "silverware.layout.links.clickPlacesCursor",
 } as const;
+
+/**
+ * How the page's markdown is met (the settings dialog's Markdown tab): while SilverBullet shows the markdown as
+ * written (Editor: Toggle Markdown Syntax Rendering), its grids hidden (SilverBullet draws them there still), their
+ * markdown alone shown; a click on a link shown as its markdown (the caret in it, or all of them in that mode) placing
+ * the cursor alone, Ctrl+click following it. Each on unless the user turns it off
+ */
+export type SyntaxModeSettings = { readonly hideGrids: boolean; readonly clickPlacesCursor: boolean };
+
+/** The settings of the page's markdown, as configured (anything but false: on) */
+export const readSyntaxModeSettings = (get: (path: string) => unknown): SyntaxModeSettings => ({
+  hideGrids: get(PATHS.syntaxHides) !== false,
+  clickPlacesCursor: get(PATHS.linkClicks) !== false,
+});
 
 /** A percent of the editor's pane, as a guide or a widget's width keeps it (`80%`) */
 export type Percent = `${number}%`;
 
 /** A guide: a width a drag snaps to and shows a line at: pixels, a percent of the editor's pane, or `full` (the pane) */
 export type Guide = number | Percent | "full";
+
+/** Where a widget stands: at the left, centred, at the right (the contract's `LayoutAlign`, shared/layout.ts) */
+export type Align = "left" | "center" | "right";
+export const ALIGNS: readonly Align[] = ["left", "center", "right"];
+export const ALIGN_NAMES: Readonly<Record<Align, string>> = { left: "Left", center: "Center", right: "Right" };
+
+/** An alignment as kept: left, center or right; anything else none */
+export const readAlign = (value: unknown): Align | undefined => (ALIGNS.includes(value as Align) ? (value as Align) : undefined);
 
 export type Settings = {
   // The text's width on a page without its own; none: the theme's
@@ -27,6 +54,15 @@ export type Settings = {
   readonly fontSize: number | undefined;
   // Whether Ctrl + scroll and Ctrl+0 change the font size on this device (docs/silverware-layout-font-size.md)
   readonly fontZoom: boolean;
+  // Whether a pinch with two fingers changes it too, the host's own two-finger gesture held back for it, a tap with two
+  // fingers given back to it (on unless turned off)
+  readonly fontPinch: boolean;
+  // Whether the files a page shows (and the widths laid out of those that say so) grow and shrink with this device's
+  // zoom, as the text does (shared/contentscale.ts; on unless turned off)
+  readonly fontScaleFiles: boolean;
+  // Where each kind of widget stands where it says nothing itself, the user's (by `<provider>/<kind>`; none: the kind's
+  // own; docs/silverware-layout-align.md)
+  readonly alignments: Readonly<Record<string, Align>>;
 };
 
 export const DEFAULT_MIN_PANE_WIDTH = 600;
@@ -79,7 +115,21 @@ export function readSettings(get: (path: string) => unknown): Settings {
     guides: readGuides(get(PATHS.guides)) ?? DEFAULT_GUIDES,
     fontSize: readFontSize(get(PATHS.fontSize)),
     fontZoom: get(PATHS.fontZoom) !== false,
+    fontPinch: get(PATHS.fontPinch) !== false,
+    fontScaleFiles: get(PATHS.fontScaleFiles) !== false,
+    alignments: readAlignments(get(PATHS.alignments)),
   };
+}
+
+/** The kinds' alignments as configured: each a kind's key and left, center or right; anything else left out */
+export function readAlignments(value: unknown): Readonly<Record<string, Align>> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const alignments: Record<string, Align> = {};
+  for (const [kind, value_] of Object.entries(value)) {
+    const align = readAlign(value_);
+    if (align) alignments[kind] = align;
+  }
+  return alignments;
 }
 
 /**

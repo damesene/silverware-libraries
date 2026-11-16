@@ -33,9 +33,19 @@ Then install a plugin with `Library: Install`.
 - **Silverware Database** ([`silverware-database/`](silverware-database/silverware-database.md)): databases of pages, in
   the spirit of Notion's: each item a page, its properties the page's frontmatter, shown as a table, a list, a board, a
   calendar or a timeline; every change reviewed where it touches many pages, and undoable.
-- **Silverware Layout** ([`silverware-layout/`](silverware-layout/silverware-layout.md)): the width of a page's text (its
-  own or a default for every page) and of its tables, databases and charts, wider or narrower than the text by a handle
-  beside them that snaps to guides of your own; the editor's font size, and font zoom with Ctrl + scroll.
+- **Silverware Layout** ([`silverware-layout/`](silverware-layout/silverware-layout.md)): columns in a page (`/grid`),
+  the width of a page's text (its own or a default for every page) and of its tables, databases, charts and grids, wider
+  or narrower than the text by a handle beside them that snaps to guides of your own; the editor's font size, and font
+  zoom with Ctrl + scroll.
+- **Silverware Assets** ([`silverware-assets/`](silverware-assets/silverware-assets.md)): embedded files shown full, as a
+  preview or as a card (a zip or a document too), a link to a file with its icon and a menu, a file opened in a side
+  panel or enlarged, files inserted through a dialog.
+- **Silverware Assets PDF**, **DOCX** and **XLSX** ([`silverware-assets-pdf/`](silverware-assets-pdf/silverware-assets-pdf.md),
+  [`silverware-assets-docx/`](silverware-assets-docx/silverware-assets-docx.md),
+  [`silverware-assets-xlsx/`](silverware-assets-xlsx/silverware-assets-xlsx.md)): with Silverware Assets, a PDF's preview
+  its first page; Word documents and Excel workbooks previewed and read in your pages. Work offline.
+- **Silverware Editor** ([`silverware-editor/`](silverware-editor/silverware-editor.md)): a markdown editor for the other
+  Silverware plugins where they let you write (a grid's cell, a database item's content).
 - **Silverware Icons** ([`silverware-icons/`](silverware-icons/silverware-icons.md)): monochrome icons (Lucide) and emoji
   for the other Silverware plugins, drawn in the colors of your theme, and sets of icons of your own.
 

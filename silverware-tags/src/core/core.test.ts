@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { pagesOperation } from "../modules/pages.ts";
 import { removeOperation } from "../modules/remove.ts";
 import { renameOperation, validateRename } from "../modules/rename.ts";
 import { memorySpace, writerOf } from "../space/memory.ts";
-import { indexCaughtUp, metaPages, pagesWith, readCatalog, subtagsOf } from "./catalog.ts";
+import { INDEX_POLL_MS, indexCaughtUp, metaPages, pagesWith, readCatalog, subtagsOf } from "./catalog.ts";
 import type { PageBuilder } from "../../../shared/pages/changes.ts";
 import { undoneBy } from "./operation.ts";
 import { applyPlan, makePlan, undoOperation } from "./plan.ts";
@@ -15,6 +15,8 @@ const pages = () =>
     B: "#project/beta\n\nnote #idea",
     C: "Nothing here",
   });
+
+afterEach(() => vi.useRealTimers());
 
 describe("catalog", () => {
   it("reads the tags of the space by page and context", async () => {
@@ -67,8 +69,10 @@ describe("plans", () => {
     await applyPlan(writerOf(space), undo);
     expect(space.pages.get("A/Plan")).toBe("#plans edited later");
   });
-  it("reads hundreds of pages a few at a time, in their order", async () => {
-    const pages = Object.fromEntries(Array.from({ length: 300 }, (_, i) => [`P/${String(i).padStart(3, "0")}`, `#many ${i}`]));
+  // (Sixty pages: ten times as many as are read at once, each read through the page writer; three hundred cost a second
+  // alone and went over a test's time while every test file ran at once)
+  it("reads many pages a few at a time, in their order", async () => {
+    const pages = Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`P/${String(i).padStart(3, "0")}`, `#many ${i}`]));
     const space = memorySpace(pages);
     let reading = 0;
     let most = 0;
@@ -84,8 +88,9 @@ describe("plans", () => {
     const seen: number[] = [];
     const plan = await makePlan(writerOf(space), await readCatalog(space), renameOperation("many", "lots", false), (done) => seen.push(done));
     expect(plan.pages.map((c) => c.page)).toEqual(Object.keys(pages));
+    expect(most).toBeGreaterThan(1);
     expect(most).toBeLessThanOrEqual(6);
-    expect(seen.at(-1)).toBe(300);
+    expect(seen.at(-1)).toBe(60);
   });
 });
 
@@ -151,7 +156,11 @@ describe("the index caught up", () => {
     // An index two reads behind the writes
     s.tagRecords = async () => (++calls < 3 ? [{ name: "old", page: "A", parent: "page" }] : records());
     s.pages.set("A", "#new");
-    await indexCaughtUp(s, [{ page: "A", tagChanges: () => ({ gone: ["old"], added: ["new"] }) }]);
+    // (Fake timers: its two waits between reads, INDEX_POLL_MS each, pass as the test moves the time)
+    vi.useFakeTimers();
+    const caught = indexCaughtUp(s, [{ page: "A", tagChanges: () => ({ gone: ["old"], added: ["new"] }) }]);
+    await vi.advanceTimersByTimeAsync(2 * INDEX_POLL_MS);
+    await caught;
     expect(calls).toBe(3);
   });
 });

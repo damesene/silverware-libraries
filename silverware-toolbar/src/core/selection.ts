@@ -2,7 +2,9 @@
 // another editor's): told once one is made, which is once the mouse is let go
 // (not while dragging), or a moment after the keys that made it; told at once
 // when there is none any more. The caret too, a moment after it moved (the
-// toolbar shown always follows it).
+// toolbar shown always follows it). Also the selection in an editing surface
+// (Silverware Editor's editor, shared/editor.ts), read in its shadow root.
+import type { EditingSurface } from "../../../shared/editor.ts";
 import { pageContentOf } from "../dom.ts";
 
 // After the last change of a selection made with the keyboard: Shift+arrows pressed again soon go on
@@ -22,6 +24,8 @@ export class SelectionWatcher {
     private readonly ignores: (node: Node) => boolean,
     // The caret in the page's text moved (or came there), a moment after
     private readonly caretMoved: (range: Range) => void = () => undefined,
+    // The editing surface a node is in (none: it is in none)
+    private readonly surfaceAt: (node: Node) => EditingSurface | undefined = () => undefined,
   ) {}
 
   start(): void {
@@ -45,19 +49,34 @@ export class SelectionWatcher {
 
   /** The selection in the page's text now, if there is one (not collapsed) */
   current(): Range | undefined {
-    const selection = this.doc.getSelection();
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return undefined;
-    const range = selection.getRangeAt(0);
-    const content = pageContentOf(range.startContainer);
-    return content && pageContentOf(range.endContainer) === content ? range : undefined;
+    const range = this.selection();
+    if (!range || range.collapsed) return undefined;
+    const content = this.textOf(range.startContainer);
+    return content && this.textOf(range.endContainer) === content ? range : undefined;
   }
 
   /** The caret in the page's text now, if the selection is one */
   caret(): Range | undefined {
+    const range = this.selection();
+    return range && range.collapsed && this.textOf(range.startContainer) ? range : undefined;
+  }
+
+  /** What text a node is in: the page's editable area, or an editing surface's element; none where neither */
+  private textOf(node: Node): Element | undefined {
+    return pageContentOf(node) ?? this.surfaceAt(node)?.element;
+  }
+
+  /**
+   * The selection's range: in the shadow root of the surface focused (the document's selection shows its host alone
+   * there, in Chromium), else the document's
+   */
+  private selection(): Range | undefined {
     const selection = this.doc.getSelection();
-    if (!selection || selection.rangeCount === 0 || !selection.isCollapsed) return undefined;
-    const range = selection.getRangeAt(0);
-    return pageContentOf(range.startContainer) ? range : undefined;
+    if (!selection || selection.rangeCount === 0) return undefined;
+    const active = this.doc.activeElement;
+    const root = active?.shadowRoot;
+    if (!active || !root || !this.surfaceAt(active)) return selection.getRangeAt(0);
+    return shadowRange(this.doc, selection, root) ?? selection.getRangeAt(0);
   }
 
   private onDown = (e: MouseEvent): void => {
@@ -99,4 +118,25 @@ export class SelectionWatcher {
     this.shown = !!range;
     this.changed(range);
   }
+}
+
+/**
+ * A selection in a shadow root as a range of its nodes: the standard's composed ranges where the browser has them,
+ * else the root's own selection (Chromium before them); none where neither (Firefox: the document's has its nodes)
+ */
+function shadowRange(doc: Document, selection: Selection, root: ShadowRoot): Range | undefined {
+  type Composed = { getComposedRanges?: (options: { shadowRoots: ShadowRoot[] }) => StaticRange[] };
+  try {
+    const composed = (selection as Selection & Composed).getComposedRanges?.({ shadowRoots: [root] })[0];
+    if (composed && root.contains(composed.startContainer)) {
+      const range = doc.createRange();
+      range.setStart(composed.startContainer, composed.startOffset);
+      range.setEnd(composed.endContainer, composed.endOffset);
+      return range;
+    }
+  } catch {
+    // (An older form of getComposedRanges: the root's own selection below)
+  }
+  const own = (root as ShadowRoot & { getSelection?: () => Selection | null }).getSelection?.();
+  return own && own.rangeCount > 0 ? own.getRangeAt(0) : undefined;
 }

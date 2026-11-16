@@ -7,17 +7,13 @@
 // yet), again as the core asks (`refresh`: once Space Lua has loaded, and as
 // the toolbar first shows after each load of it) and every few seconds as the
 // actions are asked for (a plug's commands updated), one read after another.
+import { commandsOf } from "../../../shared/silverbullet/commands.ts";
 import type { Action, ModuleHost, ToolbarModule } from "../core/action.ts";
 import { ICONS } from "../icons.ts";
 
-/** The commands of SilverBullet's list (system.listCommands: definitions by name) as actions, by name; hidden ones left out */
+/** The commands of SilverBullet's list (system.listCommands, read by shared/silverbullet/commands.ts) as actions, by name; hidden ones left out */
 export function commandActions(list: unknown, invoke: (name: string) => unknown): Action[] {
-  if (!list || typeof list !== "object") return [];
-  const names = Object.values(list as Record<string, unknown>).flatMap((def): string[] => {
-    if (!def || typeof def !== "object") return [];
-    const { name, hide } = def as { name?: unknown; hide?: unknown };
-    return typeof name === "string" && name && hide !== true ? [name] : [];
-  });
+  const names = commandsOf(list).flatMap((command) => (command.hidden ? [] : [command.name]));
   return [...new Set(names)]
     .sort((a, b) => a.localeCompare(b))
     .map((name) => ({

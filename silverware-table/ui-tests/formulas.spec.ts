@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { cell, cursorLine, expect, header, markdown, openPage, pickerOfCommand, reload, rendersAnew, setOtherPage, setPage, target, test } from "./helpers.ts";
+import { cell, cursorLine, expect, header, markdown, openPage, pickerOfCommand, reload, rendersAnew, setOtherPage, setPage, startingOn, target, test } from "./helpers.ts";
 
 test.describe("Formulas", () => {
   test("a formula with a comparison and texts shows its result and is written as typed", async ({ page }) => {
@@ -20,9 +20,8 @@ test.describe("Formulas", () => {
     await expect(cell(page, 1, 3)).toHaveText("few");
   });
 
-  test("a result of several values is #SPILL!, shown over the window by ⤢ or Ctrl+Shift+Enter, nothing written", async ({ page }) => {
-    await setPage(page, "| Tag | List |\n|---|---|\n| b | |\n| a | |\n| b | |\n");
-    // The page's table rendered (not the sample's before it)
+  test("a result of several values is #SPILL!, shown over the window by ⤢ or Ctrl+Shift+Enter, nothing written", startingOn("| Tag | List |\n|---|---|\n| b | |\n| a | |\n| b | |\n"), async ({ page }) => {
+    // The page's table rendered
     await expect(cell(page, 2, 0)).toHaveText("a");
     await cell(page, 1, 1).dblclick();
     await expect(page.locator(".swt-cell-editor")).toBeFocused();

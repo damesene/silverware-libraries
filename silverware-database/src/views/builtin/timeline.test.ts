@@ -8,6 +8,7 @@ import type { Database, Value } from "../../model/database.ts";
 import { MemoryStore } from "../../store/memory.ts";
 import { MemoryViewState } from "../../store/viewstate.ts";
 import { BUILT_IN_VIEWS } from "./index.ts";
+import { HOLD_MS } from "./timeline.ts";
 
 const TASKS: Database = {
   id: "tl",
@@ -120,13 +121,16 @@ describe("the timeline", () => {
       Object.defineProperty(event, "pointerType", { value: "touch" });
       on.dispatchEvent(event);
     };
-    const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    // The hold's time passed by fake timers, just past it (from here: the drawing above ran on real ones)
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"], now: Date.now() });
+    const held = () => vi.advanceTimersByTimeAsync(HOLD_MS + 50);
+    const settled = () => vi.advanceTimersByTimeAsync(10);
     // Moved at once: no drag, nothing written, nothing opened
     touch("pointerdown", 100);
     touch("pointermove", 180);
-    await wait(450);
+    await held();
     touch("pointerup", 180);
-    await settle();
+    await settled();
     expect([(await stored()).Plan, opened]).toEqual([["2026-11-03", "2026-11-05"], []]);
     // A tap: opened
     touch("pointerdown", 100);
@@ -134,16 +138,16 @@ describe("the timeline", () => {
     expect(opened).toEqual(["Plan"]);
     // Held and let go without moving: put back, nothing opened
     touch("pointerdown", 100);
-    await wait(450);
+    await held();
     touch("pointerup", 100);
-    await settle();
+    await settled();
     expect([(await stored()).Plan, opened, bar("Plan").classList.contains("swd-tl-dragging")]).toEqual([["2026-11-03", "2026-11-05"], ["Plan"], false]);
     // Held, then moved two days: written so
     touch("pointerdown", 100);
-    await wait(450);
+    await held();
     touch("pointermove", 100 + 2 * 40);
     touch("pointerup", 100 + 2 * 40);
-    await settle();
+    await settled();
     expect((await stored()).Plan).toEqual(["2026-11-05", "2026-11-07"]);
   });
 
@@ -194,9 +198,16 @@ describe("the timeline", () => {
     expect(element.querySelector(".swd-tl-dragging")).toBeNull();
   });
 
-  it("keeps the axis within five years of today: a date with a wrong year at its edge, marked", async () => {
-    const { all, bar } = await setup([{ name: "Typo", start: "1026-11-03" }, { name: "Plan", start: "2026-11-03" }]);
-    expect(all(".swd-tl-unit").length).toBeLessThan(2000);
+  // (Its axis drawn whole in jsdom: by weeks, a seventh of the units by days, as the reach is the same at every scale;
+  // still a time of its own, as it once went over the default 5 s while every test file ran at once in `npm run
+  // verify`: a cost of drawing, not a race; allowed by the user 2026-11-16)
+  it("keeps the axis within five years of today: a date with a wrong year at its edge, marked", { timeout: 15_000 }, async () => {
+    const { all, bar } = await setup([{ name: "Typo", start: "1026-11-03" }, { name: "Plan", start: "2026-11-03" }], { "timeline.endBy": "end", "timeline.scale": "weeks" });
+    // (The setup's own state, by weeks)
+    // (Five years of weeks and the margins, some 270, the axis reaching back that far for the typo; a thousand years
+    // would be over 52,000)
+    expect(all(".swd-tl-unit").length).toBeGreaterThan(260);
+    expect(all(".swd-tl-unit").length).toBeLessThan(300);
     expect(bar("Typo").classList.contains("swd-tl-beyond")).toBe(true);
     expect(bar("Plan").classList.contains("swd-tl-beyond")).toBe(false);
   });

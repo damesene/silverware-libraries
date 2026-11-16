@@ -1,6 +1,6 @@
 // The header held at the top of the page's view as a long table scrolls past
 import type { Page } from "@playwright/test";
-import { expect, setPage, setSettings, settled, table, tableIcon, test } from "./helpers.ts";
+import { expect, setPage, setSettings, settled, startingOn, table, tableIcon, test } from "./helpers.ts";
 
 test.describe("Rows pinned to the bottom", () => {
   test("a scroller with a bottom padding (as SilverBullet's, to scroll past the end): the row at the table's bottom while it is in view", async ({ page }) => {
@@ -46,8 +46,7 @@ test.describe("The held header and the rows pinned to the bottom", () => {
 });
 
 test.describe("The held header", () => {
-  test("a table near the page's top: its header where the table starts, the page not scrolled, its first row not covered", async ({ page }) => {
-    await setPage(page, "Intro\n| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Fig | 2 |\n\nText under.\n");
+  test("a table near the page's top: its header where the table starts, the page not scrolled, its first row not covered", startingOn("Intro\n| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Fig | 2 |\n\nText under.\n"), async ({ page }) => {
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(2);
     const at = await table(page).evaluate((w) => {
       const r = (e: Element) => e.getBoundingClientRect();
@@ -69,7 +68,8 @@ test.describe("The held header", () => {
     const rows = Array.from({ length: 40 }, (_, i) => `| Row ${i + 1} | ${i * 3} |`).join("\n");
     const filler = Array.from({ length: 30 }, (_, i) => `Line ${i + 1}.`).join("\n\n");
     await setPage(page, `# Test\n\nText above.\n\n| Name | Qty |\n|---|---|\n${rows}\n\n${filler}\n`);
-    await expect(table(page).locator("tr[data-swt-row]").first()).toBeVisible();
+    // (Its rows counted: the page before it, shown until the new text is rendered, has tables of its own)
+    await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(40);
     const look = () =>
       table(page).evaluate((w) => ({ width: getComputedStyle(w).scrollbarWidth, color: getComputedStyle(w).scrollbarColor, inner: w.clientWidth, held: w.classList.contains("swt-held-by-page") }));
     const before = await look();
@@ -103,6 +103,7 @@ test.describe("The held header", () => {
     const rows = Array.from({ length: 40 }, (_, i) => `| Row ${i + 1} | ${i * 3} |`).join("\n");
     const filler = Array.from({ length: 40 }, (_, i) => `Line ${i + 1}.`).join("\n\n");
     await setPage(page, `# Test\n\nText above.\n\n| Name | Qty |\n|---|---|\n${rows}\n\n${filler}\n`);
+    await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(40);
     // A cell selected: the table has the focus, its dots show
     await table(page).locator("tr[data-swt-row]").first().locator("td").first().click();
     const dots = page.locator(".swt-insert-dots.swt-visible > span:not([hidden])");

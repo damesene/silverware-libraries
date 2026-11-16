@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
+import { LONG_PRESS_MS } from "./press.ts";
 import { bodyTexts, buttonLabel, cell, cellMenuItem, clickOn, controller, editor, flush, key, PAGE, press, setup, text, useTablePage } from "../testing/page.ts";
 
 describe("Cell menu", () => {
@@ -177,9 +178,11 @@ describe("Cell menu", () => {
   });
 
   it("opens on a long press on a touch screen, which does not edit the cell", async () => {
+    // (The press held as long as a long press takes: fake timers moved on, not waited)
+    vi.useFakeTimers();
     await setup(PAGE);
     cell(1, 0).dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "touch", clientX: 5, clientY: 5 }));
-    await new Promise((resolve) => setTimeout(resolve, 650));
+    await vi.advanceTimersByTimeAsync(LONG_PRESS_MS);
     expect(menu()!.querySelector(".swt-menu-title")!.textContent).toBe("Cell: Name, row 1");
     // The mouse events after the touch
     window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerType: "touch" }));

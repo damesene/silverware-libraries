@@ -1,4 +1,4 @@
-import { cell, drag, expect, header, markdown, markTable, setPage, setSettings, settled, test } from "./helpers.ts";
+import { cell, drag, expect, header, markdown, markTable, setSettings, settled, startingOn, test } from "./helpers.ts";
 
 test.describe("Selecting cells", () => {
   test("a drag selects the cells, with a band on each side of the edge to drag them by", async ({ page }) => {
@@ -120,8 +120,7 @@ test.describe("Selecting cells", () => {
 test.describe("The selection after deleting", () => {
   const PAGE = "# Test\n\n| A | B |\n|---|---|\n| 1 | x |\n| 2 | y |\n| 3 | z |\n";
 
-  test("rows deleted with Delete: the row that came up is selected whole, the keyboard going on from there", async ({ page }) => {
-    await setPage(page, PAGE);
+  test("rows deleted with Delete: the row that came up is selected whole, the keyboard going on from there", startingOn(PAGE), async ({ page }) => {
     await expect(cell(page, 3, 1)).toHaveText("z");
     await drag(page, cell(page, 2, 0), cell(page, 2, 1));
     await page.keyboard.press("Delete");
@@ -139,8 +138,7 @@ test.describe("The selection after deleting", () => {
     await expect(page.locator(".swt-selected")).toHaveCount(1);
   });
 
-  test("the last row deleted: the row above it, now last, is selected whole", async ({ page }) => {
-    await setPage(page, PAGE);
+  test("the last row deleted: the row above it, now last, is selected whole", startingOn(PAGE), async ({ page }) => {
     await expect(cell(page, 3, 1)).toHaveText("z");
     await drag(page, cell(page, 3, 0), cell(page, 3, 1));
     await page.keyboard.press("Delete");
@@ -150,8 +148,7 @@ test.describe("The selection after deleting", () => {
     await expect(page.locator('tr[data-swt-row="2"] > td.swt-selected')).toHaveCount(2);
   });
 
-  test("a column deleted: the column that came left is selected whole", async ({ page }) => {
-    await setPage(page, "# Test\n\n| A | B | C |\n|---|---|---|\n| 1 | | x |\n| 2 | | y |\n");
+  test("a column deleted: the column that came left is selected whole", startingOn("# Test\n\n| A | B | C |\n|---|---|---|\n| 1 | | x |\n| 2 | | y |\n"), async ({ page }) => {
     await expect(cell(page, 2, 2)).toHaveText("y");
     await drag(page, header(page, 1), cell(page, 2, 1));
     await page.keyboard.press("Delete");

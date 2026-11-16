@@ -13,6 +13,8 @@ export const SHARED_STYLES = [
       { page: "silverware-table/silverware-table-style.md", base: "swt" },
       { page: "silverware-chart/silverware-chart-style.md", base: "swc" },
       { page: "silverware-database/silverware-database-style.md", base: "swd" },
+      { page: "silverware-layout/silverware-layout-style.md", base: "swl" },
+      { page: "silverware-assets/silverware-assets-style.md", base: "swa" },
     ],
   },
   {
@@ -24,6 +26,7 @@ export const SHARED_STYLES = [
       { page: "silverware-chart/silverware-chart-style.md", base: "swc" },
       { page: "silverware-database/silverware-database-style.md", base: "swd" },
       { page: "silverware-layout/silverware-layout-style.md", base: "swl" },
+      { page: "silverware-assets/silverware-assets-style.md", base: "swa" },
     ],
   },
   {
@@ -32,6 +35,15 @@ export const SHARED_STYLES = [
     pages: [
       { page: "silverware-tags/silverware-tags-style.md", base: "swg" },
       { page: "silverware-database/silverware-database-style.md", base: "swd" },
+    ],
+  },
+  {
+    // A document's reader (shared/docreader.ts): Silverware Assets DOCX's and XLSX's
+    template: "shared/docreader.css",
+    mark: "shared-reader",
+    pages: [
+      { page: "silverware-assets-docx/silverware-assets-docx-style.md", base: "swa-docx" },
+      { page: "silverware-assets-xlsx/silverware-assets-xlsx-style.md", base: "swa-xlsx" },
     ],
   },
   {

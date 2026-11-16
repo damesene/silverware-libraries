@@ -7,7 +7,11 @@ import { applyLayers } from "../shared/layers.ts";
 import stylePage from "../silverware-layout/silverware-layout-style.md";
 import type { LayoutChanges, LayoutEntries, LayoutProvider } from "../shared/layout.ts";
 import { layoutOf } from "../shared/layout.ts";
+import { writeAttributes } from "../shared/markdown/attributes.ts";
+import { readGrids } from "../shared/markdown/grid.ts";
 import { Registry } from "../silverware-layout/src/core/registry.ts";
+import { Grids } from "../silverware-layout/src/grid/grids.ts";
+import { gridProvider } from "../silverware-layout/src/grid/provider.ts";
 import { markNarrow, paneWidth, showPaneWidth } from "../silverware-layout/src/host/marks.ts";
 import { silverBulletPage } from "../silverware-layout/src/host/silverbullet/dom.ts";
 import { DEFAULT_MIN_PANE_WIDTH, DEFAULT_GUIDES, type Guide } from "../silverware-layout/src/model/settings.ts";
@@ -89,6 +93,61 @@ layOutWidgets(document, page, registry, { guides: () => guides, enabled, problem
 // Registered as a widget plugin does, through the API its init page hands over
 layoutOf(registry.api()).register(provider);
 showKept();
+
+// A grid (docs/silverware-layout-grid.md) as SilverBullet draws one: its body handed to the renderer, its cells'
+// markdown rendered by the host (here a few of markdown's forms, each element marked with its offset as SilverBullet's
+// renderer marks it), its columns read from the page's text
+const GRID_BODY = "<cell>\n\n**Left** column, with a [[Link]].\n\nA second paragraph.\n\n</cell>\n<cell>\n\nThe **right** column.\n\n</cell>";
+let gridPage = `${LOREM}\n\n<grid columns="1fr 2fr">\n${GRID_BODY}\n</grid>\n`;
+// (The frame as SilverBullet's, given the class the init page gives it: the widget Silverware Layout lays out)
+const gridFrame = Object.assign(document.createElement("div"), { className: "pg-grid-frame swl-grid-widget" });
+/** The grid drawn anew of the page's text, as SilverBullet draws it after its body changed */
+const drawGrid = () => void grids.render(readGrids(gridPage)[0]!.body).then((grid) => gridFrame.replaceChildren(grid));
+const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const grids = new Grids(document, {
+  renderMarkdown: async (markdown) => {
+    let at = 0;
+    return markdown
+      .split(/\n{2,}/)
+      .map((paragraph) => {
+        const pos = markdown.indexOf(paragraph, at);
+        at = pos + paragraph.length;
+        const inline = escape(paragraph)
+          .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+          .replace(/\[\[(.+?)\]\]/g, '<a class="wiki-link" href="#">$1</a>');
+        return `<span class="p" data-pos="${pos}">${inline}</span>`;
+      })
+      .join("");
+  },
+  pageText: async () => gridPage,
+  // As the page writer writes a cell, then the grid drawn anew a moment later
+  writeCell: async (write) => {
+    const grid = readGrids(gridPage).filter((one) => one.body === write.body)[write.occurrence];
+    const cell = grid?.cells[write.cell];
+    if (!cell) return "its grid changed since it was read: left alone";
+    gridPage = gridPage.slice(0, cell.innerFrom) + `\n${write.content}\n\n` + gridPage.slice(cell.innerTo);
+    setTimeout(drawGrid, 30);
+    return undefined;
+  },
+  writeAttributes: async (write) => {
+    const grid = readGrids(gridPage).filter((one) => one.body === write.body)[write.occurrence];
+    if (!grid) return "its grid changed since it was read: left alone";
+    const attributes: Record<string, string> = { ...grid.attributes };
+    for (const [name, value] of Object.entries(write.attributes)) {
+      if (value === null) delete attributes[name];
+      else attributes[name] = value;
+    }
+    const lineEnd = gridPage.indexOf("\n", grid.from);
+    gridPage = gridPage.slice(0, grid.from) + `<grid${writeAttributes(attributes)}>` + gridPage.slice(lineEnd);
+    return undefined;
+  },
+  moveCursor: (at) => flash(`The raw text shown, the cursor at ${at}: “${gridPage.slice(at, at + 20)}…”`, "info"),
+  problem: (message) => flash(message, "error"),
+});
+grids.start();
+layoutOf(registry.api()).register(gridProvider(grids));
+content.append(gridFrame, line(LOREM));
+drawGrid();
 
 // The first table shown over the window (as Silverware Table's full screen marks it): Silverware Layout stands back
 document.querySelector("#over-window")!.addEventListener("click", () => {

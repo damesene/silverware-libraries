@@ -45,10 +45,50 @@ uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-datab
 
 ```#meta/library/remote
 name: Silverware Layout
-description: "The width of a page's text (its own or a default for every page) and of its tables, databases and charts, wider or narrower than the text by a handle beside them that snaps to guides of your own; the editor's font size, and font zoom with Ctrl + scroll."
+description: "Columns in a page (/grid), the width of a page's text (its own or a default for every page) and of its tables, databases, charts and grids, wider or narrower than the text by a handle beside them that snaps to guides of your own; the editor's font size, and font zoom with Ctrl + scroll."
 author: damesene
 website: https://github.com/damesene/silverware-libraries/tree/main/silverware-layout
 uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-layout/silverware-layout.md
+```
+
+```#meta/library/remote
+name: Silverware Assets
+description: "Embedded files shown full, as a preview or as a card (a zip or a document too), a link to a file with its icon and a menu, a file opened in a side panel or enlarged, a link turned into an embed and back."
+author: damesene
+website: https://github.com/damesene/silverware-libraries/tree/main/silverware-assets
+uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-assets/silverware-assets.md
+```
+
+```#meta/library/remote
+name: Silverware Assets PDF
+description: "With Silverware Assets, a PDF's preview in your pages is its first page as an image, drawn by pdf.js (in place of a small browser viewer). Works offline, on a phone too."
+author: damesene
+website: https://github.com/damesene/silverware-libraries/tree/main/silverware-assets-pdf
+uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-assets-pdf/silverware-assets-pdf.md
+```
+
+```#meta/library/remote
+name: Silverware Assets DOCX
+description: "Word documents (.docx) in your pages, with Silverware Assets: a preview shows the first page, and a document shown full, in the side panel or enlarged is a reader of the whole document with zoom. Works offline."
+author: damesene
+website: https://github.com/damesene/silverware-libraries/tree/main/silverware-assets-docx
+uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-assets-docx/silverware-assets-docx.md
+```
+
+```#meta/library/remote
+name: Silverware Assets XLSX
+description: "Excel workbooks (.xlsx) in your pages, with Silverware Assets: a preview shows the first sheet's first cells, and a workbook shown full, in the side panel or enlarged is a reader of every sheet as a spreadsheet shows it. Works offline."
+author: damesene
+website: https://github.com/damesene/silverware-libraries/tree/main/silverware-assets-xlsx
+uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-assets-xlsx/silverware-assets-xlsx.md
+```
+
+```#meta/library/remote
+name: Silverware Editor
+description: "A markdown editor for the other Silverware plugins where they let you write (a grid's cell, a database item's content): markdown highlighted, lists continued on Enter, brackets closed, links to your pages completed. Without it they keep a plain text field."
+author: damesene
+website: https://github.com/damesene/silverware-libraries/tree/main/silverware-editor
+uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-editor/silverware-editor.md
 ```
 
 ```#meta/library/remote

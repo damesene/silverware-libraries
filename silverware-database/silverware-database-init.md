@@ -30,8 +30,13 @@ if js and js.window then
     -- Silverware Icons, where it is installed (its API page, priority 50, has run by now): items' and properties'
     -- icons drawn and picked
     icons = silverware.icons and silverware.icons.api,
+    -- Silverware Editor, where it is installed: an item's content edited in its editor (else a plain text field)
+    editor = silverware.editor and silverware.editor.api,
     -- Silverware Layout, where it is installed: the places laid out at the width their blocks keep
     layout = silverware.layout and silverware.layout.api,
+    -- Silverware Assets, where it is installed: the files an item's content embeds drawn in the peek's field as the page
+    -- draws them (else images alone)
+    assets = silverware.assets and silverware.assets.api,
     getCurrentPage = editor.getCurrentPage,
     getText = editor.getText,
     replaceRange = editor.replaceRange,
@@ -90,6 +95,8 @@ if js and js.window then
       return editor.filterBox(label, options, "", "Type to find a database")
     end,
     getConfig = config.get,
+    -- SilverBullet's commands and their shortcuts: one pressed in the peek, where it does nothing, told
+    listCommands = system.listCommands,
     -- The settings dialog: saved as SilverBullet's Configuration Manager saves (the CONFIG page, indexed, the configuration loaded again)
     -- `set`: written and indexed, the configuration not loaded again (that runs Space Lua anew and starts Silverware Database
     -- anew: the item's panel closed as its width was saved), these values set in it as it is, by path (config.set)

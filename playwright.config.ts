@@ -33,19 +33,26 @@ process.env.SW_SB_SPACE ??= join(tmpdir(), "silverware-ui-tests-space");
 const workers = silverbullet ? Number(process.env.SW_SB_WORKERS) || Math.min(4, availableParallelism()) : undefined;
 const servers = Array.from({ length: workers ?? 0 }, (_, index) => silverbulletServer(index, process.env.SW_SB_SPACE!));
 
-const reporter: ReporterDescription[] = process.env.CI
-  ? [["list"], ["github"], ["html", { open: "never" }], ["./scripts/ui-tests-summary.ts"]]
-  : [["list"], ["html", { open: "never" }]];
+// Each target's results and report in a folder of its own: a run against the playground and one against SilverBullet at
+// once do not write over each other's (two runs of one target at once still would, their servers' ports too)
+const html: ReporterDescription = ["html", { open: "never", outputFolder: `playwright-report/${target}` }];
+const reporter: ReporterDescription[] = process.env.CI ? [["list"], ["github"], html, ["./scripts/ui-tests-summary.ts"]] : [["list"], html];
 
 export default defineConfig({
   // Each plugin's interaction tests, in its own folder (<plugin>/ui-tests/)
   testMatch: "*/ui-tests/**/*.spec.ts",
+  outputDir: `test-results/${target}`,
+  // Every test in parallel with the others. One that cannot be (a `lock` of Playwright's, `-exclusive-` alone with
+  // nothing else running) only where the user allowed it, said by its comment (root CLAUDE.md, *Interaction tests run
+  // in parallel*; scripts/ui-test-locks.test.ts checks it)
   fullyParallel: true,
   workers,
   grepInvert: silverbullet ? /@playground/ : undefined,
   forbidOnly: !!process.env.CI,
-  // A flaky interaction shows as flaky (retried once), not as a pass
+  // A flaky interaction shows as flaky (retried once), not as a pass; retried at the end, alone in one worker, so a
+  // test the load of the run made fail is told apart from one that fails by itself
   retries: 1,
+  retryStrategy: "isolated",
   // SilverBullet indexes the space and loads Space Lua when a page opens: more time to start than the playground
   timeout: silverbullet ? 60_000 : 30_000,
   expect: { timeout: silverbullet ? 15_000 : 5_000 },

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { editorsOf } from "../../../../shared/editor.ts";
 import { iconsOf } from "../../../../shared/icons.ts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DatabaseCore } from "../../core/core.ts";
@@ -12,6 +13,7 @@ import { MemoryViewState } from "../../store/viewstate.ts";
 import { BUILT_IN_VIEWS } from "../../views/builtin/index.ts";
 import { PROPERTIES_MODULE } from "../properties/index.ts";
 import { PEEK_MODULE } from "./index.ts";
+import { CLICK_WAIT_MS } from "./panel.ts";
 
 const TASKS: Database = {
   id: "tasks",
@@ -46,6 +48,7 @@ async function setup(answer = true, withProperties = false, configured: Record<s
     {
       document,
       icons: iconsOf(undefined),
+      editors: editorsOf(undefined),
       core,
       types,
       ui,
@@ -139,6 +142,7 @@ describe("the peek's width", () => {
 });
 const key = (target: Element, name: string) => target.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }));
 afterEach(() => {
+  vi.useRealTimers();
   document.body.replaceChildren();
   vi.restoreAllMocks();
   Object.defineProperty(window, "innerWidth", { value: 1024, configurable: true });
@@ -524,22 +528,24 @@ describe("the peek", () => {
       return write(...args);
     };
     await peek("Fix login");
+    // (Fake timers from here: the slow write's moment and the waits for it pass as the test moves them)
+    vi.useFakeTimers();
     const body = q<HTMLTextAreaElement>(".swd-peek-body");
     body.focus();
     body.value = "Mine";
     const item = await named("Fix login");
     await write("tasks", item, "Theirs", await store.body("tasks", item.key));
     store.changeOutside("tasks", item.key, { values: { estimate: 5 } });
-    await settle();
+    await vi.advanceTimersByTimeAsync(10);
     body.blur();
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await vi.advanceTimersByTimeAsync(150);
     expect(q<HTMLTextAreaElement>(".swd-peek-body").value).toBe("Mine");
     expect(q(".swd-peek-note").textContent).toContain("Your text is still here");
     // Left again, it is refused again: never written over theirs unasked
     const field = q<HTMLTextAreaElement>(".swd-peek-body");
     field.focus();
     field.blur();
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await vi.advanceTimersByTimeAsync(150);
     expect(await store.body("tasks", item.key)).toBe("Theirs");
     expect(told.length).toBeGreaterThan(0);
   });
@@ -581,11 +587,13 @@ describe("the peek", () => {
       return write(...args);
     };
     await peek("Fix login");
+    // (Fake timers from here: the slow writes' moments and the waits for them pass as the test moves them)
+    vi.useFakeTimers();
     const body = q<HTMLTextAreaElement>(".swd-peek-body");
     body.focus();
     body.value = "One";
     body.blur();
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await vi.advanceTimersByTimeAsync(60);
     expect(q(".swd-peek-note").textContent).toContain("disk");
     expect(q<HTMLTextAreaElement>(".swd-peek-body").value).toBe("One");
     // Two writes one after the other: the field read again once both are written
@@ -594,19 +602,19 @@ describe("the peek", () => {
       return write(...args);
     };
     await q<HTMLButtonElement>(".swd-peek-reload").click();
-    await settle();
+    await vi.advanceTimersByTimeAsync(10);
     const field = q<HTMLTextAreaElement>(".swd-peek-body");
     field.focus();
     field.value = "Mine";
     field.blur();
     field.focus();
     field.blur();
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await vi.advanceTimersByTimeAsync(150);
     expect(await store.body("tasks", (await named("Fix login")).key)).toBe("Mine");
     const now = q<HTMLTextAreaElement>(".swd-peek-body");
     expect([now.value, now.readOnly, now.dataset.reading]).toEqual(["Mine", false, undefined]);
     q<HTMLButtonElement>(".swd-peek-close").click();
-    await settle();
+    await vi.advanceTimersByTimeAsync(10);
     expect(document.querySelector(".swd-peek")).toBeNull();
   });
 
@@ -737,15 +745,17 @@ describe("the peek", () => {
   it("stays open as a card or a row beside it is dragged (pressed and let go elsewhere), a press without moving closing it", async () => {
     const { peek } = await setup();
     await peek("Fix login");
+    // (Fake timers from here: the wait for a click after a press beside it passes as the test moves it)
+    vi.useFakeTimers();
     const at = (type: string, x: number) => document.body.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: 40, button: 0, bubbles: true }));
     at("pointerdown", 20);
     at("pointerup", 220);
-    await new Promise((resolve) => setTimeout(resolve, 450));
+    await vi.advanceTimersByTimeAsync(CLICK_WAIT_MS + 50);
     expect(document.querySelector(".swd-peek")).not.toBeNull();
     at("pointerdown", 20);
     at("pointerup", 22);
     at("click", 22);
-    await settle();
+    await vi.advanceTimersByTimeAsync(10);
     expect(document.querySelector(".swd-peek")).toBeNull();
   });
 

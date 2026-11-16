@@ -1,6 +1,6 @@
 import { parseDate } from "../../formulas/dates.ts";
 import { lineIcon } from "../../icons.ts";
-import { dateTimeFormat } from "../format.ts";
+import { dateTimeFormat } from "../../../../shared/intl.ts";
 import { columnType } from "../type.ts";
 
 export default columnType({

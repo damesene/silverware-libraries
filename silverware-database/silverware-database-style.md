@@ -470,6 +470,27 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   width: 16px;
   height: 16px;
 }
+/* An item's icon its own size, centred on its line: a plugin's own rules for its class (Silverware Assets' file
+   icons, 22 px) do not reach into its menus. Where any item of a menu has an icon, each item keeps its place, so
+   their words line up (an item without one an empty place) */
+.swd-menu .swd-icon {
+  width: auto;
+  height: auto;
+  align-items: center;
+}
+.swd-menu:has(.swd-menu-item > .swd-icon > svg) .swd-menu-item > .swd-icon {
+  flex: 0 0 16px;
+  width: 16px;
+}
+/* A menu of no icons: no empty place before an item's words (with the gap after it, they began further in than a row
+   of choices' label above them) */
+.swd-menu:not(:has(.swd-menu-item > .swd-icon:not(:empty))) .swd-menu-item > .swd-icon:empty {
+  display: none;
+}
+.swd-menu .swd-icon > svg {
+  width: 16px;
+  height: 16px;
+}
 /* An item's detail: a bubble beside the menu, at the item's height */
 .swd-menu-detail {
   position: absolute;
@@ -531,16 +552,30 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   margin: 4px 2px;
   background: var(--button-border-color, rgba(128, 128, 128, 0.3));
 }
-/* A row of icon buttons after a label: a choice (Align) or a pair of actions (Move up, Move down) */
+/* A row of icon buttons after a label: a choice (Align) or a pair of actions (Move up, Move down). Its buttons under
+   the label, at the right, where they do not fit beside it (a menu as wide as a phone lets it: a grid's columns, eight
+   of them, ran out of the menu), on more lines where they do not fit on one */
 .swd-menu-segmented {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 4px 8px;
   padding: 2px 4px 2px 8px;
 }
-/* A long label (a sheet's name) cut, whole in its tooltip: the menu as wide as its items */
+.swd-menu-segmented > .swd-segments {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+/* A menu whose items have icons: a row's label where their words begin (the icon's place and the gap after it) */
+.swd-menu:has(.swd-menu-item > .swd-icon > svg) .swd-menu-segmented {
+  padding-left: 32px;
+}
+/* A long label (a sheet's name) cut, whole in its tooltip: the menu as wide as its items; a short one whole, never
+   squeezed by the buttons beside it (Show as) */
 .swd-menu-segmented > .swd-label {
+  flex: 0 0 auto;
   max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4097,7 +4132,8 @@ button.swd-peek-label:hover {
   font: inherit;
   line-height: 1.5;
 }
-.swd-peek-body:focus {
+/* (The stand-in's field focused, or Silverware Editor's editor holding the focus within it) */
+.swd-peek-body:is(:focus, :focus-within) {
   background: var(--swd-surface);
 }
 ```

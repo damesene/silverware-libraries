@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { setCell } from "../ops.ts";
 import { cell, clickOn, controller, cursorMoves, editor, edits, flashes, flush, key, renderPage, setText, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
+import { PREVIEW_DELAY_MS } from "./viewdialog.ts";
 
 const TASKS = [
   "| Name | Assignee | Hours |",
@@ -132,10 +133,9 @@ describe("Views", () => {
       input.setSelectionRange(value.length, value.length);
       input.dispatchEvent(new Event("input", { bubbles: true }));
     };
-    const settle = async () => {
-      // (The preview once typing pauses)
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    };
+    // The preview once typing pauses, after the dialog's delay: time moved on by fake timers (each test's), not waited for
+    beforeEach(() => vi.useFakeTimers());
+    const settle = () => vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS);
 
     it("makes a view of a table, its whole body to start with, its preview as the formula is typed, inserted under it", async () => {
       await setup(`${TASKS}\n\nEnd.\n`, { "silverware.table.metadata": true });

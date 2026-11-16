@@ -1,6 +1,6 @@
 // Silverware Layout over a host's page, whatever the host: the page's text width (its own, the default setting's, none
 // in a narrow pane) and its font size (this device's zoom, the setting's, the host's) shown as pages open and change,
-// the widgets laid out with their handle (widgetlayout.ts), the font zoom, and the Page layout dialog. What it asks of
+// the widgets laid out with their handle (widgetlayout.ts), the font zoom, and the settings dialog. What it asks of
 // the page is a PageHost (host/page.ts); what it reads and saves (settings, a page's own width, this device's zoom) a
 // LayoutStore. SilverBullet's binding (index.ts) gives both; another host would give its own.
 import { fontSizeShown } from "./core/fontsize.ts";
@@ -12,14 +12,20 @@ import type { PageHost } from "./host/page.ts";
 import { DEFAULT_GUIDES, type Guide, type Settings } from "./model/settings.ts";
 import type { Width } from "./model/width.ts";
 import { FontZoom } from "./ui/fontzoom.ts";
+import { showContentScale } from "../../shared/contentscale.ts";
 import { GuideLines } from "./ui/guidelines.ts";
-import { PageDialog, type Preview } from "./ui/pagedialog.ts";
+import { type DialogTabPart, PageDialog, type Preview } from "./ui/pagedialog.ts";
 import { layOutWidgets, type WidgetLayout } from "./widgetlayout.ts";
+import type { LayoutAlign } from "../../shared/layout.ts";
+import { alignTab } from "./ui/aligntab.ts";
 
 // How long the page is still before its own width is read again after an edit
 const EDITED_MS = 300;
 // The font size where the host's editor says none (SilverBullet's own)
 const FALLBACK_FONT_SIZE = 18;
+
+/** The font's settings, saved together */
+export type FontSettings = Pick<Settings, "fontSize" | "fontZoom" | "fontPinch" | "fontScaleFiles">;
 
 /** What Silverware Layout reads and saves, the host's way */
 export type LayoutStore = {
@@ -32,12 +38,15 @@ export type LayoutStore = {
   savePageWidth(page: string, width: Width | undefined): Promise<string | undefined>;
   saveTextWidth(width: Width | undefined): Promise<void>;
   saveGuides(guides: readonly Guide[]): Promise<void>;
-  saveFont(fontSize: number | undefined, fontZoom: boolean): Promise<void>;
+  saveAlignments(alignments: Readonly<Record<string, LayoutAlign>>): Promise<void>;
+  saveFont(font: FontSettings): Promise<void>;
   /** This device's font zoom (px), as kept; none: none */
   readZoom(): number | undefined;
   keepZoom(size: number | undefined): void;
   confirm(question: string): Promise<boolean>;
   flash(message: string, type: "info" | "error"): void;
+  /** Optional: the host's own tap with two fingers, run where the pinch takes two fingers and they tapped */
+  twoFingerTap?(): void;
 };
 
 type State = {
@@ -60,12 +69,37 @@ export class LayoutApp {
   // Made once (their observers and listeners live as long as the window), asking the state of the last start
   private widgetLayout: WidgetLayout | undefined;
   private fontZoom: FontZoom | undefined;
+  // The theme's font size as first read (the content's scale's base where All pages has none): read once, as reading it
+  // takes Silverware Layout's own size off the page a moment
+  private themeSizeKept: number | undefined;
 
   constructor(
     private readonly doc: Document,
     private readonly page: PageHost,
     private readonly registry: Registry,
   ) {}
+
+  /** Tabs of other parts of Silverware Layout's for the settings dialog, made as it opens (the media's) */
+  dialogTabs: (() => Promise<readonly DialogTabPart[]>) | undefined;
+
+  /** Where the page's text is (x in the window, its padding left out); none before it is laid out */
+  textEdges(): { readonly left: number; readonly right: number } | undefined {
+    const widgets = this.widgetLayout?.widgets;
+    const middle = widgets?.textMiddle();
+    if (!widgets || middle === undefined) return undefined;
+    const width = widgets.textWidth();
+    return { left: middle - width / 2, right: middle + width / 2 };
+  }
+
+  /** The part of the window the page is seen in (below the host's top bar), top and bottom */
+  view(): { readonly top: number; readonly bottom: number } {
+    return this.page.view();
+  }
+
+  /** Every widget laid out again as its entries keep it (a provider's entries changed outside a drag: typed by hand) */
+  layOutWidgets(): void {
+    this.widgetLayout?.widgets.layOutAll();
+  }
 
   /** A problem said to the user (the registry's, a widget's), the console's before a start */
   problem(message: string): void {
@@ -75,7 +109,12 @@ export class LayoutApp {
 
   /** Started (again, the host's scripts loaded again): the store handed over, the settings read, the page shown */
   async start(store: LayoutStore): Promise<void> {
-    this.state = { store, settings: await store.readSettings(), page: "", pageWidth: undefined, zoom: store.readZoom() };
+    // (The theme's size read anew on a start: the configuration loaded again may have another theme)
+    this.themeSizeKept = undefined;
+    // (Started again on the same page, as another plugin's saved configuration loads the host's scripts again: the page
+    // kept, so the dialog open over it is not taken for one of another page and closed)
+    const was = this.state;
+    this.state = { store, settings: await store.readSettings(), page: was?.page ?? "", pageWidth: was?.pageWidth, zoom: store.readZoom() };
     this.stopWatching?.();
     this.stopWatching = watchPaneWidth(this.page, (width) => {
       showPaneWidth(this.doc, width);
@@ -86,13 +125,18 @@ export class LayoutApp {
       guides: () => this.state?.settings.guides ?? DEFAULT_GUIDES,
       enabled: () => !!this.state && paneWidth(this.page) >= this.state.settings.minPaneWidth,
       problem: (message) => this.problem(message),
+      alignments: () => this.state?.settings.alignments ?? {},
     });
     this.widgetLayout.widgets.layOutAll();
-    // While the Page layout dialog is open, the zoom is its This device's (set as its slider sets it, kept on Save, its
+    // While the settings dialog is open, the zoom is its This device's (set as its slider sets it, kept on Save, its
     // Ctrl + scroll box as ticked there), anywhere in the window: the dialog's ground lies over the editor
     const open = () => (this.dialog?.isOpen ? this.dialog : undefined);
     this.fontZoom ??= new FontZoom(this.doc, {
       enabled: () => open()?.font.zooms ?? !!this.state?.settings.fontZoom,
+      pinches: () => open()?.font.pinches ?? !!this.state?.settings.fontPinch,
+      // (Over the page's text alone, the dialog open or not: two fingers on the dialog are not a pinch of the page's)
+      pinchesAt: (node) => inEditor(this.page, node),
+      twoFingerTap: () => this.state?.store.twoFingerTap?.(),
       inEditor: (node) => !!open() || inEditor(this.page, node),
       size: () => {
         const dialog = open();
@@ -112,7 +156,8 @@ export class LayoutApp {
         this.show();
       },
     });
-    this.show();
+    // (The dialog open shows what it sets: not undone)
+    if (!this.dialog?.isOpen) this.show();
     await this.pageOpened();
   }
 
@@ -137,10 +182,12 @@ export class LayoutApp {
     const mine = ++this.reading;
     const { page, width } = await state.store.readPage();
     if (mine !== this.reading || state !== this.state) return;
-    if (this.dialog?.isOpen && page !== state.page) this.dialog.close();
+    const same = page === state.page;
+    if (this.dialog?.isOpen && !same) this.dialog.close();
     state.page = page;
     state.pageWidth = width;
-    this.show();
+    // (The dialog open over the same page shows what it sets: not undone)
+    if (!(this.dialog?.isOpen && same)) this.show();
   }
 
   /** The page edited: its width read again once it is still a moment (a width typed in its frontmatter) */
@@ -154,7 +201,7 @@ export class LayoutApp {
   /** The text shown at the width and the font size that apply now */
   private show(): void {
     const state = this.state;
-    if (state) this.showWith({ pageWidth: state.pageWidth, defaultWidth: state.settings.textWidth, fontSize: state.settings.fontSize, fontZoom: state.settings.fontZoom, zoom: state.zoom });
+    if (state) this.showWith({ pageWidth: state.pageWidth, defaultWidth: state.settings.textWidth, fontSize: state.settings.fontSize, fontZoom: state.settings.fontZoom, scaleFiles: state.settings.fontScaleFiles, zoom: state.zoom });
   }
 
   /** The text shown as it would be with these (the page's own width, the default; the font size, the zoom; none: none) */
@@ -169,7 +216,11 @@ export class LayoutApp {
     markNarrow(this.doc, pane < state.settings.minPaneWidth);
     this.page.showTextWidth(textWidthShown({ page: shown.pageWidth, fallback: shown.defaultWidth, paneWidth: pane, minPaneWidth: state.settings.minPaneWidth }));
     // (Font zoom off: this device's zoom not shown, still kept)
-    showFontSize(this.doc, this.page, fontSizeShown(shown.fontZoom ? shown.zoom : undefined, shown.fontSize));
+    const zoomed = shown.fontZoom ? shown.zoom : undefined;
+    showFontSize(this.doc, this.page, fontSizeShown(zoomed, shown.fontSize));
+    // The files grown or shrunk with this device's zoom, where asked: by its share of the size of all pages (the
+    // theme's where none), so a page at its default shows them at theirs
+    showContentScale(this.doc, shown.scaleFiles && zoomed !== undefined ? zoomed / (shown.fontSize ?? (this.themeSizeKept ??= this.themeSize())) : 1);
   }
 
   /** The font size Silverware Layout shows now (none: the host's) */
@@ -188,14 +239,24 @@ export class LayoutApp {
     return themeFontSize(this.doc, this.page) ?? FALLBACK_FONT_SIZE;
   }
 
-  /** The Page layout dialog over the page open */
+  /** The settings dialog over the page open */
   async openDialog(): Promise<void> {
     const state = this.state;
     if (!state) return;
     await this.pageOpened();
     const { store } = state;
     this.dialog ??= new PageDialog(this.doc);
+    // (Where each kind of widget stands: a tab of the kinds the providers registered now name)
+    const kinds = this.registry.providers.flatMap((provider) => (provider.kinds ?? []).map((kind) => ({ key: `${provider.name}/${kind.id}`, kind })));
+    const alignment = alignTab(this.doc, kinds, state.settings.alignments, async (alignments) => {
+      await store.saveAlignments(alignments);
+      state.settings = { ...state.settings, alignments };
+      this.widgetLayout?.widgets.layOutAll();
+      return undefined;
+    });
+    const tabs = [alignment, ...((await this.dialogTabs?.().catch(() => [])) ?? [])];
     this.dialog.open({
+      tabs,
       page: state.page,
       pageWidth: state.pageWidth,
       defaultWidth: state.settings.textWidth,
@@ -206,6 +267,8 @@ export class LayoutApp {
       themeWidth: () => this.page.themeTextWidth(),
       fontSize: state.settings.fontSize,
       fontZoom: state.settings.fontZoom,
+      fontPinch: state.settings.fontPinch,
+      fontScaleFiles: state.settings.fontScaleFiles,
       zoom: state.zoom,
       themeFontSize: () => themeFontSize(this.doc, this.page) ?? FALLBACK_FONT_SIZE,
       // The guides as a drag shows them: the page's width and each guide the pane can hold, by the text's middle
@@ -234,9 +297,9 @@ export class LayoutApp {
         state.settings = { ...state.settings, guides };
         return undefined;
       },
-      saveFont: async (fontSize, fontZoom) => {
-        await store.saveFont(fontSize, fontZoom);
-        state.settings = { ...state.settings, fontSize, fontZoom };
+      saveFont: async (font) => {
+        await store.saveFont(font);
+        state.settings = { ...state.settings, ...font };
         return undefined;
       },
       saveZoom: (size) => {

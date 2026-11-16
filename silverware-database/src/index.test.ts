@@ -40,7 +40,9 @@ function pickView(root: ParentNode, label: string): void {
 }
 /** Two views, "a" and "b": the place's picker picks one */
 const VIEWS: ViewDefinition[] = ["a", "b"].map((name) => ({ name, label: name, icon: name, render: (_host, element) => void element.replaceChildren(name) }));
-const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+// What was started done: its reads, writes and the places drawn by them, the fake timers the test starts moved on (a
+// real pause was too short for a loaded machine, every test file at once)
+const settle = () => vi.advanceTimersByTimeAsync(20);
 
 // A module of its own for each test: what Silverware Database keeps across loads of Space Lua (its core, its history) is the
 // module's, and each test has a space of its own
@@ -63,6 +65,7 @@ afterEach(() => {
 
 describe("Silverware Database in SilverBullet", () => {
   it("writes a view picked into the block it was picked in, and nothing where a block alike is out of view", async () => {
+    vi.useFakeTimers();
     const { memory, bridge, told } = bridgeOf({ Page: TWICE, "Page/db-tasks": ROOT }, "Page");
     init(bridge);
     defineViews(VIEWS);
@@ -120,6 +123,7 @@ describe("Silverware Database in SilverBullet", () => {
   });
 
   it("takes the blocks shown over as it starts again, drawn and written as before", async () => {
+    vi.useFakeTimers();
     const { memory, bridge } = bridgeOf({ Page: "```silverware-database\nid: tasks\n```\n", "Page/db-tasks": ROOT }, "Page");
     init(bridge);
     defineViews(VIEWS);

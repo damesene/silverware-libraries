@@ -32,20 +32,20 @@ describe("a menu's slots", () => {
     expect(topLevel).toEqual([]);
   });
 
-  it("is reached by no plugin through another's code: each plugin imports its own and shared/ alone", () => {
-    const root = join(import.meta.dirname, "..");
-    const plugins = readdirSync(root).filter((name) => name.startsWith("silverware-"));
-    const sources = (dir: string): string[] =>
-      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? sources(join(dir, entry.name)) : entry.name.endsWith(".ts") ? [join(dir, entry.name)] : []));
-    const crossing = plugins.flatMap((plugin) =>
-      sources(join(root, plugin, "src")).flatMap((file) =>
-        [...readFileSync(file, "utf8").matchAll(/(?:\bfrom\s+|^import\s+|\bimport\(\s*)["']([^"']+)["']/gm)]
-          .map((m) => relative(root, join(file, "..", m[1]!)).replace(/\\/g, "/"))
-          .filter((path) => path.startsWith("silverware-") && !path.startsWith(`${plugin}/`))
-          .map((path) => `${relative(root, file)} → ${path}`),
-      ),
+  // (A test of each plugin: every source file of all of them read in one test went over a test's time while every test
+  // file ran at once)
+  const root = join(import.meta.dirname, "..");
+  const plugins = readdirSync(root).filter((name) => name.startsWith("silverware-"));
+  const sources = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? sources(join(dir, entry.name)) : entry.name.endsWith(".ts") ? [join(dir, entry.name)] : []));
+  it("is a contract of several plugins", () => expect(plugins.length).toBeGreaterThan(1));
+  it.each(plugins)("is reached by no plugin through another's code: %s imports its own and shared/ alone", (plugin) => {
+    const crossing = sources(join(root, plugin, "src")).flatMap((file) =>
+      [...readFileSync(file, "utf8").matchAll(/(?:\bfrom\s+|^import\s+|\bimport\(\s*)["']([^"']+)["']/gm)]
+        .map((m) => relative(root, join(file, "..", m[1]!)).replace(/\\/g, "/"))
+        .filter((path) => path.startsWith("silverware-") && !path.startsWith(`${plugin}/`))
+        .map((path) => `${relative(root, file)} → ${path}`),
     );
-    expect(plugins.length).toBeGreaterThan(1);
     expect(crossing).toEqual([]);
   });
 });

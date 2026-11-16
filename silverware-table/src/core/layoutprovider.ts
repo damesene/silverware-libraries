@@ -30,6 +30,7 @@ export function tablesLayoutProvider(tables: LayoutTables): LayoutProvider {
   return {
     name: "silverware-table",
     selector: WIDGET_SELECTOR,
+    kinds: [{ id: "table", name: "Table", align: "center" }],
     read: (element): LayoutEntries => {
       const table = renderedTable(element);
       const rendered = table && renderedMeta(tables.renderedRows(table));

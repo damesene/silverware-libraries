@@ -1,7 +1,7 @@
-// The editor's font size (docs/silverware-layout-font-size.md), in SilverBullet: the setting from the Page layout
+// The editor's font size (docs/silverware-layout-font-size.md), in SilverBullet: the setting from the settings
 // dialog, Font zoom by Ctrl + scroll and Ctrl+0, its label, this device's zoom kept across a reload and Reset.
 import type { Page } from "@playwright/test";
-import { expect, PAGE_LAYOUT, runCommand, test } from "./helpers.ts";
+import { boxOf, expect, LAYOUT_SETTINGS, runCommand, test } from "./helpers.ts";
 
 const PAGE = "# Page\n\nSome text to zoom.\n";
 // SilverBullet's theme's font size
@@ -12,7 +12,7 @@ const label = (page: Page) => page.locator(".swl-zoom-label");
 
 /** Ctrl + a wheel's notches over the page's text (up: away, larger) */
 async function zoom(page: Page, notches: number): Promise<void> {
-  const text = (await page.locator(".cm-line", { hasText: "Some text to zoom." }).boundingBox())!;
+  const text = await boxOf(page.locator(".cm-line", { hasText: "Some text to zoom." }));
   await page.mouse.move(text.x + 20, text.y + text.height / 2);
   await page.keyboard.down("Control");
   for (let i = 0; i < Math.abs(notches); i++) await page.mouse.wheel(0, notches > 0 ? -100 : 100);
@@ -21,7 +21,7 @@ async function zoom(page: Page, notches: number): Promise<void> {
 
 test("Ctrl + scroll over the page: a pixel a step, its label naming the size and the default; Ctrl+0 the default again", async ({ page, space }) => {
   await space.open({ Page: PAGE }, "Page");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   await page.keyboard.press("Escape");
   expect(await fontSize(page)).toBe(THEME);
   await zoom(page, 2);
@@ -44,12 +44,12 @@ test("Ctrl + scroll over the page: a pixel a step, its label naming the size and
 
 test("this device's zoom kept across a reload, shown in the dialog, taken off by Reset", async ({ page, space }) => {
   await space.open({ Page: PAGE }, "Page");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   await page.keyboard.press("Escape");
   await zoom(page, 2);
   await expect.poll(() => fontSize(page)).toBe(THEME + 2);
   await page.reload();
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   await expect.poll(() => fontSize(page)).toBe(THEME + 2);
   const dialog = page.locator(".swl-dialog");
   await dialog.getByRole("tab", { name: "Font" }).click();
@@ -64,7 +64,7 @@ test("this device's zoom kept across a reload, shown in the dialog, taken off by
 
 test("this device's zoom set by its slider in the dialog (as on a phone, which has no Ctrl + scroll); a slider held, the dialog all but gone, the slider alone shown", async ({ page, space }) => {
   await space.open({ Page: PAGE }, "Page");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");
   await dialog.getByRole("tab", { name: "Font" }).click();
   const value = dialog.getByRole("spinbutton", { name: "This device's font size in px" });
@@ -73,7 +73,7 @@ test("this device's zoom set by its slider in the dialog (as on a phone, which h
   await expect(value).toHaveAttribute("placeholder", `${THEME}`);
   const slider = dialog.getByRole("slider", { name: "This device's font size", exact: true });
   // Pressed: the dialog clear but for the slider held
-  const box = (await slider.boundingBox())!;
+  const box = await boxOf(slider);
   await page.mouse.move(box.x + 2, box.y + box.height / 2);
   await page.mouse.down();
   await expect(dialog).toHaveClass(/swl-dialog-sliding/);
@@ -94,9 +94,9 @@ test("this device's zoom set by its slider in the dialog (as on a phone, which h
   expect(await space.config()).not.toContain("fontSize");
 });
 
-test("with the Page layout dialog open, Ctrl + scroll over the page zooms as its This device row: shown at once, kept on Save", async ({ page, space }) => {
+test("with the settings dialog open, Ctrl + scroll over the page zooms as its This device row: shown at once, kept on Save", async ({ page, space }) => {
   await space.open({ Page: PAGE }, "Page");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");
   await dialog.getByRole("tab", { name: "Font" }).click();
   await zoom(page, 2);
@@ -111,7 +111,7 @@ test("with the Page layout dialog open, Ctrl + scroll over the page zooms as its
 
 test("the font size for every page set in the dialog, shown at once, saved into CONFIG; the zoom's default then", async ({ page, space }) => {
   await space.open({ Page: PAGE }, "Page");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");
   await dialog.getByRole("tab", { name: "Font" }).click();
   const row = dialog.locator(".swl-dialog-font-row");
@@ -133,10 +133,10 @@ test("the font size for every page set in the dialog, shown at once, saved into 
 
 test("Font zoom off: Ctrl + scroll leaves the font, and the browser's zoom, alone", async ({ page, space }) => {
   await space.open({ Page: PAGE }, "Page");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");
   await dialog.getByRole("tab", { name: "Font" }).click();
-  await dialog.getByRole("checkbox", { name: "Ctrl + scroll zooms here" }).uncheck();
+  await dialog.getByRole("checkbox", { name: "Ctrl + scroll zooms the text" }).uncheck();
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
   await expect.poll(async () => (await space.config()) ?? "").toContain('config.set("silverware.layout.fontZoom.enabled", false)');
@@ -153,10 +153,15 @@ test("Font zoom off: Ctrl + scroll leaves the font, and the browser's zoom, alon
 
 test("a task's box grows with the font, as SilverBullet draws it at its own size", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n- [ ] Some text to zoom.\n" }, "Page");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
+  // (Open before Esc, gone after: an Esc the dialog had no focus for yet goes to the editor, the dialog left over the page)
+  await expect(page.locator(".swl-dialog")).toBeVisible();
   await page.keyboard.press("Escape");
-  const box = async () => (await page.locator("#sb-main .cm-editor input[type=checkbox]").boundingBox())!.width;
-  const theme = await box();
+  await expect(page.locator(".swl-dialog")).toBeHidden();
+  // (SilverBullet draws a task's box anew with any change of its editor: the one there now, none for a moment polled again)
+  const checkbox = page.locator("#sb-main .cm-editor input[type=checkbox]");
+  const box = async () => (await checkbox.boundingBox())?.width ?? Number.NaN;
+  const theme = (await boxOf(checkbox)).width;
   // A step up: the box in proportion to the font (as SilverBullet draws it at 18 px, a step larger)
   await zoom(page, 1);
   await expect.poll(() => fontSize(page)).toBe(THEME + 1);

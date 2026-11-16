@@ -20,6 +20,8 @@ import { edgeScroll } from "../edgescroll.ts";
 import { svg } from "../icons.ts";
 import { type ItemSpan, SPAN_META, type SpanChange, spanMenu, viewSpans } from "../spans.ts";
 import { fieldNodes } from "../values.ts";
+import { graphemes } from "../../domain/look.ts";
+import { dateTimeFormat } from "../../../../shared/intl.ts";
 
 // The room between a bar and its values (the style page's `left: calc(100% + 8px)`), and the least room they are shown in
 const VALUES_GAP = 8;
@@ -45,7 +47,7 @@ const PRESS_PX = 4;
 
 // A finger held this long on a bar, still (moved less than HOLD_PX), takes it: before, a move of it scrolls the timeline,
 // as a board's card is taken only once held
-const HOLD_MS = 400;
+export const HOLD_MS = 400;
 const HOLD_PX = 8;
 
 // Dates as the rest of the plugin's words: English
@@ -113,9 +115,12 @@ function draw(host: ViewHost, element: HTMLElement, live: Live): void {
   const last = addDays(within(days.at(-1)!), margin);
   const count = daysBetween(first, last) + 1;
   const x = (day: Day) => daysBetween(first, day) * dayWidth;
-  const fmt = (options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(LOCALE, { ...options, timeZone: "UTC" });
+  // (Formatters kept: shared/intl.ts)
+  const fmt = (options: Intl.DateTimeFormatOptions) => dateTimeFormat(LOCALE, { ...options, timeZone: "UTC" });
   const utc = (day: Day) => new Date(`${day}T00:00:00Z`);
   const shortDay = fmt({ day: "numeric", month: "short" });
+  const monthName = fmt({ month: scale === "months" ? "short" : "long", year: "numeric" });
+  const dayName = fmt({ weekday: "long", day: "numeric", month: "long" });
   const lasting = (span: ItemSpan) => [span.start === span.end ? shortDay.format(utc(span.start)) : `${shortDay.format(utc(span.start))} – ${shortDay.format(utc(span.end))}`, span.time?.slice(0, 5) ?? "", span.problem ?? ""].filter(Boolean).join(", ");
   // A change written, or why not said; whether it was written
   const change = (item: Item, made: SpanChange) => {
@@ -139,7 +144,7 @@ function draw(host: ViewHost, element: HTMLElement, live: Live): void {
     const month = monthOfDay(at);
     const next = `${month.month === 11 ? month.year + 1 : month.year}-${String(month.month === 11 ? 1 : month.month + 2).padStart(2, "0")}-01`;
     const until = next <= last ? next : addDays(last, 1);
-    const head = el(doc, "div", "swd-tl-month", el(doc, "span", { text: fmt({ month: scale === "months" ? "short" : "long", year: "numeric" }).format(utc(at)) }));
+    const head = el(doc, "div", "swd-tl-month", el(doc, "span", { text: monthName.format(utc(at)) }));
     head.style.left = `${x(at)}px`;
     head.style.width = `${daysBetween(at, until) * dayWidth}px`;
     months.push(head);
@@ -151,7 +156,7 @@ function draw(host: ViewHost, element: HTMLElement, live: Live): void {
       const day = addDays(first, at);
       const weekend = weekday(day) === 0 || weekday(day) === 6;
       if (scale === "days") {
-        const unit = el(doc, "div", { class: `swd-tl-unit${weekend ? " swd-tl-weekend" : ""}${day === now ? " swd-tl-now" : ""}`, text: String(Number(day.slice(8))), title: fmt({ weekday: "long", day: "numeric", month: "long" }).format(utc(day)) });
+        const unit = el(doc, "div", { class: `swd-tl-unit${weekend ? " swd-tl-weekend" : ""}${day === now ? " swd-tl-now" : ""}`, text: String(Number(day.slice(8))), title: dayName.format(utc(day)) });
         unit.style.left = `${x(day)}px`;
         unit.style.width = `${dayWidth}px`;
         units.push(unit);
@@ -173,7 +178,7 @@ function draw(host: ViewHost, element: HTMLElement, live: Live): void {
     // (Its name a text of its own: the names' column folded to a strip shows the icon alone, the name its title)
     // (Folded, an item without an icon shows its name's first three letters, a strip of nothing being no button to find)
     const icon = host.look.icon(item);
-    const initial = icon ? undefined : el(doc, "span", { class: "swd-tl-name-initial", text: [...new Intl.Segmenter().segment(item.name.trim())].slice(0, 3).map((one) => one.segment).join(""), attrs: { "aria-hidden": "true" } });
+    const initial = icon ? undefined : el(doc, "span", { class: "swd-tl-name-initial", text: graphemes(item.name.trim()).slice(0, 3).join(""), attrs: { "aria-hidden": "true" } });
     const name = el(doc, "button", { class: `swd-tl-name${unread ? " swd-invalid" : ""}`, title: `Open ${item.name}`, run: () => void host.open(item) }, icon, initial, el(doc, "span", { class: "swd-tl-name-text", text: item.name }));
     // (Its color by its name too, as a table's stripe: the strip folded shows it where its bar is out of view)
     host.look.item(item, name);

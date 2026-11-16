@@ -4,6 +4,7 @@
 // (the toolbar's own presses kept: the action's button closes it again), and
 // writes what it changes of the page's text (core/action.ts ActionPanel); the
 // action knows nothing of where it is shown.
+import { COMPANION_ATTRIBUTE } from "../../../shared/editor.ts";
 import type { Action } from "./action.ts";
 import { type Box, placeByToolbar, roomAbove } from "./place.ts";
 
@@ -26,6 +27,8 @@ export class Panel {
   constructor(private readonly doc: Document) {
     this.element = doc.createElement("div");
     this.element.className = "swb-floating swb-panel";
+    // (Its fields focused are not the editor it acts on left: shared/editor.ts)
+    this.element.setAttribute(COMPANION_ATTRIBUTE, "");
     this.element.setAttribute("role", "dialog");
     this.element.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;

@@ -9,6 +9,10 @@ import { dirname, join } from "node:path";
 import { test as base, expect, type Page } from "@playwright/test";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 
+import { boxOf } from "../../scripts/ui-test-helpers.ts";
+
+export { boxOf };
+
 export { expect };
 
 export const onSilverBullet = process.env.SW_TARGET === "silverbullet";
@@ -18,8 +22,8 @@ const FOLDER = "UiLayout";
 export type Space = {
   /** The folder of this test's pages in the space (`UiLayout/<test>`) */
   readonly folder: string;
-  /** Pages written (by their names under the folder), the page `open` of them opened, Silverware Layout started */
-  open(pages: Readonly<Record<string, string>>, open: string): Promise<void>;
+  /** Pages written (by their names under the folder), and files beside them (an image: its name with its extension), the page `open` of them opened, Silverware Layout started */
+  open(pages: Readonly<Record<string, string>>, open: string, files?: Readonly<Record<string, Uint8Array | string>>): Promise<void>;
   /** A page's text as saved (its name under the folder) */
   saved(name: string): Promise<string | undefined>;
   /** The space's CONFIG page as saved */
@@ -33,8 +37,9 @@ export const test = base.extend<{ space: Space }>({
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => {
-      // (SilverBullet answers what it looks for and does not find with a 404, which the page logs)
-      if (m.type() === "error" && !/404/.test(m.text())) errors.push(m.text());
+      // (SilverBullet answers what it looks for and does not find with a 404, which the page logs; its own gesture of two
+      // fingers prevents the default in a passive listener of the window, which Chrome logs: client/editor_ui.tsx)
+      if (m.type() === "error" && !/404|Unable to preventDefault inside passive event listener/.test(m.text())) errors.push(m.text());
     });
     try {
       await use(page);
@@ -50,14 +55,19 @@ export const test = base.extend<{ space: Space }>({
     const configBefore = existsSync(configPath) ? await readFile(configPath, "utf8") : undefined;
     await use({
       folder,
-      open: async (pages, open) => {
+      open: async (pages, open, files = {}) => {
         for (const [name, text] of Object.entries(pages)) {
           await mkdir(dirname(path(name)), { recursive: true });
           await writeFile(path(name), text);
         }
+        for (const [name, content] of Object.entries(files)) {
+          const file = join(server().space, folder, name);
+          await mkdir(dirname(file), { recursive: true });
+          await writeFile(file, content);
+        }
         await page.goto(`http://127.0.0.1:${server().port}/${folder}/${open}`);
         await page.waitForFunction(() => !!(window as unknown as { client?: { editorView?: unknown } }).client?.editorView);
-        await commandDefined(page, PAGE_LAYOUT);
+        await commandDefined(page, LAYOUT_SETTINGS);
       },
       saved: async (name) => (existsSync(path(name)) ? (await readFile(path(name), "utf8")).replace(/\r\n/g, "\n") : undefined),
       config: async () => (existsSync(configPath) ? (await readFile(configPath, "utf8")).replace(/\r\n/g, "\n") : undefined),
@@ -65,12 +75,14 @@ export const test = base.extend<{ space: Space }>({
     // (The page closed first: an open client would take CONFIG written under it for a change of its own)
     await page.close();
     await rm(join(server().space, folder), { recursive: true, force: true });
+    // (Previews Silverware Assets kept of its files: silverware-assets/src/core/stored.ts)
+    await rm(join(server().space, "_silverware-assets-previews", folder), { recursive: true, force: true });
     if (configBefore === undefined) await rm(configPath, { force: true });
     else await writeFile(configPath, configBefore);
   },
 });
 
-export const PAGE_LAYOUT = "Silverware Layout: Page layout";
+export const LAYOUT_SETTINGS = "Silverware Layout: Settings";
 
 type Client = { clientSystem: { commandHook: { buildAllCommands(): Map<string, unknown> } }; runCommandByName(name: string): Promise<void> };
 
@@ -107,4 +119,64 @@ export async function waitForIndexedLayout(page: Page, name: string): Promise<vo
       return Array.isArray(pages) && pages.some((one: { name?: string; _layout?: unknown }) => one.name === name && !!one._layout);
     })
     .toBe(true);
+}
+
+/** A PNG of one pixel: an image of the space, drawn as large as its embed says */
+export const PIXEL_PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+
+/**
+ * Waits until the page shows a grid drawn (`count` of them): SilverBullet's custom syntax is active once the page is
+ * loaded again after it is first defined, so a page shown before that has its grid as text: loaded again then
+ */
+export async function gridsDrawn(page: Page, count = 1): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await expect(page.locator("#sb-main .swl-grid:not(.swl-grid-shown)")).toHaveCount(count, { timeout: 5000 });
+      // (Still there a moment later: SilverBullet may draw the page anew once more as it loads its scripts, a grid
+      // drawn before its custom syntax is active gone again)
+      await page.waitForTimeout(700);
+      await expect(page.locator("#sb-main .swl-grid:not(.swl-grid-shown)")).toHaveCount(count, { timeout: 1000 });
+      return;
+    } catch {
+      await page.reload();
+      await page.waitForFunction(() => !!(window as unknown as { client?: { editorView?: unknown } }).client?.editorView);
+    }
+  }
+  await expect(page.locator("#sb-main .swl-grid:not(.swl-grid-shown)")).toHaveCount(count);
+}
+
+/** Where SilverBullet's cursor is (an offset of the page's text) */
+export function cursorAt(page: Page): Promise<number> {
+  return page.evaluate(() => (window as unknown as { client: { editorView: { state: { selection: { main: { head: number } } } } } }).client.editorView.state.selection.main.head);
+}
+
+/** The page's text in the editor now */
+export function editorText(page: Page): Promise<string> {
+  return page.evaluate(() => (window as unknown as { client: { editorView: { state: { doc: { toString(): string } } } } }).client.editorView.state.doc.toString());
+}
+
+/**
+ * A grid's cell's field as it is edited, whoever draws it: the stand-in's `<textarea>`, or Silverware Editor's editor
+ * where it is installed (the tests' spaces have every plugin), its element marked by the same class
+ */
+export const cellField = (page: Page) => page.locator("#sb-main .swl-grid-editor");
+
+/** The cell's field's text, its selection (offsets in its text) and whether it has the focus, read either way */
+export function fieldState(page: Page): Promise<{ readonly text: string; readonly from: number; readonly to: number; readonly focused: boolean }> {
+  return cellField(page).evaluate((root: HTMLElement) => {
+    if (root instanceof HTMLTextAreaElement) return { text: root.value, from: root.selectionStart, to: root.selectionEnd, focused: document.activeElement === root };
+    // Silverware Editor's editor (CodeMirror, in its shadow root): its text and selection its state's, as its lines show
+    // the markdown otherwise (marks hidden, a task's checkbox)
+    type State = { doc: { toString(): string }; selection: { main: { from: number; to: number } } };
+    const content = (root.shadowRoot ?? root).querySelector(".cm-content") as (Element & { cmTile?: { view?: { state: State } } }) | null;
+    const state = content?.cmTile?.view?.state;
+    if (!state) throw new Error("no editor's state in the field");
+    return { text: state.doc.toString(), from: state.selection.main.from, to: state.selection.main.to, focused: root === document.activeElement || root.contains(document.activeElement) };
+  });
+}
+
+/** The cell's field's text replaced, as typed (all of it selected first) */
+export async function fillField(page: Page, text: string): Promise<void> {
+  await page.keyboard.press("Control+a");
+  await page.keyboard.insertText(text);
 }

@@ -10,6 +10,11 @@ const FONT_SIZE_ATTRIBUTE = "data-swl-font-size";
 const FONT_SIZE = "--swl-font-size";
 const PANE_WIDTH = "--swl-pane-width";
 
+/** Whether the pane is marked too narrow for any layout of Silverware Layout's (no widget's handle shown beside it) */
+export function isNarrow(doc: Document): boolean {
+  return doc.documentElement.hasAttribute(NARROW_ATTRIBUTE);
+}
+
 /** Whether the pane is too narrow for any layout of Silverware Layout's (the style page's rule for widgets reads it) */
 export function markNarrow(doc: Document, narrow: boolean): void {
   if (doc.documentElement.hasAttribute(NARROW_ATTRIBUTE) !== narrow) doc.documentElement.toggleAttribute(NARROW_ATTRIBUTE, narrow);

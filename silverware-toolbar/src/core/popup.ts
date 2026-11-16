@@ -8,6 +8,7 @@
 // choices, as → does), Esc closes it (in the choices: back, as ← on an empty
 // field and Backspace there do); a click runs one. Actions not offered for the
 // selection show dimmed and are skipped.
+import { COMPANION_ATTRIBUTE } from "../../../shared/editor.ts";
 import { ICONS } from "../icons.ts";
 import type { Action } from "./action.ts";
 import { type Box, placeByToolbar, roomAbove } from "./place.ts";
@@ -56,6 +57,8 @@ export class Popup {
       return e;
     };
     this.element = el("div", "swb-floating swb-popup");
+    // (Its search focused is not the editor it acts on left: shared/editor.ts)
+    this.element.setAttribute(COMPANION_ATTRIBUTE, "");
     this.element.setAttribute("role", "dialog");
     this.element.setAttribute("aria-label", "Every action");
     const search = el("label", "swb-search");

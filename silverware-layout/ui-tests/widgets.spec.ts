@@ -92,7 +92,7 @@ test("@playground a drag far right snaps to Full width: the pane less 40 px, kep
   await expect.poll(() => kept(page)).toEqual({ "table-1": { width: "full" } });
   await expect.poll(async () => Math.round((await box(page, "table-1")).width)).toBe(Math.round(pane - 40));
   await barOf(page, "table-1");
-  await expect(page.locator(".swl-handle-bar")).toHaveAttribute("title", "Width: Full width. Drag to change it, double-click for the text's width");
+  await expect(page.locator(".swl-handle-bar")).toHaveAttribute("title", "Width: Full width. Drag to change it, click for where it stands, double-click for the text's width");
 });
 
 test("@playground Esc during a drag puts the width back, writing nothing", async ({ page }) => {

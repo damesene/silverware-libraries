@@ -107,7 +107,7 @@ const STOPPED_EVENTS = [
 const SORT_GLYPH = { asc: "▲", desc: "▼", none: "⇅" } as const;
 
 // A sorting is stored (metadata setting) once the clicks have settled
-const STORE_SORT_DELAY_MS = 400;
+export const STORE_SORT_DELAY_MS = 400;
 
 // Just above a table's header, as far: still the table hovered (its tab is there, and the pointer comes in from above)
 const HOVER_ABOVE = 20;

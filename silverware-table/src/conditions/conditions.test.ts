@@ -1,7 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { transformSync } from "esbuild";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Cell, Style } from "./api.ts";
 import {
@@ -72,28 +71,28 @@ describe("Built-in definitions", () => {
     for (const folder of ["conditions", "formats"]) {
       for (const file of readdirSync(join(here, "builtin", folder))) {
         const source = readFileSync(join(here, "builtin", folder, file), "utf8");
-        const imports = source.match(/^import .*$/gm) ?? [];
+        // (Every line reaching another module, as importing the file would: an import, indented or not; a line ending in
+        // `from "…"`, an export from one; an import or require called)
+        const imports = source.match(/^\s*import\b.*$|^.*\bfrom\s*["'][^"']*["'];?\s*$|^.*\b(import|require)\s*\(.*$/gm) ?? [];
         for (const line of imports) expect(line, `${folder}/${file}`).toMatch(/^import type \{[^}]+\} from "\.\.\/\.\.\/api\.ts";$/);
       }
     }
   });
 
-  it("work as a user's file: their types stripped, given as definitions they are the same", () => {
-    for (const folder of ["conditions", "formats"]) {
-      for (const file of readdirSync(join(here, "builtin", folder))) {
-        const source = readFileSync(join(here, "builtin", folder, file), "utf8");
-        const js = transformSync(source, { loader: "ts", format: "cjs" }).code;
-        const module = { exports: {} as { default?: unknown } };
-        new Function("module", "exports", js)(module, module.exports);
-        const given = module.exports.default as (h: typeof HELPERS) => { name: string };
-        expect(typeof given, file).toBe("function");
-        const name = given(HELPERS).name;
-        if (folder === "formats") {
-          const { list, problems } = checkedFormats([given]);
-          expect(problems, file).toEqual([]);
-          expect(list[0]!.name).toBe(name);
-        }
-      }
+  // A user's file is a module (`js.importFromSpace`) whose default export is the definition: each built-in file is
+  // imported as one, its types stripped as every test file's are (the test above holds that it imports nothing else).
+  // Not by esbuild's `transformSync` each: a round trip to its own process, which a loaded machine stalled for seconds.
+  const BUILT_IN_FILES = ["conditions", "formats"].flatMap((folder) => readdirSync(join(here, "builtin", folder)).map((file) => [folder, file] as const));
+  it.each(BUILT_IN_FILES)("work as a user's file: imported as a module, given as definitions they are the same (%s/%s)", async (folder, file) => {
+    // (The extension in the import's static part: Vite's dynamic imports want it there)
+    const module = (await import(`./builtin/${folder}/${file.replace(/\.ts$/, "")}.ts`)) as { default?: unknown };
+    const given = module.default as (h: typeof HELPERS) => { name: string };
+    expect(typeof given, file).toBe("function");
+    const name = given(HELPERS).name;
+    if (folder === "formats") {
+      const { list, problems } = checkedFormats([given]);
+      expect(problems, file).toEqual([]);
+      expect(list[0]!.name).toBe(name);
     }
   });
 });

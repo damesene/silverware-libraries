@@ -6,6 +6,10 @@
 // else. Built in only for now (decided 2026-11-07); another plugin's part
 // would be registered the same way, its types added to `PageChange` and
 // `PageSections` (TypeScript's interface merging for the latter).
+import { validateAttributeName, writeAttributes } from "../markdown/attributes.ts";
+import { embedAsLink, type EmbedChanges, linkAsEmbed, linkAsText, linkWithText, readEmbeds, readLinks, writeEmbed } from "../markdown/embed.ts";
+import { readGrids } from "../markdown/grid.ts";
+import { blocksIn, type GridColumns, type GridMode, gridOfBlocks, type GridPlace, type MoveMode, movedIntoGrid, ungridded } from "../markdown/gridbuild.ts";
 import { codeBlocksOf, sameBody } from "./blocks.ts";
 import type { PageBuilder } from "./changes.ts";
 import { type FrontmatterValue, readFrontmatter, readKey, validateFrontmatterKey, writeKey } from "./frontmatter.ts";
@@ -15,6 +19,9 @@ import { isWithin, matches, renamedTag } from "./tags/names.ts";
 import type { TagContext } from "./tags/scan.ts";
 import { readScalar } from "../yaml/scalar.ts";
 import { emptyMap, isYamlMap, readYamlMap, validateYamlValue, writeYamlEntry, type YamlMap, type YamlValue } from "../yaml/tree.ts";
+
+// What may stand before an embed on its line and go with it: nothing but a list's, a task's or a quote's markers
+const ONLY_MARKERS = /^\s*(?:(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?|>\s*)*$/;
 
 /** A property's value: a scalar, a list, or a map (a plugin's own data, `_database`), nested as deep as needed */
 export type PropertyValue = YamlValue;
@@ -47,10 +54,49 @@ export type PageChange =
   // A fenced code block of a language and body (the `occurrence`-th of those alike, counted from 0) written anew
   | { readonly kind: "replaceCodeBlock"; readonly language: string; readonly body: string; readonly occurrence: number; readonly of?: number; readonly text: string }
   // Such a block taken out of the page whole, its fences with it
-  | { readonly kind: "removeCodeBlock"; readonly language: string; readonly body: string; readonly occurrence: number; readonly of?: number };
+  | { readonly kind: "removeCodeBlock"; readonly language: string; readonly body: string; readonly occurrence: number; readonly of?: number }
+  // A cell of a grid (Silverware Layout's columns, shared/markdown/grid.ts) given new content: the grid of that body
+  // (the `occurrence`-th of those alike), its `cell`-th cell counted from 0
+  | { readonly kind: "replaceGridCell"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly cell: number; readonly content: string }
+  // Several cells of one grid given new content at once (a text moved from one to another): by their index
+  | { readonly kind: "replaceGridCells"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly contents: Readonly<Record<number, string>> }
+  // A range of the page's text taken out where it is still `was` (moved elsewhere by the same change: one edit)
+  | { readonly kind: "takeText"; readonly from: number; readonly to: number; readonly was: string }
+  // A grid's `<grid>` line given attributes (a value set, or null: taken off), the others on it kept
+  | { readonly kind: "setGridAttributes"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly attributes: Readonly<Record<string, string | null>> }
+  | { readonly kind: "changeGridCells"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly cells: GridCellsChange }
+  | { readonly kind: "putIntoGrid"; readonly from: number; readonly to: number; readonly was: string; readonly mode: GridMode; readonly columns: GridColumns }
+  // The blocks of a range moved into a grid (found as a cell's grid is) at a place, by a mode
+  | {
+      readonly kind: "moveIntoGrid";
+      readonly from: number;
+      readonly to: number;
+      readonly was: string;
+      readonly body: string;
+      readonly occurrence: number;
+      readonly of?: number;
+      readonly mode: MoveMode;
+      readonly place: GridPlace;
+    }
+  // An embed (shared/markdown/embed.ts) given an alt text, a size or metadata: the embed of that text (the
+  // `occurrence`-th of those alike), written in its own style
+  | { readonly kind: "setEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number; readonly changes: EmbedChanges }
+  | { readonly kind: "embedToLink"; readonly text: string; readonly occurrence: number; readonly of?: number }
+  | { readonly kind: "removeEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number }
+  | { readonly kind: "linkToEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number; readonly changes?: EmbedChanges }
+  | { readonly kind: "linkToText"; readonly text: string; readonly occurrence: number; readonly of?: number }
+  // A link given another text it shows (a wiki link's alias, a markdown link's text): found as `linkToText` finds it
+  | { readonly kind: "setLinkText"; readonly text: string; readonly occurrence: number; readonly of?: number; readonly shown: string };
 
 /** The builder's sections, one per part of a page's content (their parts below make them); every method gives the page's builder back */
 export interface PageSections {
+  readonly text: {
+    /**
+     * A range of the page's text taken out where it is still what the plugin read (`was`): moved elsewhere with the
+     * same change (a grid's cell), written as one edit. Changed since: the page left alone
+     */
+    takeOut(from: number, to: number, was: string): PageBuilder;
+  };
   readonly properties: {
     /** A property's value, at its key or down a path of keys in maps (the maps on the way made where missing) */
     set(path: PropertyPath, value: PropertyValue): PageBuilder;
@@ -83,7 +129,73 @@ export interface PageSections {
      */
     remove(language: string, body: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
   };
+  readonly grids: {
+    /**
+     * A grid's cell given new content (its markdown, written with a blank
+     * line before and after it, so other renderers read it as markdown): the
+     * grid whose body is `body` (as the plugin read it, shared/markdown/grid.ts),
+     * the `occurrence`-th of those alike, its `cell`-th cell; none so (the grid
+     * or the cell changed since it was read): the page left alone
+     */
+    replaceCell(body: string, cell: number, content: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+    /** Several cells of a grid given new content at once, by their index, the grid found as `replaceCell` finds it (one cell changed, the others' place the same) */
+    replaceCells(body: string, contents: Readonly<Record<number, string>>, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+    /**
+     * A grid's attributes set on its `<grid>` line (a value, or null: taken off; the others on it kept, the line
+     * written in HTML's form), the grid found as `replaceCell` finds it
+     */
+    setAttributes(body: string, attributes: Readonly<Record<string, string | null>>, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+    /**
+     * A grid's cells changed (found as `replaceCell` finds it): one moved by a step, an empty one added after one (none:
+     * at the end), one taken out (its content put under the grid), or all taken apart (`ungrid`: the cells one under
+     * another in their order, the grid gone); the cells written again in the form a cell is written, its attributes kept
+     */
+    changeCells(body: string, cells: GridCellsChange, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+    /**
+     * The blocks of a range put into a grid by a mode (shared/markdown/gridbuild.ts): `gallery` a cell each, `columns`
+     * to a row; `split` in order, cut into `columns` cells by their number. The range as the plugin read it (`was`):
+     * one changed since is left alone
+     */
+    put(from: number, to: number, was: string, mode: GridMode, columns: GridColumns): PageBuilder;
+    /**
+     * The blocks of a range moved into a grid (found as `replaceCell` finds it), one edit (shared/markdown/gridbuild.ts
+     * `movedIntoGrid`): `together` in one cell, `each` a cell each, at a place (new cells before a cell, or into a cell at
+     * an offset of its content); taken out of where they were. The range as the plugin read it (`was`): one changed since,
+     * or the grid, is left alone
+     */
+    moveInto(from: number, to: number, was: string, body: string, mode: MoveMode, place: GridPlace, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+  };
+  readonly embeds: {
+    /**
+     * An embed given an alt text, a size or metadata (each a value, or null: taken off), written in its own style
+     * with SilverBullet's size in its alias and the metadata in a third segment (shared/markdown/embed.ts): the embed
+     * whose text is `text` (as the plugin read it), the `occurrence`-th of those alike; none so: the page left alone
+     */
+    set(text: string, changes: EmbedChanges, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+    /** An embed written as a link to its target (its alt text the link's, its size and metadata left out), found as `set` finds it */
+    toLink(text: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+    /** An embed taken out of the page (its file deleted), found as `set` finds it: its line with it where it was alone on it */
+    remove(text: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+  };
+  readonly links: {
+    /** A link written as an embed of its target (`[[a.pdf]]`: `![[a.pdf]]`): the link whose text is `text`, the `occurrence`-th of those alike */
+    /** `changes`: the embed written with them at once (its view, its metadata), one edit */
+    toEmbed(text: string, where?: { readonly occurrence?: number; readonly of?: number }, changes?: EmbedChanges): PageBuilder;
+    /** A link written as the text it shows (its alias, else its file's name: its file deleted, the sentence kept), found as `toEmbed` finds it */
+    toText(text: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+    /** A link given another text it shows, `shown` (none: a wiki link its target alone), found as `toEmbed` finds it */
+    setText(text: string, shown: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+  };
 }
+
+/** What a grid's cells get (`changeCells`) */
+export type GridCellsChange =
+  | { readonly kind: "move"; readonly cell: number; readonly by: -1 | 1 }
+  | { readonly kind: "add"; readonly after?: number }
+  | { readonly kind: "takeOut"; readonly cell: number }
+  // A cell deleted, its content with it (the grid gone where it was its last cell)
+  | { readonly kind: "remove"; readonly cell: number }
+  | { readonly kind: "ungrid" };
 
 export type WriterOptions = {
   // How a page's tags are written where it has none yet
@@ -261,6 +373,19 @@ const removeHow = (from: TagsFrom, keepWord: boolean): RemoveHow =>
 
 export const PARTS: readonly Part[] = [
   part({
+    kinds: ["takeText"],
+    section: {
+      name: "text",
+      make: (add) => ({
+        takeOut: (from, to, was) => add({ kind: "takeText", from, to, was }),
+      }),
+    },
+    write: (text, change) => {
+      if (text.slice(change.from, change.to) !== change.was) return { text, changes: 0, problem: "the text changed since it was read: left alone" };
+      return { text: text.slice(0, change.from) + text.slice(change.to), changes: change.from < change.to ? 1 : 0 };
+    },
+  }),
+  part({
     kinds: ["setProperty", "removeProperty"],
     section: {
       name: "properties",
@@ -318,6 +443,172 @@ export const PARTS: readonly Part[] = [
       const insert = block.bodyTo > block.bodyFrom ? body + (region.endsWith("\r") ? "\r" : "") : body ? (atEnd ? nl : "") + body + nl : "";
       if (region === insert) return { text, changes: 0 };
       return { text: text.slice(0, block.bodyFrom) + insert + text.slice(block.bodyTo), changes: 1 };
+    },
+  }),
+  part({
+    kinds: ["replaceGridCell", "replaceGridCells", "setGridAttributes", "changeGridCells", "putIntoGrid", "moveIntoGrid"],
+    section: {
+      name: "grids",
+      make: (add) => ({
+        replaceCell: (body, cell, content, where = {}) =>
+          add({ kind: "replaceGridCell", body, cell, content, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+        setAttributes: (body, attributes, where = {}) =>
+          add({ kind: "setGridAttributes", body, attributes: { ...attributes }, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+        changeCells: (body, cells, where = {}) => add({ kind: "changeGridCells", body, cells: { ...cells }, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+        put: (from, to, was, mode, columns) => add({ kind: "putIntoGrid", from, to, was, mode, columns }),
+        moveInto: (from, to, was, body, mode, place, where = {}) =>
+          add({ kind: "moveIntoGrid", from, to, was, body, mode, place: { ...place }, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+        replaceCells: (body, contents, where = {}) =>
+          add({ kind: "replaceGridCells", body, contents: { ...contents }, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+      }),
+    },
+    write: (text, change) => {
+      if (change.kind === "putIntoGrid") {
+        if (text.slice(change.from, change.to) !== change.was) return { text, changes: 0, problem: "the text changed since it was read: left alone" };
+        const edit = gridOfBlocks(text, blocksIn(text, change.from, change.to, readGrids(text)), change.mode, change.columns);
+        if (!edit) return { text, changes: 0, problem: "no block to put into a grid there" };
+        return { text: text.slice(0, edit.from) + edit.insert + text.slice(edit.to), changes: 1 };
+      }
+      const grids = readGrids(text);
+      const alike = grids.filter((grid) => sameBody(grid.body) === sameBody(change.body));
+      const grid = alike[change.occurrence];
+      const changed = { text, changes: 0, problem: "its grid changed since it was read: left alone" };
+      if (!grid || (change.of !== undefined && alike.length !== change.of)) return changed;
+      if (change.kind === "moveIntoGrid") {
+        if (text.slice(change.from, change.to) !== change.was) return { text, changes: 0, problem: "the text changed since it was read: left alone" };
+        // (Its lines taken out whole: a grid among them would go with them)
+        if (grids.some((one) => one.from < change.to && one.to > change.from)) return { text, changes: 0, problem: "the text moved takes in a grid" };
+        const moved = movedIntoGrid(text, blocksIn(text, change.from, change.to, grids), grid, change.mode, change.place);
+        return "problem" in moved ? { text, changes: 0, problem: moved.problem } : { text: moved.text, changes: 1 };
+      }
+      if (change.kind === "changeGridCells") {
+        const how = change.cells;
+        if (how.kind === "ungrid") return { text: text.slice(0, grid.from) + ungridded(grid) + text.slice(grid.to), changes: 1 };
+        // Only the cells' own lines change: each cell moved whole (its `<cell …>` line's attributes with it), what
+        // lies between them where it was
+        const nl = lineBreakOf(text);
+        const cells = grid.cells;
+        // A cell's text whole, its `</cell>` written where it was left open
+        const whole = (cell: (typeof cells)[number]) => {
+          const own = text.slice(cell.from, cell.to);
+          return cell.closed ? own : `${own.replace(/\s+$/, "")}${nl}</cell>`;
+        };
+        // The end of a cell's last line, its line break after it included (where it has one)
+        const lineEnd = (at: number) => (text.startsWith("\r\n", at) ? at + 2 : text.startsWith("\n", at) ? at + 1 : at);
+        if (how.kind === "move") {
+          const to = how.cell + how.by;
+          if (how.cell < 0 || how.cell >= cells.length || to < 0 || to >= cells.length) return { text, changes: 0 };
+          const [first, second] = how.cell < to ? [cells[how.cell]!, cells[to]!] : [cells[to]!, cells[how.cell]!];
+          return { text: text.slice(0, first.from) + whole(second) + text.slice(first.to, second.from) + whole(first) + text.slice(second.to), changes: 1 };
+        }
+        if (how.kind === "add") {
+          const empty = `<cell>${nl}${nl}${nl}</cell>`;
+          const before = how.after === undefined ? cells.at(-1) : cells[how.after];
+          if (!before) {
+            // (No cell yet: the first, at the body's start)
+            return { text: text.slice(0, grid.bodyFrom) + empty + nl + text.slice(grid.bodyFrom), changes: 1 };
+          }
+          // (After the cell's `</cell>` line; one left open closed first)
+          return { text: text.slice(0, before.from) + whole(before) + nl + empty + text.slice(before.to), changes: 1 };
+        }
+        if (how.cell < 0 || how.cell >= cells.length) return { text, changes: 0 };
+        const out = cells[how.cell]!;
+        // Its content under the grid, never lost (deleted with it: none); the grid gone where it was its last cell
+        const after = how.kind !== "remove" && out.content.replace(/\r\n/g, "\n").trim() ? out.content.replace(/\r\n/g, "\n") : "";
+        if (cells.length === 1) return { text: text.slice(0, grid.from) + after.replace(/\n/g, nl) + text.slice(grid.to), changes: 1 };
+        const kept = text.slice(0, out.from) + text.slice(out.closed ? lineEnd(out.to) : out.to);
+        const shift = kept.length - text.length;
+        const end = grid.to + shift;
+        return { text: kept.slice(0, end) + (after ? `${nl}${nl}${after.replace(/\n/g, nl)}` : "") + kept.slice(end), changes: 1 };
+      }
+      if (change.kind === "setGridAttributes") {
+        const problem = Object.keys(change.attributes).map(validateAttributeName).find(Boolean);
+        if (problem) return { text, changes: 0, problem };
+        const attributes: Record<string, string> = { ...grid.attributes };
+        for (const [name, value] of Object.entries(change.attributes)) {
+          if (value === null) delete attributes[name.toLowerCase()];
+          else attributes[name.toLowerCase()] = value;
+        }
+        // The `<grid>` line, to its line break (a CR before it kept)
+        const lineEnd = text.indexOf("\n", grid.from);
+        const end = lineEnd < 0 ? text.length : text[lineEnd - 1] === "\r" ? lineEnd - 1 : lineEnd;
+        const line = `<grid${writeAttributes(attributes)}>`;
+        if (text.slice(grid.from, end) === line) return { text, changes: 0 };
+        return { text: text.slice(0, grid.from) + line + text.slice(end), changes: 1 };
+      }
+      // Each cell given its content, the last first (an earlier one's place stays as it was read)
+      const contents = change.kind === "replaceGridCells" ? change.contents : { [change.cell]: change.content };
+      const indexes = Object.keys(contents).map(Number).sort((a, b) => b - a);
+      if (indexes.some((index) => !grid.cells[index])) return changed;
+      const nl = lineBreakOf(text);
+      let after = text;
+      for (const index of indexes) {
+        const cell = grid.cells[index]!;
+        const content = sameBody(contents[index]!).replace(/^(\s*\n)+/, "");
+        // A blank line before and after the content (none for no content): what other renderers need to read it as markdown
+        const inner = (content ? nl + content.replace(/\n/g, nl) + nl + nl : nl) + (cell.closed ? "" : `</cell>${nl}`);
+        after = after.slice(0, cell.innerFrom) + inner + after.slice(cell.innerTo);
+      }
+      return after === text ? { text, changes: 0 } : { text: after, changes: 1 };
+    },
+  }),
+  part({
+    kinds: ["setEmbed", "embedToLink", "removeEmbed"],
+    section: {
+      name: "embeds",
+      make: (add) => ({
+        set: (text, changes, where = {}) =>
+          add({ kind: "setEmbed", text, changes: structuredClone(changes), occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+        toLink: (text, where = {}) => add({ kind: "embedToLink", text, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+        remove: (text, where = {}) => add({ kind: "removeEmbed", text, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+      }),
+    },
+    write: (text, change) => {
+      const alike = readEmbeds(text).filter((embed) => embed.text === change.text);
+      const embed = alike[change.occurrence];
+      if (!embed || (change.of !== undefined && alike.length !== change.of)) return { text, changes: 0, problem: "its embed changed since it was read: left alone" };
+      if (change.kind === "removeEmbed") {
+        // Alone on its line (or a list item's, a task's, a quote's: its marker before it alone): the line with it (its
+        // line break), else the embed alone
+        const start = text.lastIndexOf("\n", embed.from - 1) + 1;
+        const end = text.indexOf("\n", embed.to);
+        const lineEnd = end < 0 ? text.length : end;
+        const alone = ONLY_MARKERS.test(text.slice(start, embed.from)) && !text.slice(embed.to, lineEnd).trim();
+        if (!alone) return { text: text.slice(0, embed.from) + text.slice(embed.to), changes: 1 };
+        // (A blank line before and after it: one of them with it, not two blank lines left where it was)
+        let to = end < 0 ? lineEnd : lineEnd + 1;
+        const blankBefore = start === 0 || /^[ \t]*\r?$/.test(text.slice(text.lastIndexOf("\n", start - 2) + 1, start - 1));
+        const next = text.indexOf("\n", to);
+        if (blankBefore && to < text.length && next >= 0 && !text.slice(to, next).trim()) to = next + 1;
+        return { text: text.slice(0, start) + text.slice(to), changes: 1 };
+      }
+      const written = change.kind === "embedToLink" ? embedAsLink(embed) : writeEmbed(embed, change.changes);
+      if (written === embed.text) return { text, changes: 0 };
+      return { text: text.slice(0, embed.from) + written + text.slice(embed.to), changes: 1 };
+    },
+  }),
+  part({
+    kinds: ["linkToEmbed", "linkToText", "setLinkText"],
+    section: {
+      name: "links",
+      make: (add) => ({
+        toEmbed: (text, where = {}, changes) =>
+          add({ kind: "linkToEmbed", text, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }), ...(changes ? { changes: structuredClone(changes) } : {}) }),
+        toText: (text, where = {}) => add({ kind: "linkToText", text, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+        setText: (text, shown, where = {}) => add({ kind: "setLinkText", text, shown, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+      }),
+    },
+    write: (text, change) => {
+      const alike = readLinks(text).filter((link) => link.text === change.text);
+      const link = alike[change.occurrence];
+      if (!link || (change.of !== undefined && alike.length !== change.of)) return { text, changes: 0, problem: "its link changed since it was read: left alone" };
+      if (change.kind === "setLinkText") {
+        const written = linkWithText(link, change.shown);
+        return written === link.text ? { text, changes: 0 } : { text: text.slice(0, link.from) + written + text.slice(link.to), changes: 1 };
+      }
+      const embed = linkAsEmbed(link);
+      const written = change.kind === "linkToText" ? linkAsText(link) : change.changes ? writeEmbed(readEmbeds(embed)[0]!, change.changes) : embed;
+      return { text: text.slice(0, link.from) + written + text.slice(link.to), changes: 1 };
     },
   }),
   // The body: the page builder's own `body`, no section

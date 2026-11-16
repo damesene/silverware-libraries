@@ -1,1 +1,6 @@
 * text=auto eol=lf
+# Packages' files as they ship them (scripts/build.mjs copies them): no diff of their minified lines
+silverware-assets-pdf/silverware-assets-pdf-pdfjs*.js -diff linguist-vendored
+silverware-assets-docx/silverware-assets-docx-docxpreview.js -diff linguist-vendored
+silverware-assets-xlsx/silverware-assets-xlsx-exceljs.js -diff linguist-vendored
+silverware-editor/silverware-editor-codemirror.js -diff linguist-vendored

@@ -12,13 +12,42 @@ export type Bridge = {
   readonly listPages: () => unknown;
   // A notification
   readonly flash: (message: string, type?: "info" | "error") => unknown;
+  // Optional, for the pinch's tap with two fingers given back: a SilverBullet command run by its name (`editor.invokeCommand`)
+  readonly invokeCommand?: (name: string) => unknown;
   // Optional: without it, settings keep their defaults
   readonly getConfig?: (path: string, defaultValue: unknown) => unknown;
   // Optional, for the dialog: asks before closing it with changes (else the browser's confirm)
   readonly confirm?: (message: string) => boolean | Promise<boolean>;
+  // Optional, for a grid's cell deleted: asked in SilverBullet's dialog, its OK button the danger's
+  // (`editor.confirm(message, { destructive = true })`)
+  readonly confirmDelete?: (message: string) => boolean | Promise<boolean>;
+  // Optional, for a value asked (a grid's min width in px): SilverBullet's prompt, `value` its field's text; none where
+  // it is cancelled (`editor.prompt`)
+  readonly prompt?: (message: string, value: string) => string | undefined | null | Promise<string | undefined | null>;
   // Optional, for the dialog's default text width: the CONFIG page saved as SilverBullet's Configuration Manager saves
   // it, the configuration loaded again (readPage reads it)
   readonly saveConfigPage?: (text: string) => unknown;
+  // Optional, for the grids: markdown rendered to HTML as SilverBullet renders a page, its embeds expanded, each
+  // element marked with its offset in the text (`markdown.markdownToHtml(text, { expand = true, annotationPositions = true })`)
+  readonly renderMarkdown?: (text: string) => string | Promise<string>;
+  // Optional, for a grid's Alt+click: the cursor put at an offset of the page's text, centred in view (`editor.moveCursor`)
+  readonly moveCursor?: (at: number, center?: boolean) => unknown;
+  // Optional, for `/grid`: where the cursor is, an offset of the page's text (`editor.getCursor`)
+  readonly getCursor?: () => unknown;
+  // Optional, for Wrap in grid: the selection (`editor.getSelection`: `{ from, to }`) and a pick of one of options
+  // (`editor.filterBox`, the option picked given back, its `index` as given)
+  readonly getSelection?: () => unknown;
+  readonly filterBox?: (label: string, options: readonly { readonly name: string; readonly description: string; readonly index: number }[]) => unknown;
+  // Optional: one of SilverBullet's UI options (`editor.getUiOption`: `markdownSyntaxRendering`, the markdown shown as written)
+  readonly getUiOption?: (name: string) => unknown;
+  // Optional: Silverware Editor's API (`silverware.editor.api`), what a grid's cell is edited in (none: a `<textarea>`)
+  readonly editor?: unknown;
+  // Optional: SilverBullet goes to a page or a file by its ref (`editor.navigate`): a link pressed in a cell's field
+  // followed (none: a press puts the caret there)
+  readonly navigate?: (ref: string) => unknown;
+  // Optional: SilverBullet's commands and their shortcuts (`system.listCommands`): one pressed in a cell's field, where it
+  // does nothing, told (none: nothing told)
+  readonly listCommands?: () => unknown;
 };
 
 /** The bridge's functions Silverware Layout cannot work without, missing from what the init page gave */

@@ -3,6 +3,7 @@
 // SilverBullet's API is called and what it answers. Everything else asks the
 // platform (shared/platform.ts).
 import { iconsOf } from "../../../../shared/icons.ts";
+import { editorsOf } from "../../../../shared/editor.ts";
 import { saveConfigPage, withConfigSettings } from "../../../../shared/configpage.ts";
 import type { Choice, IndexChange, IndexedObject, Platform } from "../../../../shared/platform.ts";
 import { PAGE_KEYS, pageDates, referablePages, tasksOfPages, validatePageName } from "./pages.ts";
@@ -12,9 +13,15 @@ import { settledIndex } from "./settledindex.ts";
 export type Bridge = {
   // Silverware Icons' API where it is installed (`silverware.icons.api`; shared/icons.ts `iconsOf` reads it)
   readonly icons?: unknown;
+  // Silverware Editor's API where it is installed (`silverware.editor.api`; shared/editor.ts `editorsOf` reads it): an
+  // item's content edited in its editor
+  readonly editor?: unknown;
   // Silverware Layout's API where it is installed (`silverware.layout.api`; shared/layout.ts `layoutOf` reads it): the
   // places registered with it, laid out at the width their blocks keep
   readonly layout?: unknown;
+  // Silverware Assets' API where it is installed (`silverware.assets.api`; shared/assets.ts `assetsOf` reads it): the
+  // files an item's content embeds drawn in its field
+  readonly assets?: unknown;
   getCurrentPage(): Promise<string>;
   getText(): Promise<string>;
   replaceRange(from: number, to: number, text: string): Promise<void>;
@@ -48,6 +55,9 @@ export type Bridge = {
   // SilverBullet's filter box (editor.filterBox): the option picked, nothing where none was
   filterBox?(label: string, options: readonly { readonly name: string; readonly description?: string; readonly index: number }[]): Promise<unknown>;
   getConfig(path: string, fallback: unknown): Promise<unknown>;
+  // SilverBullet's commands and their shortcuts (`system.listCommands`): one pressed in a panel of ours, where it does
+  // nothing, told (none: nothing told)
+  listCommands?(): Promise<unknown>;
   // The CONFIG page written as the Configuration Manager writes it (synced, indexed, the configuration loaded again)
   // `set`: written and indexed, the configuration not loaded again (which starts the plugin anew), these values set in it
   // as it is (config.set, by path), so SilverBullet's config and the plugin read them alike
@@ -135,6 +145,8 @@ export function silverBulletPlatform(bridge: Bridge): {
     },
     ui: {
       icons: iconsOf(bridge.icons),
+      // (SilverBullet takes Ctrl+Z at the window and holds it back, 2.12.1: the stand-in's field undoes at the window too)
+      editors: editorsOf(bridge.editor, { historyAtWindow: true }),
       // (Its timeout and buttons where given, nothing else: SilverBullet's defaults for what is not)
       notify: (message, options) => {
         const more = { ...(options?.timeout === undefined ? {} : { timeout: options.timeout }), ...(options?.actions?.length ? { actions: options.actions } : {}) };
@@ -176,49 +188,8 @@ export function silverBulletPlatform(bridge: Bridge): {
   };
 }
 
-/** SilverBullet's editor's area on screen (`#sb-editor`: not its sidebars), where a panel beside the page goes */
-export function editorArea(doc: Document): DOMRect | undefined {
-  const editor = doc.querySelector<HTMLElement>("#sb-editor");
-  const view = doc.defaultView;
-  if (!editor || !view) return undefined;
-  // Its content box, inside its padding and borders: what pads it is kept for something of the editor's own, as Silverware
-  // Toolbar docked at its top or bottom pads it by its height (the editor border-box), which a panel over the whole box
-  // lay under (seen 2026-11-09). The element looked up as asked: SilverBullet keeps it for the session
-  const box = editor.getBoundingClientRect();
-  const style = view.getComputedStyle(editor);
-  const side = (name: "Top" | "Right" | "Bottom" | "Left") => (parseFloat(style.getPropertyValue(`padding-${name.toLowerCase()}`)) || 0) + (parseFloat(style.getPropertyValue(`border-${name.toLowerCase()}-width`)) || 0);
-  const [top, right, bottom, left] = [side("Top"), side("Right"), side("Bottom"), side("Left")];
-  return new DOMRect(box.left + left, box.top + top, Math.max(0, box.width - left - right), Math.max(0, box.height - top - bottom));
-}
-
-/**
- * `listener` told as the editor's content box may have changed: its size (a sidebar narrows it), and what pads it changed
- * without its size (a toolbar docked at its top moved to its bottom: the variables on html it pads it by, or its own
- * style); its end given back
- */
-export function watchEditorArea(doc: Document, listener: () => void): () => void {
-  const editor = doc.querySelector("#sb-editor");
-  const view = doc.defaultView;
-  if (!editor || !view) return () => {};
-  // (Once a frame however often they change: html's style is written often, by a toolbar following the keyboard too)
-  let pending = false;
-  const tell = () => {
-    if (pending) return;
-    pending = true;
-    view.requestAnimationFrame(() => {
-      pending = false;
-      listener();
-    });
-  };
-  const resized = view.ResizeObserver ? new view.ResizeObserver(tell) : undefined;
-  resized?.observe(editor);
-  const styled = new view.MutationObserver(tell);
-  for (const one of [doc.documentElement, editor]) styled.observe(one, { attributes: true, attributeFilter: ["style", "class"] });
-  return () => {
-    resized?.disconnect();
-    styled.disconnect();
-  };
-}
+// SilverBullet's editor's area, where the peek goes (shared with Silverware Assets' side panel)
+export { editorArea, watchEditorArea } from "../../../../shared/silverbullet/editorarea.ts";
 
 /**
  * How the page's text looks in SilverBullet's editor (its content, `.cm-content`: the theme's font, size, line height,

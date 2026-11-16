@@ -3,7 +3,7 @@
 // view into the embed it is on (the same file in a grid and outside it apart), a file SilverBullet cannot draw as a card,
 // a width dragged (in the page, and within a grid's cell), a PDF and a zip in a cell, a link's icon, the settings'
 // card fields and a click shown in the side panel.
-import { ASSETS_SETTINGS, expect, gridsDrawn, MOVED_PREVIEWS, PAGE_LAYOUT, PIXEL_PNG, runCommand, test } from "./helpers.ts";
+import { ASSETS_SETTINGS, expect, gridsDrawn, MOVED_PREVIEWS, LAYOUT_SETTINGS, PIXEL_PNG, runCommand, test } from "./helpers.ts";
 
 const cell = (text: string) => `<cell>\n\n${text}\n\n</cell>`;
 // What shows a PDF in its frame, whoever draws it: the browser's viewer (Silverware Assets' own type), or Silverware
@@ -644,6 +644,68 @@ test("Remove from page in an embed's menu: its markdown taken out, its file left
   expect(space.hasFile("photo.png")).toBe(true);
 });
 
+test("files zoom with the font where asked: an original of its own size, one of a width, a preview, by This device's share of All pages; the … keeps its size", async ({ page, space }) => {
+  const svg = (w: number, h: number) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="${w}" height="${h}" fill="#888"/></svg>`;
+  await space.open(
+    { Page: `# Page\n\n![[${space.folder}/own.svg]]\n\n![[${space.folder}/wide.svg|300]]\n\n![[${space.folder}/own.svg|||{ view: preview }]]\n\n![[${space.folder}/huge.svg]]\n\nEnd\n` },
+    "Page",
+    { "own.svg": svg(200, 100), "wide.svg": svg(600, 300), "huge.svg": svg(3000, 1000) },
+  );
+  // (An image wider than the text: as wide as the text, at any scale)
+  const huge = page.locator(`#sb-main [data-swa-asset='image'][data-swa-view='embed'] img[src*="huge.svg"]`);
+  const textWidth = () => page.locator("#sb-main .cm-line", { hasText: "End" }).evaluate((line) => Math.round(line.getBoundingClientRect().width));
+  const own = page.locator(`#sb-main [data-swa-asset='image'][data-swa-view='embed']:not([data-swl-width]) img[src*="own.svg"]`);
+  const wide = page.locator(`#sb-main [data-swa-asset='image'][data-swl-width] img`);
+  const preview = page.locator(`#sb-main [data-swa-asset='image'][data-swa-view='preview'] img`);
+  const box = async (locator: import("@playwright/test").Locator) => {
+    const b = (await locator.boundingBox())!;
+    return { width: Math.round(b.width), height: Math.round(b.height) };
+  };
+  await expect.poll(async () => (await box(own)).width).toBe(200);
+  await expect.poll(async () => (await box(wide)).width).toBe(300);
+  const textAt100 = await textWidth();
+  expect(Math.abs((await box(huge)).width - textAt100)).toBeLessThanOrEqual(12);
+  const previewHeight = (await box(preview)).height;
+  // All pages 18 px, This device 27 px: the files at 150 %
+  await runCommand(page, LAYOUT_SETTINGS);
+  const dialog = page.locator(".swl-dialog");
+  await dialog.getByRole("tab", { name: "Font" }).click();
+  await dialog.getByRole("spinbutton", { name: "Font size in px", exact: true }).fill("18");
+  await dialog.getByRole("checkbox", { name: "Files zoom with the text" }).check();
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toHaveCount(0);
+  // This device zoomed by Ctrl + scroll over the text, a pixel a notch: 27 px
+  const text = (await page.locator("#sb-main .cm-line").first().boundingBox())!;
+  await page.mouse.move(text.x + 10, text.y + text.height / 2);
+  await page.keyboard.down("Control");
+  for (let i = 0; i < 9; i++) await page.mouse.wheel(0, -100);
+  await page.keyboard.up("Control");
+  await expect(page.locator(".swl-zoom-label")).toHaveText("Font size 27 px");
+  await expect.poll(async () => (await box(own)).width).toBe(300);
+  expect((await box(own)).height).toBe(150);
+  await expect.poll(async () => (await box(wide)).width).toBe(450);
+  expect((await box(preview)).height).toBe(Math.round(previewHeight * 1.5));
+  expect(Math.abs((await box(huge)).width - textAt100)).toBeLessThanOrEqual(12);
+  // (Written as they were: their sizes in the page as typed)
+  expect(await space.saved("Page")).toContain(`![[${space.folder}/wide.svg|300]]`);
+  // The "…" a control: its own size, not the text's
+  const frame = page.locator(`#sb-main [data-swa-asset='image'][data-swa-view='embed']:not([data-swl-width])`, { has: page.locator(`img[src*="own.svg"]`) });
+  await frame.hover();
+  expect(await frame.locator(".swa-more").evaluate((more) => getComputedStyle(more).fontSize)).toBe("14px");
+  // Its handle dragged 60 px on the screen: written as at 100 % (450 + 60 = 510 shown, 340 written)
+  const wideFrame = page.locator(`#sb-main [data-swa-asset='image'][data-swl-width]`);
+  await wideFrame.hover();
+  const bar = page.locator(".swl-handle-bar");
+  await expect(bar).toBeVisible();
+  const handle = (await bar.boundingBox())!;
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2 + 60, handle.y + handle.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(() => space.saved("Page")).toContain(`![[${space.folder}/wide.svg||340]]`);
+  await expect.poll(async () => (await box(wide)).width).toBe(510);
+});
+
 test("the settings: a card's size shown, a click set to the side panel; the panel shows the file and Esc closes it", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/archive.zip]]\n\n![[${space.folder}/photo.png|Photo||{ view: preview }]]\n` }, "Page", { "archive.zip": "zip", "photo.png": PIXEL_PNG });
   await expect(page.locator("#sb-main .swa-card")).toHaveText("archive.zip");
@@ -657,7 +719,7 @@ test("the settings: a card's size shown, a click set to the side panel; the pane
   await expect(card.locator('.swa-sample-card .swa-sample-item[data-swa-field="size"]')).toHaveText(/860 KB/);
   await dialog.getByRole("radio", { name: "Link" }).click();
   await dialog.getByRole("tab", { name: "Files" }).click();
-  await dialog.getByLabel("All files: a click").selectOption("peek");
+  await dialog.getByLabel("All files: click").selectOption("peek");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
   await expect.poll(() => space.config()).toContain('click = "peek"');
@@ -668,6 +730,41 @@ test("the settings: a card's size shown, a click set to the side panel; the pane
   await expect(peek.locator(".swa-panel-body img")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(peek).toHaveCount(0);
+});
+
+test("the side panel's width dragged by its left edge, kept for the next panel; a double click its default again", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/photo.png|Photo||{ view: preview }]]\n` }, "Page", { "photo.png": PIXEL_PNG });
+  const frame = page.locator("#sb-main [data-swa-asset='image']");
+  const openPanel = async () => {
+    await frame.hover();
+    await frame.locator(".swa-more").click();
+    await page.locator(".swa-popup .swa-menu-item", { hasText: "Open in side panel" }).click();
+  };
+  await openPanel();
+  const peek = page.locator(".swa-peek");
+  // Over the editor's area, under SilverBullet's top bar, as a database's peek; its × first
+  const [panelBox, editorBox, topBar] = await Promise.all([peek.boundingBox(), page.locator("#sb-editor").boundingBox(), page.locator("#sb-top").boundingBox()]);
+  expect(Math.abs(panelBox!.y - editorBox!.y)).toBeLessThan(1);
+  expect(panelBox!.y).toBeGreaterThanOrEqual(topBar!.y + topBar!.height - 1);
+  await expect(peek.locator(".swa-panel-head > :first-child")).toHaveClass(/swa-panel-close/);
+  const width = async () => (await peek.boundingBox())!.width;
+  const before = await width();
+  const edge = (await peek.locator(".swa-peek-resize").boundingBox())!;
+  const x = edge.x + edge.width / 2;
+  const y = edge.y + edge.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x - 60, y, { steps: 4 });
+  await page.mouse.move(x - 120, y, { steps: 4 });
+  await page.mouse.up();
+  await expect.poll(async () => Math.abs((await width()) - (before + 120))).toBeLessThan(2);
+  await page.keyboard.press("Escape");
+  await expect(peek).toHaveCount(0);
+  // The next panel as wide
+  await openPanel();
+  await expect.poll(async () => Math.abs((await width()) - (before + 120))).toBeLessThan(2);
+  await peek.locator(".swa-peek-resize").dblclick();
+  await expect.poll(async () => Math.abs((await width()) - before)).toBeLessThan(2);
 });
 
 test("the settings: previews kept in the space turned off, a PDF's preview has no Regenerate preview in its menu", async ({ page, space }) => {
@@ -683,7 +780,7 @@ test("the settings: previews kept in the space turned off, a PDF's preview has n
   expect(await items()).toContain("Regenerate preview");
   await runCommand(page, ASSETS_SETTINGS);
   const dialog = page.locator(".swa-dialog");
-  const keep = dialog.getByLabel("Keep previews in the space, made once");
+  const keep = dialog.getByLabel("Save previews in the space");
   await expect(keep).toBeChecked();
   await keep.uncheck();
   await dialog.getByRole("button", { name: "Save" }).click();
@@ -709,7 +806,7 @@ test("the settings: the previews' folder renamed, the previews kept moved into i
   await space.open({ Page: `# Page\n\n![[${space.folder}/doc.pdf]]\n` }, "Page", { "doc.pdf": "%PDF-1.4\n" });
   await runCommand(page, ASSETS_SETTINGS);
   const dialog = page.locator(".swa-dialog");
-  const folder = dialog.getByLabel("Previews' folder");
+  const folder = dialog.getByLabel("Preview folder");
   await expect(folder).toHaveValue("_silverware-asset-preview");
   // (A name SilverBullet cannot read: not saved, said why)
   await folder.fill(".hidden");
@@ -766,12 +863,12 @@ test("SilverBullet's markdown shown as written, each plugin's box off apart: fil
   // Assets' box off, saved while Layout's dialog is open: the file drawn there, the grid still hidden. Layout's dialog
   // stays open as SilverBullet, loading the configuration Assets saved, starts Silverware Layout again under it
   const layout = page.locator(".swl-dialog");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   await expect(layout).toBeVisible();
   await runCommand(page, ASSETS_SETTINGS);
   const assets = page.locator(".swa-dialog");
   await assets.getByRole("tab", { name: "Markdown" }).click();
-  await assets.getByLabel("Hide embedded files").uncheck();
+  await assets.getByLabel("Show embedded files as markdown only").uncheck();
   await assets.getByRole("button", { name: "Save" }).click();
   await expect.poll(() => space.config()).toContain('config.set("silverware.assets.syntaxMode.hideAssets", false)');
   // (Silverware Layout started again: its init page's settings read anew, a moment after the configuration loads)
@@ -785,9 +882,9 @@ test("SilverBullet's markdown shown as written, each plugin's box off apart: fil
   await expect(shownGrid).toBeHidden();
   await toggle();
   // Layout's box off too: the grid drawn there as well
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   await layout.getByRole("tab", { name: "Markdown" }).click();
-  await layout.getByLabel("Hide grids").uncheck();
+  await layout.getByLabel("Show grids as markdown only").uncheck();
   await layout.getByRole("button", { name: "Save" }).click();
   await expect.poll(() => space.config()).toContain('config.set("silverware.layout.syntaxMode.hideGrids", false)');
   await toggle();

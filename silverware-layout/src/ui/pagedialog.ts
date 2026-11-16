@@ -1,4 +1,4 @@
-// The Page layout dialog (the command "Silverware Layout: Page layout"), three tabs, each row named by where it holds
+// The settings dialog (the command "Silverware Layout: Settings"), three tabs, each row named by where it holds
 // (this page, all pages, this device), the same in each: a slider, the value typed and ↺, and under them what it
 // follows while it has no value of its own (the field empty, that value its placeholder); moved or typed in, it is its
 // own, ↺ takes it back:
@@ -11,7 +11,7 @@
 //   What is set shows on the page at once (the dialog held at the window's top, the page seen under it).
 // - Guides: the widths a drag snaps to (a widget's bar, these sliders), each typed in its own row, in px or % of the
 //   pane (the same switch as a width's), or by its slider, which held shows them on the page as it moves; Full width a
-//   box. Preview, held, shows them on the page as typed, the dialog all but gone meanwhile; Default guides puts the
+//   box. Preview, held, shows them on the page as typed, the dialog all but gone meanwhile; Restore defaults puts the
 //   default ones back, once confirmed (saved, as all, on Save). Ascending as the tab is drawn, left in the order typed
 //   until it is drawn again.
 // Save writes what changed (the page's into its frontmatter, the default, the guides and the font into CONFIG), Cancel
@@ -67,6 +67,9 @@ export type PageDialogStore = {
   // The editor's font size for every page (none: the theme's), whether Font zoom is on, this device's zoom (none: none)
   readonly fontSize: number | undefined;
   readonly fontZoom: boolean;
+  // Whether a pinch with two fingers zooms (the setting `fontZoom.pinch`), whether the files zoom with the font
+  readonly fontPinch: boolean;
+  readonly fontScaleFiles: boolean;
   readonly zoom: number | undefined;
   // The font size the theme gives (px)
   themeFontSize(): number;
@@ -77,7 +80,7 @@ export type PageDialogStore = {
   savePage(width: Width | undefined): Promise<string | undefined>;
   saveDefault(width: Width | undefined): Promise<string | undefined>;
   saveGuides(guides: readonly Guide[]): Promise<string | undefined>;
-  saveFont(fontSize: number | undefined, fontZoom: boolean): Promise<string | undefined>;
+  saveFont(font: { readonly fontSize: number | undefined; readonly fontZoom: boolean; readonly fontPinch: boolean; readonly fontScaleFiles: boolean }): Promise<string | undefined>;
   // This device's zoom kept (none: taken off)
   saveZoom(size: number | undefined): void;
   // The guides shown on the page as a drag shows them (the page's width with them), until the function given back
@@ -94,6 +97,8 @@ export type Preview = {
   readonly defaultWidth: Width | undefined;
   readonly fontSize: number | undefined;
   readonly fontZoom: boolean;
+  // Whether the files zoom with the font (none said: no)
+  readonly scaleFiles?: boolean;
   readonly zoom: number | undefined;
 };
 
@@ -171,6 +176,8 @@ export class PageDialog {
   private fontField: FontField = { own: false, amount: "" };
   private device: FontField = { own: false, amount: "" };
   private fontZoom: HTMLInputElement | undefined;
+  private fontPinch: HTMLInputElement | undefined;
+  private fontScaleFiles: HTMLInputElement | undefined;
   // This device's row drawn again (its slider follows the font's size while it has no zoom of its own)
   private drawDevice: (() => void) | undefined;
   // How many of its controls are held now (a slider, Preview): the guides' sliders keep their room meanwhile
@@ -189,8 +196,8 @@ export class PageDialog {
    * device's row, as its slider does, kept on Save): whether Ctrl + scroll zooms, the size of all pages (none: the
    * theme's), this device's zoom (none: none)
    */
-  get font(): { readonly zooms: boolean; readonly size: number | undefined; readonly zoom: number | undefined } {
-    return { zooms: !!this.fontZoom?.checked, size: fontSizeOf(this.fontField).size, zoom: fontSizeOf(this.device).size };
+  get font(): { readonly zooms: boolean; readonly pinches: boolean; readonly size: number | undefined; readonly zoom: number | undefined } {
+    return { zooms: !!this.fontZoom?.checked, pinches: !!this.fontPinch?.checked, size: fontSizeOf(this.fontField).size, zoom: fontSizeOf(this.device).size };
   }
 
   /** This device's zoom set (none: the size of all pages again), as its row's slider sets it */
@@ -239,14 +246,14 @@ export class PageDialog {
     this.full = el(doc, "input", { attrs: { type: "checkbox" } });
     this.full.addEventListener("change", () => this.update());
     this.showGuides(store.guides);
-    // Default guides: the default ones back in the rows, once confirmed (the user's own would go); saved on Save
+    // Restore defaults: the default ones back in the rows, once confirmed (the user's own would go); saved on Save
     this.resetGuides = el(doc, "button", {
       class: `${BASE}-guides-reset`,
       html: ICONS.reset,
-      attrs: { title: `Put the default guides back: ${DEFAULT_GUIDES.map(guideName).join(", ")}` },
+      attrs: { title: `Restore the default guides: ${DEFAULT_GUIDES.map(guideName).join(", ")}` },
       run: () => void this.defaultGuides(),
     });
-    this.resetGuides.append("Default guides");
+    this.resetGuides.append("Restore defaults");
     const fullRow = el(doc, "label", `${BASE}-full`, this.full, "Full width");
     // Preview: held (a press, a finger, Space or Enter), the guides as typed on the page, the dialog all but gone
     const preview = el(doc, "button", { class: `${BASE}-preview`, html: ICONS.eye, attrs: { title: "Hold to see the guides on the page" } });
@@ -262,14 +269,14 @@ export class PageDialog {
       e.preventDefault();
       startPreview(true);
     });
-    // (Preview held shows its own box alone: Default guides beside it, not in it)
+    // (Preview held shows its own box alone: Restore defaults beside it, not in it)
     const actions = el(doc, "div", `${BASE}-guide-actions`, previewBox, this.resetGuides);
-    // (Preview and Default guides first, over the list: found at once, not under a list of any length)
+    // (Preview and Restore defaults first, over the list: found at once, not under a list of any length)
     const guidesPanel = el(doc, "div", `${BASE}-guides`, actions, this.guideList, add, fullRow);
     // Settings that cannot be saved here cannot be changed either (Save would leave them as they are); Preview still shows
     if (!store.canSaveSettings) {
       guidesPanel.classList.add(`${BASE}-readonly`);
-      for (const part of [this.fallback.element, guidesPanel, this.fontZoom!]) {
+      for (const part of [this.fallback.element, guidesPanel, this.fontZoom!, this.fontPinch!, this.fontScaleFiles!]) {
         const controls = part instanceof HTMLInputElement ? [part] : part.querySelectorAll<HTMLInputElement | HTMLButtonElement>("input, button");
         for (const control of controls) if (control !== preview) control.disabled = true;
       }
@@ -307,7 +314,7 @@ export class PageDialog {
     footer.append(this.note, cancel, this.saveButton);
 
     this.dialog = this.dialogs.open({
-      title: "Page layout",
+      title: "Silverware Layout",
       subtitle: store.page,
       bar,
       content,
@@ -342,11 +349,11 @@ export class PageDialog {
     if (this.full) this.full.checked = guides.includes("full");
   }
 
-  /** Default guides pressed: asked, then the default guides in the rows (the sliders marked with them), Save to keep */
+  /** Restore defaults pressed: asked, then the default guides in the rows (the sliders marked with them), Save to keep */
   private async defaultGuides(): Promise<void> {
     const store = this.store!;
     const names = DEFAULT_GUIDES.map(guideName).join(", ");
-    if (!(await store.confirm(`Put the default guides back (${names})? The guides you set here go; Save keeps the change.`))) return;
+    if (!(await store.confirm(`Replace your guides with the defaults (${names})? Nothing changes until you Save.`))) return;
     this.showGuides(DEFAULT_GUIDES);
     this.page?.show();
     this.fallback?.show();
@@ -538,7 +545,19 @@ export class PageDialog {
     this.fontZoom = el(doc, "input", { attrs: { type: "checkbox" } });
     this.fontZoom.checked = store.fontZoom;
     this.fontZoom.addEventListener("change", () => this.update());
-    const zoomBox = el(doc, "label", { class: `${BASE}-zoom`, attrs: { title: "Ctrl+0 puts the size of all pages back" } }, this.fontZoom, "Ctrl + scroll zooms here");
+    const zoomBox = el(doc, "label", { class: `${BASE}-zoom`, attrs: { title: "Ctrl+0 resets the zoom" } }, this.fontZoom, "Ctrl + scroll zooms the text");
+    // A pinch with two fingers zooms too, where asked (the host's own gesture of two fingers then held back, a tap of
+    // two fingers given back to it)
+    this.fontPinch = el(doc, "input", { attrs: { type: "checkbox" } });
+    this.fontPinch.checked = store.fontPinch;
+    this.fontPinch.addEventListener("change", () => this.update());
+    const pinchBox = el(doc, "label", { class: `${BASE}-zoom`, attrs: { title: "A two-finger tap still opens the page picker" } }, this.fontPinch, "Pinch with two fingers zooms the text");
+    // The files zoomed with it, where asked (images, previews, PDFs: their sizes times the zoom's share of the size of
+    // all pages), shown at once as the box is ticked
+    this.fontScaleFiles = el(doc, "input", { attrs: { type: "checkbox" } });
+    this.fontScaleFiles.checked = store.fontScaleFiles;
+    this.fontScaleFiles.addEventListener("change", () => this.update());
+    const scaleBox = el(doc, "label", { class: `${BASE}-zoom`, attrs: { title: "Images and previews grow and shrink with the text; sizes saved in your pages don't change" } }, this.fontScaleFiles, "Files zoom with the text");
     this.slides(zoomSlider);
     zoomSlider.addEventListener("input", () => {
       device.own = true;
@@ -550,7 +569,7 @@ export class PageDialog {
       device.amount = zoomAmount.value;
       this.update();
     });
-    const deviceRow = this.rowOf("This device", controls(zoomSlider, zoomAmount, zoomReset), zoomNote, zoomBox);
+    const deviceRow = this.rowOf("This device", controls(zoomSlider, zoomAmount, zoomReset), zoomNote, zoomBox, pinchBox, scaleBox);
     deviceRow.classList.add(`${BASE}-device`);
     // (Drawn again with every change: it follows the size of all pages while it has none of its own)
     this.drawDevice = () => {
@@ -723,7 +742,7 @@ export class PageDialog {
     const zoom = fontSizeOf(this.device);
     const problem = page.problem ?? fallback.problem ?? font.problem ?? zoom.problem ?? (badGuide ? rowProblem(badGuide) : undefined);
     if (!page.problem && !fallback.problem && !font.problem && !zoom.problem) {
-      store.preview({ pageWidth: page.width, defaultWidth: fallback.width, fontSize: font.size, fontZoom: !!this.fontZoom?.checked, zoom: zoom.size });
+      store.preview({ pageWidth: page.width, defaultWidth: fallback.width, fontSize: font.size, fontZoom: !!this.fontZoom?.checked, scaleFiles: !!this.fontScaleFiles?.checked, zoom: zoom.size });
     }
     if (this.saveButton) {
       this.saveButton.textContent = this.saving ? "Saving…" : "Save";
@@ -753,7 +772,7 @@ export class PageDialog {
   /** Whether the font size or Font zoom differ from what is saved */
   private fontChanged(): boolean {
     const store = this.store!;
-    return fontSizeOf(this.fontField).size !== store.fontSize || !!this.fontZoom?.checked !== store.fontZoom;
+    return fontSizeOf(this.fontField).size !== store.fontSize || !!this.fontZoom?.checked !== store.fontZoom || !!this.fontPinch?.checked !== store.fontPinch || !!this.fontScaleFiles?.checked !== store.fontScaleFiles;
   }
 
   /** Whether this device's zoom is set otherwise than it is kept (its slider moved, typed, ↺) */
@@ -765,7 +784,7 @@ export class PageDialog {
   private async dismiss(): Promise<boolean> {
     if (this.saving) return false;
     if (!this.changed()) return true;
-    return this.store!.confirm("Close Page layout without saving your changes?");
+    return this.store!.confirm("Close the settings without saving your changes?");
   }
 
   close(): void {
@@ -795,7 +814,7 @@ export class PageDialog {
       if (problem) problems.push(`the default: ${problem}`);
     }
     if (this.fontChanged() && store.canSaveSettings) {
-      const problem = await store.saveFont(font.size, !!this.fontZoom?.checked).catch((e: unknown) => String(e));
+      const problem = await store.saveFont({ fontSize: font.size, fontZoom: !!this.fontZoom?.checked, fontPinch: !!this.fontPinch?.checked, fontScaleFiles: !!this.fontScaleFiles?.checked }).catch((e: unknown) => String(e));
       if (problem) problems.push(`the font size: ${problem}`);
     }
     if (this.zoomChanged()) store.saveZoom(fontSizeOf(this.device).size);

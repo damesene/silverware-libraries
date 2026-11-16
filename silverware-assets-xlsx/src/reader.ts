@@ -2,6 +2,7 @@
 // tabs in the bar of the shared reader's shell (shared/docreader.ts: the embed's height in the page, or filling a side
 // panel or the enlarged view; the zoom); a sheet larger than the most drawn cut, said under it. Where it cannot be
 // read: said.
+import type { KeptKeys } from "../../shared/silverbullet/keptkeys.ts";
 import { readerShell } from "../../shared/docreader.ts";
 import { el } from "../../shared/elements.ts";
 import { workbook } from "./load.ts";
@@ -15,8 +16,8 @@ export function cutNote(sheet: Sheet): string | undefined {
 }
 
 /** A workbook's reader; `height` its height in the page, none where it fills a panel */
-export function xlsxReader(doc: Document, url: string, name: string, height: number | undefined, signal: AbortSignal): HTMLElement {
-  const shell = readerShell(doc, { base: "swa-xlsx" }, { name, height });
+export function xlsxReader(doc: Document, url: string, name: string, height: number | undefined, signal: AbortSignal, keyKept?: KeptKeys): HTMLElement {
+  const shell = readerShell(doc, { base: "swa-xlsx" }, { name, height, ...(keyKept ? { keyKept } : {}) });
   const { root: reader, scroller } = shell;
   let shown: HTMLTableElement | undefined;
 

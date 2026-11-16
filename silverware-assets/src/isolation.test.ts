@@ -44,7 +44,7 @@ describe("isolation", () => {
   });
 
   it("registers the built-in types and actions through the contract alone, as anyone's", () => {
-    for (const [file, list] of of("builtin")) expect(list.filter((path) => !path.startsWith("builtin/") && path !== "shared/assets.ts" && path !== "shared/elements.ts"), file).toEqual([]);
+    for (const [file, list] of of("builtin")) expect(list.filter((path) => !path.startsWith("builtin/") && path !== "shared/assets.ts" && path !== "shared/sheetarea.ts" && path !== "shared/elements.ts"), file).toEqual([]);
   });
 
   it("keeps SilverBullet to its host and its binding", () => {

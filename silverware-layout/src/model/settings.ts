@@ -10,12 +10,14 @@ export const PATHS = {
   alignments: "silverware.layout.alignments",
   fontSize: "silverware.layout.fontSize",
   fontZoom: "silverware.layout.fontZoom.enabled",
+  fontPinch: "silverware.layout.fontZoom.pinch",
+  fontScaleFiles: "silverware.layout.fontZoom.scaleFiles",
   syntaxHides: "silverware.layout.syntaxMode.hideGrids",
   linkClicks: "silverware.layout.links.clickPlacesCursor",
 } as const;
 
 /**
- * How the page's markdown is met (the Page layout dialog's Markdown tab): while SilverBullet shows the markdown as
+ * How the page's markdown is met (the settings dialog's Markdown tab): while SilverBullet shows the markdown as
  * written (Editor: Toggle Markdown Syntax Rendering), its grids hidden (SilverBullet draws them there still), their
  * markdown alone shown; a click on a link shown as its markdown (the caret in it, or all of them in that mode) placing
  * the cursor alone, Ctrl+click following it. Each on unless the user turns it off
@@ -52,6 +54,12 @@ export type Settings = {
   readonly fontSize: number | undefined;
   // Whether Ctrl + scroll and Ctrl+0 change the font size on this device (docs/silverware-layout-font-size.md)
   readonly fontZoom: boolean;
+  // Whether a pinch with two fingers changes it too, the host's own two-finger gesture held back for it, a tap with two
+  // fingers given back to it (on unless turned off)
+  readonly fontPinch: boolean;
+  // Whether the files a page shows (and the widths laid out of those that say so) grow and shrink with this device's
+  // zoom, as the text does (shared/contentscale.ts; on unless turned off)
+  readonly fontScaleFiles: boolean;
   // Where each kind of widget stands where it says nothing itself, the user's (by `<provider>/<kind>`; none: the kind's
   // own; docs/silverware-layout-align.md)
   readonly alignments: Readonly<Record<string, Align>>;
@@ -107,6 +115,8 @@ export function readSettings(get: (path: string) => unknown): Settings {
     guides: readGuides(get(PATHS.guides)) ?? DEFAULT_GUIDES,
     fontSize: readFontSize(get(PATHS.fontSize)),
     fontZoom: get(PATHS.fontZoom) !== false,
+    fontPinch: get(PATHS.fontPinch) !== false,
+    fontScaleFiles: get(PATHS.fontScaleFiles) !== false,
     alignments: readAlignments(get(PATHS.alignments)),
   };
 }

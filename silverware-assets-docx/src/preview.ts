@@ -10,6 +10,7 @@ import { fileVersion } from "../../shared/reads.ts";
 import { safeHtml } from "../../shared/safehtml.ts";
 import { drawn, showDocument } from "./documents.ts";
 import { DOCX_CLASS, pageSize } from "./load.ts";
+import { scaledNumber, scaledPx } from "../../shared/contentscale.ts";
 
 /** The room a preview has, in CSS pixels */
 export type PreviewBox = { readonly width: number; readonly height: number };
@@ -111,18 +112,19 @@ async function storedFirst(doc: Document, url: string, stored: StoredPreview): P
 /** A document's preview: a box at once (its icon and name), its first page drawn smaller in it once read */
 export function docxPreview(doc: Document, url: string, name: string, icon: string, box: PreviewBox, signal: AbortSignal, stored?: StoredPreview): HTMLElement {
   const preview = el(doc, "div", { class: "swa-docx-preview", attrs: { "data-swa-docx-state": "drawing", title: name } }, el(doc, "span", { class: "swa-docx-preview-icon", html: icon }), el(doc, "span", { class: "swa-docx-preview-name", text: name }));
-  preview.style.setProperty("--swa-docx-box-width", `${Math.round(box.width)}px`);
-  preview.style.setProperty("--swa-docx-box-height", `${Math.round(box.height)}px`);
+  // (Its sizes as the content's scale makes them, at once as it changes: shared/contentscale.ts)
+  preview.style.setProperty("--swa-docx-box-width", scaledPx(Math.round(box.width)));
+  preview.style.setProperty("--swa-docx-box-height", scaledPx(Math.round(box.height)));
   (stored ? storedFirst(doc, url, stored) : drawnFirst(doc, url))
     .then(({ styles, page: first, size }) => {
       if (signal.aborted) return;
       const scale = previewScale(size, box);
       // (docx-preview's wrapper's class kept: its rules are scoped by it)
       const wrapper = el(doc, "div", { class: `${DOCX_CLASS}-wrapper` }, first.cloneNode(true));
-      wrapper.style.zoom = String(scale);
+      wrapper.style.zoom = scaledNumber(scale);
       const page = el(doc, "div", { class: "swa-docx-preview-page" });
-      page.style.width = `${Math.round(size.width * scale)}px`;
-      page.style.height = `${Math.round(size.height * scale)}px`;
+      page.style.width = scaledPx(Math.round(size.width * scale));
+      page.style.height = scaledPx(Math.round(size.height * scale));
       showDocument(page, styles, [wrapper], "previewing");
       preview.replaceChildren(page);
       preview.dataset.swaDocxState = "page";

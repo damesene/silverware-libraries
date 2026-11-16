@@ -11,7 +11,7 @@ Word documents (.docx) drawn by docx-preview (prefix `swa-docx-`, settings and A
 
 ## Gotchas
 
-- The reader stops `mousedown`, `pointerdown` and `keydown` at its element (the shared shell): the editor around it would move its cursor into the embed and show its markdown.
+- The reader stops `mousedown`, `pointerdown` and `keydown` at its element (the shared shell): the editor around it would move its cursor into the embed and show its markdown. A shortcut of SilverBullet's kept so is told (the shell's `keyKept`, shared/silverbullet/keptkeys.ts; the init page's `flash` and `listCommands`).
 - docx-preview's own wrapper has a grey ground and padding: `DOCUMENT_CSS` in the shadow root takes them off (`!important` over its generated rules); the style page reaches no further than the shadow's host.
 - Pages break where the document has a page break (`breakPages`); a page's content is not split at its height (docx-preview lays out no lines).
 

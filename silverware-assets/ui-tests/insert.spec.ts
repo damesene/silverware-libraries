@@ -243,7 +243,7 @@ test("turned off in the settings: a paste is SilverBullet's own (its prompt), Fi
   await space.open({ Page: "# Page\n\nText\n" }, "Page");
   await runCommand(page, "Silverware Assets: Settings");
   const settings = page.locator(".swa-dialog.swa-settings-window");
-  await settings.locator(".swa-settings-check", { hasText: "Paste, drop and upload" }).locator("input").uncheck();
+  await settings.locator(".swa-settings-check", { hasText: "Use the insert dialog" }).locator("input").uncheck();
   await settings.getByRole("button", { name: "Save" }).click();
   await expect(settings).toHaveCount(0);
   await expect.poll(() => space.config()).toContain("enabled = false");

@@ -45,6 +45,18 @@ config.define("silverware.layout", {
           description = "Ctrl + scroll over the page makes its font larger or smaller on this device, as the browser zooms; Ctrl+0 puts it back.",
           ui = { category = "Silverware Layout", label = "Font zoom", priority = 0.7 },
         },
+        pinch = {
+          type = "boolean",
+          default = true,
+          description = "A pinch with two fingers makes the font larger or smaller on this device; a tap with two fingers still opens the page picker.",
+          ui = { category = "Silverware Layout", label = "Font zoom by a pinch", priority = 0.69 },
+        },
+        scaleFiles = {
+          type = "boolean",
+          default = true,
+          description = "The files a page shows (images, previews, PDFs) grow and shrink with this device's font zoom, as the text does.",
+          ui = { category = "Silverware Layout", label = "Files zoom with the text", priority = 0.68 },
+        },
       },
     },
     syntaxMode = {
@@ -54,8 +66,8 @@ config.define("silverware.layout", {
         hideGrids = {
           type = "boolean",
           default = true,
-          description = "While SilverBullet shows the markdown as written (Editor: Toggle Markdown Syntax Rendering), grids are hidden: their markdown alone.",
-          ui = { category = "Silverware Layout", label = "Markdown as written: hide grids", priority = 0.6 },
+          description = "When SilverBullet shows the page's markdown as written (Editor: Toggle Markdown Syntax Rendering), a grid shows as its markdown only, not drawn under it as SilverBullet draws it there.",
+          ui = { category = "Silverware Layout", label = "Markdown as written: grids as markdown only", priority = 0.6 },
         },
       },
     },
@@ -67,18 +79,18 @@ config.define("silverware.layout", {
           type = "boolean",
           default = true,
           description = "A click on a link shown as its markdown (the cursor in it, or all links while SilverBullet shows the markdown as written) only places the cursor; Ctrl+click opens it.",
-          ui = { category = "Silverware Layout", label = "A click on a link shown as markdown places the cursor", priority = 0.59 },
+          ui = { category = "Silverware Layout", label = "Clicking a link shown as markdown places the cursor", priority = 0.59 },
         },
       },
     },
     guides = {
       type = "array",
-      description = "The widths a drag snaps to and shows a guide at, in px (\"1200px\"), in % of the editor's width (\"80%\"), or full (the editor's width). Set in the Page layout dialog (Guides), kept in Silverware Layout's own block of CONFIG.",
+      description = "The widths a drag snaps to and shows a guide at, in px (\"1200px\"), in % of the editor's width (\"80%\"), or full (the editor's width). Set in the settings dialog (Guides), kept in Silverware Layout's own block of CONFIG.",
       items = { type = "string" },
     },
     alignments = {
       type = "object",
-      description = "Where each kind of widget stands where it says nothing itself, by its plugin and kind (\"silverware-assets/preview\" = \"right\"): left, center or right. Set in the Page layout dialog (Alignment), kept in Silverware Layout's own block of CONFIG.",
+      description = "Where each kind of widget stands where it says nothing itself, by its plugin and kind (\"silverware-assets/preview\" = \"right\"): left, center or right. Set in the settings dialog (Alignment), kept in Silverware Layout's own block of CONFIG.",
     },
   },
 })
@@ -97,6 +109,8 @@ if js and js.window then
       editor.flashNotification(message, type)
     end,
     getConfig = config.get,
+    -- A tap with two fingers given back to SilverBullet where the pinch zooms the font (its command doing the same)
+    invokeCommand = editor.invokeCommand,
     confirm = editor.confirm,
     -- A grid's min width in px asked
     prompt = editor.prompt,
@@ -119,6 +133,8 @@ if js and js.window then
     end,
     -- Whether SilverBullet shows the markdown's syntax (Editor: Toggle Markdown Syntax Rendering): grids hidden then
     getUiOption = editor.getUiOption,
+    -- SilverBullet's commands and their shortcuts: one pressed in a cell's field, where it does nothing, told
+    listCommands = system.listCommands,
     -- A grid's cell edited in Silverware Editor's editor where it is installed (else a plain text field)
     editor = silverware.editor and silverware.editor.api,
     -- The dialog's default text width: saved as SilverBullet's Configuration Manager saves

@@ -95,6 +95,8 @@ if js and js.window then
       return editor.filterBox(label, options, "", "Type to find a database")
     end,
     getConfig = config.get,
+    -- SilverBullet's commands and their shortcuts: one pressed in the peek, where it does nothing, told
+    listCommands = system.listCommands,
     -- The settings dialog: saved as SilverBullet's Configuration Manager saves (the CONFIG page, indexed, the configuration loaded again)
     -- `set`: written and indexed, the configuration not loaded again (that runs Space Lua anew and starts Silverware Database
     -- anew: the item's panel closed as its width was saved), these values set in it as it is, by path (config.set)

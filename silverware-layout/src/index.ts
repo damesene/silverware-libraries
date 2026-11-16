@@ -14,6 +14,7 @@ import { gridInsertion } from "./grid/core/insert.ts";
 import { gridLinks } from "./grid/core/links.ts";
 import { GRID_MODES, isGridMode, isMoveMode, MOVE_MODES, moveIntoGrid, wrapInNewGrid } from "./grid/build.ts";
 import { gridTags } from "./grid/core/tags.ts";
+import { TWO_FINGER_TAP_COMMAND } from "./host/silverbullet/behaviour.ts";
 import { gridRelations, gridTagObjects } from "./host/silverbullet/gridindex.ts";
 import { gridRanges, Grids } from "./grid/grids.ts";
 import { gridProvider } from "./grid/provider.ts";
@@ -32,7 +33,7 @@ import { DEFAULT_GUIDES, DEFAULT_MIN_PANE_WIDTH, keptGuides, PATHS, readSettings
 import { syntaxTab } from "./ui/syntaxtab.ts";
 import { cssWidth, readTextWidth } from "./model/width.ts";
 
-const PAGE_LAYOUT = "Silverware Layout: Page layout";
+const LAYOUT_SETTINGS = "Silverware Layout: Settings";
 const WRAP_IN_NEW_GRID = "Silverware Layout: Wrap in new grid";
 const MOVE_INTO_EXISTING_GRID = "Silverware Layout: Move into existing grid";
 // Silverware Layout's own block of CONFIG: the guides, a list, which the Configuration Manager's block would lose
@@ -123,7 +124,7 @@ export async function init(bridge: Bridge): Promise<void> {
     holdShownLinkClicks(document, () => markdownSettings.clickPlacesCursor);
     void readSyntaxSettings(bridge);
   }
-  // The Markdown tab of the Page layout dialog, made as it opens
+  // The Markdown tab of the settings dialog, made as it opens
   app.dialogTabs = async () => [
     syntaxTab(document, await readSyntaxSettings(bridge), async (saved) => {
       await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) =>
@@ -233,11 +234,11 @@ export async function runSlashCommand(name: string): Promise<void> {
 
 /** The commands, as the init page defines them */
 export function commandNames(): string[] {
-  return [PAGE_LAYOUT, WRAP_IN_NEW_GRID, MOVE_INTO_EXISTING_GRID];
+  return [LAYOUT_SETTINGS, WRAP_IN_NEW_GRID, MOVE_INTO_EXISTING_GRID];
 }
 
 export async function runCommand(name: string): Promise<void> {
-  if (name === PAGE_LAYOUT) await app.openDialog();
+  if (name === LAYOUT_SETTINGS) await app.openDialog();
   if (name === WRAP_IN_NEW_GRID) await wrapInNew();
   if (name === MOVE_INTO_EXISTING_GRID) await moveInto();
 }
@@ -310,7 +311,15 @@ function silverBulletStore(bridge: Bridge, writer: PageWriter): LayoutStore {
     saveGuides: (guides) => saveConfig({ [PATHS.guides]: keptGuides(guides) }, OWN_MARKER),
     // (A table: in Silverware Layout's own block; none set, taken out)
     saveAlignments: (alignments) => saveConfig({ [PATHS.alignments]: Object.keys(alignments).length ? alignments : undefined }, OWN_MARKER),
-    saveFont: (fontSize, fontZoom) => saveConfig({ [PATHS.fontSize]: fontSize === undefined ? undefined : `${fontSize}px`, [PATHS.fontZoom]: fontZoom ? undefined : false }),
+    saveFont: (font) =>
+      saveConfig({
+        [PATHS.fontSize]: font.fontSize === undefined ? undefined : `${font.fontSize}px`,
+        [PATHS.fontZoom]: font.fontZoom ? undefined : false,
+        [PATHS.fontPinch]: font.fontPinch ? undefined : false,
+        [PATHS.fontScaleFiles]: font.fontScaleFiles ? undefined : false,
+      }),
+    // (SilverBullet's own tap with two fingers, as its command does it: src/host/silverbullet/behaviour.ts)
+    twoFingerTap: () => void Promise.resolve(bridge.invokeCommand?.(TWO_FINGER_TAP_COMMAND)).catch(() => undefined),
     readZoom: () => readDeviceZoom(window),
     keepZoom: (size) => keepDeviceZoom(window, size),
     confirm: async (question) => (bridge.confirm ? !!(await bridge.confirm(question)) : globalThis.confirm(question)),
@@ -320,7 +329,7 @@ function silverBulletStore(bridge: Bridge, writer: PageWriter): LayoutStore {
 
 /** The settings as configured (none read: the defaults) */
 async function settingsOf(bridge: Bridge): Promise<Settings> {
-  if (!bridge.getConfig) return { textWidth: undefined, minPaneWidth: DEFAULT_MIN_PANE_WIDTH, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true, alignments: {} };
+  if (!bridge.getConfig) return { textWidth: undefined, minPaneWidth: DEFAULT_MIN_PANE_WIDTH, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true, fontPinch: true, fontScaleFiles: true, alignments: {} };
   const values = new Map<string, unknown>();
   for (const path of Object.values(PATHS)) values.set(path, await bridge.getConfig(path, undefined));
   return readSettings((path) => values.get(path));

@@ -28,6 +28,25 @@ test("a document's preview is its first page drawn smaller, as high as a preview
   await expect.poll(() => page.evaluate(() => (window as unknown as { opened: string[] }).opened.join(" "))).toContain("doc.docx");
 });
 
+test("a document's preview grows with the content's scale (files zoomed with the font: 150 %) at once, nothing drawn again", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/doc.docx|||{ view: preview }]]\n\nAfter\n` }, "Page", { "doc.docx": await docxOf(PAGES) });
+  const shown = page.locator("#sb-main [data-swa-asset='docx'][data-swa-view='preview'] .swa-docx-preview[data-swa-docx-state='page'] .swa-docx-preview-page");
+  await expect(shown).toBeVisible();
+  expect(Math.round((await shown.boundingBox())!.height)).toBe(160);
+  // (As Silverware Layout sets it where the files zoom with the font: shared/contentscale.ts)
+  // (A frame later, nothing drawn again: its sizes CSS following the scale, as an image's)
+  const nextFrame = () => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  const drawn = await shown.elementHandle();
+  await page.evaluate(() => document.documentElement.style.setProperty("--sw-content-scale", "1.5"));
+  await nextFrame();
+  expect(Math.round((await shown.boundingBox())!.height)).toBe(240);
+  // (The same page, not one drawn anew)
+  expect(await shown.evaluate((now, before) => now === before, drawn)).toBe(true);
+  await page.evaluate(() => document.documentElement.style.removeProperty("--sw-content-scale"));
+  await nextFrame();
+  expect(Math.round((await shown.boundingBox())!.height)).toBe(160);
+});
+
 test("a document's preview kept in the space as HTML once drawn, shown from there made safe", async ({ page, space }) => {
   await space.open({ Page: `# Page
 
@@ -81,6 +100,10 @@ test("a document in the side panel is the reader filling it", async ({ page, spa
   await expect(reader.locator("section.swa-docx-docx").first()).toContainText("The first page's words.");
   const body = (await panel.locator(".swa-panel-body").boundingBox())!;
   expect((await reader.boundingBox())!.height).toBeGreaterThan(body.height - 30);
+  // A shortcut of SilverBullet's pressed in the reader (its zoom's button focused): it does nothing there, said so
+  await reader.locator(".swa-docx-reader-fit").click();
+  await page.keyboard.press("Control+k");
+  await expect(page.locator(".sb-notifications")).toContainText("Navigate: Page Picker doesn't work here");
   await page.keyboard.press("Escape");
   await expect(panel).toHaveCount(0);
 });

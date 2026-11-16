@@ -58,6 +58,7 @@ registry.onChange(() => {
   redraw = setTimeout(() => void decorator?.redecorateAll(), REDRAW_MS);
 });
 
+
 /** Silverware Assets' API, as its API page hands it to other plugins (`silverware.assets.api`): types of file and actions (shared/assets.ts) */
 export const api: Assets = {
   ...registry.api(),

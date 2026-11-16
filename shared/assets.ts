@@ -4,6 +4,7 @@
 // the card). A type and an action use only what they are handed, and import nothing of Silverware Assets. As
 // shared/layout.ts: Silverware Assets' API as a plugin's init page hands it over, or a stand-in without it (`assetsOf`).
 import type { EditorEmbed } from "./editor.ts";
+import type { SheetArea } from "./sheetarea.ts";
 
 /** The version of the assets' API this file is written for: another is taken as none (updated apart) */
 export const ASSETS_VERSION = 1;
@@ -111,6 +112,8 @@ export type ActionContext = {
   render(view: Exclude<AssetView, "icon">, container: HTMLElement): Promise<void>;
   /** A URL opened in a new tab of the browser */
   open(url: string): void;
+  /** Where a panel beside the page goes, as the host gives it (none: the window) */
+  readonly sheetArea?: SheetArea;
 };
 
 /** What an asset can be shown as, for an action to decide whether it fits */

@@ -21,6 +21,6 @@ A markdown editor for the other plugins (prefix `swe-`, API under `silverware.ed
 
 ## Tests
 
-- `src/isolation.test.ts`: only `shared/editor.ts` and `shared/markdown/inline.ts` (hashtags read as SilverBullet reads them, drawn in its look: `swe-hashtag`) of `shared/`; CodeMirror in `vendor.ts` alone at run time (types elsewhere).
-- Unit tests (jsdom): the stand-in, the keys' names; the CodeMirror editor made over the vendor module in the test.
+- `src/isolation.test.ts`: only `shared/editor.ts`, `shared/keys.ts` (the keys' names, which `editor.ts` matches by) and `shared/markdown/inline.ts` (hashtags read as SilverBullet reads them, drawn in its look: `swe-hashtag`) of `shared/`; CodeMirror in `vendor.ts` alone at run time (types elsewhere).
+- Unit tests (jsdom): the stand-in; the CodeMirror editor made over the vendor module in the test. The keys' names: shared/keys.test.ts.
 - Its use is tested where it is used: Silverware Layout's grid, Silverware Database's peek, Silverware Toolbar over a surface.

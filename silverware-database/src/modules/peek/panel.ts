@@ -240,10 +240,12 @@ export class PeekPanel {
     // Over the window as a full screen is (shared/overwindow.ts): the other plugins' controls placed by the pointer
     // (a table's +, a chart's toolbar under it) stand back from it
     markOverWindow(element, true);
-    // Its keys its own: none goes on to the page (SilverBullet would act on them); Esc closes it where no field takes it
+    // Its keys its own: none goes on to the page (SilverBullet would act on them), a shortcut of the host's told that it
+    // does nothing here (as it goes down: what a field took then is known); Esc closes it where no field takes it
     const keep = (event: KeyboardEvent) => event.stopPropagation();
     element.addEventListener("keydown", (event) => {
       keep(event);
+      this.host.keyKept?.(event);
       if (event.key === "Escape" && !event.defaultPrevented) {
         event.preventDefault();
         void this.close();

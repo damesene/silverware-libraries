@@ -109,7 +109,7 @@ export function labelEditor(doc: Document, changed: (label: PreviewLabel) => voi
   // The sample: the label's lines (its properties shown, as their values) round a preview's box, as the page draws them
   const box = el(doc, "div", { class: `${BASE}-preview`, attrs: { "aria-hidden": "true" } });
   const sample = el(doc, "div", { class: `${BASE}-sample` }, lists.above, box, lists.below);
-  const hint = el(doc, "div", "swa-sample-hint", "Point at or tap a property for its name and ×; drag it above or below the preview, or up to the row to hide it.");
+  const hint = el(doc, "div", "swa-sample-hint", "Drag a property above or below the preview, or to the row above to hide it.");
   const element = el(doc, "div", `swa-sample-editor ${BASE}`, hiddenRow(doc, lists.off), sampleStage(doc, sample), hint);
 
   const set = (next: PreviewLabel, focusField?: LabelField) => {

@@ -70,6 +70,10 @@ export type LayoutProvider = {
   // Optional: whether the widget whose element this is may be widened by the handle (none: yes). One that may not (a
   // preview, its size its plugin's settings') has the handle's grip alone: its menu, where it stands
   resizable?(element: Element): boolean;
+  // Optional: whether its widgets' sizes follow the content's scale (shared/contentscale.ts: this device's font zoom,
+  // where its user asked files to follow it): a width kept in px shown that many times wider, a drag's written back as
+  // it would be at the scale of 1. None: not (a table's, a chart's)
+  readonly scales?: boolean;
   // Optional: what a widget without a width of its own is: as wide as the text ("text", a table: none said) or of its
   // own size ("own", a medium: SilverBullet's size or the file's). Where its own, the text's width a drag snaps to is
   // kept as its pixels: none would give it back its own size

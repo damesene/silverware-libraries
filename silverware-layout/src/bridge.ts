@@ -12,6 +12,8 @@ export type Bridge = {
   readonly listPages: () => unknown;
   // A notification
   readonly flash: (message: string, type?: "info" | "error") => unknown;
+  // Optional, for the pinch's tap with two fingers given back: a SilverBullet command run by its name (`editor.invokeCommand`)
+  readonly invokeCommand?: (name: string) => unknown;
   // Optional: without it, settings keep their defaults
   readonly getConfig?: (path: string, defaultValue: unknown) => unknown;
   // Optional, for the dialog: asks before closing it with changes (else the browser's confirm)
@@ -40,6 +42,9 @@ export type Bridge = {
   readonly getUiOption?: (name: string) => unknown;
   // Optional: Silverware Editor's API (`silverware.editor.api`), what a grid's cell is edited in (none: a `<textarea>`)
   readonly editor?: unknown;
+  // Optional: SilverBullet's commands and their shortcuts (`system.listCommands`): one pressed in a cell's field, where it
+  // does nothing, told (none: nothing told)
+  readonly listCommands?: () => unknown;
 };
 
 /** The bridge's functions Silverware Layout cannot work without, missing from what the init page gave */

@@ -14,6 +14,8 @@ const isPreview = (element: Element) => element.getAttribute("data-swa-view") ==
 export function assetProvider(assets: AssetDecorator): LayoutProvider {
   return {
     name: "silverware-assets",
+    // (Its sizes grow and shrink with the content's scale: shared/contentscale.ts)
+    scales: true,
     // (Not a card, which has no size and stands at the left)
     selector: '[data-swa-asset]:not([data-swa-view="icon"])',
     read: (element): LayoutEntries => {

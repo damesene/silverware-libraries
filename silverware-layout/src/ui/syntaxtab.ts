@@ -1,4 +1,4 @@
-// The Markdown tab of the Page layout dialog: how the page's markdown is met. A click on a link shown as its markdown
+// The Markdown tab of the settings dialog: how the page's markdown is met. A click on a link shown as its markdown
 // (the caret in it, or all of them while SilverBullet shows the markdown as written) placing the cursor alone, and,
 // while SilverBullet shows the markdown as written (Editor: Toggle Markdown Syntax Rendering), its grids hidden: a box
 // each. Saved on Save, as every tab.
@@ -19,10 +19,11 @@ export function syntaxTab(doc: Document, settings: SyntaxModeSettings, save: (se
     doc,
     "div",
     "swl-syntax",
-    el(doc, "label", "swl-syntax-check", clicks, "A click on a link shown as its markdown only places the cursor (Ctrl+click opens it)"),
-    el(doc, "p", "swl-syntax-note", "A link shows its markdown while the cursor is in it, and always while SilverBullet shows the markdown as written. A link drawn as a link opens on a click as ever."),
-    el(doc, "p", "swl-syntax-note", "While SilverBullet shows the markdown as written (Editor: Toggle Markdown Syntax Rendering):"),
-    el(doc, "label", "swl-syntax-check", hide, "Hide grids: their markdown alone"),
+    el(doc, "label", "swl-syntax-check", clicks, "Clicking a link shown as markdown only places the cursor (Ctrl+click opens it)"),
+    el(doc, "p", "swl-syntax-note", "A link shows as markdown while the cursor is in it, or in markdown-as-written mode. Rendered links still open on click."),
+    el(doc, "p", "swl-syntax-note", "When SilverBullet shows the page's markdown as written (Editor: Toggle Markdown Syntax Rendering):"),
+    el(doc, "label", "swl-syntax-check", hide, "Show grids as markdown only"),
+    el(doc, "p", "swl-syntax-note", "Off: SilverBullet draws the columns under the markdown too."),
   );
   return {
     id: "markdown",

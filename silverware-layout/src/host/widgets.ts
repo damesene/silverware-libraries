@@ -11,6 +11,7 @@ import type { Registry } from "../core/registry.ts";
 import { anchorOf, cssWidgetWidth, keptWidgetWidth, type LayoutAnchor, readAlign, readWidgetWidth, type WidgetWidth } from "../core/widgetwidth.ts";
 import { markContent, textWidthOf } from "./marks.ts";
 import type { PageHost } from "./page.ts";
+import { scaledPx } from "../../../shared/contentscale.ts";
 
 const WIDTH_ATTRIBUTE = "data-swl-width";
 const WIDTH_VARIABLE = "--swl-width";
@@ -260,7 +261,8 @@ export class Widgets {
     }
     const kept = keptWidgetWidth(width);
     if (element.getAttribute(WIDTH_ATTRIBUTE) !== kept) element.setAttribute(WIDTH_ATTRIBUTE, kept);
-    const css = cssWidgetWidth(width);
+    // (A widget whose sizes follow the content's scale: its width in px times it, as the text grows with the zoom)
+    const css = typeof width === "number" && this.widgetAt(element)?.provider.scales ? scaledPx(width) : cssWidgetWidth(width);
     if (element.style.getPropertyValue(WIDTH_VARIABLE) !== css) element.style.setProperty(WIDTH_VARIABLE, css);
   }
 

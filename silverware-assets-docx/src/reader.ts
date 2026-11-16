@@ -2,6 +2,7 @@
 // another, in the shared reader's shell (shared/docreader.ts: the embed's height in the page, or filling a side panel
 // or the enlarged view; its bar: the page in view of how many, the zoom). The pages fitted to the reader's width times
 // the zoom (CSS zoom on docx-preview's wrapper), again as the reader's width changes. Where it cannot be read: said.
+import type { KeptKeys } from "../../shared/silverbullet/keptkeys.ts";
 import { readerShell } from "../../shared/docreader.ts";
 import { el } from "../../shared/elements.ts";
 import { drawn, showDocument } from "./documents.ts";
@@ -15,8 +16,8 @@ const REFIT_SHARE = 0.02;
 export const fittedZoom = (readerWidth: number, pageWidth: number, zoom: number): number => Math.max(0.05, ((readerWidth - 2 * GAP) / pageWidth) * zoom);
 
 /** A document's reader; `height` its height in the page, none where it fills a panel */
-export function docxReader(doc: Document, url: string, name: string, height: number | undefined, signal: AbortSignal): HTMLElement {
-  const shell = readerShell(doc, { base: "swa-docx" }, { name, height });
+export function docxReader(doc: Document, url: string, name: string, height: number | undefined, signal: AbortSignal, keyKept?: KeptKeys): HTMLElement {
+  const shell = readerShell(doc, { base: "swa-docx" }, { name, height, ...(keyKept ? { keyKept } : {}) });
   const { root: reader, scroller } = shell;
   const content = el(doc, "div", { class: "swa-docx-reader-document" });
   scroller.append(content);

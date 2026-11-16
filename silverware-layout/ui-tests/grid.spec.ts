@@ -1,6 +1,6 @@
 // Columns (docs/silverware-layout-grid.md) as a user works with them in SilverBullet: /grid, a cell edited in place,
 // Alt+click to the raw text, columns set by the grid's line, a grid in an embedded page, its hashtags indexed.
-import { cellField, cursorAt, editorText, expect, fieldState, fillField, gridsDrawn, PAGE_LAYOUT, PIXEL_PNG, runCommand, test } from "./helpers.ts";
+import { cellField, cursorAt, editorText, expect, fieldState, fillField, gridsDrawn, LAYOUT_SETTINGS, PIXEL_PNG, runCommand, test } from "./helpers.ts";
 
 const GRID = "<grid>\n<cell>\n\nLeft text\n\n</cell>\n<cell>\n\nRight text\n\n</cell>\n</grid>\n";
 
@@ -43,6 +43,18 @@ test("a cell edited in place: its markdown in a field, written as it is left, th
   await page.keyboard.press("Escape");
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n${GRID.replace("Left text", "Left **edited**")}\nBelow\n`);
   await expect(page.locator("#sb-main .swl-grid-cell").first().locator("strong")).toHaveText("edited");
+});
+
+test("a shortcut of SilverBullet's pressed in a cell's field does nothing there and says so, the cell still edited", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${GRID}\nBelow\n` }, "Page");
+  await gridsDrawn(page);
+  await page.locator("#sb-main .swl-grid-cell").first().click();
+  await expect.poll(async () => (await fieldState(page)).text).toBe("Left text");
+  await page.keyboard.press("Control+k");
+  await expect(page.locator(".sb-notifications")).toContainText("Navigate: Page Picker doesn't work here");
+  await expect(cellField(page)).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(cellField(page)).toHaveCount(0);
 });
 
 test("a cell left by a click straight into another of its grid: the first written, the second edited on, what is typed in it kept as the grid is drawn anew", async ({ page, space }) => {
@@ -412,7 +424,7 @@ test("a grid aligned right from its handle's menu: written as its attribute, at 
   await expect.poll(() => space.saved("Page")).toContain('<grid width="460">');
 });
 
-test("the Page layout dialog's Alignment tab: every grid at the right where it says nothing itself, saved in CONFIG; its own from its menu wins", async ({ page, space }) => {
+test("the settings dialog's Alignment tab: every grid at the right where it says nothing itself, saved in CONFIG; its own from its menu wins", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\nAbove\n\n${GRID.replace("<grid>", '<grid width="400">')}\nBelow\n` }, "Page");
   await gridsDrawn(page);
   const grid = page.locator("#sb-main .swl-grid");
@@ -426,7 +438,7 @@ test("the Page layout dialog's Alignment tab: every grid at the right where it s
     const box = (await grid.boundingBox())!;
     return [Math.round(box.x), Math.round(box.x + box.width)];
   };
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");
   await dialog.getByRole("tab", { name: "Alignment" }).click();
   const select = dialog.getByRole("combobox", { name: "Grid: where it stands" });
@@ -951,6 +963,10 @@ test("Clear column… above Delete column… in a column's grip's menu: asked in
   await expect(page.locator("#sb-main .swl-grid-cell")).toHaveCount(2);
 });
 
+// The grid menu's two choices of lines, by their titles
+const INNER_LINES = "Lines between the cells alone";
+const ALL_LINES = "Lines round the grid and between its cells";
+
 test("a grid's borders from its handle's menu: written as its attribute, the first column's line where its divider is", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${GRID}\nAfter\n` }, "Page");
   await gridsDrawn(page);
@@ -958,7 +974,7 @@ test("a grid's borders from its handle's menu: written as its attribute, the fir
   const borders = async () => {
     await grid.hover();
     await page.locator(".swl-handle-bar").click();
-    await page.locator(".swl-popup .swl-menu-item", { hasText: "Borders" }).click();
+    await page.locator(".swl-popup .swl-menu-segmented").getByRole("menuitemradio", { name: ALL_LINES, exact: true }).click();
   };
   await borders();
   await expect(grid).toHaveAttribute("data-swl-border", "");
@@ -988,6 +1004,64 @@ test("a grid's borders from its handle's menu: written as its attribute, the fir
   await borders();
   await expect(grid).not.toHaveAttribute("data-swl-border");
   await expect.poll(() => space.saved("Page")).toContain("<grid>\n");
+});
+
+test("a grid's lines between its cells alone from its handle's menu: in the middle of each gap, its rows' too, none round it", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${GRID}\nAfter\n` }, "Page");
+  await gridsDrawn(page);
+  const grid = page.locator("#sb-main .swl-grid");
+  const choose = async (title: string) => {
+    await grid.hover();
+    await page.locator(".swl-handle-bar").click();
+    await page.locator(".swl-popup .swl-menu-segmented").getByRole("menuitemradio", { name: title, exact: true }).click();
+  };
+  await choose(INNER_LINES);
+  await expect(grid).toHaveAttribute("data-swl-border-inner", "");
+  await expect(grid).not.toHaveAttribute("data-swl-border");
+  await expect.poll(() => space.saved("Page")).toContain('<grid border="inner">');
+  const lines = await page.evaluate(() => {
+    const [first, second] = [...document.querySelectorAll<HTMLElement>("#sb-main .swl-grid-cell")];
+    const before = getComputedStyle(second!, "::before");
+    return {
+      first: first!.getBoundingClientRect().right,
+      second: second!.getBoundingClientRect().left,
+      line: second!.getBoundingClientRect().left + parseFloat(before.left) + parseFloat(before.width) / 2,
+      shown: before.content !== "none",
+      row: getComputedStyle(first!, "::after").height,
+      ring: getComputedStyle(document.querySelector("#sb-main .swl-grid")!).boxShadow,
+    };
+  });
+  // The line in the gap's middle, no ring round the grid
+  expect(lines.shown).toBe(true);
+  expect(lines.row).toBe("1px");
+  expect(Math.abs(lines.line - (lines.first + lines.second) / 2)).toBeLessThan(1);
+  expect(lines.ring).toBe("none");
+  // Switched to all lines, then taken off by the one chosen
+  await choose(ALL_LINES);
+  await expect(grid).toHaveAttribute("data-swl-border", "");
+  await expect(grid).not.toHaveAttribute("data-swl-border-inner");
+  await expect.poll(() => space.saved("Page")).toContain('<grid border="1">');
+  await choose(ALL_LINES);
+  await expect(grid).not.toHaveAttribute("data-swl-border");
+  await expect.poll(() => space.saved("Page")).toContain("<grid>\n");
+});
+
+test("a grid of columns as many as fit, without borders, its width dragged: every line drawn, not its ring alone", async ({ page, space }) => {
+  const cell = (text: string) => `<cell>\n\n${text}\n\n</cell>\n`;
+  await space.open({ Page: `# Page\n\n<grid columns="auto" min="xs">\n${["One", "Two", "Three", "Four"].map(cell).join("")}</grid>\n\nAfter\n` }, "Page");
+  await gridsDrawn(page);
+  const grid = page.locator("#sb-main .swl-grid");
+  const cellLines = () => grid.evaluate((element) => [...element.querySelectorAll(".swl-grid-cell")].map((one) => getComputedStyle(one, "::after").boxShadow));
+  expect(await cellLines()).toEqual(["none", "none", "none", "none"]);
+  await grid.hover();
+  const bar = (await page.locator(".swl-handle-bar").boundingBox())!;
+  await page.mouse.move(bar.x + bar.width / 2, bar.y + bar.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bar.x + bar.width / 2 - 20, bar.y + bar.height / 2, { steps: 4 });
+  await expect.poll(async () => (await cellLines()).every((shadow) => shadow !== "none")).toBe(true);
+  expect(await grid.evaluate((element) => getComputedStyle(element, "::before").boxShadow)).not.toBe("none");
+  await page.mouse.up();
+  await expect.poll(async () => (await cellLines()).every((shadow) => shadow === "none")).toBe(true);
 });
 
 test("SilverBullet's button bar of a grid's frame stays hidden as the pointer is over the grid", async ({ page, space }) => {

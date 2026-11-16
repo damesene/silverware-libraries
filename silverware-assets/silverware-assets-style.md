@@ -31,8 +31,9 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   padding: 0;
   border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
   border-radius: 4px;
-  font: inherit;
-  line-height: 1;
+  /* (Its own size: a control, not the text's, which the font zoom makes larger or smaller; important, as SilverBullet
+     gives a widget's buttons the editor's font, its size inherited, by a rule naming its editor) */
+  font: 14px/1 var(--ui-font, system-ui, sans-serif) !important;
   color: inherit;
   background: var(--root-background-color);
   opacity: 0;
@@ -877,6 +878,14 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   object-fit: contain;
   cursor: pointer;
 }
+/* An image's or a video's preview as large as the content's scale makes it (shared/contentscale.ts), one smaller than
+   the preview's height too: the host's medium alone zoomed (not a picture a type draws in its own), its limits in px
+   (the scale in them already) taken back by it, so it is counted once; a percentage is the room's, which zoom leaves */
+[data-swa-view="preview"] :is(img, video).swa-medium {
+  zoom: var(--sw-content-scale, 1);
+  max-height: calc(var(--swa-height, 160px) / var(--sw-content-scale, 1));
+  max-width: min(100%, calc(var(--swa-preview-width, 100000px) / var(--sw-content-scale, 1)));
+}
 /* The frame as wide as what is shown in it, without the host's border round a widget: its "…" at the medium's corner,
    not the page's (a card's at the text's right). A PDF's viewer, as wide as its room, keeps the text's width */
 [data-swa-asset] {
@@ -915,6 +924,14 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 .swa-frame[data-swa-view="icon"] {
   display: inline-flex !important;
+}
+/* An original of its own size (an image, a video; no width laid out by Silverware Layout's handle, which follows the
+   scale itself): as large as the content's scale makes it (shared/contentscale.ts, this device's font zoom where the
+   files zoom with it), never wider than its room (a percentage is the room's, which zoom leaves as it is). The host's
+   medium alone, not its frame (its "…" and label keep their size) nor a picture a type draws in its own */
+[data-swa-asset][data-swa-view="embed"]:not([data-swl-width]) :is(img, video).swa-medium {
+  zoom: var(--sw-content-scale, 1);
+  max-width: 100%;
 }
 /* A medium in markdown rendered outside the editor (a grid's cell) in a frame of Silverware Assets' own */
 .swa-frame {
@@ -994,10 +1011,38 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   display: flex;
   flex-direction: column;
   width: min(560px, 100vw);
+  max-width: 100vw;
   color: var(--root-color);
   background: var(--root-background-color);
   border-left: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
   box-shadow: -6px 0 24px rgba(0, 0, 0, 0.18);
+}
+/* Its left edge dragged to set its width: a zone to hit over its height, the cursor saying what it does, nothing drawn
+   but a line in the accent's color while pointed at or focused */
+.swa-peek-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -5px;
+  z-index: 1;
+  width: 10px;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+.swa-peek-resize::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 2px;
+  background: var(--ui-accent-color, #4a90e2);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.swa-peek-resize:is(:hover, :focus-visible)::before {
+  opacity: 1;
 }
 .swa-popover {
   position: fixed;
@@ -1052,6 +1097,10 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   font-size: 18px;
   line-height: 24px;
   border-color: transparent;
+}
+/* The side panel's × first, at the edge it opened from: the head's padding even */
+.swa-peek .swa-panel-head {
+  padding-left: 6px;
 }
 .swa-panel-body {
   display: flex;

@@ -3,7 +3,7 @@ tags: meta
 ---
 # Silverware Layout style
 
-The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. It is installed with the library.
+The look of [Silverware Layout](silverware-layout.md): its settings dialog. It is installed with the library.
 
 ```space-style
 /* The page as Silverware Layout marks it (src/host/marks.ts), never by a host's elements: the content its widgets
@@ -103,6 +103,11 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
    18 px (13.33 / 18), it is as SilverBullet draws it there and grows with the font */
 :root[data-swl-font-size] [data-swl-editor] input[type="checkbox"] {
   font-size: 0.7407em;
+}
+/* The content's scale (shared/contentscale.ts) none over the window (a database's peek, a full screen): its text is not
+   the editor's, which the font zoom sizes, so what it shows keeps its size too */
+[data-silverware-over-window] {
+  --sw-content-scale: 1;
 }
 /* Font zoom's label at the window's bottom left, a moment after each step, as the browser's own zoom shows its */
 .swl-zoom-label {
@@ -221,7 +226,7 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   height: min(40px, 100%);
   background: var(--ui-accent-color, #464cfc);
 }
-/* Silverware Layout (prefix swl-): the Page layout dialog ("Silverware Layout: Page layout"), over the page and
+/* Silverware Layout (prefix swl-): the settings dialog ("Silverware Layout: Settings"), over the page and
    SilverBullet's top bar, in the page's colors; over the part of the window an on-screen keyboard leaves
    (shared/dialog.ts sets where it is) */
 .swl-dialog-backdrop {
@@ -546,7 +551,7 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   width: 16px;
   height: 16px;
 }
-/* Preview on the Guides tab (held, the guides on the page) and Default guides beside it, over the list: an icon and its name each */
+/* Preview on the Guides tab (held, the guides on the page) and Restore defaults beside it, over the list: an icon and its name each */
 .swl-dialog-guide-actions {
   display: flex;
   flex-wrap: wrap;
@@ -950,37 +955,59 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   box-shadow: inset 1px 1px 0 0 var(--swl-grid-line);
   clip-path: inset(-48px -1px -1px 0);
 }
-/* A grid one of whose cells is edited, without borders: lines as a table's for as long as it is edited (in place of
-   an outline round the field: the user's choice, 2026-11-14), its layout as it is (its borders' gap and padding moved
-   its content: the user's report, 2026-11-15). Each line in the middle of a gap: each cell's right and bottom, the
-   grid's top and left half a gap outside it, the grid letting that half gap be seen. Opaque, one line where two meet */
-.swl-grid:not([data-swl-border]):has(> .swl-grid-editing) {
+/* A grid's lines between its cells alone (`border="inner"`): a faint line in the middle of each gap, between its
+   columns and between its rows, no ring round it, its layout as it is. Each cell draws its line at its left, half a
+   gap before it, run down through the gap under it to meet the next row's, and its line under it, in the middle of the
+   gap under it, run half a gap past each side to meet its neighbours'. What falls outside the grid (the first column's
+   line, the last row's, the ends past its sides) its `clip-path` cuts off. Drawn by the cells, not the dividers: the
+   same in a grid of columns as many as fit and in a narrow pane, where there are none. Not while a cell is edited or the
+   grid resized (all its lines are drawn then, by the same pseudo-elements) nor while a place is picked (the
+   grid's clip taken off, what falls outside would show). */
+.swl-grid[data-swl-border-inner] {
+  --swl-grid-line: color-mix(in srgb, var(--root-color, #000) 16%, var(--root-background-color, #fff));
+  align-items: stretch;
+}
+:root:not([data-swl-picking]) .swl-grid[data-swl-border-inner]:not(:has(> .swl-grid-editing), :has(> .swl-grid-divider[data-swl-dragging]), [data-swl-resizing] *) > .swl-grid-cell::before,
+:root:not([data-swl-picking]) .swl-grid[data-swl-border-inner]:not(:has(> .swl-grid-editing), :has(> .swl-grid-divider[data-swl-dragging]), [data-swl-resizing] *) > .swl-grid-cell::after {
+  content: "";
+  position: absolute;
+  background: var(--swl-grid-line);
+  pointer-events: none;
+}
+:root:not([data-swl-picking]) .swl-grid[data-swl-border-inner]:not(:has(> .swl-grid-editing), :has(> .swl-grid-divider[data-swl-dragging]), [data-swl-resizing] *) > .swl-grid-cell::before {
+  top: 0;
+  bottom: calc(var(--swl-grid-row-gap) * -1);
+  left: calc(var(--swl-grid-column-gap) / -2 - 0.5px);
+  width: 1px;
+}
+:root:not([data-swl-picking]) .swl-grid[data-swl-border-inner]:not(:has(> .swl-grid-editing), :has(> .swl-grid-divider[data-swl-dragging]), [data-swl-resizing] *) > .swl-grid-cell::after {
+  bottom: calc(var(--swl-grid-row-gap) / -2 - 0.5px);
+  left: calc(var(--swl-grid-column-gap) / -2);
+  right: calc(var(--swl-grid-column-gap) / -2);
+  height: 1px;
+}
+/* A grid without all its lines one of whose cells is edited, or whose column divider or width is dragged (its widget
+   marked data-swl-resizing by the handle): all its lines as a table's for as long as it is (in place of an outline round
+   the field: the user's choice, 2026-11-14; every line while it is resized, not its ring alone: the user's report,
+   2026-11-16), its layout as it is (its borders' gap and padding moved its content and the columns under the pointer:
+   2026-11-15). Each line in the middle of a gap: each cell's right and bottom, the grid's top and left half a gap
+   outside it, the grid letting that half gap be seen. Opaque, one line where two meet */
+.swl-grid:not([data-swl-border]):is(:has(> .swl-grid-editing), :has(> .swl-grid-divider[data-swl-dragging]), [data-swl-resizing] *) {
   --swl-grid-line: color-mix(in srgb, var(--root-color, #000) 16%, var(--root-background-color, #fff));
   clip-path: inset(-48px calc(var(--swl-grid-column-gap) / -2 - 1px) calc(var(--swl-grid-row-gap) / -2 - 1px));
 }
-.swl-grid:not([data-swl-border]):has(> .swl-grid-editing)::before,
-.swl-grid:not([data-swl-border]):has(> .swl-grid-editing) > .swl-grid-cell::after {
+.swl-grid:not([data-swl-border]):is(:has(> .swl-grid-editing), :has(> .swl-grid-divider[data-swl-dragging]), [data-swl-resizing] *)::before,
+.swl-grid:not([data-swl-border]):is(:has(> .swl-grid-editing), :has(> .swl-grid-divider[data-swl-dragging]), [data-swl-resizing] *) > .swl-grid-cell::after {
   content: "";
   position: absolute;
   inset: calc(var(--swl-grid-row-gap) / -2) calc(var(--swl-grid-column-gap) / -2);
   pointer-events: none;
 }
-.swl-grid:not([data-swl-border]):has(> .swl-grid-editing)::before {
+.swl-grid:not([data-swl-border]):is(:has(> .swl-grid-editing), :has(> .swl-grid-divider[data-swl-dragging]), [data-swl-resizing] *)::before {
   box-shadow: inset 1px 1px 0 0 var(--swl-grid-line);
 }
-.swl-grid:not([data-swl-border]):has(> .swl-grid-editing) > .swl-grid-cell::after {
+.swl-grid:not([data-swl-border]):is(:has(> .swl-grid-editing), :has(> .swl-grid-divider[data-swl-dragging]), [data-swl-resizing] *) > .swl-grid-cell::after {
   box-shadow: inset -1px -1px 0 0 var(--swl-grid-line);
-}
-/* A grid whose column divider or width is dragged (its widget marked data-swl-resizing by the handle): its lines as
-   long as it is dragged, its ring and a line in each gap, its layout as it is (the borders' gap and padding moved the
-   columns under the pointer, and a divider's snap to the text's edge was off) */
-.swl-grid:not([data-swl-border]):is(:has(> .swl-grid-divider[data-swl-dragging]), [data-swl-resizing] *) {
-  --swl-grid-line: color-mix(in srgb, var(--root-color, #000) 16%, var(--root-background-color, #fff));
-  box-shadow: inset 0 0 0 1px var(--swl-grid-line);
-}
-.swl-grid:not([data-swl-border]):is(:has(> .swl-grid-divider[data-swl-dragging]), [data-swl-resizing] *) > .swl-grid-divider:not([data-swl-dragging])::before {
-  opacity: 1;
-  background: var(--swl-grid-line);
 }
 /* A cell is edited by a click in it: the text's pointer over it (no outline round it: cut off at the grid's edges, and
    drawn on every column, the user found it noisy, 2026-11-14), its markdown in a field as tall as its text while

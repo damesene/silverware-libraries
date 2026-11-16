@@ -1,30 +1,15 @@
 // @vitest-environment jsdom
-// Silverware Editor: the stand-in (a `<textarea>`) and the CodeMirror editor, both one `TextEditor`; the keys' names;
-// the editing surfaces found. CodeMirror is imported here from vendor.ts (in SilverBullet it is a file beside the
+// Silverware Editor: the stand-in (a `<textarea>`) and the CodeMirror editor, both one `TextEditor` (the keys' names:
+// shared/keys.test.ts); the editing surfaces found. CodeMirror is imported here from vendor.ts (in SilverBullet it is a file beside the
 // bundle, loaded when idle).
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { COMPANION_ATTRIBUTE, EDITOR_VERSION, editorsOf, keyMatches, textareaEditor, type TextEditor } from "../../shared/editor.ts";
+import { COMPANION_ATTRIBUTE, EDITOR_VERSION, editorsOf, textareaEditor, type TextEditor } from "../../shared/editor.ts";
 import { codeMirrorEditor } from "./codemirror.ts";
 import * as cm from "./vendor.ts";
 
 afterEach(() => document.body.replaceChildren());
 
 const key = (init: KeyboardEventInit) => new KeyboardEvent("keydown", init);
-
-describe("the keys' names", () => {
-  it("match a key with its modifiers exactly, Mod as Ctrl off a Mac", () => {
-    expect(keyMatches("Mod-Enter", key({ key: "Enter", ctrlKey: true }))).toBe(true);
-    expect(keyMatches("Mod-Enter", key({ key: "Enter" }))).toBe(false);
-    expect(keyMatches("Escape", key({ key: "Escape" }))).toBe(true);
-    expect(keyMatches("Escape", key({ key: "Escape", ctrlKey: true }))).toBe(false);
-    expect(keyMatches("Shift-Tab", key({ key: "Tab", shiftKey: true }))).toBe(true);
-    expect(keyMatches("Mod-b", key({ key: "B", ctrlKey: true }))).toBe(true);
-    // (A letter's key with Shift held is not the key without it: Ctrl+Shift+Z is no `Mod-z`; a shifted sign is itself)
-    expect(keyMatches("Mod-z", key({ key: "Z", ctrlKey: true, shiftKey: true }))).toBe(false);
-    expect(keyMatches("Mod-Shift-z", key({ key: "Z", ctrlKey: true, shiftKey: true }))).toBe(true);
-    expect(keyMatches("?", key({ key: "?", shiftKey: true }))).toBe(true);
-  });
-});
 
 /** The same checks for both editors: a `TextEditor` either way */
 function behaves(name: string, make: (options: Parameters<typeof textareaEditor>[1]) => TextEditor) {

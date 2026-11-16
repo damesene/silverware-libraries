@@ -13,7 +13,7 @@ Excel workbooks (.xlsx) read by ExcelJS and drawn as spreadsheets (prefix `swa-x
 
 - A formula's value is the one Excel saved (`result`); nothing is calculated. Dates are UTC (Excel's have no time zone): formatted with `timeZone: "UTC"`.
 - Excel's theme colours are its default theme's (Office 2013+), tinted as the file says; a workbook with a theme of its own shows the default's colours.
-- The reader stops `mousedown`, `pointerdown` and `keydown` at its element (the shared shell).
+- The reader stops `mousedown`, `pointerdown` and `keydown` at its element (the shared shell). A shortcut of SilverBullet's kept so is told (the shell's `keyKept`, shared/silverbullet/keptkeys.ts; the init page's `flash` and `listCommands`).
 
 ## Tests
 

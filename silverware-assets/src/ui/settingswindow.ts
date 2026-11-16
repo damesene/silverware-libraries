@@ -24,8 +24,10 @@ export function markdownTab(doc: Document, settings: SyntaxModeSettings, save: (
     doc,
     "div",
     "swa-settings-markdown",
-    el(doc, "p", "swa-settings-intro", "While SilverBullet shows the markdown as written (Editor: Toggle Markdown Syntax Rendering):"),
-    el(doc, "label", "swa-settings-check", hide, "Hide embedded files: their markdown alone"),
+    el(doc, "p", "swa-settings-intro", "When SilverBullet shows the page's markdown as written (Editor: Toggle Markdown Syntax Rendering):"),
+    el(doc, "label", "swa-settings-check", hide, "Show embedded files as markdown only"),
+    // (What it does said: the mode was not known by the name alone, the user found)
+    el(doc, "p", "swa-settings-note", "Off: SilverBullet draws the file under the markdown too."),
   );
   return {
     id: "markdown",

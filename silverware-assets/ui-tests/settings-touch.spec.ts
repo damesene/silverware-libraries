@@ -15,10 +15,10 @@ test("the settings window on a phone covers the screen; its last tab reached in 
   const last = dialog.getByRole("tab", { name: "Markdown" });
   await last.scrollIntoViewIfNeeded();
   await last.tap();
-  await expect(dialog.getByText("Hide embedded files")).toBeVisible();
+  await expect(dialog.getByText("Show embedded files as markdown only")).toBeVisible();
   // Files: a type's choices under its name, within the screen
   await dialog.getByRole("tab", { name: "Files" }).tap();
-  const shift = (await dialog.getByLabel("pdf: a Shift+click").boundingBox())!;
+  const shift = (await dialog.getByLabel("pdf: Shift+click").boundingBox())!;
   expect(shift.x + shift.width).toBeLessThanOrEqual(view.width);
   // Preview's label: a property tapped, chosen: its name and its × over it; the × hides it
   await dialog.getByRole("tab", { name: "Appearance" }).tap();

@@ -8,6 +8,7 @@ import type { PageHost } from "./host/page.ts";
 import { type Widget, Widgets } from "./host/widgets.ts";
 import type { Guide } from "./model/settings.ts";
 import { WidthHandle } from "./ui/handle.ts";
+import { contentScaleOf } from "../../shared/contentscale.ts";
 
 export type WidgetLayoutOptions = {
   readonly guides: () => readonly Guide[];
@@ -25,12 +26,18 @@ export type WidgetLayout = { readonly widgets: Widgets; readonly handle: WidthHa
 export function layOutWidgets(doc: Document, page: PageHost, registry: Registry, options: WidgetLayoutOptions): WidgetLayout {
   const widgets = new Widgets(doc, page, registry, options.problem, options.alignments);
   widgets.start();
+  // The handle measures, snaps and shows widths as they are on the screen; a widget whose sizes follow the content's
+  // scale keeps them as at the scale of 1 (shared/contentscale.ts): its width kept shown times the scale, one dragged
+  // written back divided by it
+  const scale = (widget: Widget | undefined) => (widget?.provider.scales ? contentScaleOf(doc) : 1);
+  const onScreen = <T>(width: T, by: number): T => (typeof width === "number" ? ((width * by) as T) : width);
+  const whole = <T>(width: T): T => (typeof width === "number" ? (Math.round(width) as T) : width);
   const handle = new WidthHandle<Widget>(doc, {
     widgetAt: (node) => widgets.widgetAt(node),
     element: (widget) => widget.element,
-    kept: (widget) => widgets.kept(widget),
-    show: (element, width) => widgets.show(element, width),
-    write: (widget, width) => widgets.write(widget, width),
+    kept: (widget) => whole(onScreen(widgets.kept(widget), scale(widget))),
+    show: (element, width) => widgets.show(element, onScreen(width, 1 / scale(widgets.widgetAt(element)))),
+    write: (widget, width) => widgets.write(widget, typeof width === "number" ? Math.round(width / scale(widget)) : width),
     textWidth: () => widgets.textWidth(),
     paneWidth: () => paneWidth(page),
     guides: options.guides,

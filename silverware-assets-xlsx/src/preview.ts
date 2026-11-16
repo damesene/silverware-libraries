@@ -9,6 +9,7 @@ import { fileVersion } from "../../shared/reads.ts";
 import { safeHtml } from "../../shared/safehtml.ts";
 import { workbook } from "./load.ts";
 import { drawSheet } from "./table.ts";
+import { scaledNumber, scaledPx } from "../../shared/contentscale.ts";
 
 // The cells a preview draws at most, and how small (CSS zoom)
 const ROWS = 12;
@@ -52,15 +53,16 @@ async function storedCells(doc: Document, url: string, stored: StoredPreview): P
 /** A workbook's preview: a box at once (its icon and name), its first sheet's first cells in it once read */
 export function xlsxPreview(doc: Document, url: string, name: string, icon: string, box: PreviewBox, signal: AbortSignal, stored?: StoredPreview): HTMLElement {
   const preview = el(doc, "div", { class: "swa-xlsx-preview", attrs: { "data-swa-xlsx-state": "reading", title: name } }, el(doc, "span", { class: "swa-xlsx-preview-icon", html: icon }), el(doc, "span", { class: "swa-xlsx-preview-name", text: name }));
-  preview.style.setProperty("--swa-xlsx-box-width", `${Math.round(box.width)}px`);
-  preview.style.setProperty("--swa-xlsx-box-height", `${Math.round(box.height)}px`);
+  // (Its sizes as the content's scale makes them, at once as it changes: shared/contentscale.ts)
+  preview.style.setProperty("--swa-xlsx-box-width", scaledPx(Math.round(box.width)));
+  preview.style.setProperty("--swa-xlsx-box-height", scaledPx(Math.round(box.height)));
   (stored ? storedCells(doc, url, stored) : drawnCells(doc, url))
     .then((html) => {
       if (signal.aborted) return;
       // (What was kept made safe as it is read: anyone who can write the space can write it)
       const table = safeHtml(doc, html, { styleSheets: false }).querySelector<HTMLElement>("table");
       if (!table) throw new Error("the workbook has no cells");
-      table.style.zoom = String(PREVIEW_ZOOM);
+      table.style.zoom = scaledNumber(PREVIEW_ZOOM);
       preview.replaceChildren(el(doc, "div", { class: "swa-xlsx-preview-sheet" }, table));
       preview.dataset.swaXlsxState = "sheet";
     })

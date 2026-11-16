@@ -24,14 +24,14 @@ Images, videos, audio, PDFs and other files you embed (`![[photo.png]]`, `![Phot
 Point at a file, and a **…** button shows at its top right (also in a grid's column being edited and in a database's peek, where what you choose changes the text there; Alt+click shows its markdown). On a card, its icon is that button (as a link's icon); with the icon hidden, a small arrow after the card's name. Its menu, the same for every file:
 
 - **Show as**, at the top: a row of four, how the file is in the page: a **link**, a **card**, a **preview** or the **original**, the one shown lit, the one your settings give marked *(default)*. One a file cannot be shown as is greyed out (a zip has no preview).
-- **Open in a new tab**, **Open in side panel** (a panel at the window's right, the page still beside it), **Open enlarged** (over the page). Esc or × closes them, and a click beside the enlarged file.
+- **Open in a new tab**, **Open in side panel** (a panel at the window's right, the page still beside it; drag its left edge to make it wider or narrower, kept on this device, a double click on the edge for its default width), **Open enlarged** (over the page). Esc or × closes them, and a click beside the enlarged file.
 - What is done with the file: **Copy image** (an image), **Copy markdown**, **Download**, **Regenerate preview** (a preview kept in the space).
 - **Remove from page** (an embedded file, an image of the web too): takes the embed out of the page, the file left as it is; undo puts it back.
 - **Delete file…**, last (a file of your space).
 
 A click on a card or a preview opens the file in a new tab; Shift+click does the same, unless you set otherwise: either can instead open it in the side panel, enlarged, or download it.
 
-**Its alignment**, with [Silverware Layout](https://github.com/damesene/silverware-libraries/blob/main/silverware-layout/silverware-layout.md) installed (it places what is on a page): click the bar beside a file (a preview's too), and **Align** in its menu puts it at the left, in the middle or at the right of its line (of its column, in a grid); kept in its embed, `![[photo.png|Photo||{ align: center }]]`. Without its own, the default in Silverware Layout's **Page layout** dialog (**Alignment**: previews and originals apart) holds, left unless you change it. A card is always at the left. Without Silverware Layout files stand as SilverBullet draws them.
+**Its alignment**, with [Silverware Layout](https://github.com/damesene/silverware-libraries/blob/main/silverware-layout/silverware-layout.md) installed (it places what is on a page): click the bar beside a file (a preview's too), and **Align** in its menu puts it at the left, in the middle or at the right of its line (of its column, in a grid); kept in its embed, `![[photo.png|Photo||{ align: center }]]`. Without its own, the default in **Silverware Layout: Settings** (its **Alignment** tab: previews and originals apart) holds, left unless you change it. A card is always at the left. Without Silverware Layout files stand as SilverBullet draws them.
 
 **Its width** (the original's: a preview keeps the size the settings give it), with [Silverware Layout](https://github.com/damesene/silverware-libraries/blob/main/silverware-layout/silverware-layout.md) installed: point at an image (or a video, a PDF), and the bar beside it makes it wider or narrower, as a table's. It grows as it is aligned: at the left to the right (the bar at its right edge), centred both ways, at the right to the left (the bar at its left edge). Let go, and the width is saved as SilverBullet's own size: `![[photo.png|Photo|300]]`.
 
@@ -57,7 +57,7 @@ A click on a card or a preview opens the file in a new tab; Shift+click does the
 
 **Insert** writes the files and puts them where you pasted (a selection is replaced) or dropped them (dropped on an embedded file or a grid: on a line of their own beside it; in a grid's column being edited: at its cursor); **Cancel** writes nothing. While the files upload, a panel at the bottom right shows each with whether it is waiting, uploading, uploaded or failed, and how many are done; they go where the cursor was when you pressed **Insert**, even if you go on writing elsewhere meanwhile. A link is written as SilverBullet's `defaultLinkStyle` says. Several files go one under another, or a space apart in a table's row or a line of text. Undo takes the markdown out; the files stay in your space. A file larger than SilverBullet takes (`maximumDocumentSize`, 10 MiB by default) is left out, said in its row (an image of the web is linked instead). Text you paste stays text, and nothing is taken in a code block or the front matter.
 
-**How a file is inserted** is set on the settings' **Files** tab, in the column **Inserted as**: **As shown** (the default: as **Shown as** says, nothing written into the embed, so changing **Shown as** later changes it too), **Link**, **Card**, **Preview** or **Original**, for all files and for each kind. To let SilverBullet insert files as it does without Silverware Assets, turn off **Paste, drop and upload files through Silverware Assets** there; on by default.
+**How a file is inserted** is set on the settings' **Files** tab, in the column **Inserted as**: **Same as shown** (the default: as **Shown as** says, nothing written into the embed, so changing **Shown as** later changes it too), **Link**, **Card**, **Preview** or **Original**, for all files and for each kind. To let SilverBullet insert files as it does without Silverware Assets, turn off **Paste, drop and upload files through Silverware Assets** there; on by default.
 
 ## Where it is kept
 
@@ -88,7 +88,7 @@ Saved into your CONFIG, in a block of Silverware Assets' own.
 
 Files in a grid's columns (Silverware Layout's) are shown the same way, and their bar makes them wider or narrower within their column: it snaps to a quarter, a half, three quarters and the whole of the column's width.
 
-**SilverBullet's markdown as written** (*Editor: Toggle Markdown Syntax Rendering*): SilverBullet still draws embedded files in that mode; Silverware Assets hides them there, so you see their markdown alone. Turn it off in the settings' **Markdown** tab (or in the Configuration Manager, under Silverware Assets):
+**SilverBullet's markdown as written** (*Editor: Toggle Markdown Syntax Rendering*): SilverBullet still draws embedded files in that mode; Silverware Assets hides them there, so you see their markdown alone. Untick *Show embedded files as their markdown only* in the settings' **Markdown** tab to see both (or in the Configuration Manager, under Silverware Assets):
 
 ```lua
 config.set("silverware.assets.syntaxMode.hideAssets", false)

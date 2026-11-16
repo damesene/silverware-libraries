@@ -7,6 +7,7 @@
 import { applyLayers } from "../../shared/layers.ts";
 import { iconsOf } from "../../shared/icons.ts";
 import { editorsOf } from "../../shared/editor.ts";
+import { keptKeys } from "../../shared/silverbullet/keptkeys.ts";
 import { assetsOf } from "../../shared/assets.ts";
 import { imageEmbed } from "../../shared/silverbullet/embedimage.ts";
 import { layoutOf } from "../../shared/layout.ts";
@@ -198,6 +199,8 @@ export function init(bridge: Bridge): void {
       editorArea: () => editorArea(document),
       onEditorAreaChanged: (listener) => watchEditorArea(document, listener),
       editorLook: () => editorLook(document),
+      // SilverBullet's shortcuts a panel keeps from it, told in its notification (shared/silverbullet/keptkeys.ts)
+      keyKept: keptKeys(bridge.listCommands, (message) => bridge.flash(message, "info")),
       onChanged: (listener) => store.onChanged((change) => listener(change.database)),
       onDocumentOpened: (listener) => platform.editor.onOpened?.(listener) ?? (() => {}),
       refreshPlaces: (database) => {

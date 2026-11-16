@@ -43,6 +43,41 @@ describe("the asset's panels", () => {
     expect(document.querySelector(".swa-peek")).toBeNull();
   });
 
+  it("peek: its width set by its left edge, kept on this device for the next panel; a double click its default again", async () => {
+    peek.run(context());
+    await flush();
+    const panel = () => document.querySelector<HTMLElement>(".swa-peek")!;
+    const edge = () => panel().querySelector<HTMLElement>(".swa-peek-resize")!;
+    expect(edge().getAttribute("role")).toBe("separator");
+    expect(panel().style.width).toBe("");
+    // (jsdom measures nothing: a step from 0 is held at the narrowest)
+    edge().dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    expect(panel().style.width).toBe("320px");
+    expect(localStorage.getItem("silverware.assets.peekWidth")).toBe("320");
+    esc();
+    peek.run(context());
+    await flush();
+    expect(panel().style.width).toBe("320px");
+    edge().dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    expect(panel().style.width).toBe("");
+    expect(localStorage.getItem("silverware.assets.peekWidth")).toBeNull();
+  });
+
+  it("peek: over the area the host gives (its editor's), its × first; placed again as the area changes, no more once closed", async () => {
+    let area = new DOMRect(200, 50, 800, 600);
+    const listeners = new Set<() => void>();
+    peek.run({ ...context(), sheetArea: { rect: () => area, watch: (listener) => (listeners.add(listener), () => listeners.delete(listener)) } });
+    await flush();
+    const panel = document.querySelector<HTMLElement>(".swa-peek")!;
+    expect([panel.style.top, panel.style.right, panel.style.height, panel.style.maxWidth]).toEqual(["50px", `${window.innerWidth - 1000}px`, "600px", "800px"]);
+    expect(panel.querySelector(".swa-panel-head")!.firstElementChild!.classList.contains("swa-panel-close")).toBe(true);
+    area = new DOMRect(200, 90, 800, 560);
+    listeners.forEach((listener) => listener());
+    expect([panel.style.top, panel.style.height]).toEqual(["90px", "560px"]);
+    esc();
+    expect(listeners.size).toBe(0);
+  });
+
   it("popover: over the dimmed page, closed by a click beside it or ×", async () => {
     popover.run(context());
     await flush();

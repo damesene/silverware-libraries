@@ -27,17 +27,16 @@ function imports(file: string): string[] {
 }
 
 describe("isolation", () => {
-  // What of shared/ it may import; each of them importing nothing else at run time (so nothing more comes in through them)
-  const ALLOWED = ["shared/editor.ts", "shared/markdown/inline.ts"];
+  // What of shared/ it may import (the editor's keys matched by shared/keys.ts); each of them importing nothing else at
+  // run time but another of them (so nothing more comes in through them)
+  const ALLOWED = ["shared/editor.ts", "shared/keys.ts", "shared/markdown/inline.ts"];
   it("imports of shared/ the editor's contract and a line's marks alone, no other plugin's code", () => {
     for (const file of files(SRC)) {
       const outside = imports(file).filter((path) => path.startsWith("shared/") || path.startsWith("silverware-") || path.startsWith(".."));
       expect(outside.filter((path) => !ALLOWED.includes(path)), relative(SRC, file)).toEqual([]);
     }
     for (const allowed of ALLOWED) {
-      const text = readFileSync(join(SRC, "..", "..", allowed), "utf8");
-      const runTime = [...text.matchAll(/^(?:import|export)(?! type)[^"']*from ["']([^"']+)["']/gm)].map(([, spec]) => spec!);
-      expect(runTime, allowed).toEqual([]);
+      expect(imports(join(SRC, "..", "..", allowed)).filter((path) => !ALLOWED.includes(path)), allowed).toEqual([]);
     }
   });
 

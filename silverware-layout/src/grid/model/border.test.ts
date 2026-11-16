@@ -1,17 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { borderAttribute, bordered } from "./border.ts";
+import { borderAttribute, borderOf } from "./border.ts";
 
 describe("a grid's lines", () => {
-  it("are asked for by border, but by a value meaning none", () => {
-    expect(bordered({})).toBe(false);
-    expect(bordered({ border: "1" })).toBe(true);
-    expect(bordered({ border: "" })).toBe(true);
-    expect(bordered({ border: "true" })).toBe(true);
-    for (const off of ["0", "false", "None", " off "]) expect(bordered({ border: off })).toBe(false);
+  it("are asked for by its border attribute: inner the lines between its cells alone, any other value but none all", () => {
+    expect(borderOf({})).toBe("none");
+    expect(borderOf({ border: "1" })).toBe("all");
+    expect(borderOf({ border: "" })).toBe("all");
+    expect(borderOf({ border: "true" })).toBe("all");
+    expect(borderOf({ border: "inner" })).toBe("inner");
+    expect(borderOf({ border: " Inner " })).toBe("inner");
+    for (const off of ["0", "false", "None", " off "]) expect(borderOf({ border: off })).toBe("none");
   });
 
-  it("are written as HTML's table has them, taken off where none", () => {
-    expect(borderAttribute(true)).toBe("1");
-    expect(borderAttribute(false)).toBeNull();
+  it("are written as HTML's table has them, the lines between cells alone as inner, none taken off", () => {
+    expect(borderAttribute("all")).toBe("1");
+    expect(borderAttribute("inner")).toBe("inner");
+    expect(borderAttribute("none")).toBeNull();
   });
 });

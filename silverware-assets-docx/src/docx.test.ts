@@ -37,7 +37,7 @@ describe("where docx-preview cannot be loaded", () => {
   it("a reader, as wide as its line, says it cannot show the document", async () => {
     const reader = docxReader(document, "/b.docx", "b.docx", 480, new AbortController().signal);
     expect(reader.hasAttribute(ASSET_WIDE_ATTRIBUTE)).toBe(true);
-    expect(reader.style.height).toBe("480px");
+    expect(reader.style.height).toBe("calc(480px * var(--sw-content-scale, 1))");
     await vi.waitFor(() => expect(reader.dataset.swaDocxState).toBe("failed"));
     expect(reader.querySelector(".swa-docx-reader-failed")!.textContent).toMatch(/^This document cannot be shown here/);
   });

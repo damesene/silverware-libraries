@@ -15,6 +15,17 @@ const widget = (page: Page, key: string) => page.locator(`.pg-widget[data-key="$
 const kept = async (page: Page) => JSON.parse((await page.locator("#entries").textContent()) || "{}") as Record<string, Record<string, string>>;
 const width = async (page: Page, key: string) => Math.round((await widget(page, key).boundingBox())!.width);
 
+/**
+ * What a gesture does, waited for until the widget it writes is drawn anew: the playground's provider replaces the
+ * widget's element a moment after a write (as SilverBullet does), and the old element, measured as it goes, has no box
+ */
+async function written(page: Page, key: string, gesture: () => Promise<void>): Promise<void> {
+  const before = (await widget(page, key).elementHandle())!;
+  await gesture();
+  await before.waitForElementState("hidden");
+  await before.dispose();
+}
+
 /** A finger moved from one point to another and lifted, as Chrome gets it (Playwright's touchscreen only taps) */
 async function swipe(page: Page, x: number, y: number, toX: number, steps = 10): Promise<void> {
   const cdp = await page.context().newCDPSession(page);
@@ -37,7 +48,7 @@ async function tapWidget(page: Page, key: string) {
 test("@playground a tap on a widget shows its bar, a finger dragging it widens the widget, written once; a tap elsewhere hides it", async ({ page }) => {
   expect(await width(page, "table-1")).toBe(TEXT);
   const at = await tapWidget(page, "table-1");
-  await swipe(page, at.x, at.y, at.x + 100);
+  await written(page, "table-1", () => swipe(page, at.x, at.y, at.x + 100));
   await expect.poll(() => kept(page)).toEqual({ "table-1": { width: String(TEXT + 200) } });
   await expect.poll(() => width(page, "table-1")).toBe(TEXT + 200);
   // Still shown for the widget (a finger has no hover to leave)
@@ -50,17 +61,19 @@ test("@playground a tap on a widget shows its bar, a finger dragging it widens t
 test("@playground a finger takes the bar beside it, wider than the bar looks", async ({ page }) => {
   const at = await tapWidget(page, "table-1");
   // 8 px right of the bar's edge: the room around it is its own on a touch screen
-  await swipe(page, at.right + 8, at.y, at.right + 108);
+  await written(page, "table-1", () => swipe(page, at.right + 8, at.y, at.right + 108));
   await expect.poll(() => width(page, "table-1")).toBe(TEXT + 200);
 });
 
 test("@playground a double tap on the bar takes the width off: the text's again", async ({ page }) => {
   let at = await tapWidget(page, "table-1");
-  await swipe(page, at.x, at.y, at.x + 100);
+  await written(page, "table-1", () => swipe(page, at.x, at.y, at.x + 100));
   await expect.poll(() => width(page, "table-1")).toBe(TEXT + 200);
   at = await tapWidget(page, "table-1");
-  await page.touchscreen.tap(at.x, at.y);
-  await page.touchscreen.tap(at.x, at.y);
+  await written(page, "table-1", async () => {
+    await page.touchscreen.tap(at.x, at.y);
+    await page.touchscreen.tap(at.x, at.y);
+  });
   await expect.poll(() => kept(page)).toEqual({});
   await expect.poll(() => width(page, "table-1")).toBe(TEXT);
 });

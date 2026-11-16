@@ -4,6 +4,7 @@
 // here: the same editor drawn as a `<textarea>`. A plugin writes against `TextEditor` alone and works the same either
 // way; no plugin needs Silverware Editor. What draws the editor (CodeMirror) is never seen through it. An editor that
 // Silverware Toolbar may act on is an `EditingSurface`, found by `surfaceOf` (the stand-in's none).
+import { keyMatches } from "./keys.ts";
 
 /** The version of the editor's API this file is written for: another is taken as none (updated apart) */
 export const EDITOR_VERSION = 1;
@@ -195,20 +196,6 @@ export function editorsOf(given: unknown, host: EditorHost = {}): Editors {
   return host.historyAtWindow ? STAND_IN_HISTORY_AT_WINDOW : STAND_IN;
 }
 
-/** Whether a key event is a key of CodeMirror's name (`Mod-Shift-z`), on its key alone, modifiers exactly */
-export function keyMatches(name: string, event: KeyboardEvent): boolean {
-  const parts = name.split(/-(?!$)/);
-  const key = parts.pop()!;
-  const has = new Set(parts.map((part) => part.toLowerCase()));
-  const mac = /Mac|iP(hone|ad)/.test(globalThis.navigator?.platform ?? "");
-  const ctrl = has.has("ctrl") || (has.has("mod") && !mac);
-  const meta = has.has("meta") || has.has("cmd") || (has.has("mod") && mac);
-  if (event.ctrlKey !== ctrl || event.metaKey !== meta || event.altKey !== has.has("alt")) return false;
-  // (Shift named: held; not named: not held, but where the key is itself a shifted one, as `?` or `+`: a letter or a
-  // named key is not, `Mod-z` is not Ctrl+Shift+Z)
-  if (has.has("shift") ? !event.shiftKey : event.shiftKey && (key.length > 1 || /^\p{L}$/u.test(key))) return false;
-  return event.key.toLowerCase() === key.toLowerCase() || (key === "Space" && event.key === " ");
-}
 
 /**
  * Undo and redo an editor's own, as the window gets them, for a page that takes Ctrl+Z (Ctrl+Y, Ctrl+Shift+Z) at the

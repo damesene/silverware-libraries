@@ -29,7 +29,7 @@ export function cardEditor(doc: Document, card: readonly CardField[], icon: stri
   const sample = sampleFile("pdf");
   const off = el(doc, "div", { attrs: { "data-swa-place": "off", role: "list", "aria-label": "Not shown" } });
   const stage = el(doc, "div", "swa-sample-card-holder");
-  const element = editorFrame(doc, "swa-card-edit", stage, off, "Point at or tap a part of the card for its name and ×, which hides it; click one not shown to show it. Its icon, or the arrow after its name where it is hidden, opens the file's menu.");
+  const element = editorFrame(doc, "swa-card-edit", stage, off, "Click a hidden part to show it, × to hide one. The icon (or the arrow, if the icon is hidden) opens the file's menu.");
   const tell = () => {
     changed(cardFields(on));
     element.dispatchEvent(new Event("change", { bubbles: true }));
@@ -108,7 +108,7 @@ export function linkEditor(doc: Document, shown: boolean, icon: string, changed:
   const sample = sampleFile("pdf");
   const off = el(doc, "div", { attrs: { "data-swa-place": "off", role: "list", "aria-label": "Not shown" } });
   const stage = el(doc, "p", "swa-sample-sentence");
-  const element = editorFrame(doc, "swa-link-edit", stage, off, "The icon, or the arrow after the link where it is hidden, opens the file's menu. Point at or tap it for its name; × hides the icon.");
+  const element = editorFrame(doc, "swa-link-edit", stage, off, "The icon (or the arrow, if the icon is hidden) opens the file's menu. × hides the icon.");
   const set = (to: boolean) => {
     on = to;
     selected = false;

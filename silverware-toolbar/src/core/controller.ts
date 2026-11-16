@@ -16,7 +16,8 @@
 // the next selection is made). Where the focus is in an editing surface
 // (Silverware Editor's editor in a grid's cell or a database's peek,
 // shared/editor.ts), the toolbar reads and writes it in place of the page.
-import { type EditingSurface, type Editors, editorsOf, keyMatches } from "../../../shared/editor.ts";
+import { type EditingSurface, type Editors, editorsOf } from "../../../shared/editor.ts";
+import { keyMatches } from "../../../shared/keys.ts";
 import { type Icons, iconsOf } from "../../../shared/icons.ts";
 import { overWindowOf, overWindowShown, watchOverWindow } from "../../../shared/overwindow.ts";
 import { type Bridge, readShortcut, type Settings } from "../bridge.ts";

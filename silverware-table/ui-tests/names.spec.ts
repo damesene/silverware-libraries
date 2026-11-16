@@ -82,18 +82,18 @@ test("Shift pressed over a table with a long name: the names beside the icons, t
 });
 
 test("long names in the ⋯ menu are cut, whole in their tooltips, the table's in the title", async ({ page }) => {
-  await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='asdasdasdasdasdasdasdasdasda' sheet.name='Sheet1withaverylongnameindeed' sheet.at='A1'> |\n");
+  await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='QuarterlyRevenueByRegionAndProductLine' sheet.name='Sheet1withaverylongnameindeed' sheet.at='A1'> |\n");
   await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
   await hoverCell(page, cell(page, 1, 0));
   await page.locator(".swt-bar.swt-visible .swt-bar-more").click();
   const title = page.locator(".swt-menu .swt-menu-title-text");
-  await expect(title).toHaveText("asdasdasdasdasdasdasdasdasda");
-  await expect(title).toHaveAttribute("title", "asdasdasdasdasdasdasdasdasda");
+  await expect(title).toHaveText("QuarterlyRevenueByRegionAndProductLine");
+  await expect(title).toHaveAttribute("title", "QuarterlyRevenueByRegionAndProductLine");
   const sheet = page.locator(".swt-menu .swt-menu-row-container .swt-label");
   await expect(sheet).toHaveCount(1);
   expect(await sheet.evaluate((b) => b.scrollWidth > b.clientWidth)).toBe(true);
   expect(await sheet.getAttribute("title")).toContain("Sheet1withaverylongnameindeed");
-  // The title cut too: the menu as wide as its items
+  // The title cut too: the menu as wide as its items (a name longer than any of them)
   expect(await title.evaluate((s) => s.scrollWidth > s.clientWidth)).toBe(true);
 });
 

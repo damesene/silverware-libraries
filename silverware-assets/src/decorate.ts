@@ -18,8 +18,10 @@ import { writeClipboard, writeClipboardLater } from "../../shared/clipboard.ts";
 import { addMoreButton, type MoreMenu, popupOf, type ShowAs } from "./ui/moremenu.ts";
 import { VIEW_CARD, VIEW_LINK, VIEW_ORIGINAL, VIEW_PREVIEW } from "../../shared/glyphs.ts";
 import type { EditorEmbed, EmbedEdit } from "../../shared/editor.ts";
+import { CONTENT_SCALE, scaledPx } from "../../shared/contentscale.ts";
 import { hasPlainMedium, plainMedium } from "./ui/plainmedium.ts";
 import type { InsertType } from "./ui/insertdialog.ts";
+import type { SheetArea } from "../../shared/sheetarea.ts";
 
 // The popup menu's classes: Silverware Assets'
 const POPUP = { base: "swa" } as const;
@@ -105,10 +107,15 @@ export type AssetHost = {
   /** The space's files a preview is kept in (core/stored.ts; none: previews made each time) */
   previewFiles?: PreviewFiles;
   open(url: string): void;
+  /** Where a panel beside the page goes (none: the window) */
+  readonly sheetArea?: SheetArea;
   problem(message: string): void;
 };
 
 const NATIVE_HIDDEN = "swa-native-hidden";
+// The host's medium of a file (its image, video, PDF's viewer), marked: what the style page zooms with the content's
+// scale, never a picture a type draws inside its own (a document's)
+const MEDIUM = "swa-medium";
 // What shows a document of its own, taking the clicks on it (a PDF's viewer)
 const DOCUMENT_VIEWERS = "object, iframe, embed";
 const LINK_ICON = "swa-link-icon";
@@ -356,7 +363,7 @@ export class AssetDecorator {
         copy: action.name.startsWith("copy"),
         label: action.label ?? action.name,
         run: () => {
-          const context: ActionContext = { asset, open: (url) => this.host.open(url), render: (as, container) => render(container, as) };
+          const context: ActionContext = { asset, open: (url) => this.host.open(url), render: (as, container) => render(container, as), sheetArea: this.host.sheetArea };
           void Promise.resolve(action.run(context)).catch((error: unknown) => this.host.problem(`Silverware Assets: ${action.name}: ${message(error)}`));
         },
       }));
@@ -614,6 +621,7 @@ export class AssetDecorator {
     this.renders.set(drawn.frame, control);
     readOnly?.addEventListener("abort", () => control.abort(), { once: true, signal: control.signal });
     const { frame, native } = drawn;
+    native?.classList.add(MEDIUM);
     frame.querySelectorAll(":scope > .swa-own, :scope > .swa-failed").forEach((own) => own.remove());
     frame.classList.remove("swa-has-error");
     frame.removeAttribute("data-swa-label-above");
@@ -628,10 +636,11 @@ export class AssetDecorator {
     // Its height: its embed's own, else the setting's for its view (a preview's; the original's for a viewer of the
     // host's that has no height of its own, a PDF's: the style page's rules read it)
     const preview = previewSize(settings, type.name);
-    frame.style.setProperty("--swa-height", `${Number(found.embed.height) || (view === "embed" ? settings.heights.embed : preview.height)}px`);
+    // (In px times the content's scale: as large as the text makes it, where the files zoom with it: shared/contentscale.ts)
+    frame.style.setProperty("--swa-height", scaledPx(Number(found.embed.height) || (view === "embed" ? settings.heights.embed : preview.height)));
     // A preview's width (none: as wide as it fits)
     const sized = view === "preview" && preview.width !== undefined;
-    if (sized) frame.style.setProperty("--swa-preview-width", `${preview.width}px`);
+    if (sized) frame.style.setProperty("--swa-preview-width", scaledPx(preview.width!));
     else frame.style.removeProperty("--swa-preview-width");
     frame.toggleAttribute("data-swa-preview-width", sized);
     // (Written to the embed as the page has it now: its place among those of its text may have changed since)
@@ -673,7 +682,7 @@ export class AssetDecorator {
     const runAction = (gesture: Gesture) => {
       const action = actionFor(gesture, type.name, settings, (name) => this.registry.actions.get(name), asset, capabilities);
       if (!action) return;
-      const actionContext: ActionContext = { asset, open: (url) => this.host.open(url), render: renderInto };
+      const actionContext: ActionContext = { asset, open: (url) => this.host.open(url), render: renderInto, sheetArea: this.host.sheetArea };
       void Promise.resolve(action.run(actionContext)).catch((error: unknown) => this.host.problem(`Silverware Assets: ${action.name}: ${message(error)}`));
     };
     // Its menu: how it is shown (the one the settings give left unwritten), what can be done with it. Opened by the "…"
@@ -895,14 +904,23 @@ function shownCopy(native: HTMLElement | undefined): HTMLElement | undefined {
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-/** The room an asset is drawn in: the frame's width; its height the stored one, else the view's default */
+/**
+ * The room an asset is drawn in: the frame's width; its height the stored one, else the view's default. As at the
+ * content's scale of 1 (shared/contentscale.ts): a type draws its sizes as CSS following the scale (`scaledPx`), so
+ * they change at once with it, as the host's media do, nothing drawn again
+ */
 function viewportOf(element: HTMLElement, embed: Embed, view: View, settings: AssetSettings, signal: AbortSignal, width?: number, ownHeight?: number): Viewport {
   // (A preview's: its type's own where it has one, as the frame's --swa-height says, else all files')
   const height = () => Number(embed.height) || ownHeight || (view === "icon" ? 0 : settings.heights[view]);
   return {
     // (A preview of a width the settings give: that width its room, the frame taking its width from what is drawn)
+    // (Measured on the screen: given back at the scale of 1, as the type multiplies it again; the scale the element's
+    // own, as what is over the window has 1)
     get width() {
-      return width ?? (element.clientWidth || element.getBoundingClientRect().width);
+      if (width !== undefined) return width;
+      const shown = element.clientWidth || element.getBoundingClientRect().width;
+      const scale = parseFloat(element.ownerDocument.defaultView?.getComputedStyle(element).getPropertyValue(CONTENT_SCALE) ?? "");
+      return Number.isFinite(scale) && scale > 0 ? shown / scale : shown;
     },
     get height() {
       return height();

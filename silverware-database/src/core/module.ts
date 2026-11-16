@@ -105,6 +105,8 @@ export type ModuleHost = DocumentsHost & MentionsHost & {
   onEditorAreaChanged?(listener: () => void): () => void;
   /** How the page's text looks (CSS properties: its font, size, line height, color), for what a module shows beside it; none: the style page's */
   editorLook?(): Readonly<Record<string, string>> | undefined;
+  /** A key a panel of a module's kept from the page (it stops every key), told where it is a shortcut of the host's that does nothing there (none: nothing told) */
+  keyKept?(event: KeyboardEvent): void;
   /** An embed of an item's content (`markdown`, its target resolved against the item's document) drawn in its field as the page draws it; none: its markdown shown */
   drawEmbed?(markdown: string, item: Item): EditorEmbed | undefined;
   /** One of the module's settings (declared in its `settings`), its default where not set */

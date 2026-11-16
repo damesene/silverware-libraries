@@ -7,6 +7,7 @@ import type { StoredPreview } from "../../shared/assets.ts";
 import { fileVersion, readTurns } from "../../shared/reads.ts";
 import { el } from "../../shared/elements.ts";
 import { drawPage, openPdf, screenRatio } from "./pdfjs/load.ts";
+import { contentScaleOf, scaledPx } from "../../shared/contentscale.ts";
 
 // At most so many PDFs read at once: a page of many previews does not read them all together
 const AT_ONCE = 2;
@@ -134,7 +135,9 @@ function keep(key: string, image: Promise<Blob>): void {
 async function firstPage(doc: Document, address: string, box: PageBox, signal: AbortSignal): Promise<Blob> {
   const url = new URL(address, doc.baseURI).href;
   const version = `${await fileVersion(url, doc.baseURI)} ${url}`;
-  const ratio = screenRatio(doc);
+  // (Drawn sharper than the screen asks: the image is shown at its own size within the box, which grows with the
+  // content's scale (shared/contentscale.ts) without the page drawn again; as large as the scale now, twice the box at least)
+  const ratio = Math.max(2, screenRatio(doc)) * Math.max(1, contentScaleOf(doc));
   const key = keyOf(version, box, ratio);
   const known = kept.get(key);
   if (known) {
@@ -164,8 +167,9 @@ async function firstPage(doc: Document, address: string, box: PageBox, signal: A
 /** A PDF's preview: a box at once, its first page in it as an image once drawn; the browser's viewer where it cannot be */
 export function pdfPreview(doc: Document, url: string, name: string, box: PageBox, signal: AbortSignal, stored?: StoredPreview): HTMLElement {
   const preview = el(doc, "div", { class: "swa-pdf-preview", attrs: { "data-swa-pdf-state": "drawing" } });
-  preview.style.setProperty("--swa-pdf-box-width", `${Math.round(box.width)}px`);
-  preview.style.setProperty("--swa-pdf-box-height", `${Math.round(box.height)}px`);
+  // (Its sizes as the content's scale makes them, at once as it changes: shared/contentscale.ts)
+  preview.style.setProperty("--swa-pdf-box-width", scaledPx(Math.round(box.width)));
+  preview.style.setProperty("--swa-pdf-box-height", scaledPx(Math.round(box.height)));
   (stored ? storedPage(doc, url, stored, signal) : firstPage(doc, url, box, signal)).then(
     (image) => {
       if (signal.aborted) return;

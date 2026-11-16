@@ -15,7 +15,7 @@ The layout of your pages: columns side by side, how wide a page's text is, how w
 
 ## Page width
 
-Run **Silverware Layout: Page layout** from the command palette. Its **Page width** tab has two rows:
+Run **Silverware Layout: Settings** from the command palette. Its **Page width** tab has two rows:
 
 - **All pages**: the width of every page without its own.
 - **This page**: the width of this page alone.
@@ -52,7 +52,7 @@ Without Silverware Layout, each is as wide as the text, its width still kept.
 
 Click the bar beside a table, a database, a chart, a grid or an embedded file (a preview's too: its bar has no width to drag), and its menu puts it at the **left**, in the **middle** or at the **right** of the page's text (of its column, in a grid), or makes it as wide as the text again. Where there is no width to drag (a preview, or anything on a phone), the bar is fainter and opens the menu alone; on a phone it shows beside a widget narrower than the screen (an image), not beside one as wide as it. A widget at the left grows to the right as you drag its bar, one at the right to the left (its bar beside its left edge), a centred one both ways. It is kept with its width, as `layout.align` (a file's in its embed, `{ align: right }`; a grid's on its line, `<grid align="right">`).
 
-A widget without its own stands as the **Alignment** tab of **Silverware Layout: Page layout** says for its kind (a table, a chart, a database, a grid, a file's preview, a file's original): tables, charts, databases and grids centred, files at the left, unless you change them there. The one marked *(default)* in a widget's menu is that one; choosing it keeps nothing of the widget's own, so the widget follows the tab as it changes.
+A widget without its own stands as the **Alignment** tab of **Silverware Layout: Settings** says for its kind (a table, a chart, a database, a grid, a file's preview, a file's original): tables, charts, databases and grids centred, files at the left, unless you change them there. The one marked *(default)* in a widget's menu is that one; choosing it keeps nothing of the widget's own, so the widget follows the tab as it changes.
 
 ## Columns
 
@@ -84,15 +84,15 @@ The second column.
 
   Then click in a grid where it goes (the grids on the page are outlined, a bar at the top says what to do). A line follows the pointer: between two cells it puts new cells there (its label says how many); with Together, inside a cell (away from its edges) it shows where the cell's blocks meet, and the text is added to that cell there. The text is taken out of where it was, all in one step: Ctrl+Z puts it back. Esc, **Cancel** or a click away from the grids gives up. On a phone, a tap shows where it would go and a second tap on the same place moves it. With Silverware Toolbar, **Move into grid** can be a button, its *Mode* set or asked.
 - **Change a column by its grip**: point at a column, and a short grip shows at the middle of its top edge (on a phone, once you tap into the grid). Click it to move the column left or right, add a column after it, move it out of the grid (its content goes under the grid), **Clear column…** (everything in it goes, the column stays) or **Delete column…** (its content with it); both ask first, and Ctrl+Z brings it back.
-- **Change the whole grid by its handle**: the bar beside the grid (the one you drag its width by) opens, on a click, the grid's menu: where it stands, its **Columns** (Auto, or 2 to 8; with Auto its **Min width**: XS, S, M, L, or your own in px), its **Borders** on or off, a column added at the end, or **Unwrap grid**: the grid goes, its content stays, the columns one under another in their order (row by row), as it was before you wrapped it in a grid. On a phone, where no bar shows beside a grid as wide as the screen, each column's grip menu has **Grid…**, which opens the same menu.
-- **Edit a column where it is**: click into it, and its markdown shows in a field of its own, the cursor where you clicked (or the text you selected in it by a drag, selected there too), the rest of the grid as it was. Click elsewhere, or press Esc (or Ctrl+Enter), and it is saved. A click on a link or a tag in it still follows it.
+- **Change the whole grid by its handle**: the bar beside the grid (the one you drag its width by) opens, on a click, the grid's menu: where it stands, its **Columns** (Auto, or 2 to 8; with Auto its **Min width**: XS, S, M, L, or your own in px), its **Borders** (two buttons: lines between its cells alone, or lines round the grid and between all its cells; the one chosen pressed again takes them off), a column added at the end, or **Unwrap grid**: the grid goes, its content stays, the columns one under another in their order (row by row), as it was before you wrapped it in a grid. On a phone, where no bar shows beside a grid as wide as the screen, each column's grip menu has **Grid…**, which opens the same menu.
+- **Edit a column where it is**: click into it, and its markdown shows in a field of its own, the cursor where you clicked (or the text you selected in it by a drag, selected there too), the rest of the grid as it was. Click elsewhere, or press Esc (or Ctrl+Enter), and it is saved. A click on a link or a tag in it still follows it. SilverBullet's shortcuts (Ctrl+K, Ctrl+/, …) do nothing while you edit a column; one pressed there says so.
 - **See the raw text**: Alt+click a column, or choose **Edit markdown** in its grip's menu, and the page shows its markdown, the cursor where you clicked (or at the column's start). Otherwise the grid keeps the cursor out of its markdown, as a table does: a click anywhere in it is the grid's, and the arrow keys move the cursor over it, from the line before it to the line after it and back.
 - **Drag text into a column, or out of it**: select text in the page and drag it onto a column (it is outlined as you hold it there), and it moves there, written where you let it go; drag text selected in a column onto another column, or within it, and it moves too, its formatting with it (a bold word stays bold). A move into a column is one change: one undo takes it back. Text dragged out of a column into the page moves as well (two undos take it back: the page's and the column's). Text dragged from another app is copied in.
 - **A grid's width and place**: point at a grid, and a bar shows beside it, as beside a table: drag it to widen or narrow the grid, double-click it for the page's width, click it to put the grid at the left, in the middle or at the right (see *Where a widget stands*).
 - **Columns' widths by dragging**: point at a grid, and a line shows between its columns. Drag it to make one column wider and its neighbour narrower; it snaps to 1 : 1, 2 : 1, 1 : 2, 3 : 1, 1 : 3, 3 : 2 and 2 : 3, and in a grid wider than the page's text to the text's edges (a column lined up with the text above and below it), showing a guide for each and saying where it snapped as you drag, and is saved as the grid's `columns` (`<grid columns="2fr 1fr">`). Double-click the line to make the two even again.
 - **More columns, or other widths**: give the grid a `columns` attribute: `<grid columns="3">` for three of the same width, or their widths, `<grid columns="1fr 2fr">` (the second twice as wide), `30% 70%`, `200px 1fr`. More columns than you give make more rows: nine columns in `<grid columns="3">` are three rows of three, a gallery of images. Without it, each `<cell>` is a column of its own, eight at most in a row.
 - **Auto: as many columns as fit** (a gallery of images): `<grid columns="auto">` shows as many columns of the same width in a row as fit, none narrower than its min width (fewer columns than fit share the whole width), so a wider page shows more of them and a phone fewer. The min width is `min`: `xs` (100 px), `s` (160 px), `m` (240 px, the default), `l` (360 px), or px (`<grid columns="auto" min="180">`). Its columns are not resized by dragging. Put into grid's Gallery offers Auto too.
-- **Borders**: faint lines round the grid and between its columns and rows, as a table's, the columns' text a little in from them. Turn them on in the grid's menu; they are kept on its line, `<grid border="1">`. The lines you drag between its columns lie on them.
+- **Borders**: two kinds, chosen in the grid's menu. *Lines between the cells alone*: a faint line in the middle of each space between two columns and between two rows, nothing round the grid, the text where it was; kept on its line as `<grid border="inner">`. *Lines round the grid and between its cells*: as a table's, the columns' text a little in from them; kept as `<grid border="1">`. The lines you drag between its columns lie on them.
 - **The grid's width and place** are kept on its line too, `<grid width="1100" align="right">`.
 - **On a phone** (an editor narrower than the setting *Narrowest editor laid out*), the columns are shown one under another (an Auto grid keeps as many to a row as fit).
 
@@ -106,7 +106,7 @@ What you should know:
 - A task in a column is toggled by its box there, as in the page.
 - A grid starts on a line of its own, not straight after a paragraph's line: leave a blank line before it (/grid does).
 
-**SilverBullet's markdown as written** (*Editor: Toggle Markdown Syntax Rendering*): SilverBullet still draws grids in that mode; Silverware Layout hides them there, so you see their markdown alone. Turn it off in the **Markdown** tab of **Silverware Layout: Page layout** (or `silverware.layout.syntaxMode.hideGrids` in your CONFIG).
+**SilverBullet's markdown as written** (*Editor: Toggle Markdown Syntax Rendering*): SilverBullet still draws grids in that mode; Silverware Layout hides them there, so you see their markdown alone. Untick *Show grids as their markdown only* in the **Markdown** tab of **Silverware Layout: Settings** to see both (or `silverware.layout.syntaxMode.hideGrids` in your CONFIG).
 
 **A link shown as its markdown** (the cursor in it, so you see its `[[`, `]]` or `](…)`, or every link while SilverBullet shows the markdown as written): a click places the cursor there, so you can edit it, and Ctrl+click opens it. A link drawn as a link opens on a click as ever. Turn it off in the same **Markdown** tab (or `silverware.layout.links.clickPlacesCursor` in your CONFIG).
 
@@ -120,11 +120,15 @@ The dialog's **Font** tab sets the editor's font size: **All pages** for every p
 
 **Font zoom**: hold Ctrl and scroll over the page, and its font grows or shrinks a pixel a step, as the browser zooms. A label at the bottom left says the size for a moment, and says *default* where it is back at your default. **Ctrl+0** puts the default back. The size you zoom to is this device's alone, kept as the browser keeps its zoom, and never written into your space. On the Font tab, **This device** sets it too, by its slider or typed (on a phone, which has no Ctrl + scroll, that is how you zoom), and **↺** takes it off. Untick *Ctrl + scroll zooms here*, and Ctrl + scroll zooms the browser again. With the dialog open, Ctrl + scroll and Ctrl+0 set its **This device** row, as its slider does: **Save** keeps it, **Cancel** puts it back.
 
+**Pinch to zoom** (a touch screen): spreading or closing two fingers over the page makes its font larger or smaller, as Ctrl + scroll does. A tap with two fingers still opens the page picker, as SilverBullet does without it (as you lift your fingers, not as they touch); moving two fingers together still scrolls. Untick *A pinch with two fingers zooms here* on the Font tab to leave two fingers to SilverBullet.
+
+**Files zoom with the text**: the files your pages show (images, previews, PDFs; with Silverware Assets) grow and shrink with this device's zoom, by the share of **This device** in the size of **All pages** (18 px for all pages, 27 px on this device: the files at 150 %). Their sizes in your pages stay as written: an image of `|300` shows 450 px wide at 150 %, and one you widen by its handle meanwhile is written as it would be at 100 %. The **…** of a file and the handle keep their size. Untick *Files zoom with the font* on the Font tab to keep them at their own size.
+
 ## Guides
 
 The widths a widget snaps to, and the page's sliders are marked with. Change them in the dialog's **Guides** tab: set a width in its row by its slider (held, it shows the guides on the page as it moves) or type it, in **px** or in **%** of the editor's width (the px / % switch beside it), × takes one away, **+ Add guide** adds one, **Full width** is the editor's whole width. They show from the narrowest. A widget snapped to a guide in % keeps that share of the editor (`layout.width: 80%`): in a wider or narrower window it is still at the guide. Saved into your CONFIG, in a block of Silverware Layout's own.
 
-Hold **Preview** (press it, or hold Space or Enter on it) to see the guides on the page as you typed them, the dialog out of the way meanwhile. **Default guides** puts the default ones back (900 px, 1200 px and Full width) once you confirm; **Save** keeps them, as everything in the dialog.
+Hold **Preview** (press it, or hold Space or Enter on it) to see the guides on the page as you typed them, the dialog out of the way meanwhile. **Restore defaults** puts the default ones back (900 px, 1200 px and Full width) once you confirm; **Save** keeps them, as everything in the dialog.
 
 ## Settings
 
@@ -143,6 +147,8 @@ config.set("silverware.layout.fontZoom.enabled", true)
 - `guides`: the guides (see above), each a width in px (`"1200px"`), in % of the editor's width (`"80%"`), or `full` for the editor's whole width.
 - `fontSize`: the editor's font size on every page, in px (empty: your theme's).
 - `fontZoom.enabled`: whether Ctrl + scroll and Ctrl+0 zoom the font (see above).
+- `fontZoom.pinch`: whether a pinch with two fingers zooms the font (see above); on by default.
+- `fontZoom.scaleFiles`: whether the files a page shows zoom with the font (see above); on by default.
 
 ## Good to know
 

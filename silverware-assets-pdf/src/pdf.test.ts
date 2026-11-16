@@ -15,7 +15,8 @@ describe("a PDF's preview", () => {
   it("is a box of its room at once, the browser's viewer in it where pdf.js cannot be loaded", async () => {
     const preview = pdfPreview(document, "/doc.pdf", "doc.pdf", { width: 300, height: 160 }, new AbortController().signal);
     expect(preview.dataset.swaPdfState).toBe("drawing");
-    expect(preview.style.getPropertyValue("--swa-pdf-box-height")).toBe("160px");
+    // (As the content's scale makes it: shared/contentscale.ts)
+    expect(preview.style.getPropertyValue("--swa-pdf-box-height")).toBe("calc(160px * var(--sw-content-scale, 1))");
     await vi.waitFor(() => expect(preview.dataset.swaPdfState).toBe("viewer"));
     expect(preview.querySelector("object")!.getAttribute("data")).toBe("/doc.pdf");
   });

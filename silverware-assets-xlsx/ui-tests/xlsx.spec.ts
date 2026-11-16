@@ -57,6 +57,23 @@ test("a workbook's preview is its first sheet's first cells, drawn small in a pr
   await expect.poll(() => page.evaluate(() => (window as unknown as { opened: string[] }).opened.join(" "))).toContain("budget.xlsx");
 });
 
+test("a workbook's preview grows with the content's scale (files zoomed with the font: 150 %) at once, nothing drawn again", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/budget.xlsx|||{ view: preview }]]\n\nAfter\n` }, "Page", { "budget.xlsx": await BUDGET() });
+  const preview = page.locator("#sb-main [data-swa-asset='xlsx'][data-swa-view='preview'] .swa-xlsx-preview");
+  const sheet = preview.locator("table.swa-xlsx-sheet");
+  await expect(sheet).toBeVisible();
+  expect(Math.round((await preview.boundingBox())!.height)).toBe(160);
+  const cellWidth = (await sheet.locator("td").first().boundingBox())!.width;
+  // (A frame later, nothing drawn again: its sizes CSS following the scale, as an image's)
+  const nextFrame = () => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  await page.evaluate(() => document.documentElement.style.setProperty("--sw-content-scale", "1.5"));
+  await nextFrame();
+  expect(Math.round((await preview.boundingBox())!.height)).toBe(240);
+  // (Its cells drawn larger too, as its zoom follows the scale)
+  expect(Math.abs((await sheet.locator("td").first().boundingBox())!.width - cellWidth * 1.5)).toBeLessThan(2);
+  await page.evaluate(() => document.documentElement.style.removeProperty("--sw-content-scale"));
+});
+
 test("a workbook's preview kept in the space as HTML once drawn, shown from there", async ({ page, space }) => {
   await space.open({ Page: `# Page
 
@@ -120,6 +137,10 @@ test("a workbook in the side panel is the reader filling it", async ({ page, spa
   await expect(reader.locator("table.swa-xlsx-sheet")).toContainText("Monthly budget");
   const body = (await panel.locator(".swa-panel-body").boundingBox())!;
   expect((await reader.boundingBox())!.height).toBeGreaterThan(body.height - 30);
+  // A shortcut of SilverBullet's pressed in the reader (its zoom's button focused): it does nothing there, said so
+  await reader.locator(".swa-xlsx-reader-fit").click();
+  await page.keyboard.press("Control+k");
+  await expect(page.locator(".sb-notifications")).toContainText("Navigate: Page Picker doesn't work here");
   await page.keyboard.press("Escape");
   await expect(panel).toHaveCount(0);
 });

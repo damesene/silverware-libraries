@@ -73,7 +73,7 @@ export const test = base.extend<{ space: Space }>({
         await page.goto(`http://127.0.0.1:${server().port}/${folder}/${open}`);
         await page.waitForFunction(() => !!(window as unknown as { client?: { editorView?: unknown } }).client?.editorView);
         await commandDefined(page, ASSETS_SETTINGS);
-        await commandDefined(page, PAGE_LAYOUT);
+        await commandDefined(page, LAYOUT_SETTINGS);
       },
       kept: async (name, root = "_silverware-asset-preview") => !!(await stat(join(server().space, root, folder, name)).catch(() => undefined)) || !!(await keptPath(join(server().space, root, folder), name)),
       writeKept: async (name, content) => {
@@ -100,7 +100,7 @@ export const ASSETS_SETTINGS = "Silverware Assets: Settings";
 // The previews' folder a test moves them to (taken away after it, as the default's)
 export const MOVED_PREVIEWS = "UiMovedPreviews";
 // (Silverware Layout's, for the cases where the two meet: a file in a grid, its width by Layout's handle)
-export const PAGE_LAYOUT = "Silverware Layout: Page layout";
+export const LAYOUT_SETTINGS = "Silverware Layout: Settings";
 
 type Client = { clientSystem: { commandHook: { buildAllCommands(): Map<string, unknown> } }; runCommandByName(name: string): Promise<void> };
 

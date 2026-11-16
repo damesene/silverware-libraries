@@ -6,6 +6,7 @@
 // outweighs. (The frame's border is the style page's, by the class the init page gives the frame: SilverBullet sets it
 // unimportant. An inline border set here did not hold in 2.12.1, 2026-11-13: the frame's style is SilverBullet's.)
 import { editorsOf } from "../../../../shared/editor.ts";
+import { keptKeys } from "../../../../shared/silverbullet/keptkeys.ts";
 import { resolvedTarget } from "../../../../shared/markdown/embed.ts";
 import type { EditorEmbed } from "../../../../shared/editor.ts";
 import type { EmbedDrawer } from "../../../../shared/rendered.ts";
@@ -62,9 +63,12 @@ type IntoGridWrite = {
 
 /** SilverBullet's grid host; `drawer`: what draws embeds in a cell's field as another plugin registered it (Silverware Assets), none: images alone */
 export function silverBulletGridHost(bridge: Bridge, writer: PageWriter, drawer: () => EmbedDrawer | undefined = () => undefined) {
+  // SilverBullet's shortcuts a cell's field keeps from it, told in its notification (shared/silverbullet/keptkeys.ts)
+  const keyKept = keptKeys(bridge.listCommands, (message) => void bridge.flash(message, "info"));
   return {
     // A cell edited in Silverware Editor's editor where the init page hands its API over, else a `<textarea>`
     editors: editorsOf(bridge.editor, SILVERBULLET_EDITORS),
+    ...(keyKept ? { keyKept } : {}),
     renderMarkdown: async (text: string): Promise<string> => {
       if (!bridge.renderMarkdown) throw new Error("the init page hands over no renderMarkdown");
       // (An embed SilverBullet's HTML draws none of, a PDF, a zip, kept as a place: the page's widget draws it)

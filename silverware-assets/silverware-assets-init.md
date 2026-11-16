@@ -35,8 +35,8 @@ config.define("silverware.assets", {
         hideAssets = {
           type = "boolean",
           default = true,
-          description = "While SilverBullet shows the markdown as written (Editor: Toggle Markdown Syntax Rendering), embedded files are hidden: their markdown alone.",
-          ui = { category = "Silverware Assets", label = "Markdown as written: hide embedded files", priority = 0.6 },
+          description = "When SilverBullet shows the page's markdown as written (Editor: Toggle Markdown Syntax Rendering), an embedded file shows as its markdown only, not drawn under it as SilverBullet draws it there.",
+          ui = { category = "Silverware Assets", label = "Markdown as written: embedded files as markdown only", priority = 0.6 },
         },
       },
     },

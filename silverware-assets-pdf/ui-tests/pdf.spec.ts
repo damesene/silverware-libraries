@@ -1,6 +1,37 @@
 // Silverware Assets PDF in SilverBullet, with Silverware Assets: a PDF's preview its first page as an image, its original and
 // Assets' side panel the browser's own viewer, the browser's viewer for a preview pdf.js cannot read.
-import { BLUE, expect, middleColour, nearColour, pdfOf, RED, test } from "./helpers.ts";
+import { BLUE, expect, middleColour, nearColour, pdfOf, RED, runCommand, test } from "./helpers.ts";
+
+test("a PDF's preview grows with the content's scale (files zoomed with the font: 150 %) at once, nothing drawn again", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/doc.pdf|||{ view: preview }]]\n\nAfter\n` }, "Page", { "doc.pdf": pdfOf([RED, BLUE]) });
+  const image = page.locator("#sb-main [data-swa-asset='pdf'][data-swa-view='preview'] .swa-pdf-preview[data-swa-pdf-state='page'] > img");
+  await expect(image).toBeVisible();
+  expect(Math.round((await image.boundingBox())!.height)).toBe(160);
+  // (A frame later, nothing drawn again: its sizes CSS following the scale, as an image's)
+  const nextFrame = () => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  await page.evaluate(() => document.documentElement.style.setProperty("--sw-content-scale", "1.5"));
+  await nextFrame();
+  expect(Math.round((await image.boundingBox())!.height)).toBe(240);
+  await page.evaluate(() => document.documentElement.style.removeProperty("--sw-content-scale"));
+});
+
+test("a PDF's preview drawn by pdf.js, none kept in the space, grows with the content's scale too: drawn twice the box at least", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/doc.pdf|||{ view: preview }]]\n\nAfter\n` }, "Page", { "doc.pdf": pdfOf([RED, BLUE]) });
+  await runCommand(page, "Silverware Assets: Settings");
+  const dialog = page.locator(".swa-dialog");
+  await dialog.getByLabel("Save previews in the space").uncheck();
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  await page.reload();
+  const image = page.locator("#sb-main [data-swa-asset='pdf'][data-swa-view='preview'] .swa-pdf-preview[data-swa-pdf-state='page'] > img");
+  await expect(image).toBeVisible();
+  // (Kept once as the page first opened: not read now, the setting off)
+  expect(Math.round((await image.boundingBox())!.height)).toBe(160);
+  expect(await image.evaluate((img: HTMLImageElement) => img.naturalHeight)).toBeGreaterThanOrEqual(320);
+  await page.evaluate(() => document.documentElement.style.setProperty("--sw-content-scale", "1.5"));
+  await expect.poll(async () => Math.round((await image.boundingBox())!.height)).toBe(240);
+  await page.evaluate(() => document.documentElement.style.removeProperty("--sw-content-scale"));
+});
 
 test("a PDF's preview is its first page as an image, as high as a preview, its frame as wide; its click the preview's", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/doc.pdf|||{ view: preview }]]\n\nAfter\n` }, "Page", { "doc.pdf": pdfOf([RED, BLUE]) });

@@ -2,6 +2,7 @@
 // each cell's markdown as the host rendered it.
 import { el } from "../../../../shared/elements.ts";
 import { blankLinesBefore, blankLinesDrawn } from "../core/blanklines.ts";
+import type { BorderStyle } from "../model/border.ts";
 
 const COLUMNS = "--swl-grid-columns";
 // A blank line of a cell's markdown its rendering left out, put back
@@ -39,12 +40,14 @@ export function showFit(grid: HTMLElement, on: boolean): void {
 /** Whether a grid is shown as one of columns as many as fit */
 export const shownFit = (grid: HTMLElement): boolean => grid.hasAttribute(FIT);
 
-// A grid drawn with its lines (its `border` attribute)
+// A grid drawn with all its lines, and with the lines between its cells alone (its `border` attribute)
 const BORDER = "data-swl-border";
+const BORDER_INNER = "data-swl-border-inner";
 
-/** A grid's lines shown or not (unchanged: nothing touched) */
-export function showBorder(grid: HTMLElement, on: boolean): void {
-  if (grid.hasAttribute(BORDER) !== on) grid.toggleAttribute(BORDER, on);
+/** A grid's lines shown as their style says (unchanged: nothing touched) */
+export function showBorder(grid: HTMLElement, style: BorderStyle): void {
+  if (grid.hasAttribute(BORDER) !== (style === "all")) grid.toggleAttribute(BORDER, style === "all");
+  if (grid.hasAttribute(BORDER_INNER) !== (style === "inner")) grid.toggleAttribute(BORDER_INNER, style === "inner");
 }
 
 /** A cell's markdown that could not be rendered, shown as its text */

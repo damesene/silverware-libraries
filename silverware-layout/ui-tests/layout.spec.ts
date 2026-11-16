@@ -1,4 +1,4 @@
-import { expect, PAGE_LAYOUT, runCommand, test, waitForIndexedLayout, widths, widthSet } from "./helpers.ts";
+import { expect, LAYOUT_SETTINGS, runCommand, test, waitForIndexedLayout, widths, widthSet } from "./helpers.ts";
 
 // Frames a page may show at the page before's width: none on an idle machine, one on a busy one (the width is set from
 // SilverBullet's editor:pageLoaded, dispatched after the page is shown; docs/silverware-layout.md, probe 2)
@@ -43,7 +43,7 @@ const row = (page: import("@playwright/test").Page, name: "page" | "all") => pag
 
 test("the dialog: a width typed in % shown at once and saved into the frontmatter (typing makes it the page's own); ↺ takes _layout off", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");
   await expect(dialog).toBeVisible();
   const own = row(page, "page");
@@ -59,7 +59,7 @@ test("the dialog: a width typed in % shown at once and saved into the frontmatte
   await expect.poll(() => space.saved("Page")).toBe('---\n_layout:\n  width: "90%"\n---\n# Page\n\nSome text.\n');
   expect(await widthSet(page)).toBe("90%");
 
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   await expect(own.locator(".swl-dialog-amount")).toHaveValue("90");
   await expect(own.getByRole("radio", { name: "Percent of the editor's width" })).toHaveAttribute("aria-checked", "true");
   await own.getByRole("button", { name: "Use all pages' width" }).click();
@@ -70,7 +70,7 @@ test("the dialog: a width typed in % shown at once and saved into the frontmatte
 
 test("the dialog's slider, moved near a guide, takes the guide's width and makes it the page's own", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   const own = row(page, "page");
   await expect(own.locator(".swl-dialog-tick")).toHaveText(["900", "1200", "Full"]);
   await own.locator(".swl-dialog-slider").evaluate((slider: HTMLInputElement) => {
@@ -84,7 +84,7 @@ test("the dialog's slider, moved near a guide, takes the guide's width and makes
 
 test("a slider held stays where it was pressed (the dialog all but gone round it): a press near its edge still on it, and it drags", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   await page.locator(".swl-dialog").getByRole("tab", { name: "Font" }).click();
   const slider = page.locator(".swl-dialog").getByRole("slider", { name: "Font size", exact: true });
   const box = (await slider.boundingBox())!;
@@ -104,7 +104,7 @@ test("a slider held stays where it was pressed (the dialog all but gone round it
 test("Cancel puts the page back as it was, writing nothing", async ({ page, space }) => {
   await space.open({ Page: wide("Some text.") }, "Page");
   await expect.poll(() => widthSet(page)).toBe("1100px");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");
   await row(page, "page").locator(".swl-dialog-amount").fill("700");
   await expect.poll(() => widthSet(page)).toBe("700px");
@@ -116,7 +116,7 @@ test("Cancel puts the page back as it was, writing nothing", async ({ page, spac
 
 test("the default text width saved into CONFIG, applying to a page without its own", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");
   await row(page, "all").locator(".swl-dialog-amount").fill("1000");
   await expect.poll(() => widthSet(page)).toBe("1000px");
@@ -130,7 +130,7 @@ test("the default text width saved into CONFIG, applying to a page without its o
 
 test("the guides typed straight in their rows, saved into Silverware Layout's own block of CONFIG, ascending as the tab shows again", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");
   await dialog.getByRole("tab", { name: "Guides" }).click();
   const amounts = dialog.locator(".swl-dialog-guide-amount");
@@ -152,7 +152,7 @@ test("the guides typed straight in their rows, saved into Silverware Layout's ow
   await expect(dialog).toBeHidden();
   await expect.poll(async () => (await space.config()) ?? "").toContain('config.set("silverware.layout.guides", { "900px", "600px", "1500px" })');
   expect(await space.config()).toContain("-- managed-by: silverware-layout");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   await dialog.getByRole("tab", { name: "Guides" }).click();
   expect(await amounts.evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value))).toEqual(["600", "900", "1500"]);
   await expect(dialog.getByRole("checkbox", { name: "Full width" })).not.toBeChecked();
@@ -161,7 +161,7 @@ test("the guides typed straight in their rows, saved into Silverware Layout's ow
 test("Preview held on the Guides tab: the guides as typed on the page (one added, unsaved), the dialog all but gone; let go, the dialog back and no guide", async ({ page, space }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");
   await dialog.getByRole("tab", { name: "Guides" }).click();
   await dialog.getByRole("button", { name: "+ Add guide" }).click();
@@ -189,7 +189,7 @@ test("Preview held on the Guides tab: the guides as typed on the page (one added
 test("a guide's slider dragged: its number follows, the guides shown on the page as it moves, the dialog all but gone; let go, both back", async ({ page, space }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");
   await dialog.getByRole("tab", { name: "Guides" }).click();
   const row = dialog.locator(".swl-dialog-guide-row").first();
@@ -209,20 +209,20 @@ test("a guide's slider dragged: its number follows, the guides shown on the page
   await expect(page.locator(".swl-handle-guide")).toHaveCount(0);
 });
 
-test("Default guides on the Guides tab: asked in SilverBullet's dialog; Cancel keeps the guides, Ok puts the default ones back", async ({ page, space }) => {
+test("Restore defaults on the Guides tab: asked in SilverBullet's dialog; Cancel keeps the guides, Ok puts the default ones back", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");
   await dialog.getByRole("tab", { name: "Guides" }).click();
   const amounts = dialog.locator(".swl-dialog-guide-amount");
-  const reset = dialog.getByRole("button", { name: "Default guides" });
+  const reset = dialog.getByRole("button", { name: "Restore defaults" });
   // The default ones already: nothing to put back
   await expect(reset).toBeDisabled();
   await amounts.first().fill("600");
   await expect(reset).toBeEnabled();
   const prompt = page.locator("dialog.sb-modal-box .sb-prompt");
   await reset.click();
-  await expect(prompt).toContainText("Put the default guides back (900 px, 1200 px, Full width)?");
+  await expect(prompt).toContainText("Replace your guides with the defaults (900 px, 1200 px, Full width)?");
   await prompt.locator(".sb-prompt-buttons button", { hasText: "Cancel" }).click();
   await expect(prompt).toHaveCount(0);
   expect(await amounts.evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value))).toEqual(["600", "1200"]);
@@ -230,7 +230,7 @@ test("Default guides on the Guides tab: asked in SilverBullet's dialog; Cancel k
   await prompt.locator(".sb-prompt-buttons button", { hasText: "Ok" }).click();
   await expect.poll(() => amounts.evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value))).toEqual(["900", "1200"]);
   await expect(reset).toBeDisabled();
-  // The Page layout dialog still open, nothing saved yet
+  // The settings dialog still open, nothing saved yet
   await expect(dialog).toBeVisible();
 });
 
@@ -240,13 +240,13 @@ test("a pane narrower than the setting's least gets no width, and gets it back w
   await page.setViewportSize({ width: 500, height: 800 });
   await expect.poll(() => widthSet(page)).toBe("");
   // The Page width tab says why: the widths show on a wider screen
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");
   await expect(dialog.getByRole("note")).toHaveText("Widths apply on screens wider than 600 px. On this one, the text fills the screen.");
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await page.setViewportSize({ width: 1400, height: 800 });
   await expect.poll(() => widthSet(page)).toBe("1100px");
-  await runCommand(page, PAGE_LAYOUT);
+  await runCommand(page, LAYOUT_SETTINGS);
   await expect(dialog.getByRole("note")).toHaveCount(0);
 });
 

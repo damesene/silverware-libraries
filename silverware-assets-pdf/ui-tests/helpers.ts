@@ -142,3 +142,9 @@ async function keptPath(dir: string, name: string): Promise<string | undefined> 
   const found = files.find((file) => file.startsWith(`${base}.`) && file.endsWith(`.${extension}`) && /^\d+-\d+$/.test(file.slice(base.length + 1, -extension.length - 1)));
   return found && join(dir, found);
 }
+
+/** A command run as the palette would, once Space Lua has defined it */
+export async function runCommand(page: Page, name: string): Promise<void> {
+  await commandDefined(page, name);
+  await page.evaluate((command) => void (window as unknown as { client: { runCommandByName(name: string): Promise<void> } }).client.runCommandByName(command), name);
+}

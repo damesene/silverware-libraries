@@ -15,7 +15,7 @@ Word documents (`.docx`) your pages embed, drawn in SilverBullet, where without 
 
 - **A preview** (`![[report.docx|||{ view: preview }]]`, or previews chosen in Silverware Assets' settings) is the document's first page, drawn smaller, as high as your previews are. A click on it does what Silverware Assets' settings say (open it in a new tab, in a side panel, enlarged).
 - **The original** (`{ view: embed }`) is a reader of the whole document in a box of the page, its pages one under another, scrolled inside it. Its bar shows the page you are on and how many there are, and zooms out, back to the width (the percentage), and in.
-- **The side panel and the enlarged view** (a file's menu: *Show in a side panel*, *Show enlarged*) are the same reader, as large as the panel.
+- **The side panel and the enlarged view** (a file's menu: *Show in a side panel*, *Show enlarged*) are the same reader, as large as the panel. SilverBullet's shortcuts (Ctrl+K, Ctrl+/, …) do nothing while the reader has the focus (its zoom's buttons pressed); one pressed there says so.
 
 The documents are drawn by [docx-preview](https://github.com/VolodymyrBaydalka/docxjs), which comes with this library (installed beside it), so it works offline. It is loaded the first time a document is shown, not before. A preview is drawn once and kept in your space (Silverware Assets' `_silverware-asset-preview` folder): shown from there after, the document not read again until it changes.
 

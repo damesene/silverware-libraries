@@ -12,6 +12,11 @@ if js and js.window then
   local silverwareAssetsDocxJs = js.importFromSpace("Library/damesene/silverware-assets-docx.js")
   silverwareAssetsDocxJs.init({
     assets = silverware and silverware.assets and silverware.assets.api,
+    -- A notification, and SilverBullet's commands and their shortcuts: one pressed in a reader, where it does nothing, told
+    flash = function(message, type)
+      editor.flashNotification(message, type)
+    end,
+    listCommands = system.listCommands,
   })
 end
 ```

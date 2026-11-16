@@ -33,9 +33,15 @@ function host(text: string, fail?: string) {
       state.text = state.text.slice(0, cell.innerFrom) + `\n${write.content}\n\n` + state.text.slice(cell.innerTo);
       return undefined;
     },
+    // Written into the page's text as a host writes them: the grids read them back from there as they settle
+    // (`refresh`, a moment after a grid is drawn), and kept none where they were not
     writeAttributes: async (write) => {
       state.attributeWrites.push(write);
-      return state.refuse;
+      if (state.refuse) return state.refuse;
+      const grid = readGrids(state.text).filter((one) => one.body === write.body)[write.occurrence]!;
+      const attributes = Object.entries({ ...grid.attributes, ...write.attributes }).flatMap(([name, value]) => (value === null ? [] : [` ${name}="${value}"`]));
+      state.text = `${state.text.slice(0, grid.from)}<grid${attributes.join("")}>${state.text.slice(state.text.indexOf("\n", grid.from))}`;
+      return undefined;
     },
     moveCursor: (at) => void (state.cursor = at),
     problem: (message) => void state.problems.push(message),
@@ -314,12 +320,24 @@ describe("a grid's menus: a column's by its grip, the grid's in its handle's", (
     await settled();
     expect(state.attributeWrites.map((write) => write.attributes)).toEqual([{ columns: "3", min: null }]);
     expect(grid.style.getPropertyValue("--swl-grid-columns")).toBe("repeat(3, minmax(0, 1fr))");
-    // Its borders: written as HTML's table has them, shown at once, taken off again
-    await run("Borders");
+    // Its borders, a row of two: all (as HTML's table has them), the cells' alone, shown at once; chosen again, off
+    const borders = () => {
+      const row = gridItems().find((one) => one.label === "Borders")!;
+      if (!("kind" in row)) throw new Error("no row of borders");
+      return row.options;
+    };
+    expect(borders().map((option) => option.title)).toEqual(["Lines between the cells alone", "Lines round the grid and between its cells"]);
+    borders()[1]!.run();
+    await settled();
     expect(grid.hasAttribute("data-swl-border")).toBe(true);
-    await run("Borders");
-    expect(grid.hasAttribute("data-swl-border")).toBe(false);
-    expect(state.attributeWrites.slice(1).map((write) => write.attributes)).toEqual([{ border: "1" }, { border: null }]);
+    expect(borders().map((option) => !!option.active)).toEqual([false, true]);
+    borders()[0]!.run();
+    await settled();
+    expect([grid.hasAttribute("data-swl-border"), grid.hasAttribute("data-swl-border-inner")]).toEqual([false, true]);
+    borders()[0]!.run();
+    await settled();
+    expect(grid.hasAttribute("data-swl-border-inner")).toBe(false);
+    expect(state.attributeWrites.slice(1).map((write) => write.attributes)).toEqual([{ border: "1" }, { border: "inner" }, { border: null }]);
     // As many as fit: shown at once (no divider), its min width a row of names and px asked
     columns.options[0]!.run();
     await settled();
@@ -367,7 +385,8 @@ describe("a grid's menus: a column's by its grip, the grid's in its handle's", (
     expect(items().map((item) => item.textContent?.trim())).toEqual(["Edit markdown (Alt+click)", "Move left", "Move right", "Add a column after it", "Move out of the grid", "Grid…", "Clear column…", "Delete column…"]);
     items().find((item) => item.textContent?.trim() === "Grid…")!.click();
     expect(document.querySelector(".swl-popup .swl-menu-title")?.textContent ?? document.querySelector(".swl-popup")!.textContent).toContain("Grid");
-    expect(items().map((item) => item.textContent?.trim())).toEqual(["Borders", "Add a column at the end", "Unwrap grid"]);
+    expect(items().map((item) => item.textContent?.trim())).toEqual(["Add a column at the end", "Unwrap grid"]);
+    expect([...document.querySelectorAll(".swl-popup .swl-menu-segmented .swl-label")].map((label) => label.textContent)).toEqual(["Columns", "Borders"]);
     expect(document.querySelector(".swl-popup .swl-menu-segmented")?.textContent).toContain("Columns");
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     // Its handle shown: no Grid… (its menu the handle's)
@@ -377,10 +396,13 @@ describe("a grid's menus: a column's by its grip, the grid's in its handle's", (
     grid.querySelector<HTMLElement>(".swl-grid-column-grip")!.click();
   });
 
-  it("draws a grid's borders as its border attribute says", async () => {
+  it("draws a grid's borders as its border attribute says: all, or the lines between its cells alone", async () => {
     const { gridHost } = host(`<grid border="1">\n${body}\n</grid>\n`);
     const grid = await new Grids(document, gridHost).render(body);
     expect(grid.hasAttribute("data-swl-border")).toBe(true);
+    const columns = host(`<grid border="inner">\n${body}\n</grid>\n`);
+    const lined = await new Grids(document, columns.gridHost).render(body);
+    expect([lined.hasAttribute("data-swl-border"), lined.hasAttribute("data-swl-border-inner")]).toEqual([false, true]);
   });
 });
 

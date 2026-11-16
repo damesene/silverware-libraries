@@ -17,7 +17,7 @@ import { labelEditor } from "./labeleditor.ts";
 
 const VIEW_LABELS: Readonly<Record<View, string>> = { icon: "Card", preview: "Preview", embed: "Original" };
 // How a file is inserted, as its pick lists say it (docs/silverware-assets-insert.md)
-const INSERT_LABELS: Readonly<Record<InsertAs, string>> = { shown: "As shown", link: "Link", ...VIEW_LABELS };
+const INSERT_LABELS: Readonly<Record<InsertAs, string>> = { shown: "Same as shown", link: "Link", ...VIEW_LABELS };
 const NONE = "";
 // The heights a preview may be given (px)
 const MIN_HEIGHT = 40;
@@ -92,14 +92,14 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
   const allView = select(doc, "All files: shown as", views, settings.views.default);
   const inserts = INSERT_AS.map((as) => [as, INSERT_LABELS[as]] as const);
   const allInsert = select(doc, "All files: inserted as", inserts, settings.insert.as.default);
-  const allClick = select(doc, "All files: a click", actions, settings.actions.default.click ?? NONE);
-  const allShift = select(doc, "All files: a Shift+click", actions, settings.actions.default["shift+click"] ?? NONE);
+  const allClick = select(doc, "All files: click", actions, settings.actions.default.click ?? NONE);
+  const allShift = select(doc, "All files: Shift+click", actions, settings.actions.default["shift+click"] ?? NONE);
   const fileRows = input.types.map((type) => {
     const own = (gesture: Gesture) => settings.actions.types[type.name]?.[gesture];
     const view = select(doc, `${type.name}: shown as`, [[DEFAULT, LIKE_ALL], ...views], settings.views.types[type.name] ?? DEFAULT);
     const insert = select(doc, `${type.name}: inserted as`, [[DEFAULT, LIKE_ALL], ...inserts], settings.insert.as.types[type.name] ?? DEFAULT);
-    const click = select(doc, `${type.name}: a click`, [[DEFAULT, LIKE_ALL], ...actions], own("click") ?? DEFAULT);
-    const shift = select(doc, `${type.name}: a Shift+click`, [[DEFAULT, LIKE_ALL], ...actions], own("shift+click") ?? DEFAULT);
+    const click = select(doc, `${type.name}: click`, [[DEFAULT, LIKE_ALL], ...actions], own("click") ?? DEFAULT);
+    const shift = select(doc, `${type.name}: Shift+click`, [[DEFAULT, LIKE_ALL], ...actions], own("shift+click") ?? DEFAULT);
     return { name: type.name, view, insert, click, shift, row: el(doc, "div", "swa-settings-row", typeName(doc, type), view, insert, click, shift) };
   });
   // Files pasted, dropped and uploaded through the dialog (docs/silverware-assets-insert.md), off: SilverBullet's own
@@ -108,43 +108,43 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
   const insertSection = section(
     doc,
     "Inserting files",
-    el(doc, "label", "swa-settings-check", insertOn, "Paste, drop and upload files through Silverware Assets"),
+    el(doc, "label", "swa-settings-check", insertOn, "Use the insert dialog for pasted, dropped and uploaded files"),
     el(
       doc,
       "p",
       "swa-settings-note",
-      "A file pasted, dropped on the page or uploaded (File: Upload, the toolbar's paperclip) opens a dialog: its name, and how it is put in the page, shown as it will be. “Inserted as” above is what the dialog starts with; “As shown” follows “Shown as”. Off: SilverBullet asks the name and puts the file in as it does.",
+      "A dialog to name each file and choose how it's inserted, with a preview; it starts from “Inserted as”. Off: SilverBullet's own prompt.",
     ),
   );
   // Previews kept in the space (docs/silverware-assets-stored-previews.md)
   const storePreviews = el(doc, "input", { attrs: { type: "checkbox" } });
   storePreviews.checked = settings.storePreviews;
   // The folder they are kept in, moved there with what it holds as it is saved (src/index.ts)
-  const previewFolder = el(doc, "input", { class: "swa-settings-folder", attrs: { type: "text", spellcheck: "false", "aria-label": "Previews' folder", placeholder: DEFAULT_ASSET_SETTINGS.previewFolder } });
+  const previewFolder = el(doc, "input", { class: "swa-settings-folder", attrs: { type: "text", spellcheck: "false", "aria-label": "Preview folder", placeholder: DEFAULT_ASSET_SETTINGS.previewFolder } });
   previewFolder.value = settings.previewFolder;
   const storeSection = section(
     doc,
     "Previews",
-    el(doc, "label", "swa-settings-check", storePreviews, "Keep previews in the space, made once"),
+    el(doc, "label", "swa-settings-check", storePreviews, "Save previews in the space"),
     el(
       doc,
       "p",
       "swa-settings-note",
-      "A preview slow to make (a PDF's first page, a document's, a workbook's) is made the first time it is shown, kept in the folder below and shown from there after, on every device; Regenerate preview in its menu makes it again. Off: each is made every time it is shown, and its menu has no Regenerate preview. Those kept already stay until Silverware Assets: Clean up previews.",
+      "Slow previews (PDF, DOCX, XLSX) are made once and saved, so every device loads them fast. Regenerate preview in a file's menu remakes one. Off: made each time. Saved ones stay until Silverware Assets: Clean up previews.",
     ),
     el(doc, "div", "swa-settings-fields", el(doc, "label", "swa-settings-field", el(doc, "span", { text: "Folder" }), previewFolder)),
     el(
       doc,
       "p",
       "swa-settings-note",
-      "From your space's top. A name starting with _ is hidden from SilverBullet's pickers, its space tree and link completion; another is shown there as any folder. Changed and saved, the previews kept are moved into the new folder.",
+      "From the space root. A name starting with _ stays hidden in SilverBullet's pickers and tree. Changing it moves the saved previews.",
     ),
   );
   const filesGrid = el(
     doc,
     "div",
     "swa-settings-grid swa-settings-grid-files",
-    el(doc, "div", "swa-settings-row swa-settings-head", el(doc, "span"), el(doc, "span", { text: "Shown as" }), el(doc, "span", { text: "Inserted as" }), el(doc, "span", { text: "A click" }), el(doc, "span", { text: "A Shift+click" })),
+    el(doc, "div", "swa-settings-row swa-settings-head", el(doc, "span"), el(doc, "span", { text: "Shown as" }), el(doc, "span", { text: "Inserted as" }), el(doc, "span", { text: "Click" }), el(doc, "span", { text: "Shift+click" })),
     el(doc, "div", "swa-settings-row swa-settings-all-row", el(doc, "span", "swa-settings-type-name", "All files"), allView, allInsert, allClick, allShift),
     el(doc, "div", "swa-settings-divider"),
     ...fileRows.map((one) => one.row),
@@ -201,7 +201,7 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
         section(
           doc,
           "Size",
-          el(doc, "p", "swa-settings-note", all ? "Width × height in px; an image fits in it, its proportions kept. Width empty: as wide as there is room." : "Width × height in px. Empty: like all files."),
+          el(doc, "p", "swa-settings-note", all ? "Width × height in px; the file fits inside, keeping its proportions. Empty width: as wide as the line." : "Width × height in px. Empty: like all files."),
           el(doc, "div", "swa-type-size", el(doc, "span", "swa-settings-unit", size.width, "×", size.height, "px")),
         ),
       ];
@@ -228,19 +228,19 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
       doc,
       "div",
       { class: "swa-settings-look", attrs: { "data-swa-look": "preview" } },
-      el(doc, "p", "swa-settings-note", "A file shown small (“Preview” on the Files tab), the label of your choice with it: for all files, and a type's own where it differs (marked Own)."),
+      el(doc, "p", "swa-settings-note", "A small picture of the file with an optional label; for all files, or per type (marked Own)."),
       list,
     ),
-    card: el(doc, "div", { class: "swa-settings-look", attrs: { "data-swa-look": "card" } }, el(doc, "p", "swa-settings-note", "A file shown as its icon and name (“Card” on the Files tab), for all files."), cardSection),
+    card: el(doc, "div", { class: "swa-settings-look", attrs: { "data-swa-look": "card" } }, el(doc, "p", "swa-settings-note", "The file's icon and name."), cardSection),
     original: el(
       doc,
       "div",
       { class: "swa-settings-look", attrs: { "data-swa-look": "original" } },
-      el(doc, "p", "swa-settings-note", "A file shown as SilverBullet draws it (“Original” on the Files tab): a label of your choice with it, none unless you turn one on, for all files and a type's own where it differs (marked Own); a PDF's height."),
+      el(doc, "p", "swa-settings-note", "The file as SilverBullet shows it, with an optional label; for all files, or per type."),
       originalList,
-      section(doc, "A PDF's height", el(doc, "p", "swa-settings-note", "An original PDF's viewer, where its embed gives no size."), el(doc, "span", "swa-settings-unit", embedHeight, "px")),
+      section(doc, "A PDF's height", el(doc, "p", "swa-settings-note", "Used when the embed sets no size."), el(doc, "span", "swa-settings-unit", embedHeight, "px")),
     ),
-    link: el(doc, "div", { class: "swa-settings-look", attrs: { "data-swa-look": "link" } }, el(doc, "p", "swa-settings-note", "A link to a file in your text, [[report.pdf]], for all files."), linkSection),
+    link: el(doc, "div", { class: "swa-settings-look", attrs: { "data-swa-look": "link" } }, el(doc, "p", "swa-settings-note", "A link to a file in your text, like [[report.pdf]]."), linkSection),
   };
   type Look = keyof typeof looks;
   const showLook = (look: Look) => {
@@ -308,10 +308,10 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
     tab(
       "assets",
       "Files",
-      panelOf(doc, "files", "How an embedded file is shown where its embed does not say, and what a click on it does. A type set to “Like all files” follows the first row.", filesGrid, insertSection, storeSection),
+      panelOf(doc, "files", "Default look and click action for embedded files; a file's own setting overrides it. “Like all files” follows the first row.", filesGrid, insertSection, storeSection),
       true,
     ),
-    tab("appearance", "Appearance", panelOf(doc, "appearance", "How a file looks where it is shown: as a link to it, as a card, as a preview, or as the original.", el(doc, "div", "swa-settings-looks", lookSwitch.element), ...Object.values(looks))),
+    tab("appearance", "Appearance", panelOf(doc, "appearance", "How each way of showing a file looks.", el(doc, "div", "swa-settings-looks", lookSwitch.element), ...Object.values(looks))),
   ];
 }
 
@@ -357,7 +357,7 @@ function labelRows(
   const list = el(doc, "div", { class: "swa-types", attrs: { role: "list", "aria-label": name } });
   /** A row's element, by its type's name (as given: no selector made of it) */
   const rowElement = (type: string) => [...list.children].find((one) => one.getAttribute("data-swa-type") === type);
-  const ownMark = () => el(doc, "span", { class: "swa-type-mark", text: "Own", title: "Set apart from all files" });
+  const ownMark = () => el(doc, "span", { class: "swa-type-mark", text: "Own", title: "Differs from All files" });
   /** A row's head: its icon, its name, Own where it differs from all files (what, said as it is opened), a chevron */
   const headOf = (row: (typeof rows)[number]) => {
     const head = el(
@@ -389,7 +389,7 @@ function labelRows(
             el(doc, "button", {
               class: "swa-settings-button",
               text: "↺ Reset to all files",
-              title: extra ? "Its label and its size as all files' again" : "Its label as all files' again",
+              title: extra ? "Use All files' label and size again" : "Use All files' label again",
               run: () => {
                 delete labels.types[row.name];
                 extra?.reset(row.name);

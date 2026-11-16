@@ -8,7 +8,7 @@ import type { PageHost } from "./host/page.ts";
 import { DEFAULT_GUIDES, type Settings } from "./model/settings.ts";
 import { type Width } from "./model/width.ts";
 
-const SETTINGS: Settings = { textWidth: undefined, minPaneWidth: 600, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true, alignments: {} };
+const SETTINGS: Settings = { textWidth: undefined, minPaneWidth: 600, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true, fontPinch: false, fontScaleFiles: false, alignments: {} };
 
 /** A page of plain elements: its pane 1200 px wide (jsdom lays nothing out), its text width kept as shown */
 function plainPage(paneWidth = 1200) {
@@ -50,7 +50,7 @@ function memoryStore(pages: Record<string, Width | undefined>, settings: Partial
     saveTextWidth: async (width) => void store.saved.push(`textWidth ${width?.amount}`),
     saveGuides: async (guides) => void store.saved.push(`guides ${guides.join(" ")}`),
     saveAlignments: async (alignments) => void store.saved.push(`alignments ${JSON.stringify(alignments)}`),
-    saveFont: async (size, zoom) => void store.saved.push(`font ${size} ${zoom}`),
+    saveFont: async (font) => void store.saved.push(`font ${font.fontSize} ${font.fontZoom}`),
     readZoom: () => store.zoom,
     keepZoom: (size) => void (store.zoom = size),
     confirm: async () => store.answer,
@@ -259,7 +259,7 @@ describe("Silverware Layout's app over a page of no host's", () => {
     expect(document.querySelectorAll(".swl-handle-guide")).toHaveLength(0);
   });
 
-  it("Default guides: asked; declined, the guides as they were; confirmed, the default ones in the rows, saved on Save; off while they are the default", async () => {
+  it("Restore defaults: asked; declined, the guides as they were; confirmed, the default ones in the rows, saved on Save; off while they are the default", async () => {
     const { page } = plainPage();
     const { api, store } = memoryStore({ Page: undefined }, { guides: [600, "75%"] });
     const app = new LayoutApp(document, page, new Registry(() => undefined));

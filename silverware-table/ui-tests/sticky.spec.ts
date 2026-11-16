@@ -69,7 +69,8 @@ test.describe("The held header", () => {
     const rows = Array.from({ length: 40 }, (_, i) => `| Row ${i + 1} | ${i * 3} |`).join("\n");
     const filler = Array.from({ length: 30 }, (_, i) => `Line ${i + 1}.`).join("\n\n");
     await setPage(page, `# Test\n\nText above.\n\n| Name | Qty |\n|---|---|\n${rows}\n\n${filler}\n`);
-    await expect(table(page).locator("tr[data-swt-row]").first()).toBeVisible();
+    // (Its rows counted: the page before it, shown until the new text is rendered, has tables of its own)
+    await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(40);
     const look = () =>
       table(page).evaluate((w) => ({ width: getComputedStyle(w).scrollbarWidth, color: getComputedStyle(w).scrollbarColor, inner: w.clientWidth, held: w.classList.contains("swt-held-by-page") }));
     const before = await look();
@@ -103,6 +104,7 @@ test.describe("The held header", () => {
     const rows = Array.from({ length: 40 }, (_, i) => `| Row ${i + 1} | ${i * 3} |`).join("\n");
     const filler = Array.from({ length: 40 }, (_, i) => `Line ${i + 1}.`).join("\n\n");
     await setPage(page, `# Test\n\nText above.\n\n| Name | Qty |\n|---|---|\n${rows}\n\n${filler}\n`);
+    await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(40);
     // A cell selected: the table has the focus, its dots show
     await table(page).locator("tr[data-swt-row]").first().locator("td").first().click();
     const dots = page.locator(".swt-insert-dots.swt-visible > span:not([hidden])");

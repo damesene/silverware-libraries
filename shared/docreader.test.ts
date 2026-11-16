@@ -18,7 +18,8 @@ describe("a document's reader", () => {
   it("is as wide as its line, its height in the page or filling a panel, its zoom said and told", () => {
     const inPage = readerShell(document, { base: "swz" }, { name: "a.docx", height: 480 });
     expect(inPage.root.hasAttribute(ASSET_WIDE_ATTRIBUTE)).toBe(true);
-    expect(inPage.root.style.height).toBe("480px");
+    // (As the content's scale makes it: shared/contentscale.ts)
+    expect(inPage.root.style.height).toBe("calc(480px * var(--sw-content-scale, 1))");
     expect(readerShell(document, { base: "swz" }, { name: "a.docx", height: undefined }).root.classList.contains("swz-reader-fills")).toBe(true);
     const told = vi.fn();
     inPage.onZoom(told);

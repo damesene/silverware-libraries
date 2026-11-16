@@ -19,6 +19,9 @@ export type CellHost = {
   // The cell's rendering shown again as it is left: what it draws told again (a rendering it was moved into while
   // edited, drawn anew by another cell's write, was never in the page: its files not decorated)
   readonly restored?: (cell: HTMLElement) => void;
+  // A key the field kept from the host's page (its editor stops every key: the page's editor would act on it), told
+  // where it is a shortcut of the host's that does nothing here (none: nothing told)
+  readonly keyKept?: (event: KeyboardEvent) => void;
 };
 
 /** A cell edited: its editor, and moving it into the same cell of the grid drawn anew */
@@ -132,6 +135,9 @@ export function editCell(cell: HTMLElement, markdown: string, at: number | TextS
     );
     for (const type of ["pointerup", "pointercancel"]) win.addEventListener(type, () => setTimeout(() => (pressing = false), 0), { capture: true, signal: presses.signal });
   }
+  // (A listener of its own on the field's element, the one the editor stops keys at: it runs after the editor's there,
+  // registered as the editor was made, so the key's `defaultPrevented` says whether the editor took it)
+  if (host.keyKept) editor.element.addEventListener("keydown", host.keyKept);
   // (One showing the markdown as rendered looks as the cell did: only what the caret is at changes, as in the page)
   if (editor.preview) editor.element.classList.add("swl-grid-editor-preview");
   cell.classList.add("swl-grid-editing");

@@ -1,7 +1,7 @@
 // A click on a link SilverBullet shows as its markdown (src/host/silverbullet/links.ts): the cursor's alone, a link
 // drawn as a link followed as ever; while all the markdown is shown as written (shared/syntaxmode.ts), an embed's line
-// too; the Markdown tab of the Page layout dialog turning it off.
-import { cursorAt, expect, PAGE_LAYOUT, PIXEL_PNG, runCommand, test } from "./helpers.ts";
+// too; the Markdown tab of the settings dialog turning it off.
+import { cursorAt, expect, LAYOUT_SETTINGS, PIXEL_PNG, runCommand, test } from "./helpers.ts";
 
 test("a click on a link shown as its markdown (the cursor in it) places the cursor, the text pointer over it; drawn as a link, a click opens it", async ({ page, space }) => {
   const text = "# Page\n\nSee [[Other]] here\n\nAfter\n";
@@ -56,11 +56,11 @@ test("SilverBullet's markdown shown as written: a click on an embed's `![[` plac
   expect(await told()).toBe(0);
   await page.waitForTimeout(500);
   expect(page.url()).toBe(url);
-  // The box off in the Page layout dialog's Markdown tab: the click SilverBullet's again (what it does with it, its own)
-  await runCommand(page, PAGE_LAYOUT);
+  // The box off in the settings dialog's Markdown tab: the click SilverBullet's again (what it does with it, its own)
+  await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");
   await dialog.getByRole("tab", { name: "Markdown" }).click();
-  await dialog.getByLabel("A click on a link shown as its markdown only places the cursor").uncheck();
+  await dialog.getByLabel("Clicking a link shown as markdown only places the cursor").uncheck();
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect.poll(() => space.config()).toContain('config.set("silverware.layout.links.clickPlacesCursor", false)');
   await expect.poll(() => page.evaluate(() => document.documentElement.hasAttribute("data-swl-syntax-clicks")), { timeout: 15_000 }).toBe(false);

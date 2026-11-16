@@ -14,6 +14,7 @@ import { ASSETS_PATH } from "../../model/settings.ts";
 import type { FileFacts } from "../../core/stored.ts";
 import { documentUrl } from "../../../../shared/silverbullet/platform.ts";
 import { editorPosition } from "./editorposition.ts";
+import { editorSheetArea } from "../../../../shared/silverbullet/editorarea.ts";
 
 const FRAME = ".sb-inline-content";
 // A medium drawn outside the editor (a grid's cell) is a plain element: put in a frame of Silverware Assets' own, to
@@ -306,6 +307,8 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
         }
       : {}),
     open: (url: string): void => void (doc.defaultView ?? window).open(url, "_blank", "noopener"),
+    // (The side panel over the editor's area: under SilverBullet's top bar and a toolbar docked at the editor's edge)
+    sheetArea: editorSheetArea(doc),
     problem: (message: string): void => void bridge.flash(message, "error"),
   };
 }

@@ -26,29 +26,29 @@ describe("the assets' settings tabs", () => {
     expect(selects.map((select) => select.getAttribute("aria-label"))).toEqual([
       "All files: shown as",
       "All files: inserted as",
-      "All files: a click",
-      "All files: a Shift+click",
+      "All files: click",
+      "All files: Shift+click",
       "image: shown as",
       "image: inserted as",
-      "image: a click",
-      "image: a Shift+click",
+      "image: click",
+      "image: Shift+click",
       "pdf: shown as",
       "pdf: inserted as",
-      "pdf: a click",
-      "pdf: a Shift+click",
+      "pdf: click",
+      "pdf: Shift+click",
     ]);
     const named = (label: string) => selects.find((select) => select.getAttribute("aria-label") === label)!;
     expect(named("image: shown as").selectedOptions[0]!.textContent).toBe("Like all files");
     expect(named("pdf: shown as").value).toBe("icon");
     // (How a file is inserted: as shown by default, a link among the choices)
-    expect(named("All files: inserted as").selectedOptions[0]!.textContent).toBe("As shown");
-    expect([...named("All files: inserted as").options].map((option) => option.textContent)).toEqual(["As shown", "Link", "Card", "Preview", "Original"]);
+    expect(named("All files: inserted as").selectedOptions[0]!.textContent).toBe("Same as shown");
+    expect([...named("All files: inserted as").options].map((option) => option.textContent)).toEqual(["Same as shown", "Link", "Card", "Preview", "Original"]);
     named("image: shown as").value = "preview";
     named("pdf: shown as").value = "*";
-    named("All files: a Shift+click").value = "";
+    named("All files: Shift+click").value = "";
     named("image: inserted as").value = "link";
     // The dialog turned off
-    const insertOn = [...files.panel.querySelectorAll<HTMLLabelElement>(".swa-settings-check")].find((label) => label.textContent?.includes("Paste, drop and upload"))!.querySelector("input")!;
+    const insertOn = [...files.panel.querySelectorAll<HTMLLabelElement>(".swa-settings-check")].find((label) => label.textContent?.includes("Use the insert dialog"))!.querySelector("input")!;
     expect(insertOn.checked).toBe(true);
     insertOn.checked = false;
     // (A change in any tab is the first's to tell and to save: one write)
@@ -82,7 +82,7 @@ describe("the assets' settings tabs", () => {
     await files.save();
     expect((saved as { linkIcons: unknown }).linkIcons).toBe(false);
     // Previews kept in the space: on by default, turned off on the Files tab
-    const keep = [...files.panel.querySelectorAll<HTMLLabelElement>(".swa-settings-section .swa-settings-check")].find((label) => label.textContent?.includes("Keep previews"))!.querySelector("input")!;
+    const keep = [...files.panel.querySelectorAll<HTMLLabelElement>(".swa-settings-section .swa-settings-check")].find((label) => label.textContent?.includes("Save previews"))!.querySelector("input")!;
     expect(keep.checked).toBe(true);
     keep.checked = false;
     await files.save();

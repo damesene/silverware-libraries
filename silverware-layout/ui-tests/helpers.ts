@@ -33,8 +33,9 @@ export const test = base.extend<{ space: Space }>({
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => {
-      // (SilverBullet answers what it looks for and does not find with a 404, which the page logs)
-      if (m.type() === "error" && !/404/.test(m.text())) errors.push(m.text());
+      // (SilverBullet answers what it looks for and does not find with a 404, which the page logs; its own gesture of two
+      // fingers prevents the default in a passive listener of the window, which Chrome logs: client/editor_ui.tsx)
+      if (m.type() === "error" && !/404|Unable to preventDefault inside passive event listener/.test(m.text())) errors.push(m.text());
     });
     try {
       await use(page);
@@ -62,7 +63,7 @@ export const test = base.extend<{ space: Space }>({
         }
         await page.goto(`http://127.0.0.1:${server().port}/${folder}/${open}`);
         await page.waitForFunction(() => !!(window as unknown as { client?: { editorView?: unknown } }).client?.editorView);
-        await commandDefined(page, PAGE_LAYOUT);
+        await commandDefined(page, LAYOUT_SETTINGS);
       },
       saved: async (name) => (existsSync(path(name)) ? (await readFile(path(name), "utf8")).replace(/\r\n/g, "\n") : undefined),
       config: async () => (existsSync(configPath) ? (await readFile(configPath, "utf8")).replace(/\r\n/g, "\n") : undefined),
@@ -77,7 +78,7 @@ export const test = base.extend<{ space: Space }>({
   },
 });
 
-export const PAGE_LAYOUT = "Silverware Layout: Page layout";
+export const LAYOUT_SETTINGS = "Silverware Layout: Settings";
 
 type Client = { clientSystem: { commandHook: { buildAllCommands(): Map<string, unknown> } }; runCommandByName(name: string): Promise<void> };
 

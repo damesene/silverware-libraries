@@ -1,6 +1,7 @@
 // Silverware Assets XLSX's type of file, registered with Silverware Assets (shared/assets.ts): an Excel workbook (.xlsx), its
 // preview its first sheet's first cells drawn small, the original (and the side panel and the enlarged view, which draw
 // a type's `embed`) a reader of every sheet.
+import type { KeptKeys } from "../../shared/silverbullet/keptkeys.ts";
 import { assetName, type AssetType } from "../../shared/assets.ts";
 import { xlsxPreview } from "./preview.ts";
 import { xlsxReader } from "./reader.ts";
@@ -13,7 +14,8 @@ const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.s
 // Narrower than this (px) there is no room for a preview: the card
 const LEAST_WIDTH = 40;
 
-export function xlsxType(doc: Document): AssetType {
+/** The type; `keyKept`: told each key a reader keeps from the page (SilverBullet's shortcuts that do nothing there said so) */
+export function xlsxType(doc: Document, keyKept?: KeptKeys): AssetType {
   return {
     name: "xlsx",
     match: { kind: ["file", "web"], mime: XLSX_MIME, ext: ["xlsx"] },
@@ -27,7 +29,7 @@ export function xlsxType(doc: Document): AssetType {
         "url" in context.asset && context.viewport.width >= LEAST_WIDTH
           ? xlsxPreview(doc, context.asset.url, assetName(context.asset), ICON, { width: context.viewport.width, height: context.viewport.height }, context.signal, context.stored)
           : null,
-      embed: (context) => ("url" in context.asset ? xlsxReader(doc, context.asset.url, assetName(context.asset), context.fills ? undefined : context.viewport.height, context.signal) : null),
+      embed: (context) => ("url" in context.asset ? xlsxReader(doc, context.asset.url, assetName(context.asset), context.fills ? undefined : context.viewport.height, context.signal, keyKept) : null),
     },
   };
 }

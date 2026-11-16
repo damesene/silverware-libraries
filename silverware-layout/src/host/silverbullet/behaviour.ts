@@ -81,3 +81,10 @@ export function afterPress(doc: Document): Promise<void> {
 
 /** How SilverBullet's page behaves for an editor of a cell (shared/editor.ts): it takes Ctrl+Z (Ctrl+Y) at the window and holds them back (2.12.1) */
 export const SILVERBULLET_EDITORS: EditorHost = { historyAtWindow: true };
+
+/**
+ * What SilverBullet does on a tap with two fingers (`client/editor_ui.tsx`, a `touchstart` of two touches at the window,
+ * 2.12.1 and main 2026-11-15: `startPageNavigate("page")`), as the command doing the same (`client/editor_commands.ts`):
+ * run where Silverware Layout takes two fingers for its pinch (the setting `fontZoom.pinch`) and they tapped
+ */
+export const TWO_FINGER_TAP_COMMAND = "Navigate: Page Picker";

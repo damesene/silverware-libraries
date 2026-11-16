@@ -1,6 +1,7 @@
 // Silverware Assets DOCX's type of file, registered with Silverware Assets (shared/assets.ts): a Word document (.docx), its
 // preview its first page drawn smaller, the original (and the side panel and the enlarged view, which draw a type's
 // `embed`) a reader of the whole document.
+import type { KeptKeys } from "../../shared/silverbullet/keptkeys.ts";
 import { assetName, type AssetType } from "../../shared/assets.ts";
 import { docxPreview } from "./preview.ts";
 import { docxReader } from "./reader.ts";
@@ -13,7 +14,8 @@ const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingm
 // Narrower than this (px) there is no room for a preview: the card
 const LEAST_WIDTH = 40;
 
-export function docxType(doc: Document): AssetType {
+/** The type; `keyKept`: told each key a reader keeps from the page (SilverBullet's shortcuts that do nothing there said so) */
+export function docxType(doc: Document, keyKept?: KeptKeys): AssetType {
   return {
     name: "docx",
     match: { kind: ["file", "web"], mime: DOCX_MIME, ext: ["docx"] },
@@ -27,7 +29,7 @@ export function docxType(doc: Document): AssetType {
         "url" in context.asset && context.viewport.width >= LEAST_WIDTH
           ? docxPreview(doc, context.asset.url, assetName(context.asset), ICON, { width: context.viewport.width, height: context.viewport.height }, context.signal, context.stored)
           : null,
-      embed: (context) => ("url" in context.asset ? docxReader(doc, context.asset.url, assetName(context.asset), context.fills ? undefined : context.viewport.height, context.signal) : null),
+      embed: (context) => ("url" in context.asset ? docxReader(doc, context.asset.url, assetName(context.asset), context.fills ? undefined : context.viewport.height, context.signal, keyKept) : null),
     },
   };
 }

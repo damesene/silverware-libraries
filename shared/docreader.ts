@@ -5,6 +5,7 @@
 // template shared/docreader.css (__base__ the library's prefix), in each library's style page.
 import { ASSET_WIDE_ATTRIBUTE } from "./assets.ts";
 import { el } from "./elements.ts";
+import { scaledPx } from "./contentscale.ts";
 
 /** The library's base of classes (`swa-docx`) */
 export type ReaderLook = { readonly base: string };
@@ -35,8 +36,15 @@ export type ReaderShell = {
   state(state: string): void;
 };
 
-/** A reader's shell; `height` its height in the page, none where it fills a panel; `zoom` false: no zoom in its bar */
-export function readerShell(doc: Document, look: ReaderLook, options: { readonly name: string; readonly height: number | undefined; readonly zoom?: boolean }): ReaderShell {
+/**
+ * A reader's shell; `height` its height in the page, none where it fills a panel; `zoom` false: no zoom in its bar;
+ * `keyKept` told each key it keeps from the page (shared/silverbullet/keptkeys.ts: a shortcut that does nothing here said so)
+ */
+export function readerShell(
+  doc: Document,
+  look: ReaderLook,
+  options: { readonly name: string; readonly height: number | undefined; readonly zoom?: boolean; readonly keyKept?: (event: KeyboardEvent) => void },
+): ReaderShell {
   const p = `${look.base}-reader`;
   const label = el(doc, "span", { class: `${p}-label`, text: "…" });
   const tools = el(doc, "span", { class: `${p}-tools` });
@@ -47,10 +55,15 @@ export function readerShell(doc: Document, look: ReaderLook, options: { readonly
   const bar = el(doc, "div", { class: `${p}-bar` }, label, tools, zoomBox);
   const scroller = el(doc, "div", { class: `${p}-scroll` });
   const root = el(doc, "div", { class: p, attrs: { [ASSET_WIDE_ATTRIBUTE]: "", [`data-${look.base}-state`]: "opening", role: "document", "aria-label": options.name } }, bar, scroller);
-  if (options.height !== undefined) root.style.height = `${Math.round(options.height)}px`;
+  // (Its height as the content's scale makes it: shared/contentscale.ts)
+  if (options.height !== undefined) root.style.height = scaledPx(Math.round(options.height));
   else root.classList.add(`${p}-fills`);
   // (Presses and keys in the reader its own: the editor around it moves no cursor, shows no markdown)
-  for (const type of ["mousedown", "pointerdown", "keydown"]) root.addEventListener(type, (event) => event.stopPropagation());
+  for (const type of ["mousedown", "pointerdown"]) root.addEventListener(type, (event) => event.stopPropagation());
+  root.addEventListener("keydown", (event) => {
+    event.stopPropagation();
+    options.keyKept?.(event);
+  });
   let zoom = 1;
   const listeners: ((zoom: number) => void)[] = [];
   const zoomTo = (to: number) => {

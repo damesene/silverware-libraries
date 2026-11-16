@@ -1,4 +1,4 @@
-// The Alignment tab of the Page layout dialog (docs/silverware-layout-align.md): where each kind of widget stands where
+// The Alignment tab of the settings dialog (docs/silverware-layout-align.md): where each kind of widget stands where
 // it says nothing itself, a row per kind of the providers registered (a medium's preview and original, a table, a
 // chart), each a pick list, its kind's own default named. A widget's own (its handle's menu) wins. Saved on Save, as
 // every tab.
@@ -32,8 +32,8 @@ export function alignTab(doc: Document, kinds: readonly AlignKind[], alignments:
     doc,
     "div",
     "swl-align",
-    el(doc, "p", "swl-align-note", "Where each kind of widget stands on the page where it says nothing itself. One of its own, from its handle's menu (a click on the bar beside it), wins."),
-    ...(rows.length ? rows.map((one) => one.row) : [el(doc, "p", "swl-align-note", "No widget of a kind that is placed is installed.")]),
+    el(doc, "p", "swl-align-note", "Default alignment for each kind of widget. An alignment set in a widget's own menu overrides it."),
+    ...(rows.length ? rows.map((one) => one.row) : [el(doc, "p", "swl-align-note", "No installed plugin has widgets to align.")]),
   );
   return {
     id: "alignment",

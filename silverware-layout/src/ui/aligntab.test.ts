@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// The Page layout dialog's Alignment tab: a row per kind registered, the default written as none, and the saved
+// The settings dialog's Alignment tab: a row per kind registered, the default written as none, and the saved
 // defaults of kinds not registered now (their plugin not loaded) kept as the rows shown are saved.
 import { describe, expect, it } from "vitest";
 import { alignTab } from "./aligntab.ts";

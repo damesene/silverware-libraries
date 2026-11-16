@@ -10,7 +10,7 @@
 import type { Attributes } from "../../../shared/markdown/attributes.ts";
 import { type Grid, readGridBody, readGrids } from "../../../shared/markdown/grid.ts";
 import { gridsOfBody } from "./core/match.ts";
-import { borderAttribute, bordered } from "./model/border.ts";
+import { borderAttribute, borderOf } from "./model/border.ts";
 import { columnsWithout, columnTemplate, fitsColumns, minWidthOf, validateMinWidth } from "./model/columns.ts";
 import { RENDERED_VERSION, type Rendered, type RenderedItem, type RenderedRange } from "../../../shared/rendered.ts";
 import { type Drawn, drawnIn, itemsOf } from "./drawn.ts";
@@ -104,6 +104,8 @@ export type GridHost = {
   moveIntoGrid?(write: IntoGridWrite): Promise<string | undefined>;
   /** What draws an embed in a cell's field (shared/editor.ts `EditorOptions.embed`), as the page draws it; none: its markdown */
   embeds?(): Promise<(markdown: string) => EditorEmbed | undefined>;
+  /** A key a cell's field kept from the page (its editor stops every key), told where it is a shortcut of the host's that does nothing there (none: nothing told) */
+  keyKept?(event: KeyboardEvent): void;
 };
 
 // How long after a grid is drawn its attributes are read again (it is in the page by then, its order among its alike known)
@@ -311,7 +313,7 @@ export class Grids {
     const attributes = first?.attributes ?? {};
     const element = drawGrid(this.doc, columnTemplate(attributes.columns, cells.length, attributes.min), html);
     showFit(element, fitsColumns(attributes.columns));
-    showBorder(element, bordered(attributes));
+    showBorder(element, borderOf(attributes));
     this.keepBlankLines(element, cells.map((cell) => cell.content));
     // The cells whose markdown did not change: the rendering of the grid it replaces taken over (its media loaded,
     // decorated), not drawn anew (a write of one cell drew every other again: its images and previews flashed, the
@@ -390,7 +392,7 @@ export class Grids {
     const html = await Promise.all(cells.map((cell) => this.host.renderMarkdown(cell.content).catch(() => plainCell(this.doc, cell.content))));
     const element = drawGrid(this.doc, columnTemplate(grid.attributes.columns, cells.length, grid.attributes.min), html);
     showFit(element, fitsColumns(grid.attributes.columns));
-    showBorder(element, bordered(grid.attributes));
+    showBorder(element, borderOf(grid.attributes));
     this.keepBlankLines(element, cells.map((cell) => cell.content));
     element.classList.add("swl-grid-shown");
     return element;
@@ -408,7 +410,7 @@ export class Grids {
       if (!found) continue;
       showColumns(element, columnTemplate(found.grid.attributes.columns, element.querySelectorAll(":scope > .swl-grid-cell").length, found.grid.attributes.min));
       showFit(element, fitsColumns(found.grid.attributes.columns));
-      showBorder(element, bordered(found.grid.attributes));
+      showBorder(element, borderOf(found.grid.attributes));
       if (markPlaces(element, found.grid)) this.changedSinceTold = true;
       this.placed.set(element, found.grid);
       this.rememberAt(found.grid.from, element);
@@ -541,7 +543,7 @@ export class Grids {
   /** A grid drawn as its menus show it: its columns attribute, its borders, its number of cells */
   private menuState(element: HTMLElement): GridMenuState {
     const attributes = this.attributesOf(element);
-    return { columns: attributes.columns, min: attributes.min, border: bordered(attributes), cells: element.querySelectorAll(":scope > .swl-grid-cell").length };
+    return { columns: attributes.columns, min: attributes.min, border: borderOf(attributes), cells: element.querySelectorAll(":scope > .swl-grid-cell").length };
   }
 
   /**
@@ -598,9 +600,9 @@ export class Grids {
       return void (problem && this.host.problem(`Silverware Layout: the column was not cleared: ${problem}`));
     }
     if (action.kind === "border") {
-      const problem = await this.writeAttributes(element, { border: borderAttribute(action.on) });
+      const problem = await this.writeAttributes(element, { border: borderAttribute(action.style) });
       // (Shown at once: its body the same, the grid is not drawn anew)
-      if (!problem) showBorder(element, action.on);
+      if (!problem) showBorder(element, action.style);
       return void said(problem);
     }
     const text = await this.host.pageText().catch(() => undefined);
@@ -790,6 +792,7 @@ export class Grids {
     const cellHost = {
       afterPress: (doc: Document) => this.host.afterPress?.(doc) ?? Promise.resolve(),
       focusPage: (cell: HTMLElement) => this.host.focusPage?.(cell),
+      ...(this.host.keyKept ? { keyKept: this.host.keyKept.bind(this.host) } : {}),
       ...(embed ? { embed } : {}),
       ...(shown ? { look: shown } : {}),
       // (Its rendering back in the page: what it drew told again, to be decorated where it was not yet)

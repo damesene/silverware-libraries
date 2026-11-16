@@ -1020,6 +1020,16 @@ test("the peek shows an item beside the page, its content written as it is left,
   expect(await space.saved("Page")).toBe("# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n");
 });
 
+test("a shortcut of SilverBullet's pressed in the peek does nothing there and says so, the peek kept open", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS }, "Page");
+  await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
+  await expect(page.locator(".swd-peek")).toBeVisible();
+  await page.locator(".swd-peek-name").click();
+  await page.keyboard.press("Control+k");
+  await expect(page.locator(".sb-notifications")).toContainText("Navigate: Page Picker doesn't work here");
+  await expect(page.locator(".swd-peek")).toBeVisible();
+});
+
 test("with Silverware Editor installed, an item's content is edited in its editor in the peek: a list continued on Enter, Esc closing the peek, written", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS }, "Page");
   const body = page.locator(".swd-peek .swd-peek-body");

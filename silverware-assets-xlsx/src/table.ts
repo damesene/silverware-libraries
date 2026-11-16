@@ -82,7 +82,8 @@ function cellElement(doc: Document, cell: SheetCell | undefined, rowsLeft: numbe
  * it (CSS zoom) scales what is set in it again, so what was measured is divided by it
  */
 export function holdFrozen(table: HTMLTableElement, frozen: Sheet["frozen"]): void {
-  const zoom = Number(table.style.zoom) || 1;
+  // (A zoom written as a number, else as CSS works it out: one following the content's scale is a `calc`)
+  const zoom = Number(table.style.zoom) || parseFloat(table.ownerDocument.defaultView?.getComputedStyle(table).zoom ?? "") || 1;
   const height = (element: Element) => element.getBoundingClientRect().height / zoom;
   const head = table.tHead?.rows[0];
   const top = head ? height(head) : 0;

@@ -9,6 +9,7 @@ import { ERASER, TRASH } from "../../../../shared/glyphs.ts";
 import type { LayoutMenuEntry } from "../../../../shared/layout.ts";
 import { opensMenu, type PopupItem, type PopupMenu, showPopup } from "../../../../shared/popupmenu.ts";
 import { columnCount, FIT, fitsColumns, MAX_COLUMNS, MIN_WIDTHS, type MinWidthName, minWidthChoice } from "../model/columns.ts";
+import type { BorderStyle } from "../model/border.ts";
 
 // The popup menu's classes: Silverware Layout's
 const POPUP = { base: "swl" } as const;
@@ -25,7 +26,7 @@ export type CellAction =
   | { readonly kind: "min"; readonly min: MinWidthName }
   | { readonly kind: "askMin" }
   | { readonly kind: "addColumn" }
-  | { readonly kind: "border"; readonly on: boolean }
+  | { readonly kind: "border"; readonly style: BorderStyle }
   | { readonly kind: "ungrid" }
   | { readonly kind: "source" };
 
@@ -33,7 +34,7 @@ export type CellAction =
 export type GridMenuItem = PopupItem;
 
 /** A grid as its menus show it: its columns attribute (and `min`, where they are as many as fit), its borders, its number of cells */
-export type GridMenuState = { readonly columns: string | undefined; readonly min?: string | undefined; readonly border: boolean; readonly cells: number };
+export type GridMenuState = { readonly columns: string | undefined; readonly min?: string | undefined; readonly border: BorderStyle; readonly cells: number };
 
 /** The column's menu: its sections, for the cell at `index` */
 export function columnMenu(index: number, now: GridMenuState, act: (action: CellAction) => void): GridMenuItem[][] {
@@ -53,6 +54,10 @@ export function columnMenu(index: number, now: GridMenuState, act: (action: Cell
     ],
   ];
 }
+
+// The borders' choices drawn: the lines between four cells, and the same in a ring
+const INNER_LINES = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 2.5v11M2.5 8h11"/></svg>';
+const ALL_LINES = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5"/><path d="M8 2.5v11M2.5 8h11"/></svg>';
 
 /** The grid's own sections of its handle's menu (after Layout's Align and Width) */
 export function gridMenu(now: GridMenuState, act: (action: CellAction) => Promise<void>): LayoutMenuEntry[][] {
@@ -90,7 +95,17 @@ export function gridMenu(now: GridMenuState, act: (action: CellAction) => Promis
   return [
     [columns, ...sized],
     [
-      { label: "Borders", checked: now.border, run: () => act({ kind: "border", on: !now.border }) },
+      // (Its lines a row of two choices: between its cells alone, or all; the one chosen chosen again takes them off)
+      {
+        kind: "segmented",
+        label: "Borders",
+        options: (
+          [
+            ["inner", INNER_LINES, "Lines between the cells alone"],
+            ["all", ALL_LINES, "Lines round the grid and between its cells"],
+          ] as const
+        ).map(([style, icon, title]) => ({ icon, title, active: now.border === style, run: () => act({ kind: "border", style: now.border === style ? "none" : style }) })),
+      },
       { label: "Add a column at the end", run: () => act({ kind: "addColumn" }) },
     ],
     [{ label: "Unwrap grid", run: () => act({ kind: "ungrid" }) }],

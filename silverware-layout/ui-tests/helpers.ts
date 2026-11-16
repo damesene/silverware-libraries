@@ -9,6 +9,10 @@ import { dirname, join } from "node:path";
 import { test as base, expect, type Page } from "@playwright/test";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 
+import { boxOf } from "../../scripts/ui-test-helpers.ts";
+
+export { boxOf };
+
 export { expect };
 
 export const onSilverBullet = process.env.SW_TARGET === "silverbullet";

@@ -2,7 +2,7 @@
 // SilverBullet itself: where a new version changes one, the test names it (the other tests would fail somewhere further
 // on, or not at all where the playground stands in for SilverBullet). docs/silverware-layout.md, probes 1 to 3.
 import type { Page } from "@playwright/test";
-import { expect, gridsDrawn, test } from "./helpers.ts";
+import { boxOf, expect, gridsDrawn, test } from "./helpers.ts";
 
 const PAGE = `# Table\n\nSome text.\n\n| Name | Amount |\n| --- | --- |\n| a | 1 |\n| b | 2 |\n\nSome text.\n`;
 // The room a widget leaves the editor's pane, each side together (core/widgetwidth.ts' PANE_GUTTER)
@@ -14,14 +14,16 @@ test.use({ viewport: { width: 1000, height: 800 } });
 async function dragTable(page: Page, dx: number): Promise<void> {
   const table = page.locator(".sb-table-widget");
   await expect(table).toBeVisible();
-  const b = (await table.boundingBox())!;
+  const b = await boxOf(table);
   await page.mouse.move(b.x + 40, b.y + b.height / 2);
   const bar = page.locator(".swl-handle-bar");
   await expect(bar).toBeVisible();
-  const at = (await bar.boundingBox())!;
+  const at = await boxOf(bar);
   await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
   await page.mouse.down();
   await page.mouse.move(at.x + dx / 2, at.y + at.height / 2, { steps: 5 });
+  // (The drag begun: the bar pressed, not the table drawn anew under it meanwhile)
+  await expect(page.locator(".swl-handle")).toHaveClass(/swl-handle-dragging/);
   await page.mouse.move(at.x + dx, at.y + at.height / 2, { steps: 5 });
 }
 
@@ -90,10 +92,10 @@ test("a widget dragged wider than the editor is held at the editor's width less 
   await space.open({ Page: PAGE }, "Page");
   await dragTable(page, 600);
   const pane = await page.evaluate(() => document.querySelector("#sb-editor")!.getBoundingClientRect().width);
-  await expect.poll(async () => Math.round((await page.locator(".sb-table-widget").boundingBox())!.width)).toBe(Math.round(pane - GUTTER));
+  await expect.poll(async () => Math.round((await page.locator(".sb-table-widget").boundingBox())?.width ?? Number.NaN)).toBe(Math.round(pane - GUTTER));
   // Centred on the text, within what the scroller shows (its scrollbar not covered)
-  const b = (await page.locator(".sb-table-widget").boundingBox())!;
-  const content = (await page.locator(".cm-content").boundingBox())!;
+  const b = await boxOf(page.locator(".sb-table-widget"));
+  const content = await boxOf(page.locator(".cm-content"));
   expect(Math.abs(b.x + b.width / 2 - (content.x + content.width / 2))).toBeLessThanOrEqual(1);
   const shown = await page.evaluate(() => {
     const scroller = document.querySelector(".cm-scroller")!;

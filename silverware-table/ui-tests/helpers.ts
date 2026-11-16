@@ -23,6 +23,10 @@ import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { LONG_PRESS_MS } from "../src/core/press.ts";
 
+import { boxOf } from "../../scripts/ui-test-helpers.ts";
+
+export { boxOf };
+
 export { expect };
 
 export type Target = "playground" | "silverbullet";
@@ -481,12 +485,6 @@ export async function markTable(page: Page, index = 0): Promise<void> {
   await table(page, index).locator("table").evaluate((t) => t.setAttribute("data-test-old", ""));
 }
 
-/** Where an element is once laid out: waited for (a write, a hover or a save may render it anew meanwhile; a box read at once may be none) */
-export async function boxOf(target: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
-  let box: { x: number; y: number; width: number; height: number } | null = null;
-  await expect.poll(async () => (box = await target.boundingBox()) !== null).toBe(true);
-  return box!;
-}
 
 /**
  * Where an element rests: its box the same before and after two frames (what

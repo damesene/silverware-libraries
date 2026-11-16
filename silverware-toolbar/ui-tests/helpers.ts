@@ -24,6 +24,10 @@ import { OWN_MARKER } from "../src/bridge.ts";
 import type { Favorites } from "../src/core/favorites.ts";
 import { SETTINGS_VERSION } from "../src/migrations/index.ts";
 
+import { boxOf } from "../../scripts/ui-test-helpers.ts";
+
+export { boxOf };
+
 export { expect };
 
 const target = process.env.SW_TARGET === "silverbullet" ? "silverbullet" : "playground";
@@ -248,9 +252,3 @@ export async function addGesture(page: Page, tap: string, up: string | undefined
   await expect(gestureButton(page)).toBeVisible();
 }
 
-/** Where an element is once laid out: waited for (a write, a hover or a save may render it anew meanwhile; a box read at once may be none) */
-export async function boxOf(target: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
-  let box: { x: number; y: number; width: number; height: number } | null = null;
-  await expect.poll(async () => (box = await target.boundingBox()) !== null).toBe(true);
-  return box!;
-}

@@ -1,7 +1,7 @@
 // A click on a link SilverBullet shows as its markdown (src/host/silverbullet/links.ts): the cursor's alone, a link
 // drawn as a link followed as ever; while all the markdown is shown as written (shared/syntaxmode.ts), an embed's line
 // too; the Markdown tab of the settings dialog turning it off.
-import { cursorAt, expect, LAYOUT_SETTINGS, PIXEL_PNG, runCommand, test } from "./helpers.ts";
+import { boxOf, cursorAt, expect, LAYOUT_SETTINGS, PIXEL_PNG, runCommand, test } from "./helpers.ts";
 
 test("a click on a link shown as its markdown (the cursor in it) places the cursor, the text pointer over it; drawn as a link, a click opens it", async ({ page, space }) => {
   const text = "# Page\n\nSee [[Other]] here\n\nAfter\n";
@@ -12,7 +12,7 @@ test("a click on a link shown as its markdown (the cursor in it) places the curs
   await page.evaluate((at) => (window as unknown as { client: { editorView: { dispatch(spec: unknown): void } } }).client.editorView.dispatch({ selection: { anchor: at } }), inLink);
   const shown = page.locator("#sb-main .cm-line span.sb-wiki-link", { hasText: "Other" });
   await expect(shown).toBeVisible();
-  const box = (await shown.boundingBox())!;
+  const box = await boxOf(shown);
   await page.mouse.click(box.x + box.width - 2, box.y + box.height / 2);
   await page.waitForTimeout(500);
   expect(page.url()).toBe(url);
@@ -36,7 +36,7 @@ test("SilverBullet's markdown shown as written: a click on an embed's `![[` plac
   const url = page.url();
   const clickAtStart = async () => {
     const line = page.locator("#sb-main .cm-line", { hasText: "photo.png" });
-    const box = (await line.boundingBox())!;
+    const box = await boxOf(line);
     await page.mouse.click(box.x + 3, box.y + 8);
   };
   // The clicks SilverBullet is told of (its editor's listener is under `#sb-main`): counted there

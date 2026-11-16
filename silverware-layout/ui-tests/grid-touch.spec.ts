@@ -1,6 +1,6 @@
 // A grid's cell edited on a phone (the "touch" project: Pixel 7), against SilverBullet: a tap in a cell, a tap back in
 // the page's text, the page's editor taking the typing again.
-import { cellField, expect, gridsDrawn, runCommand, test } from "./helpers.ts";
+import { boxOf, cellField, expect, gridsDrawn, runCommand, test } from "./helpers.ts";
 
 test("a tap in a cell edits it, a tap back in the page's text leaves it and writes it, the page's editor taking the typing where tapped", async ({ page, space }) => {
   const text = "# Page\n\n<grid>\n<cell>\n\nLeft text\n\n</cell>\n<cell>\n\nRight text\n\n</cell>\n</grid>\n\nAfter\n";
@@ -78,7 +78,7 @@ test("Move to grid on a phone: a tap shows where (cells one under another: a lin
   });
   void runCommand(page, "Silverware Layout: Move to grid");
   await expect(page.locator(".swl-pick-bar")).toContainText("Tap again to confirm");
-  const second = (await page.locator("#sb-main .swl-grid-cell").nth(1).boundingBox())!;
+  const second = await boxOf(page.locator("#sb-main .swl-grid-cell").nth(1));
   await page.touchscreen.tap(second.x + second.width / 2, second.y + 4);
   await expect(page.locator(".swl-pick-mark")).toHaveAttribute("data-swl-pick", "between-rows");
   await expect(page.locator(".swl-pick-label")).toHaveText("New cell");

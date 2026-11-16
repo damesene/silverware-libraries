@@ -1,4 +1,4 @@
-import { expect, LAYOUT_SETTINGS, runCommand, test, waitForIndexedLayout, widths, widthSet } from "./helpers.ts";
+import { boxOf, expect, LAYOUT_SETTINGS, runCommand, test, waitForIndexedLayout, widths, widthSet } from "./helpers.ts";
 
 // Frames a page may show at the page before's width: none on an idle machine, one on a busy one (the width is set from
 // SilverBullet's editor:pageLoaded, dispatched after the page is shown; docs/silverware-layout.md, probe 2)
@@ -87,13 +87,13 @@ test("a slider held stays where it was pressed (the dialog all but gone round it
   await runCommand(page, LAYOUT_SETTINGS);
   await page.locator(".swl-dialog").getByRole("tab", { name: "Font" }).click();
   const slider = page.locator(".swl-dialog").getByRole("slider", { name: "Font size", exact: true });
-  const box = (await slider.boundingBox())!;
+  const box = await boxOf(slider);
   const before = Number(await slider.inputValue());
   // Pressed by its top edge: moved by as little as a few pixels, the press was off it as the browser began to drag
   await page.mouse.move(box.x + box.width * 0.3, box.y + 1);
   await page.mouse.down();
   await expect(page.locator(".swl-dialog")).toHaveClass(/swl-dialog-sliding/);
-  const held = (await slider.boundingBox())!;
+  const held = await boxOf(slider);
   expect([held.x, held.y, held.width]).toEqual([box.x, box.y, box.width]);
   expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.classList.contains("swl-dialog-slider"), { x: box.x + box.width * 0.3, y: box.y + 1 })).toBe(true);
   await page.mouse.move(box.x + box.width * 0.6, box.y + 1, { steps: 6 });
@@ -167,7 +167,7 @@ test("Preview held on the Guides tab: the guides as typed on the page (one added
   await dialog.getByRole("button", { name: "+ Add guide" }).click();
   await page.keyboard.type("1000");
   const preview = dialog.getByRole("button", { name: "Hold to preview" });
-  const box = (await preview.boundingBox())!;
+  const box = await boxOf(preview);
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await expect(dialog).toHaveClass(/swl-dialog-sliding/);
@@ -194,7 +194,7 @@ test("a guide's slider dragged: its number follows, the guides shown on the page
   await dialog.getByRole("tab", { name: "Guides" }).click();
   const row = dialog.locator(".swl-dialog-guide-row").first();
   const slider = row.locator(".swl-dialog-guide-slider");
-  const box = (await slider.boundingBox())!;
+  const box = await boxOf(slider);
   await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2);
   await page.mouse.down();
   await expect(dialog).toHaveClass(/swl-dialog-sliding/);

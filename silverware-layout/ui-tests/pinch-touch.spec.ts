@@ -2,7 +2,7 @@
 // default), a pinch zooms the font and opens nothing, and a tap with two fingers still opens the page picker, as the
 // fingers are lifted; off (the settings dialog's Font tab), two fingers are SilverBullet's (its page picker at once).
 import type { CDPSession, Page } from "@playwright/test";
-import { expect, LAYOUT_SETTINGS, runCommand, test } from "./helpers.ts";
+import { boxOf, expect, LAYOUT_SETTINGS, runCommand, test } from "./helpers.ts";
 
 const PAGE = "# Page\n\nSome text to zoom with two fingers.\n\nMore text under it.\n";
 
@@ -24,7 +24,7 @@ async function twoFingers(cdp: CDPSession, x: number, y: number, spread: number,
 test("a pinch with two fingers zooms the font (on by default), a tap with two fingers still opens the page picker; turned off, two fingers are SilverBullet's", async ({ page, space }) => {
   await space.open({ Page: PAGE }, "Page");
   const cdp = await page.context().newCDPSession(page);
-  const text = (await page.locator(".cm-line", { hasText: "Some text to zoom" }).boundingBox())!;
+  const text = await boxOf(page.locator(".cm-line", { hasText: "Some text to zoom" }));
   const [x, y] = [text.x + text.width / 2, text.y + text.height / 2];
   const before = await fontSize(page);
   // On (the default): a pinch makes the font larger, nothing opened

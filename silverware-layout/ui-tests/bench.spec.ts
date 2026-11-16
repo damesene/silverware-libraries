@@ -13,7 +13,7 @@ import { copyFile, mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { Page } from "@playwright/test";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
-import { expect, test } from "./helpers.ts";
+import { boxOf, expect, test } from "./helpers.ts";
 
 const ON = process.env.SW_BENCH === "1";
 const WITH_LAYOUT = process.env.SW_BENCH_LAYOUT !== "0";
@@ -185,13 +185,13 @@ async function chartRedraw(page: Page) {
 async function drag(page: Page, selector: string) {
   await reveal(page, selector);
   const widget = page.locator(selector).first();
-  const b = (await widget.boundingBox())!;
+  const b = await boxOf(widget);
   // (On the part of it in view: a tall table's top is above the window)
   const view = page.viewportSize()!;
   await page.mouse.move(b.x + 40, Math.min(Math.max(b.y, 0) + 120, b.y + b.height - 10, view.height - 20));
   const bar = page.locator(".swl-handle-bar");
   await expect(bar).toBeVisible();
-  const at = (await bar.boundingBox())!;
+  const at = await boxOf(bar);
   await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
   await page.mouse.down();
   const frames = await page.evaluate(() => (window as unknown as { bench: { frames: number[] } }).bench.frames.length);

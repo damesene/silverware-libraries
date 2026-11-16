@@ -1,6 +1,6 @@
 // Columns (docs/silverware-layout-grid.md) as a user works with them in SilverBullet: /grid, a cell edited in place,
 // Alt+click to the raw text, columns set by the grid's line, a grid in an embedded page, its hashtags indexed.
-import { cellField, cursorAt, editorText, expect, fieldState, fillField, gridsDrawn, LAYOUT_SETTINGS, PIXEL_PNG, runCommand, test } from "./helpers.ts";
+import { boxOf, cellField, cursorAt, editorText, expect, fieldState, fillField, gridsDrawn, LAYOUT_SETTINGS, PIXEL_PNG, runCommand, test } from "./helpers.ts";
 
 const GRID = "<grid>\n<cell>\n\nLeft text\n\n</cell>\n<cell>\n\nRight text\n\n</cell>\n</grid>\n";
 
@@ -97,7 +97,7 @@ test("text dropped on a cell not edited: written into its markdown where it was 
   await gridsDrawn(page);
   const cell = page.locator("#sb-main .swl-grid-cell").nth(1);
   // (A drag as the browser carries one, from wherever: its plain text, let go at the end of the cell's text)
-  const words = (await cell.getByText("Right text").boundingBox())!;
+  const words = await boxOf(cell.getByText("Right text"));
   const at = { x: words.x + words.width + 2, y: words.y + words.height / 2 };
   const data = { items: [{ mimeType: "text/plain", data: " **dropped**" }], dragOperationsMask: 1 };
   const cdp = await page.context().newCDPSession(page);
@@ -166,7 +166,7 @@ test("text selected in a cell's field dragged onto another cell: moved at once, 
     const box = view.coordsAtPos(at + 3)!;
     return { x: box.left + 2, y: (box.top + box.bottom) / 2 };
   });
-  const words = (await page.locator("#sb-main .swl-grid-cell").nth(1).getByText("Right").boundingBox())!;
+  const words = await boxOf(page.locator("#sb-main .swl-grid-cell").nth(1).getByText("Right"));
   await mouseDrag(page, from, { x: words.x + words.width + 2, y: words.y + words.height / 2 });
   await expect.poll(() => editorText(page)).toBe(text.replace("Some *italic* words", "Some  words").replace("Right\n", "Right*italic*\n"));
   await expect(cellField(page)).toHaveCount(1);
@@ -177,7 +177,7 @@ test("a drag moves text: the page's selection into a cell, a cell's (its markdow
   await space.open({ Page: text }, "Page");
   await gridsDrawn(page);
   const endOfRight = async () => {
-    const words = (await page.locator("#sb-main .swl-grid-cell").nth(1).getByText("Right").boundingBox())!;
+    const words = await boxOf(page.locator("#sb-main .swl-grid-cell").nth(1).getByText("Right"));
     return { x: words.x + words.width + 2, y: words.y + words.height / 2 };
   };
   // The page's "After" selected and dragged into the second cell: taken out of the page, as one edit
@@ -207,7 +207,7 @@ test("a drag moves text: the page's selection into a cell, a cell's (its markdow
   // Into the page: the page's editor takes it, the cell has it taken out
   await gridsDrawn(page);
   await dragFromCell(page, "em", "italic");
-  const after = (await page.locator("#sb-main .cm-line", { hasText: "After" }).boundingBox())!;
+  const after = await boxOf(page.locator("#sb-main .cm-line", { hasText: "After" }));
   await dropAt(page, after.x + after.width - 5, after.y + after.height / 2, "*italic*");
   await page.evaluate(() => document.querySelector("#sb-main .swl-grid-cell em")?.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer: new DataTransfer() })));
   await expect.poll(() => editorText(page)).toContain("Some  words");
@@ -221,8 +221,8 @@ test("the grid keeps the page's cursor out of its text: a quick second click on 
   const grid = page.locator("#sb-main .swl-grid");
   const cells = page.locator("#sb-main .swl-grid-cell");
   // One cell, then another at once, the second press a double click's (the cell opened in between)
-  const left = (await cells.first().getByText("Left text").boundingBox())!;
-  const right = (await cells.nth(1).getByText("Right text").boundingBox())!;
+  const left = await boxOf(cells.first().getByText("Left text"));
+  const right = await boxOf(cells.nth(1).getByText("Right text"));
   await page.mouse.click(left.x + 5, left.y + 5);
   await page.waitForTimeout(150);
   await page.mouse.click(right.x + 5, right.y + 5, { clickCount: 2 });
@@ -230,8 +230,8 @@ test("the grid keeps the page's cursor out of its text: a quick second click on 
   await expect(grid).toHaveCount(1);
   await page.keyboard.press("Escape");
   // A press between the cells (the divider there): the grid as it is, the page's cursor not in it
-  const a = (await cells.first().boundingBox())!;
-  const b = (await cells.nth(1).boundingBox())!;
+  const a = await boxOf(cells.first());
+  const b = await boxOf(cells.nth(1));
   await page.mouse.click((a.x + a.width + b.x) / 2, b.y + 5);
   await page.waitForTimeout(300);
   await expect(grid).toHaveCount(1);
@@ -260,7 +260,7 @@ test("a cell shorter than its row clicked under its text: edited, the caret afte
   await space.open({ Page: `# Page\n\n<grid>\n<cell>\n\nOne\n\nTwo\n\nThree\n\nFour\n\n</cell>\n<cell>\n\nShort\n\n</cell>\n</grid>\n` }, "Page");
   await gridsDrawn(page);
   const short = page.locator("#sb-main .swl-grid-cell").nth(1);
-  const box = (await short.boundingBox())!;
+  const box = await boxOf(short);
   await page.mouse.click(box.x + box.width / 2, box.y + box.height - 6);
   await expect.poll(async () => (await fieldState(page)).text).toBe("Short");
   const state = await fieldState(page);
@@ -272,15 +272,15 @@ test("a press beside a grid, in the page's margin at its height, keeps the grid 
   const text = `# Page\n\n${GRID}\nAfter\n`;
   await space.open({ Page: text }, "Page");
   await gridsDrawn(page);
-  const grid = (await page.locator("#sb-main .swl-grid").boundingBox())!;
-  const content = (await page.locator("#sb-main .cm-content").boundingBox())!;
+  const grid = await boxOf(page.locator("#sb-main .swl-grid"));
+  const content = await boxOf(page.locator("#sb-main .cm-content"));
   const viewport = page.viewportSize()!;
   for (const x of [Math.max(4, content.x - 30), Math.min(viewport.width - 4, content.x + content.width + 30)]) {
     await page.mouse.click(x, grid.y + grid.height / 2);
     await page.waitForTimeout(400);
     await expect(page.locator("#sb-main .swl-grid")).toHaveCount(1);
   }
-  const after = (await page.locator("#sb-main .cm-line", { hasText: "After" }).boundingBox())!;
+  const after = await boxOf(page.locator("#sb-main .cm-line", { hasText: "After" }));
   await page.mouse.click(Math.min(viewport.width - 4, content.x + content.width + 30), after.y + after.height / 2);
   await expect.poll(() => cursorAt(page)).toBe(text.length - 1);
 });
@@ -290,7 +290,7 @@ test("Alt+click in a cell shows the raw text, the cursor where the click was", a
   await space.open({ Page: text }, "Page");
   await gridsDrawn(page);
   const words = page.locator("#sb-main .swl-grid-cell").nth(1).getByText("Right text");
-  const box = (await words.boundingBox())!;
+  const box = await boxOf(words);
   // On "text", the second word
   await words.click({ modifiers: ["Alt"], position: { x: box.width - 4, y: box.height / 2 } });
   await expect.poll(() => cursorAt(page)).toBeGreaterThanOrEqual(text.indexOf("Right text") + "Right ".length);
@@ -303,7 +303,7 @@ test("a grid's columns as its line says, given again as the line is edited", asy
   await space.open({ Page: `# Page\n\n${GRID.replace("<grid>", '<grid columns="1fr 3fr">')}\nBelow\n` }, "Page");
   await gridsDrawn(page);
   const cells = page.locator("#sb-main .swl-grid-cell");
-  const widthsOf = async () => [Math.round((await cells.nth(0).boundingBox())!.width), Math.round((await cells.nth(1).boundingBox())!.width)];
+  const widthsOf = async () => [Math.round((await boxOf(cells.nth(0))).width), Math.round((await boxOf(cells.nth(1))).width)];
   await expect.poll(async () => {
     const [a, b] = await widthsOf();
     return Math.round(b! / a!);
@@ -315,14 +315,14 @@ test("a grid's handle drags it both ways from its middle (centred by default); a
   await gridsDrawn(page);
   const grid = page.locator("#sb-main .swl-grid");
   const edges = async () => {
-    const box = (await grid.boundingBox())!;
+    const box = await boxOf(grid);
     return [Math.round(box.x), Math.round(box.x + box.width)];
   };
   const [left, right] = await edges();
   await grid.hover();
   const bar = page.locator(".swl-handle-bar");
   await expect(bar).toBeVisible();
-  const box = (await bar.boundingBox())!;
+  const box = await boxOf(bar);
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2, { steps: 8 });
@@ -344,8 +344,8 @@ test("a cell keeps the blank lines of its markdown as the editor shows them: bet
   const first = page.locator("#sb-main .swl-grid-cell").first();
   // The two SilverBullet's rendering leaves out, put back; those between paragraphs it keeps
   await expect(first.locator(".swl-grid-blank")).toHaveCount(2);
-  const top = async (selector: string) => (await first.locator(selector).first().boundingBox())!.y;
-  const line = (await first.locator("li").first().boundingBox())!.height;
+  const top = async (selector: string) => (await boxOf(first.locator(selector).first())).y;
+  const line = (await boxOf(first.locator("li").first())).height;
   // item2 two lines under item (a blank line between), the heading a blank line under the list
   expect(Math.round(((await top("li >> nth=1")) - (await top("li"))) / line)).toBe(2);
   expect(Math.round(((await top("h1")) - (await top("li >> nth=1"))) / line)).toBe(2);
@@ -358,8 +358,8 @@ test("a click on a blank line of a cell puts the field's caret on that line, not
   await gridsDrawn(page);
   const first = page.locator("#sb-main .swl-grid-cell").first();
   const clickAbove = async (selector: string, lines: number) => {
-    const box = (await first.locator(selector).first().boundingBox())!;
-    const line = (await first.locator(".p").first().boundingBox())!.height;
+    const box = await boxOf(first.locator(selector).first());
+    const line = (await boxOf(first.locator(".p").first())).height;
     await page.mouse.click(box.x + 30, box.y - line * (lines - 0.5));
   };
   const caret = async () => (await fieldState(page)).from;
@@ -379,7 +379,7 @@ test("an empty cell is a line high, clicked into to write in it", async ({ page,
   await space.open({ Page: "# Page\n\n<grid>\n<cell>\n\nLeft\n\n</cell>\n<cell>\n\n\n</cell>\n</grid>\n" }, "Page");
   await gridsDrawn(page);
   const empty = page.locator("#sb-main .swl-grid-cell").nth(1);
-  expect((await empty.boundingBox())!.height).toBeGreaterThan(10);
+  expect((await boxOf(empty)).height).toBeGreaterThan(10);
   await empty.click();
   await expect(empty.locator(".swl-grid-editor")).toBeVisible();
   await expect.poll(async () => (await fieldState(page)).focused).toBe(true);
@@ -395,7 +395,7 @@ test("a grid aligned right from its handle's menu: written as its attribute, at 
   const content = page.locator("#sb-main .cm-content");
   const textRight = await content.evaluate((one) => one.getBoundingClientRect().right - parseFloat(getComputedStyle(one).paddingRight));
   const rightEdge = async () => {
-    const box = (await grid.boundingBox())!;
+    const box = await boxOf(grid);
     return Math.round(box.x + box.width);
   };
   const openMenu = async () => {
@@ -424,13 +424,13 @@ test("a grid aligned right from its handle's menu: written as its attribute, at 
   await grid.hover();
   const bar = page.locator(".swl-handle-bar");
   await expect(bar).toBeVisible();
-  const handle = (await bar.boundingBox())!;
-  expect(handle.x + handle.width).toBeLessThanOrEqual((await grid.boundingBox())!.x);
+  const handle = await boxOf(bar);
+  expect(handle.x + handle.width).toBeLessThanOrEqual((await boxOf(grid)).x);
   await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
   await page.mouse.down();
   // (Wider than the text too: still to the left alone, its right edge kept, the guides placed from it with it)
   await page.mouse.move(handle.x + handle.width / 2 - 600, handle.y + handle.height / 2, { steps: 12 });
-  expect((await grid.boundingBox())!.width).toBeGreaterThan(textRight - (await content.boundingBox())!.x);
+  expect((await boxOf(grid)).width).toBeGreaterThan(textRight - (await boxOf(content)).x);
   expect(await rightEdge()).toBe(Math.round(textRight));
   await page.mouse.move(handle.x + handle.width / 2 - 60, handle.y + handle.height / 2, { steps: 12 });
   await page.mouse.up();
@@ -453,7 +453,7 @@ test("the settings dialog's Alignment tab: every grid at the right where it says
     return { left: box.left + parseFloat(style.paddingLeft), right: box.right - parseFloat(style.paddingRight) };
   });
   const edges = async () => {
-    const box = (await grid.boundingBox())!;
+    const box = await boxOf(grid);
     return [Math.round(box.x), Math.round(box.x + box.width)];
   };
   await runCommand(page, LAYOUT_SETTINGS);
@@ -547,12 +547,12 @@ test("the divider between two columns dragged: their shares change as it moves, 
   await space.open({ Page: `# Page\n\n${GRID}\nBelow\n` }, "Page");
   await gridsDrawn(page);
   const cells = page.locator("#sb-main .swl-grid-cell");
-  const widths = async () => [(await cells.nth(0).boundingBox())!.width, (await cells.nth(1).boundingBox())!.width];
+  const widths = async () => [(await boxOf(cells.nth(0))).width, (await boxOf(cells.nth(1))).width];
   const [a, b] = await widths();
   await page.locator("#sb-main .swl-grid").hover();
   const divider = page.locator("#sb-main .swl-grid-divider");
   await expect(divider).toHaveCount(1);
-  const box = (await divider.boundingBox())!;
+  const box = await boxOf(divider);
   const y = box.y + Math.min(box.height / 2, 20);
   await page.mouse.move(box.x + box.width / 2, y);
   await page.mouse.down();
@@ -575,7 +575,7 @@ test("the divider between two columns dragged: their shares change as it moves, 
   await divider.dblclick();
   await expect.poll(() => space.saved("Page")).toContain("<grid>\n");
   await expect.poll(async () => {
-    const [first, second, line] = [(await cells.nth(0).boundingBox())!, (await cells.nth(1).boundingBox())!, (await divider.boundingBox())!];
+    const [first, second, line] = [(await boxOf(cells.nth(0))), (await boxOf(cells.nth(1))), (await boxOf(divider))];
     return Math.round(Math.abs(line.x + line.width / 2 - (first.x + first.width + second.x) / 2));
   }).toBeLessThan(2);
 });
@@ -607,7 +607,7 @@ test("a grid's columns set to Auto in its handle's menu: as many to a row as fit
   await choose("Columns", "Auto");
   await expect.poll(() => space.saved("Page")).toContain('<grid columns="auto">');
   await expect(grid).toHaveAttribute("data-swl-fit", "");
-  const width = (await grid.boundingBox())!.width;
+  const width = (await boxOf(grid)).width;
   const { gap } = await firstRow();
   const fit = (min: number) => Math.min(8, Math.max(1, Math.floor((width + gap) / (min + gap))));
   // M: 240 px at least
@@ -641,7 +641,7 @@ test("a wide grid's divider snaps to the text's edge too: its first column lined
   });
   await page.locator("#sb-main .swl-grid").hover();
   const divider = page.locator("#sb-main .swl-grid-divider");
-  const box = (await divider.boundingBox())!;
+  const box = await boxOf(divider);
   const y = box.y + Math.min(box.height / 2, 20);
   await page.mouse.move(box.x + box.width / 2, y);
   await page.mouse.down();
@@ -650,11 +650,11 @@ test("a wide grid's divider snaps to the text's edge too: its first column lined
   await page.mouse.move(textRight + gap / 2 - 4, y, { steps: 10 });
   await expect(page.locator(".swl-grid-divider-label")).toHaveText("Page width");
   await expect(page.locator("#sb-main .swl-grid-guide.swl-grid-guide-near")).toHaveText("Page width");
-  const right = (await page.locator("#sb-main .swl-grid-cell").first().boundingBox())!;
+  const right = await boxOf(page.locator("#sb-main .swl-grid-cell").first());
   expect(Math.round(right.x + right.width)).toBe(Math.round(textRight));
   // The guide where the divider is, snapped (its line on the divider's, not on the column's edge beside it)
   const middle = async (selector: string) => {
-    const one = (await page.locator(selector).boundingBox())!;
+    const one = await boxOf(page.locator(selector));
     return Math.round(one.x + one.width / 2);
   };
   expect(Math.abs((await middle("#sb-main .swl-grid-guide.swl-grid-guide-near")) - (await middle("#sb-main .swl-grid-divider")))).toBeLessThanOrEqual(1);
@@ -673,7 +673,7 @@ test("a grid in a page embedded in another: drawn with its own columns, not edit
   const shown = page.locator("#sb-main .swl-grid-shown");
   await expect(shown).toHaveCount(1, { timeout: 15000 });
   await expect(shown.locator(".swl-grid-cell")).toHaveText(["Left text", "Right text"]);
-  const [a, b] = [(await shown.locator(".swl-grid-cell").nth(0).boundingBox())!.width, (await shown.locator(".swl-grid-cell").nth(1).boundingBox())!.width];
+  const [a, b] = [(await boxOf(shown.locator(".swl-grid-cell").nth(0))).width, (await boxOf(shown.locator(".swl-grid-cell").nth(1))).width];
   expect(Math.round(b / a)).toBe(3);
   await shown.locator(".swl-grid-cell").first().click();
   await expect(shown.locator("textarea")).toHaveCount(0);
@@ -751,14 +751,14 @@ test("Move to grid: two paragraphs a cell each, put where the line shows between
   await page.keyboard.press("Enter");
   // The bar says what to do; the line between the cells, labelled with the cells made, follows the pointer
   await expect(page.locator(".swl-pick-bar")).toContainText("2 new cells go there");
-  const second = (await page.locator("#sb-main .swl-grid-cell").nth(1).boundingBox())!;
+  const second = await boxOf(page.locator("#sb-main .swl-grid-cell").nth(1));
   await page.mouse.move(second.x + 10, second.y + second.height / 2);
   const mark = page.locator(".swl-pick-mark");
   await expect(mark).toBeVisible();
   await expect(mark).toHaveAttribute("data-swl-pick", "between-columns");
   await expect(page.locator(".swl-pick-label")).toHaveText("2 new cells");
   // (The line in the gap left of the second cell)
-  const line = (await mark.boundingBox())!;
+  const line = await boxOf(mark);
   expect(line.x + line.width / 2).toBeLessThan(second.x);
   await page.mouse.click(second.x + 10, second.y + second.height / 2);
   await expect(page.locator(".swl-pick-bar")).toHaveCount(0);
@@ -784,7 +784,7 @@ test("Move to grid: Esc gives up, nothing written; a block put into a cell where
   void runCommand(page, "Silverware Layout: Move to grid");
   await expect(page.locator(".swl-pick-bar")).toBeVisible();
   const first = page.locator("#sb-main .swl-grid-cell").first();
-  const cell = (await first.boundingBox())!;
+  const cell = await boxOf(first);
   // (In the cell's middle, under its text: after its last block)
   await page.mouse.move(cell.x + cell.width / 2, cell.y + cell.height - 2);
   await expect(page.locator(".swl-pick-mark")).toHaveAttribute("data-swl-pick", "inside");
@@ -954,7 +954,7 @@ test("a cell of a grid without borders edited: lines in the middle of its gaps, 
         return [Math.round(box.left), Math.round(box.top), Math.round(box.width)];
       }),
     );
-  const text = async () => (await page.locator("#sb-main .swl-grid-cell").nth(1).getByText("Cell 2").boundingBox())!;
+  const text = async () => (await boxOf(page.locator("#sb-main .swl-grid-cell").nth(1).getByText("Cell 2")));
   const before = await places();
   const second = await text();
   await page.locator("#sb-main .swl-grid-cell").first().getByText("Cell 1").click();
@@ -1088,7 +1088,7 @@ test("a grid of columns as many as fit, without borders, its width dragged: ever
   const cellLines = () => grid.evaluate((element) => [...element.querySelectorAll(".swl-grid-cell")].map((one) => getComputedStyle(one, "::after").boxShadow));
   expect(await cellLines()).toEqual(["none", "none", "none", "none"]);
   await grid.hover();
-  const bar = (await page.locator(".swl-handle-bar").boundingBox())!;
+  const bar = await boxOf(page.locator(".swl-handle-bar"));
   await page.mouse.move(bar.x + bar.width / 2, bar.y + bar.height / 2);
   await page.mouse.down();
   await page.mouse.move(bar.x + bar.width / 2 - 20, bar.y + bar.height / 2, { steps: 4 });
@@ -1109,7 +1109,7 @@ test("a click on a word of a cell edits it with the cursor in that word", async 
   await space.open({ Page: `# Page\n\n${GRID}` }, "Page");
   await gridsDrawn(page);
   const words = page.locator("#sb-main .swl-grid-cell").nth(1).getByText("Right text");
-  const box = (await words.boundingBox())!;
+  const box = await boxOf(words);
   // Into "text", the second word
   await words.click({ position: { x: box.width - 6, y: box.height / 2 } });
   await expect.poll(async () => (await fieldState(page)).focused).toBe(true);
@@ -1123,7 +1123,7 @@ test("text selected in a cell by a drag is selected in its field as it is edited
   await space.open({ Page: `# Page\n\n${GRID.replace("Right text", "Right side text")}` }, "Page");
   await gridsDrawn(page);
   const words = page.locator("#sb-main .swl-grid-cell").nth(1).getByText("Right side text");
-  const box = (await words.boundingBox())!;
+  const box = await boxOf(words);
   const char = box.width / "Right side text".length;
   // From the start of "side" to its end
   await page.mouse.move(box.x + char * 6 + 1, box.y + box.height / 2);
@@ -1192,7 +1192,7 @@ test("a cell left by Esc, then a drag in a cell: the grid stays drawn, the field
   // (SilverBullet may draw the page anew as another test's CONFIG is put back: the grid drawn again first)
   await gridsDrawn(page);
   const words = page.locator("#sb-main .swl-grid-cell").nth(1).getByText("Right text");
-  const box = (await words.boundingBox())!;
+  const box = await boxOf(words);
   await page.mouse.move(box.x + 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2, { steps: 6 });
@@ -1343,7 +1343,7 @@ test("a cell written, the grid drawn anew: the other cells' rendering kept as it
   await expect(image).toBeVisible();
   await image.evaluate((element) => element.setAttribute("data-test-kept", ""));
   const after = page.locator("#sb-main .cm-line", { hasText: "After" });
-  const afterTop = (await after.boundingBox())!.y;
+  const afterTop = (await boxOf(after)).y;
   // The second cell edited, then left by a click in the page's text: written, the grid drawn anew
   await expect(async () => {
     if (await cellField(page).count()) await page.keyboard.press("Escape");
@@ -1357,5 +1357,5 @@ test("a cell written, the grid drawn anew: the other cells' rendering kept as it
   await expect(page.locator("#sb-main .swl-grid-cell").nth(1)).toContainText("Right text typed");
   // (The same image element in the grid drawn anew: taken over, not drawn again)
   await expect(page.locator("#sb-main .swl-grid [data-test-kept]")).toHaveCount(1);
-  expect(Math.abs((await after.boundingBox())!.y - afterTop)).toBeLessThan(2);
+  expect(Math.abs((await boxOf(after)).y - afterTop)).toBeLessThan(2);
 });

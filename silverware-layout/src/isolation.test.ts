@@ -58,7 +58,7 @@ describe("isolation", () => {
     // Code less its comments; the style page's rules less theirs (its colors are the themes' variables every plugin reads)
     const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     // (Its editor's editable area too: the page's editor focused again is the host's, host/silverbullet/behaviour.ts)
-    const sbNames = /\.cm-[a-z]|#sb-|--editor-(width|font-size)|\[contenteditable/;
+    const sbNames = /\.cm-[a-z]|#sb-|\.sb-[a-z]|--editor-(width|font-size)|\[contenteditable/;
     for (const [file] of of(".").filter(([file]) => !file.startsWith("host/silverbullet/"))) expect(code(readFileSync(join(SRC, file), "utf8")).match(sbNames)?.[0], file).toBeUndefined();
     const style = readFileSync(join(SRC, "..", "silverware-layout-style.md"), "utf8");
     const rules = /```space-style\r?\n([\s\S]*?)```/.exec(style)?.[1] ?? "";

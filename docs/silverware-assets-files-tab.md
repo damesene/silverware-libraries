@@ -89,7 +89,7 @@ an empty list says "No guides: a drag does not snap".
 1. [x] Assets: the Files tab rebuilt (ui/mediatab.ts), the types' human names and which are documents (the type's
    own, `shared/assets.ts`), a document's height by type (`full.types`), Saved previews, the Markdown tab's texts.
 2. [x] Layout: the Markdown tab's texts, the Guides tab (an agent, its files apart).
-3. [ ] Unit tests, UI tests (Assets, Layout), screenshots, review, commit on the user's word.
+3. [x] Unit tests, UI tests (Assets, Layout), screenshots, review, commit on the user's word.
 
 ## Findings
 

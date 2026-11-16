@@ -21,7 +21,9 @@ export type EditorKeys = Readonly<Record<string, () => boolean>>;
 /**
  * An embed drawn in an editor in place of its markdown, by its user's plugin (or the plugin drawing files that it
  * hands it over from): into an element the editor gives it, in the editor's own root (a shadow root: the page's rules
- * of the classes drawn, by their prefix, `swa-`, are put in there for it)
+ * of the classes and data attributes drawn, by their prefix, are put in there for it. The prefix is the name's first
+ * word and dash, `swa-` of `swa-frame` and of `swa-pdf-preview` alike, so every plugin's rules under it come along; a
+ * plugin marking what is drawn there (Silverware Layout's `data-swl-width`) has its own rules put in by the same)
  */
 export type EditorEmbed = {
   // Which drawing it is: the same key, the drawing kept as the text around it changes

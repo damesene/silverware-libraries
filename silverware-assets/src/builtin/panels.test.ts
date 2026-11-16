@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 // The asset in a side panel or enlarged: rendered as the core renders it, one of a kind at a time, closed by Esc, ×,
-// or (the popover) a click beside it; over the window, so the other plugins stand back.
+// or (the enlarged view) a click beside it; over the window, so the other plugins stand back.
 import { afterEach, describe, expect, it } from "vitest";
 import { type ActionContext, assetName } from "../../../shared/assets.ts";
-import { peek, popover } from "./panels.ts";
+import { sidePanel, enlarged } from "./panels.ts";
 
 const context = (opened: string[] = []): ActionContext => ({
   asset: { kind: "file", path: "Docs/report.pdf", url: ".fs/Docs/report.pdf" },
@@ -21,33 +21,33 @@ afterEach(() => {
 describe("the asset's panels", () => {
   it("fit an asset drawn larger than its card", () => {
     const asset = context().asset;
-    expect(peek.fits(asset, { views: ["card", "full"] })).toBe(true);
-    expect(popover.fits(asset, { views: ["card"] })).toBe(false);
+    expect(sidePanel.fits(asset, { views: ["card", "full"] })).toBe(true);
+    expect(enlarged.fits(asset, { views: ["card"] })).toBe(false);
     expect(assetName(asset)).toBe("report.pdf");
   });
 
-  it("peek: the asset rendered in a panel at the right, its name, Open in a new tab; one at a time; Esc closes it", async () => {
+  it("the side panel: the asset rendered in a panel at the right, its name, Open in a new tab; one at a time; Esc closes it", async () => {
     const opened: string[] = [];
-    peek.run(context(opened));
+    sidePanel.run(context(opened));
     await flush();
-    const panel = document.querySelector(".swa-peek")!;
+    const panel = document.querySelector(".swa-side-panel")!;
     expect(panel.hasAttribute("data-silverware-over-window")).toBe(true);
     expect(panel.querySelector(".swa-panel-title")!.textContent).toBe("report.pdf");
     expect(panel.querySelector(".swa-panel-body .drawn")).not.toBeNull();
     panel.querySelector<HTMLButtonElement>(".swa-panel-button")!.click();
     expect(opened).toEqual([".fs/Docs/report.pdf"]);
-    peek.run(context());
+    sidePanel.run(context());
     await flush();
-    expect(document.querySelectorAll(".swa-peek")).toHaveLength(1);
+    expect(document.querySelectorAll(".swa-side-panel")).toHaveLength(1);
     esc();
-    expect(document.querySelector(".swa-peek")).toBeNull();
+    expect(document.querySelector(".swa-side-panel")).toBeNull();
   });
 
-  it("peek: its width set by its left edge, kept on this device for the next panel; a double click its default again", async () => {
-    peek.run(context());
+  it("the side panel: its width set by its left edge, kept on this device for the next panel; a double click its default again", async () => {
+    sidePanel.run(context());
     await flush();
-    const panel = () => document.querySelector<HTMLElement>(".swa-peek")!;
-    const edge = () => panel().querySelector<HTMLElement>(".swa-peek-resize")!;
+    const panel = () => document.querySelector<HTMLElement>(".swa-side-panel")!;
+    const edge = () => panel().querySelector<HTMLElement>(".swa-side-panel-resize")!;
     expect(edge().getAttribute("role")).toBe("separator");
     expect(panel().style.width).toBe("");
     // (jsdom measures nothing: a step from 0 is held at the narrowest)
@@ -55,7 +55,7 @@ describe("the asset's panels", () => {
     expect(panel().style.width).toBe("320px");
     expect(localStorage.getItem("silverware.assets.peekWidth")).toBe("320");
     esc();
-    peek.run(context());
+    sidePanel.run(context());
     await flush();
     expect(panel().style.width).toBe("320px");
     edge().dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
@@ -63,12 +63,12 @@ describe("the asset's panels", () => {
     expect(localStorage.getItem("silverware.assets.peekWidth")).toBeNull();
   });
 
-  it("peek: over the area the host gives (its editor's), its × first; placed again as the area changes, no more once closed", async () => {
+  it("the side panel: over the area the host gives (its editor's), its × first; placed again as the area changes, no more once closed", async () => {
     let area = new DOMRect(200, 50, 800, 600);
     const listeners = new Set<() => void>();
-    peek.run({ ...context(), sheetArea: { rect: () => area, watch: (listener) => (listeners.add(listener), () => listeners.delete(listener)) } });
+    sidePanel.run({ ...context(), sheetArea: { rect: () => area, watch: (listener) => (listeners.add(listener), () => listeners.delete(listener)) } });
     await flush();
-    const panel = document.querySelector<HTMLElement>(".swa-peek")!;
+    const panel = document.querySelector<HTMLElement>(".swa-side-panel")!;
     expect([panel.style.top, panel.style.right, panel.style.height, panel.style.maxWidth]).toEqual(["50px", `${window.innerWidth - 1000}px`, "600px", "800px"]);
     expect(panel.querySelector(".swa-panel-head")!.firstElementChild!.classList.contains("swa-panel-close")).toBe(true);
     area = new DOMRect(200, 90, 800, 560);
@@ -78,16 +78,16 @@ describe("the asset's panels", () => {
     expect(listeners.size).toBe(0);
   });
 
-  it("popover: over the dimmed page, closed by a click beside it or ×", async () => {
-    popover.run(context());
+  it("the enlarged view: over the dimmed page, closed by a click beside it or ×", async () => {
+    enlarged.run(context());
     await flush();
-    const root = document.querySelector<HTMLElement>(".swa-popover")!;
-    root.querySelector<HTMLElement>(".swa-popover-box")!.click();
-    expect(document.querySelector(".swa-popover")).not.toBeNull();
+    const root = document.querySelector<HTMLElement>(".swa-enlarged")!;
+    root.querySelector<HTMLElement>(".swa-enlarged-box")!.click();
+    expect(document.querySelector(".swa-enlarged")).not.toBeNull();
     root.click();
-    expect(document.querySelector(".swa-popover")).toBeNull();
-    popover.run(context());
+    expect(document.querySelector(".swa-enlarged")).toBeNull();
+    enlarged.run(context());
     document.querySelector<HTMLButtonElement>(".swa-panel-close")!.click();
-    expect(document.querySelector(".swa-popover")).toBeNull();
+    expect(document.querySelector(".swa-enlarged")).toBeNull();
   });
 });

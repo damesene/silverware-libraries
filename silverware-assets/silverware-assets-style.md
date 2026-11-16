@@ -570,12 +570,6 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 .swa-settings-field {
   display: contents;
 }
-.swa-settings-checks {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 14px;
-}
 .swa-settings-check {
   display: flex;
   align-items: center;
@@ -979,7 +973,8 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 .swa-native-hidden {
   display: none !important;
 }
-[data-swa-view="preview"] :is(img, video, object):not(.swa-icon img, .swa-pdf) {
+/* (The host's medium alone, .swa-medium: never what a type draws, a document's page or its pictures) */
+[data-swa-view="preview"] :is(img, video, object).swa-medium {
   max-height: var(--swa-height, 160px);
   max-width: min(100%, var(--swa-preview-width, 100%));
   width: auto !important;
@@ -1002,26 +997,26 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   max-width: 100%;
   border: none !important;
 }
-[data-swa-type]:has(object:not(.swa-native-hidden, .swa-native-hidden *), .swa-pdf) {
+[data-swa-type]:has(object.swa-medium:not(.swa-native-hidden, .swa-native-hidden *), .swa-pdf) {
   display: block;
   width: auto;
 }
 /* A PDF's preview of a width the settings give: its frame as wide as the preview, its "…" at the preview's corner
    (none given: as wide as the text, the frame too) */
-[data-swa-type][data-swa-view="preview"][data-swa-preview-width]:has(object:not(.swa-native-hidden, .swa-native-hidden *), .swa-pdf) {
+[data-swa-type][data-swa-view="preview"][data-swa-preview-width]:has(object.swa-medium:not(.swa-native-hidden, .swa-native-hidden *), .swa-pdf) {
   width: fit-content;
   max-width: 100%;
 }
 /* The host's PDF viewer shown full, without a size of its own: as wide as its frame (the text's), so the frame's
    edge, and Silverware Layout's handle beside it, is the viewer's (SilverBullet 2.12.1 draws it 300 px wide, its
    style `max-width: 100%;`; one with a size, `width: 200px` after it, keeps it) */
-[data-swa-type][data-swa-view="full"] object:not(.swa-icon *, [style*="; width"]) {
+[data-swa-type][data-swa-view="full"] object.swa-medium:not([style*="; width"]) {
   width: 100% !important;
   max-width: 100% !important;
 }
 /* Its height: a full file's setting (`full.height`, 480 px, or its type's own: `full.types`), or its embed's own (`|600x800`): SilverBullet gives
    the viewer none, so the browser's 150 px of an object showed it as small as a preview */
-[data-swa-type][data-swa-view="full"] object:not(.swa-icon *) {
+[data-swa-type][data-swa-view="full"] object.swa-medium {
   height: var(--swa-height, 480px) !important;
 }
 /* A card's frame: the card alone in it (its menu's way in within the card: its icon, else an arrow after its name) */
@@ -1048,8 +1043,9 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   vertical-align: top;
 }
 /* Laid out by the handle (its width on the frame, data-swl-width): the host's medium fills the frame, its height by
-   its ratio, so a drag shows at once what the width written will draw */
-[data-swa-type][data-swl-width]:not([data-swa-view="preview"]) :is(img, video, object):not(.swa-icon img) {
+   its ratio, so a drag shows at once what the width written will draw (its medium alone: a document's pictures, a
+   type's own drawing, keep theirs) */
+[data-swa-type][data-swl-width]:not([data-swa-view="preview"]) :is(img, video, object).swa-medium {
   width: 100% !important;
   max-width: 100% !important;
   height: auto;
@@ -1107,10 +1103,10 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   content: "·";
   margin-right: 6px;
 }
-/* An asset shown by an action: in a panel at the window's right (peek, over part of the window: the sheet's layer), or
-   enlarged over the dimmed page (popover, a dialog's layer); its head its name, Open in a new tab and ×, its body the
+/* An asset shown by an action: in a panel at the window's right (the side panel, over part of the window: the sheet's layer), or
+   enlarged over the dimmed page (the enlarged view, a dialog's layer); its head its name, Open in a new tab and ×, its body the
    asset as large as the panel lets it be */
-.swa-peek {
+.swa-side-panel {
   position: fixed;
   top: 0;
   right: 0;
@@ -1127,7 +1123,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 /* Its left edge dragged to set its width: a zone to hit over its height, the cursor saying what it does, nothing drawn
    but a line in the accent's color while pointed at or focused */
-.swa-peek-resize {
+.swa-side-panel-resize {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -1138,7 +1134,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   touch-action: none;
   outline: none;
 }
-.swa-peek-resize::before {
+.swa-side-panel-resize::before {
   content: "";
   position: absolute;
   top: 0;
@@ -1149,10 +1145,10 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   opacity: 0;
   transition: opacity 0.12s;
 }
-.swa-peek-resize:is(:hover, :focus-visible)::before {
+.swa-side-panel-resize:is(:hover, :focus-visible)::before {
   opacity: 1;
 }
-.swa-popover {
+.swa-enlarged {
   position: fixed;
   inset: 0;
   z-index: var(--sw-layer-dialog);
@@ -1161,7 +1157,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   justify-content: center;
   background: rgba(0, 0, 0, 0.55);
 }
-.swa-popover-box {
+.swa-enlarged-box {
   display: flex;
   flex-direction: column;
   max-width: 92vw;
@@ -1207,7 +1203,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   border-color: transparent;
 }
 /* The side panel's × first, at the edge it opened from: the head's padding even */
-.swa-peek .swa-panel-head {
+.swa-side-panel .swa-panel-head {
   padding-left: 6px;
 }
 .swa-panel-body {
@@ -1226,7 +1222,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   height: auto !important;
   object-fit: contain;
 }
-.swa-popover .swa-panel-body > :is(img, video) {
+.swa-enlarged .swa-panel-body > :is(img, video) {
   max-height: calc(92vh - 70px);
 }
 /* A type's reader as wide as its line (shared/assets.ts, ASSET_WIDE_ATTRIBUTE: a document's, read at any width): its
@@ -1246,7 +1242,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   height: 100% !important;
   min-height: 60vh;
 }
-.swa-popover .swa-panel-body > object {
+.swa-enlarged .swa-panel-body > object {
   width: 85vw !important;
   height: calc(92vh - 70px) !important;
 }
@@ -1350,12 +1346,6 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 .swa-label-icon > .swa-icon {
   width: 1.2em;
   height: 1.2em;
-}
-.swa-label-line > .swa-label-line-icon {
-  margin-right: 0.35em;
-}
-.swa-label-line > .swa-label-line-icon + span::before {
-  content: none;
 }
 .swa-label-size,
 .swa-label-modified {

@@ -2,7 +2,7 @@
 // URL in a new tab of the browser; the asset in a side panel, or enlarged over the page (./panels.ts); an image copied
 // to the clipboard (its menu's alone); the file downloaded.
 import type { AssetAction } from "../../../shared/assets.ts";
-import { peek, popover } from "./panels.ts";
+import { sidePanel, enlarged } from "./panels.ts";
 
 export const openTab: AssetAction = {
   name: "open-tab",
@@ -100,4 +100,4 @@ export const download: AssetAction = {
   },
 };
 
-export const BUILTIN_ACTIONS: readonly AssetAction[] = [openTab, peek, popover, copyImage, download];
+export const BUILTIN_ACTIONS: readonly AssetAction[] = [openTab, sidePanel, enlarged, copyImage, download];

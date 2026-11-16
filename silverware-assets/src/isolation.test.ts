@@ -75,6 +75,13 @@ describe("isolation", () => {
     }
   });
 
+  it("names nothing under a type plugin's prefix (swa-pdf-, swa-docx-, swa-xlsx-: Silverware Assets PDF's, DOCX's, XLSX's, after its own swa-)", () => {
+    const style = readFileSync(join(SRC, "..", "silverware-assets-style.md"), "utf8");
+    const theirs = /swa-(pdf|docx|xlsx)-[a-z]/;
+    expect(style.match(theirs)?.[0], "style page").toBeUndefined();
+    for (const [file] of of(".")) expect(readFileSync(join(SRC, file), "utf8").match(theirs)?.[0], file).toBeUndefined();
+  });
+
   it("imports no other plugin's code", () => {
     for (const [file, list] of of(".")) expect(list.filter((path) => /^silverware-(?!assets\/)/.test(path)), file).toEqual([]);
   });

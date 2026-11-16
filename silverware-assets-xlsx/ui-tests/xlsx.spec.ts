@@ -132,7 +132,7 @@ test("a workbook in the side panel is the reader filling it", async ({ page, spa
   await preview.hover();
   await preview.locator(".swa-more").click();
   await page.locator(".swa-popup .swa-menu-item", { hasText: "Open in side panel" }).click();
-  const panel = page.locator(".swa-peek");
+  const panel = page.locator(".swa-side-panel");
   const reader = panel.locator(".swa-xlsx-reader[data-swa-xlsx-state='sheet']");
   await expect(reader.locator("table.swa-xlsx-sheet")).toContainText("Monthly budget");
   const body = (await panel.locator(".swa-panel-body").boundingBox())!;

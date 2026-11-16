@@ -630,7 +630,7 @@ describe("a link's menu", () => {
     // Shown in the side panel: the file's viewer, as the browser draws a PDF
     arrow.click();
     [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")][1]!.click();
-    await vi.waitFor(() => expect(document.querySelector(".swa-peek object")?.getAttribute("data")).toBe(".fs/report.pdf"));
+    await vi.waitFor(() => expect(document.querySelector(".swa-side-panel object")?.getAttribute("data")).toBe(".fs/report.pdf"));
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   });
 });

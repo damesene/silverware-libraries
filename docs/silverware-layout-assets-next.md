@@ -1,10 +1,10 @@
 # Silverware Layout and Silverware Assets: where the branch stands, what is next
 
-Written 2026-11-14 so that a new session can start from here. Branch `docs/layout-assets` (90 commits past `main`, all pushed; nothing of it released). The design and decisions of each part are in its own plan, kept up to date: [silverware-layout-grid.md](silverware-layout-grid.md) (the grid: columns, dividers, edges, blank lines, Put into grid), [silverware-assets.md](silverware-assets.md) (the files: views, cards, links, menus, previews, which embed a widget is), [silverware-assets-split.md](silverware-assets-split.md) (Assets split out of Layout: all its steps done), [silverware-layout.md](silverware-layout.md) (widths, font, guides). This file says what is left and how to work.
+Written 2026-11-14 so that a new session can start from here; brought up to date 2026-11-16. Branch `docs/layout-assets` (squashed to 12 commits past `main` on 2026-11-16; nothing of it released). The design and decisions of each part are in its own plan, kept up to date: [silverware-layout-grid.md](silverware-layout-grid.md) (the grid: columns, dividers, edges, blank lines, Wrap in grid and Move to grid), [silverware-assets.md](silverware-assets.md) (the files: views, cards, links, menus, previews, which embed a widget is), [silverware-assets-split.md](silverware-assets-split.md) (Assets split out of Layout: all its steps done), [silverware-layout.md](silverware-layout.md) (widths, font, guides). This file says what is left and how to work.
 
 ## Done on the branch (in short)
 
-- **Silverware Layout**: the grid (`<grid>`/`<cell>`, a cell edited in place, its caret and selection carried, Ctrl+Z, tasks, `/grid`, Put into grid with its modes, a cell's "…" menu, embedded pages' grids, indexing); column widths dragged by a divider between columns, snapping to ratios and to the page text's edges, guides shown; a grid's edges dragged alone (its place kept as `shift` beside `width`; Alt: both ways) in place of the width handle's bar; grips for every handle (the user's choice); blank lines of a cell kept as the editor shows them, a click on one placing the caret there; an empty cell a line high; Put into grid taking a paragraph's lines as blocks each.
+- **Silverware Layout**: the grid (`<grid>`/`<cell>`, a cell edited in place, its caret and selection carried, Ctrl+Z, tasks, `/grid`, Wrap in grid with its modes and Move to grid (named Put into grid at first), a cell's menu by its grip (a "…" at first), embedded pages' grids, indexing); column widths dragged by a divider between columns, snapping to ratios and to the page text's edges, guides shown; a grid's edges dragged alone (its place kept as `shift` beside `width`; Alt: both ways) in place of the width handle's bar; grips for every handle (the user's choice); blank lines of a cell kept as the editor shows them, a click on one placing the caret there; an empty cell a line high; Wrap in grid taking a paragraph's lines as blocks each.
 - **Silverware Assets** (new plugin, prefix `swa-`, `silverware.assets`, command `Silverware Assets: Settings`): embedded files shown full, as a preview or a card; links to files with their icon and menu; link ↔ embed; side panel and enlarged views; the settings window (Assets, Markdown tabs; a preview's size for all files and per type; a full PDF's height); the markdown-as-written mode (`shared/syntaxmode.ts`); which embed a widget of the editor is (SilverBullet's `posAtDOM` first, marked `SILVERBULLET-INTERNAL`, `src/host/silverbullet/editorposition.ts`; else the text around it; else the run of widgets drawn).
 - A review of the whole branch (2026-11-14) and its findings fixed; the isolation tests check Assets' layers and its use of Layout through its API alone.
 
@@ -12,11 +12,15 @@ Written 2026-11-14 so that a new session can start from here. Branch `docs/layou
 
 1. ~~The Page layout dialog closed when another plugin saved the configuration~~: fixed 2026-11-14. Started again, Silverware Layout took the page it had for none (`start` set it `""`), and `pageOpened` closed the dialog as over another page; the page is kept now, and what the open dialog shows is not undone (`app.test.ts`, and Assets' markdown-as-written test with Layout's dialog open as Assets saves).
 2. **SilverBullet after 2.12.1 (edge)**: [silverware-library-prefix.md](silverware-library-prefix.md) plans the change for every plugin (scripts only under `Library/`, CONFIG moved to `Library/Config`). Silverware Assets' init page has its own `saveConfigPage` writing `CONFIG`: add Assets to that plan. The grid and the assets were never tried on edge.
-3. **Releases** (on the user's word only, the last commits of the branch, root `CLAUDE.md` *Versions*):
-   - Silverware Assets 1.0.0: its entry (`silverware-assets/CHANGELOG.md`, dated 2026-11-13) predates the settings window, previews' sizes, the PDF's height and the click on a PDF's preview: redraft it and its date, then ask.
-   - Silverware Layout: 1.0.0 now; propose 1.1.0 (a MINOR: the grid and everything around it, grips, Put into grid; nothing a space has breaks, the assets never being released in Layout), its entry drafted from `git log layout-v1.0.0..HEAD -- silverware-layout/ shared/` (check the tag's name first: `git tag -l`).
-   - `shared/` changed for other plugins too (the page writer's grid cells, `shared/layout.ts`' new optional members, `shared/popupmenu.ts`, `shared/markdown/embed.ts`): their bundles were rebuilt; whether any of them needs a release of its own, ask.
-4. **The PR to `main`**, merged on GitHub (the user's way), then the tags (`assets-v1.0.0`, `layout-v1.1.0`), each with the user's confirmation.
+3. **Releases** (on the user's word only, the last commit of the branch, root `CLAUDE.md` *Versions*). No tag exists yet: a
+   plugin's history since its last release is `git diff origin/main..HEAD -- silverware-<name>/ shared/`. Proposed at the
+   review before the release (2026-11-16):
+   - First releases, 1.0.0: Silverware Assets, Silverware Editor, Silverware Assets PDF, DOCX and XLSX (their entries
+     dated anew; Assets' redrafted for what ships), each added to `REPO.md` and the README.
+   - Silverware Layout 2.0.0 (its command `Silverware Layout: Page layout` renamed `Silverware Layout: Settings`: a
+     toolbar button or key bound to the old name breaks), Database 1.2.0, Toolbar 1.1.0, Table 1.2.1, Chart 1.1.1;
+     Tags and Icons none.
+4. **The PR to `main`**, merged on GitHub (the user's way), then the tags (one per plugin released: `assets-v1.0.0`, `layout-v2.0.0`, …), each with the user's confirmation.
 
 ## Waiting on others
 

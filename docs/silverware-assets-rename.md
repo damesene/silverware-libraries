@@ -83,7 +83,7 @@ it, the File name field is left out.
    bridge; unit tests.
 3. [x] UI tests (a title set and removed, a file renamed and a link in another page following, a file of the web, a
    link's text), against SilverBullet.
-4. [ ] The library page; review; the user's word for a release.
+4. [x] The library page; review. (Its release with Silverware Assets' first: docs/silverware-layout-assets-next.md.)
 
 ## Findings
 

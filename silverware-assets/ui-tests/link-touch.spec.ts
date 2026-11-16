@@ -12,5 +12,5 @@ test("the arrow after a link tapped opens its menu, the link not followed", asyn
   await page.waitForTimeout(500);
   expect(page.url()).toBe(url);
   await page.locator(".swa-popup .swa-menu-item", { hasText: "Open enlarged" }).tap();
-  await expect(page.locator(".swa-popover object")).toBeVisible();
+  await expect(page.locator(".swa-enlarged object")).toBeVisible();
 });

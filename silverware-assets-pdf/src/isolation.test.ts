@@ -31,4 +31,12 @@ describe("isolation", () => {
       expect(outside.filter((path) => !allowed.includes(path)), relative(SRC, file)).toEqual([]);
     }
   });
+  it("names its classes, attributes and variables under its own prefix, swa-pdf- (Silverware Assets' swa- before it: none of Assets' names nor another type's)", () => {
+    const style = readFileSync(join(SRC, "..", "silverware-assets-pdf-style.md"), "utf8");
+    // (A shared reader's block, shared/docreader.css, written in its style page is its own: under its base, swa-pdf)
+    for (const [name, text] of [...files(SRC).map((file) => [relative(SRC, file), readFileSync(file, "utf8")] as const), ["style page", style] as const]) {
+      const names = [...text.replace(/^\s*\/\/.*$/gm, "").matchAll(/(?<![A-Za-z0-9-])-{0,2}(?:data-)?swa-[a-z]+/g)].map(([found]) => found.replace(/^-+|^data-/g, ""));
+      expect(names.filter((found) => found !== "swa-pdf"), name).toEqual([]);
+    }
+  });
 });

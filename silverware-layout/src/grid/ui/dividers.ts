@@ -30,21 +30,21 @@ function laidOut(grid: HTMLElement): { readonly widths: number[]; readonly gap: 
 }
 
 // The knob's height (px, the style page's: a touch screen's) and the room kept above and below it within the grid
-const GRIP = 12;
-const GRIP_ROOM = 6;
-// The variable the grips' place is in (px from the grid's top)
-const GRIP_Y = "--swl-grip-y";
+const KNOB = 12;
+const KNOB_ROOM = 6;
+// The variable the knobs' place is in (px from the grid's top)
+const KNOB_Y = "--swl-knob-y";
 
 /**
- * Where the grips stand (px from the grid's top): the middle of the part of the grid in view, held within the grid;
+ * Where the knobs stand (a touch screen's; a dragged divider's label above them) (px from the grid's top): the middle of the part of the grid in view, held within the grid;
  * none in view: its middle
  */
-export function gripAt(grid: { readonly top: number; readonly bottom: number }, view: { readonly top: number; readonly bottom: number }): number {
+export function knobAt(grid: { readonly top: number; readonly bottom: number }, view: { readonly top: number; readonly bottom: number }): number {
   const height = grid.bottom - grid.top;
   const top = Math.max(grid.top, view.top);
   const bottom = Math.min(grid.bottom, view.bottom);
   const middle = bottom > top ? (top + bottom) / 2 - grid.top : height / 2;
-  const least = GRIP / 2 + GRIP_ROOM;
+  const least = KNOB / 2 + KNOB_ROOM;
   return height <= 2 * least ? height / 2 : Math.min(Math.max(middle, least), height - least);
 }
 
@@ -86,13 +86,13 @@ export function addColumnDividers(
 ): void {
   let dividers: HTMLElement[] = [];
   /** The knobs (and a dragged divider's label) placed in the part of the grid in view */
-  const placeGrips = () => {
+  const placeKnobs = () => {
     const rect = grid.getBoundingClientRect();
     const seen = view?.() ?? { top: 0, bottom: doc.defaultView?.innerHeight ?? rect.bottom };
-    grid.style.setProperty(GRIP_Y, `${Math.round(gripAt(rect, seen))}px`);
+    grid.style.setProperty(KNOB_Y, `${Math.round(knobAt(rect, seen))}px`);
   };
   const place = () => {
-    placeGrips();
+    placeKnobs();
     const { widths, gap } = laidOut(grid);
     // (Columns as many as fit are equal, none resized: no divider)
     const places = widths.length > 1 && !shownFit(grid) ? dividerPlaces(widths, gap) : [];
@@ -203,7 +203,7 @@ export function addColumnDividers(
   grid.addEventListener("pointerenter", place);
   // Its columns changed while its dividers are shown (a double click made two even, its menu set another count or as
   // many as fit): placed again at once (they stayed where the old columns had them until the grid was drawn anew).
-  // Told by the grid's template and fit alone: its other styles (the grips' place) set by `place` itself
+  // Told by the grid's template and fit alone: its other styles (the knobs' place) set by `place` itself
   const columnsNow = () => `${grid.style.getPropertyValue("--swl-grid-columns")}|${shownFit(grid)}`;
   let columnsSeen = columnsNow();
   const MutationObserverOf = doc.defaultView?.MutationObserver;
@@ -217,7 +217,7 @@ export function addColumnDividers(
     }).observe(grid, { attributes: true, attributeFilter: ["style", "data-swl-fit"] });
   // (A pointer's first press, a touch screen's: placed then)
   grid.addEventListener("pointerdown", place, { capture: true });
-  // The grips kept in view as the page scrolls (a frame's work at most; the listener let go once the grid is gone). A
+  // The knobs kept in view as the page scrolls (a frame's work at most; the listener let go once the grid is gone). A
   // grid drawn anew under the pointer (its host draws it again as the page scrolls) gets its dividers then, no
   // pointer's coming into it needed: none comes while the pointer stays put
   let pending = false;
@@ -227,7 +227,7 @@ export function addColumnDividers(
     pending = true;
     (doc.defaultView?.requestAnimationFrame ?? ((run: () => void) => setTimeout(run, 16)))(() => {
       pending = false;
-      if (dividers.length) placeGrips();
+      if (dividers.length) placeKnobs();
       else place();
     });
   };

@@ -146,7 +146,7 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   display: none;
 }
 /* The handle of a widget's width: a short rounded grip beside its right edge, quiet grey, the accent's as the pointer
-   is on it or it is dragged (the user's choice, 2026-11-14: grips, as the grid's column dividers have) */
+   is on it or it is dragged (the user's choice, 2026-11-14; a grid's column dividers a line alone, no grip: 2026-11-16) */
 .swl-handle {
   position: fixed;
   z-index: var(--sw-layer-control);
@@ -893,9 +893,9 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   opacity: 0;
 }
 /* A finger's knob, on a touch screen alone: at the middle of the part of the grid in view (src/grid/ui/dividers.ts
-   sets --swl-grip-y), a tall grid's seen wherever it is scrolled to */
+   sets --swl-knob-y), a tall grid's seen wherever it is scrolled to */
 .swl-grid-divider::after {
-  top: var(--swl-grip-y, 50%);
+  top: var(--swl-knob-y, 50%);
   width: 12px;
   height: 12px;
   box-sizing: border-box;
@@ -962,7 +962,7 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
 .swl-grid-divider-label {
   position: absolute;
   /* (Over the knob's place, which rides in the part of the grid in view) */
-  top: calc(var(--swl-grip-y, 50%) - 12px - 1.8em);
+  top: calc(var(--swl-knob-y, 50%) - 12px - 1.8em);
   left: 50%;
   transform: translateX(-50%);
   padding: 1px 6px;

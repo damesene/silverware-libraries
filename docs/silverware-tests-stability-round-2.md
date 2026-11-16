@@ -43,11 +43,13 @@ where one did too much, Table's `moduleHost` shared). Two parts:
 3. [x] Table UI `choices`, `names`, `widths`, `autofill` (Esc while dragging): reproduce with `--repeat-each`, cause, fix.
 4. [x] Profile Database's unit tests: the top functions; what is the code's; changes worth making.
 5. [x] Profile Layout's unit tests alike.
-6. [ ] Review (independent agent), fixes; numbers before and after; commits (with the user's word).
+6. [x] Review (independent agent), fixes; numbers before and after; commits (with the user's word): done with the third
+   round, [silverware-tests-stability-round-3.md](silverware-tests-stability-round-3.md).
 
 ## Findings
 
-(Each step's result, written as it is done.)
+The steps' results and the numbers before and after are in the third round's plan, which carried this one on:
+[silverware-tests-stability-round-3.md](silverware-tests-stability-round-3.md).
 
 - **Database `index.test.ts`**: `settle` was a real pause of 20 ms after a view picked; loaded, the write came later
   (an `AssertionError` with the page as before, or the test's time out). `settle` moves fake timers by 20 ms instead

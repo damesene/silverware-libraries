@@ -1,7 +1,7 @@
 // Two of Silverware Assets' own actions (docs/silverware-assets.md, *Actions*), registered as anyone's: the
 // asset shown in a panel at the window's right (`open-panel`: the page beside it still used) or enlarged over the page
 // (`open-enlarged`), each rendered as the core renders it (`render`: the type's own view, else the host's drawing, else its
-// card). One of each at a time: another shown takes its place. Esc, ×, or (the popover) a click beside it closes it.
+// card). One of each at a time: another shown takes its place. Esc, ×, or (the enlarged view) a click beside it closes it.
 // Over the window, so marked `data-silverware-over-window` (the other plugins stand back: shared/overwindow.ts, its
 // attribute named here as the contract leaves this part to know no more than the contract and the elements).
 import { type ActionContext, type Asset, type AssetAction, assetName, type Capabilities } from "../../../shared/assets.ts";
@@ -13,11 +13,11 @@ const OVER_WINDOW = "data-silverware-over-window";
 // What a panel shows: an asset drawn larger than its card (a card alone is no more than the card in the page)
 const shows = (_asset: Asset, can: Capabilities) => can.views.includes("full") || can.views.includes("preview");
 
-/** The one shown now of a kind (peek, popover), closed as another takes its place */
+/** The one shown now of a kind (side panel, enlarged), closed as another takes its place */
 const open = new Map<string, () => void>();
 
 /** A panel of a kind shown: its frame (marked over the window), closed by Esc or its ×; what closes it given back */
-function show(kind: "peek" | "popover", context: ActionContext, build: (close: () => void) => { readonly root: HTMLElement; readonly body: HTMLElement; readonly stop?: () => void }): () => void {
+function show(kind: "side-panel" | "enlarged", context: ActionContext, build: (close: () => void) => { readonly root: HTMLElement; readonly body: HTMLElement; readonly stop?: () => void }): () => void {
   open.get(kind)?.();
   const doc = document;
   let closed = false;
@@ -88,7 +88,7 @@ function keepWidth(width: number | undefined): void {
  */
 function resizer(panel: HTMLElement): HTMLElement {
   const doc = panel.ownerDocument;
-  const handle = el(doc, "div", { class: "swa-peek-resize", title: "Drag to set the panel's width (a double click: its default)", attrs: { role: "separator", "aria-orientation": "vertical", "aria-label": "The panel's width", tabindex: "0" } });
+  const handle = el(doc, "div", { class: "swa-side-panel-resize", title: "Drag to set the panel's width (a double click: its default)", attrs: { role: "separator", "aria-orientation": "vertical", "aria-label": "The panel's width", tabindex: "0" } });
   const widest = () => doc.defaultView?.innerWidth ?? Infinity;
   // The width set (none: the style page's), within the window: a width past it is not kept
   let width: number | undefined;
@@ -140,14 +140,14 @@ function placeIn(panel: HTMLElement, context: ActionContext): void {
   panel.style.maxWidth = `${Math.max(0, Math.round(Math.min(area.width, view.innerWidth)))}px`;
 }
 
-export const peek: AssetAction = {
+export const sidePanel: AssetAction = {
   name: "open-panel",
   label: "Open in side panel",
   fits: shows,
   run: (context) =>
-    void show("peek", context, (close) => {
+    void show("side-panel", context, (close) => {
       const body = el(document, "div", { class: "swa-panel-body" });
-      const root = el(document, "aside", { class: "swa-peek", attrs: { role: "dialog", "aria-label": assetName(context.asset) } }, head(context, close, true), body);
+      const root = el(document, "aside", { class: "swa-side-panel", attrs: { role: "dialog", "aria-label": assetName(context.asset) } }, head(context, close, true), body);
       root.prepend(resizer(root));
       // (Over the area the host gives, its editor's: under its top bar and a toolbar docked at the editor's edge)
       const place = () => placeIn(root, context);
@@ -156,15 +156,15 @@ export const peek: AssetAction = {
     }),
 };
 
-export const popover: AssetAction = {
+export const enlarged: AssetAction = {
   name: "open-enlarged",
   label: "Open enlarged",
   fits: shows,
   run: (context) =>
-    void show("popover", context, (close) => {
+    void show("enlarged", context, (close) => {
       const body = el(document, "div", { class: "swa-panel-body" });
-      const box = el(document, "div", { class: "swa-popover-box", attrs: { role: "dialog", "aria-modal": "true", "aria-label": assetName(context.asset) } }, head(context, close), body);
-      const root = el(document, "div", { class: "swa-popover" }, box);
+      const box = el(document, "div", { class: "swa-enlarged-box", attrs: { role: "dialog", "aria-modal": "true", "aria-label": assetName(context.asset) } }, head(context, close), body);
+      const root = el(document, "div", { class: "swa-enlarged" }, box);
       // A click beside the box (on the dimmed page) closes it
       root.addEventListener("click", (event) => {
         if (event.target === root) close();

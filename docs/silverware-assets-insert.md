@@ -233,7 +233,7 @@ Seen in SilverBullet's main (2026-11-15, d:\git\silverbullet: `client/codemirror
 ## Open
 
 - A dialog over a page's editor that is read-only (SilverBullet's read-only mode): nothing taken, as SilverBullet takes
-  nothing there? To check in step 1.
+  nothing there? Not checked in step 1; still to try.
 - A grid's cell: a file dropped on a cell's rendering, not in its field. Today Silverware Layout moves dropped text
   into the cell (`src/grid/drag.ts`). A dropped file could open the cell's field and insert there, through a hook of
   Layout's `rendered` API; to decide once paste and drop in the page work.

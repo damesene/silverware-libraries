@@ -279,10 +279,10 @@ test("a link to a file shows its type's icon, in a grid too; a link to a page no
   const url = page.url();
   await page.locator("#sb-main .swl-grid [data-swa-link='pdf'] .swa-link-marker").click();
   await page.locator(".swa-popup .swa-menu-item", { hasText: "Open enlarged" }).click();
-  await expect(page.locator(".swa-popover object")).toHaveAttribute("data", `.fs/${encodeURI(`${space.folder}/doc.pdf`)}`);
+  await expect(page.locator(".swa-enlarged object")).toHaveAttribute("data", `.fs/${encodeURI(`${space.folder}/doc.pdf`)}`);
   expect(page.url()).toBe(url);
   await page.keyboard.press("Escape");
-  await expect(page.locator(".swa-popover")).toHaveCount(0);
+  await expect(page.locator(".swa-enlarged")).toHaveCount(0);
 });
 
 test("a preview's size the settings' (all files, a type's own), never widened by a handle, a PDF's neither", async ({ page, space }) => {
@@ -860,11 +860,11 @@ test("the settings: a card's size shown, a click set to the side panel; the pane
   await expect.poll(() => space.config()).toContain('click = "open-panel"');
   await expect(page.locator("#sb-main .swa-card-size")).toHaveText("3 B");
   await page.locator("#sb-main [data-swa-type='image'] img").click();
-  const peek = page.locator(".swa-peek");
-  await expect(peek.locator(".swa-panel-title")).toHaveText("Photo");
-  await expect(peek.locator(".swa-panel-body img")).toBeVisible();
+  const panel = page.locator(".swa-side-panel");
+  await expect(panel.locator(".swa-panel-title")).toHaveText("Photo");
+  await expect(panel.locator(".swa-panel-body img")).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(peek).toHaveCount(0);
+  await expect(panel).toHaveCount(0);
 });
 
 test("the settings' Files tab: a type's row opened, its own way of showing pressed and saved, its files shown so, the row closed saying it", async ({ page, space }) => {
@@ -895,15 +895,15 @@ test("the side panel's width dragged by its left edge, kept for the next panel; 
     await page.locator(".swa-popup .swa-menu-item", { hasText: "Open in side panel" }).click();
   };
   await openPanel();
-  const peek = page.locator(".swa-peek");
+  const panel = page.locator(".swa-side-panel");
   // Over the editor's area, under SilverBullet's top bar, as a database's peek; its × first
-  const [panelBox, editorBox, topBar] = await Promise.all([peek.boundingBox(), page.locator("#sb-editor").boundingBox(), page.locator("#sb-top").boundingBox()]);
+  const [panelBox, editorBox, topBar] = await Promise.all([panel.boundingBox(), page.locator("#sb-editor").boundingBox(), page.locator("#sb-top").boundingBox()]);
   expect(Math.abs(panelBox!.y - editorBox!.y)).toBeLessThan(1);
   expect(panelBox!.y).toBeGreaterThanOrEqual(topBar!.y + topBar!.height - 1);
-  await expect(peek.locator(".swa-panel-head > :first-child")).toHaveClass(/swa-panel-close/);
-  const width = async () => (await peek.boundingBox())!.width;
+  await expect(panel.locator(".swa-panel-head > :first-child")).toHaveClass(/swa-panel-close/);
+  const width = async () => (await panel.boundingBox())!.width;
   const before = await width();
-  const edge = (await peek.locator(".swa-peek-resize").boundingBox())!;
+  const edge = (await panel.locator(".swa-side-panel-resize").boundingBox())!;
   const x = edge.x + edge.width / 2;
   const y = edge.y + edge.height / 2;
   await page.mouse.move(x, y);
@@ -913,11 +913,11 @@ test("the side panel's width dragged by its left edge, kept for the next panel; 
   await page.mouse.up();
   await expect.poll(async () => Math.abs((await width()) - (before + 120))).toBeLessThan(2);
   await page.keyboard.press("Escape");
-  await expect(peek).toHaveCount(0);
+  await expect(panel).toHaveCount(0);
   // The next panel as wide
   await openPanel();
   await expect.poll(async () => Math.abs((await width()) - (before + 120))).toBeLessThan(2);
-  await peek.locator(".swa-peek-resize").dblclick();
+  await panel.locator(".swa-side-panel-resize").dblclick();
   await expect.poll(async () => Math.abs((await width()) - before)).toBeLessThan(2);
 });
 

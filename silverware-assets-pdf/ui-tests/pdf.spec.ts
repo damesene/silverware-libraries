@@ -92,7 +92,7 @@ test("a PDF shown full, in the side panel too, is the browser's own viewer: no p
   await preview.hover();
   await preview.locator(".swa-more").click();
   await page.locator(".swa-popup .swa-menu-item", { hasText: "Open in side panel" }).click();
-  const panel = page.locator(".swa-peek");
+  const panel = page.locator(".swa-side-panel");
   await expect(panel.locator(".swa-panel-body object")).toHaveCount(1);
   await page.keyboard.press("Escape");
   await expect(panel).toHaveCount(0);

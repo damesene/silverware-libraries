@@ -11,7 +11,7 @@ files:
 ---
 # Silverware Editor
 
-A markdown editor for the other Silverware plugins, where they let you write markdown in a field of their own: a column of [Silverware Layout](https://github.com/damesene/silverware-libraries/blob/main/silverware-layout/silverware-layout.md)'s grid as you edit it, an item's content in [Silverware Database](https://github.com/damesene/silverware-libraries/blob/main/silverware-database/silverware-database.md)'s side panel. Without this library they keep a plain text field; with it you get:
+A markdown editor for the other Silverware plugins, where they let you write markdown in a field of their own: a cell of [Silverware Layout](https://github.com/damesene/silverware-libraries/blob/main/silverware-layout/silverware-layout.md)'s grid as you edit it, an item's content in [Silverware Database](https://github.com/damesene/silverware-libraries/blob/main/silverware-database/silverware-database.md)'s peek. Without this library they keep a plain text field; with it you get:
 
 - **Markdown highlighted** in your theme's colours: headings, bold, italic, links, code, quotes.
 - **Shown as SilverBullet shows it**: tasks as checkboxes you click to tick, done tasks struck through, bullets for list marks; the `**`, `#`, backticks and link brackets hidden, shown again where your cursor touches them; tables drawn as tables (click a cell to edit its markdown); embedded files drawn where the library using it draws them (in Silverware Layout's grid and a database's item, as Silverware Assets draws them in the page, a link to a file with its icon and menu too; without it, images); a backslash before a character (`\[`) hidden.

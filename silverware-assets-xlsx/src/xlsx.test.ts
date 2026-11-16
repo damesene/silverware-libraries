@@ -2,7 +2,7 @@
 // Silverware Assets XLSX: values shown by their formats, Excel's colours, a worksheet (a stand-in of ExcelJS' objects) made
 // into the model, a sheet drawn; the preview and the reader where ExcelJS is not loaded (as in a test: it is a file
 // beside the built bundle, not beside src/). The workbook drawn in SilverBullet is tested in ui-tests/.
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ASSET_WIDE_ATTRIBUTE, ASSETS_VERSION, type AssetType } from "../../shared/assets.ts";
 import { excelDate, formatNumber, isDateFormat, showValue } from "./format.ts";
 import { init } from "./index.ts";
@@ -163,13 +163,17 @@ describe("a sheet's frozen columns", () => {
 });
 
 describe("where ExcelJS cannot be loaded", () => {
+  // (A file's version and its body answered here, not by the network: jsdom's page is at localhost, where a server of
+  // the machine's may answer or not; what fails is the renderer's loading alone, as named)
+  beforeEach(() => vi.stubGlobal("fetch", async () => new Response("not a workbook")));
+  afterEach(() => vi.unstubAllGlobals());
   it("a preview stays its icon and name, its title saying why; a reader, as wide as its line, says it cannot show the workbook", async () => {
     const preview = xlsxPreview(document, "/a.xlsx", "a.xlsx", "<svg/>", { width: 200, height: 160 }, new AbortController().signal);
     expect(preview.querySelector(".swa-xlsx-preview-name")!.textContent).toBe("a.xlsx");
     const reader = xlsxReader(document, "/b.xlsx", "b.xlsx", 480, new AbortController().signal);
     expect(reader.hasAttribute(ASSET_WIDE_ATTRIBUTE)).toBe(true);
-    await vi.waitFor(() => expect(preview.dataset.swaXlsxState).toBe("failed"));
-    await vi.waitFor(() => expect(reader.dataset.swaXlsxState).toBe("failed"));
+    await vi.waitFor(() => expect(preview.dataset.swaXlsxState).toBe("failed"), { timeout: 5_000 });
+    await vi.waitFor(() => expect(reader.dataset.swaXlsxState).toBe("failed"), { timeout: 5_000 });
     expect(reader.querySelector(".swa-xlsx-reader-failed")!.textContent).toMatch(/^This workbook cannot be shown here/);
   });
 });

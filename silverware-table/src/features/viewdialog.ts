@@ -34,6 +34,9 @@ const PREVIEW_ROWS = 50;
 const PREVIEW_COLUMNS = 12;
 const LARGE_ROWS = 1000;
 
+/** How long after the formula typed last changes its preview is calculated (typing does not calculate it on every key) */
+export const PREVIEW_DELAY_MS = 150;
+
 export function openViewDialog(host: ModelHost, options: ViewDialogOptions): Dialog {
   const doc = host.doc;
   const e = <K extends keyof HTMLElementTagNameMap>(tag: K, props?: Parameters<typeof el>[2], ...children: ElementChild[]) => el(doc, tag, props, ...children);
@@ -132,7 +135,7 @@ export function openViewDialog(host: ModelHost, options: ViewDialogOptions): Dia
     clearTimeout(typing);
     // Not submitted while its preview is not the formula's yet
     submit.disabled = true;
-    typing = setTimeout(showPreview, 150);
+    typing = setTimeout(showPreview, PREVIEW_DELAY_MS);
   };
 
   const form = e(

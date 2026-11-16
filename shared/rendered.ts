@@ -3,9 +3,9 @@
 // The contract between them, as shared/layout.ts is between Silverware Layout and the widgets' plugins
 // (docs/silverware-assets-split.md, *The one place they meet*): the one drawing offers it, the one decorating asks for
 // it, neither reads the other's HTML. Handed over as `silverware.layout.api.rendered`. The other way, the plugin that
-// draws files registers what draws an embed in an editor of that markdown (a grid's cell edited: `drawEmbeds`), so that
-// a file looks there as in the page.
-import type { EditorEmbed } from "./editor.ts";
+// draws files registers what it draws in an editor of that markdown (a grid's cell edited: `drawInFields`), so that a
+// file and a link to one look there as in the page.
+import type { FieldDrawing } from "./editor.ts";
 
 /** The version of this contract: a plugin asks for the one it was built for, and gets a stand-in otherwise */
 export const RENDERED_VERSION = 1;
@@ -28,11 +28,10 @@ export type RenderedItem = {
 export type RenderedRange = { readonly from: number; readonly to: number };
 
 /**
- * What draws an embed in an editor of markdown rendered outside the page's (a grid's cell edited), read-only (no menu,
- * nothing written: the text is not the page's yet): its markdown (`![[report.pdf]]`) and the page it is in (its target
- * resolved from it). None: left as its markdown
+ * What a plugin draws in an editor of markdown rendered outside the page's (a grid's cell edited), for the page it is
+ * in (its targets resolved from it): an embed, a link's icon (shared/editor.ts `FieldDrawing`)
  */
-export type EmbedDrawer = (markdown: string, page: string) => EditorEmbed | undefined;
+export type FieldDrawer = (page: string) => FieldDrawing;
 
 export type Rendered = {
   readonly version: number;
@@ -48,14 +47,11 @@ export type Rendered = {
    * editor's text was still the page before); given what is drawn now. The function given back stops it
    */
   onChange(listener: (items: readonly RenderedItem[]) => void): () => void;
-  /**
-   * What draws embeds in its editors, registered (one registered again replaces it); the function given back takes it
-   * off. Optional: a Silverware Layout before it has none (its other parts used still)
-   */
-  drawEmbeds?(drawer: EmbedDrawer): () => void;
+  /** What draws in its editors, registered (one registered again replaces it); the function given back takes it off */
+  drawInFields?(drawer: FieldDrawer): () => void;
 };
 
-const STAND_IN: Rendered = { version: RENDERED_VERSION, items: () => [], ranges: () => [], onChange: () => () => undefined, drawEmbeds: () => () => undefined };
+const STAND_IN: Rendered = { version: RENDERED_VERSION, items: () => [], ranges: () => [], onChange: () => () => undefined, drawInFields: () => () => undefined };
 
 /** The API as handed over, where it is of this version; else the stand-in: nothing drawn, nothing told */
 export function renderedOf(given: unknown): Rendered {

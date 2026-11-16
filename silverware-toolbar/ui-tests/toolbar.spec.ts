@@ -45,7 +45,7 @@ test.describe("The toolbar", () => {
     await expect(bar(page)).toBeHidden();
     await page.mouse.up();
     await expect(bar(page)).toBeVisible();
-    await page.screenshot({ path: "test-results/toolbar-bar.png" });
+    await page.screenshot({ path: test.info().outputPath("toolbar-bar.png") });
   });
 
   test("a format toggles: bold written around the selection, shown on, and taken off again", async ({ page }) => {
@@ -158,7 +158,7 @@ test.describe("The popup of every action", () => {
     expect((await popup(page).boundingBox())!.y).toBeGreaterThanOrEqual(toolbar.y + toolbar.height);
     const search = popup(page).locator(".swb-search-field");
     await expect(search).toBeFocused();
-    await page.screenshot({ path: "test-results/toolbar-popup.png" });
+    await page.screenshot({ path: test.info().outputPath("toolbar-popup.png") });
     await search.fill("num");
     // First, the format (SilverBullet's commands it finds too come after it)
     await expect(popup(page).locator(".swb-option").first()).toHaveText("Numbered list");

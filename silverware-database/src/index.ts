@@ -9,7 +9,8 @@ import { iconsOf } from "../../shared/icons.ts";
 import { editorsOf } from "../../shared/editor.ts";
 import { keptKeys } from "../../shared/silverbullet/keptkeys.ts";
 import { assetsOf } from "../../shared/assets.ts";
-import { imageEmbed } from "../../shared/silverbullet/embedimage.ts";
+import { withImages } from "../../shared/silverbullet/embedimage.ts";
+import { followLink } from "../../shared/silverbullet/links.ts";
 import { layoutOf } from "../../shared/layout.ts";
 import { linesOf, linesUnder } from "../../shared/markdown/lines.ts";
 import { type ConflictHost, openConflict } from "./core/conflictdialog.ts";
@@ -179,12 +180,16 @@ export function init(bridge: Bridge): void {
             },
           }
         : {}),
-      // An embed of an item's content drawn in the peek's field: by Silverware Assets where it is installed (as the page
-      // draws it), else an image alone
-      drawEmbed: (markdown, item) => {
+      // What an item's content draws in the peek's field: by Silverware Assets where it is installed (its files and their
+      // links as the page draws them), else an embedded image alone
+      fieldDrawing: (item) => {
         const name = store.documentOf(item.key);
-        if (name === undefined) return undefined;
-        return assetsOf(bridge.assets).drawEmbed?.(markdown, name) ?? imageEmbed(markdown, name);
+        return name === undefined ? {} : withImages(assetsOf(bridge.assets).fieldDrawing?.(name), name);
+      },
+      // A link pressed in an item's content followed as SilverBullet follows one in the page, from the item's document
+      followLink: (markdown, item, how) => {
+        const name = store.documentOf(item.key);
+        if (name !== undefined) followLink(markdown, name, how, { navigate: (ref) => bridge.navigate(ref), openTab: (url) => void window.open(url, "_blank", "noopener") });
       },
       showConflict: (conflict, done) =>
         openConflict(

@@ -1,4 +1,4 @@
-import { cell, expect, header, hoverCell, markdown, notification, rendersAnew, setPage, table, tableIcon, test } from "./helpers.ts";
+import { cell, expect, header, hoverCell, markdown, notification, rendersAnew, startingOn, table, tableIcon, test } from "./helpers.ts";
 
 const TASKS = `| Name | Assignee | Hours |
 |---|---|--:|
@@ -17,11 +17,7 @@ ${TASKS}
 | <meta core.table core.name='people' view.formula='=SORT(UNIQUE(tasks![assignee]))'> |
 `;
 
-test.describe("Views", () => {
-  test.beforeEach(async ({ page }) => {
-    await setPage(page, PAGE);
-  });
-
+test.describe("Views", startingOn(PAGE), () => {
   test("a view says it is out of date in its tab; Refresh view writes it, an edit of its source writes it anew", async ({ page }) => {
     await expect(cell(page, 1, 0, 1)).toHaveText("anna");
     await page.mouse.move(2, 2);

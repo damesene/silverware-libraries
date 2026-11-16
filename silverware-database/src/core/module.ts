@@ -8,7 +8,7 @@
 // only through what one offers (`offer`, `offered`), as Silverware Table's and
 // Silverware Tags' do. Modules import only types from here.
 import type { Icons } from "../../../shared/icons.ts";
-import type { EditorEmbed, Editors } from "../../../shared/editor.ts";
+import type { Editors, FieldDrawing, LinkOpening } from "../../../shared/editor.ts";
 import type { DocumentsHost } from "./documents.ts";
 import type { MentionsHost } from "./mentions.ts";
 import type { Settings, UserInterface } from "../../../shared/platform.ts";
@@ -107,8 +107,10 @@ export type ModuleHost = DocumentsHost & MentionsHost & {
   editorLook?(): Readonly<Record<string, string>> | undefined;
   /** A key a panel of a module's kept from the page (it stops every key), told where it is a shortcut of the host's that does nothing there (none: nothing told) */
   keyKept?(event: KeyboardEvent): void;
-  /** An embed of an item's content (`markdown`, its target resolved against the item's document) drawn in its field as the page draws it; none: its markdown shown */
-  drawEmbed?(markdown: string, item: Item): EditorEmbed | undefined;
+  /** What an item's content field draws as the page draws it (shared/editor.ts `FieldDrawing`: an embed, a file's link's icon; targets resolved against the item's document); none: its markdown shown */
+  fieldDrawing?(item: Item): FieldDrawing;
+  /** A link pressed in an item's content followed as the page follows one, from the item's document (in a new tab or in place); none: a press puts the caret there */
+  followLink?(markdown: string, item: Item, how: LinkOpening): void;
   /** One of the module's settings (declared in its `settings`), its default where not set */
   setting(key: string): unknown;
   /**

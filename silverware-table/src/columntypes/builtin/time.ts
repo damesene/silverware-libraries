@@ -1,6 +1,7 @@
 import { DAY_SECONDS, formatClock, parseClock } from "../../formulas/values.ts";
 import { lineIcon } from "../../icons.ts";
-import { dateTimeFormat, numberOf } from "../format.ts";
+import { dateTimeFormat } from "../../../../shared/intl.ts";
+import { numberOf } from "../format.ts";
 import { columnType } from "../type.ts";
 
 /**

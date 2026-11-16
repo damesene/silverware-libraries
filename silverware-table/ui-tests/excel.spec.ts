@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import type { Download, Page } from "@playwright/test";
-import { cell, expect, hoverCell, menu, setPage, table, test } from "./helpers.ts";
+import { cell, expect, hoverCell, menu, startingOn, table, test } from "./helpers.ts";
 
 const dialog = (page: Page) => page.locator(".swt-excel-dialog");
 
@@ -10,8 +10,7 @@ async function savedFile(download: Download): Promise<{ name: string; zip: boole
   return { name: download.suggestedFilename(), zip: bytes.subarray(0, 2).toString() === "PK" };
 }
 
-test("Export to Excel's Download gives the browser the file, under the name typed, Enter in its field too", async ({ page }) => {
-  await setPage(page, "# Test\n\n| Fruit | Qty |\n|---|--:|\n| Pear | 3 |\n| Apple | 10 |\n| <meta core.table core.name='shop'> |\n");
+test("Export to Excel's Download gives the browser the file, under the name typed, Enter in its field too", startingOn("# Test\n\n| Fruit | Qty |\n|---|--:|\n| Pear | 3 |\n| Apple | 10 |\n| <meta core.table core.name='shop'> |\n"), async ({ page }) => {
   await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(2);
   await hoverCell(page, cell(page, 1, 0));
   await page.locator(".swt-bar.swt-visible .swt-bar-more").click();

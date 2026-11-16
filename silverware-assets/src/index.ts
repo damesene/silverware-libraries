@@ -62,8 +62,12 @@ registry.onChange(() => {
 /** Silverware Assets' API, as its API page hands it to other plugins (`silverware.assets.api`): types of file and actions (shared/assets.ts) */
 export const api: Assets = {
   ...registry.api(),
-  // (An embed drawn in another plugin's field as the page draws it: a database's peek; none until the files are decorated)
-  drawEmbed: (markdown, page) => decorator?.editorEmbed(markdown, page),
+  // (What is drawn in another plugin's field as the page draws it: a database's peek. Asked of the decorator as each is
+  // drawn, none until the files are decorated: a field opened before draws them once they are)
+  fieldDrawing: (page) => ({
+    embed: (markdown) => decorator?.fieldDrawing(page).embed?.(markdown),
+    linkIcon: (markdown) => decorator?.fieldDrawing(page).linkIcon?.(markdown),
+  }),
 };
 
 // The files decorated, one per window (its observers live as long), its host the bridge handed over last
@@ -205,9 +209,9 @@ export function init(bridge: Bridge): void {
   layout.register(assetProvider(decorator));
   decorator.onDecorated = () => layout.layOutAgain?.();
   if (fresh) decorator.start();
-  // Files drawn in the fields of Silverware Layout's grids as in the page (shared/rendered.ts `drawEmbeds`)
+  // Files and links to them drawn in the fields of Silverware Layout's grids as in the page (shared/rendered.ts `drawInFields`)
   const drawing = decorator;
-  rendered.drawEmbeds?.((markdown, page) => drawing.editorEmbed(markdown, page));
+  rendered.drawInFields?.((page) => drawing.fieldDrawing(page));
   // Files pasted, dropped and uploaded: Silverware Assets' dialog (docs/silverware-assets-insert.md), as the settings say
   if (!inserting) {
     inserting = new AbortController();

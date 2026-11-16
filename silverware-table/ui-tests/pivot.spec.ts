@@ -1,4 +1,4 @@
-import { cell, drag, expect, hoverCell, markdown, notification, rendersAnew, setOtherPage, setPage, table, tableIcon, test } from "./helpers.ts";
+import { cell, drag, expect, hoverCell, markdown, notification, rendersAnew, setOtherPage, setPage, startingOn, table, tableIcon, test } from "./helpers.ts";
 
 const PAGE = `# Pivots
 
@@ -15,11 +15,7 @@ const PAGE = `# Pivots
 | <meta core.table pivot.source='orders' pivot.rows='region' pivot.values='SUM([revenue])'> |
 `;
 
-test.describe("Pivot tables", () => {
-  test.beforeEach(async ({ page }) => {
-    await setPage(page, PAGE);
-  });
-
+test.describe("Pivot tables", startingOn(PAGE), () => {
   test("a pivot says what it is at a glance: Pivot of its source in its tab, beside its source's name", async ({ page }) => {
     await expect(cell(page, 1, 0, 1)).toHaveText("East");
     await page.mouse.move(2, 2);
@@ -80,13 +76,9 @@ test.describe("Pivot tables", () => {
   });
 });
 
-test.describe("The pivot dialog", () => {
-  test.beforeEach(async ({ page }) => {
-    await setPage(page, PAGE);
-  });
-
+test.describe("The pivot dialog", startingOn(PAGE), () => {
   test("Insert pivot table… shows the pivot as its fields change and writes it under its source", async ({ page }) => {
-    // (The page set: its pivot shown, the source the table before it)
+    // (The page it starts on: its pivot shown, the source the table before it)
     await expect(cell(page, 1, 0)).toHaveText("East");
     await hoverCell(page, cell(page, 1, 0));
     await (await tableIcon(page, "Insert pivot table…")).click();

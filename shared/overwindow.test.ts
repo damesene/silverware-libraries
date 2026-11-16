@@ -1,14 +1,19 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
-import { markOverWindow, OVER_WINDOW_ATTRIBUTE, overWindowShown, watchOverWindow } from "./overwindow.ts";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ENDED_MS, markOverWindow, OVER_WINDOW_ATTRIBUTE, overWindowShown, watchOverWindow } from "./overwindow.ts";
 
-// The observer's records handled (a task)
-const settled = () => new Promise((resolve) => setTimeout(resolve));
+// Fake timers: the watcher's moment (ENDED_MS) passes as the test moves it, not as a loaded machine lets a real wait end
+// The observer's records handled (they come in a microtask)
+const settled = () => vi.advanceTimersByTimeAsync(0);
 // An end told (it waits a moment: ENDED_MS)
-const ended = () => new Promise((resolve) => setTimeout(resolve, 150));
+const ended = () => vi.advanceTimersByTimeAsync(ENDED_MS);
 
 describe("What is shown over the whole window", () => {
-  afterEach(() => document.body.replaceChildren());
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    document.body.replaceChildren();
+  });
 
   it("is any element marked, marked off again or taken out with its mark", () => {
     const view = document.createElement("div");

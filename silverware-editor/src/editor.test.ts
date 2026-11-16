@@ -3,11 +3,29 @@
 // shared/keys.test.ts); the editing surfaces found. CodeMirror is imported here from vendor.ts (in SilverBullet it is a file beside the
 // bundle, loaded when idle).
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { COMPANION_ATTRIBUTE, EDITOR_VERSION, editorsOf, textareaEditor, type TextEditor } from "../../shared/editor.ts";
+import { COMPANION_ATTRIBUTE, COMPANION_LOOK_MS, EDITOR_VERSION, editorsOf, textareaEditor, type TextEditor } from "../../shared/editor.ts";
 import { codeMirrorEditor } from "./codemirror.ts";
 import * as cm from "./vendor.ts";
+import { forceParsing } from "@codemirror/language";
 
-afterEach(() => document.body.replaceChildren());
+/**
+ * A CodeMirror editor made as the module makes it, its text parsed whole before a test reads what it draws: CodeMirror
+ * parses within a time budget and the rest a moment later, drawing again then, and a loaded machine (every test file at
+ * once) left the last lines drawn as written as a test read them
+ */
+function parsedEditor(...args: Parameters<typeof codeMirrorEditor>): ReturnType<typeof codeMirrorEditor> {
+  const editor = codeMirrorEditor(...args);
+  const view = cm.EditorView.findFromDOM(editor.element.shadowRoot!.querySelector<HTMLElement>(".cm-editor")!);
+  // (Found always: a test reading its drawing unparsed would pass or fail by the machine's load)
+  if (!view) throw new Error("the editor's view was not found to parse its text");
+  forceParsing(view, view.state.doc.length, 60_000);
+  return editor;
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+  document.body.replaceChildren();
+});
 
 const key = (init: KeyboardEventInit) => new KeyboardEvent("keydown", init);
 
@@ -44,11 +62,11 @@ function behaves(name: string, make: (options: Parameters<typeof textareaEditor>
 }
 
 behaves("the stand-in (a <textarea>)", (options) => textareaEditor(document, options));
-behaves("the CodeMirror editor", (options) => codeMirrorEditor(cm, document, options, { made: () => undefined, gone: () => undefined }));
+behaves("the CodeMirror editor", (options) => parsedEditor(cm, document, options, { made: () => undefined, gone: () => undefined }));
 
 describe("the CodeMirror editor's own", () => {
   const make = (options: Partial<Parameters<typeof codeMirrorEditor>[2]> = {}) =>
-    codeMirrorEditor(cm, document, { text: "", ...options }, { made: () => undefined, gone: () => undefined });
+    parsedEditor(cm, document, { text: "", ...options }, { made: () => undefined, gone: () => undefined });
   const content = (editor: TextEditor) => editor.element.shadowRoot!.querySelector<HTMLElement>(".cm-content")!;
 
   it("keeps the text a plugin puts in out of its history: undone, it stays", () => {
@@ -71,6 +89,8 @@ describe("the CodeMirror editor's own", () => {
 
 describe("an editor left", () => {
   it("is told so once the companion that had the focus is taken away (no focus event tells it)", async () => {
+    // (Fake timers: the editor's look at where the focus is, every COMPANION_LOOK_MS, comes as the test moves the time)
+    vi.useFakeTimers();
     const left = vi.fn();
     const editor = textareaEditor(document, { text: "x", onBlur: left });
     const companion = document.createElement("div");
@@ -80,7 +100,7 @@ describe("an editor left", () => {
     editor.focus();
     search.focus();
     companion.remove();
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    await vi.advanceTimersByTimeAsync(COMPANION_LOOK_MS);
     expect(left).toHaveBeenCalledTimes(1);
     editor.destroy();
   });
@@ -109,7 +129,7 @@ describe("an editor left", () => {
 
 describe("the CodeMirror editor's live preview", () => {
   const make = (text: string, selection = 0, readOnly = false) => {
-    const editor = codeMirrorEditor(cm, document, { text, selection, readOnly }, { made: () => undefined, gone: () => undefined });
+    const editor = parsedEditor(cm, document, { text, selection, readOnly }, { made: () => undefined, gone: () => undefined });
     const root = editor.element.shadowRoot!;
     const lines = () => [...root.querySelectorAll(".cm-line")].map((line) => line.textContent);
     return { editor, root, lines };
@@ -172,7 +192,7 @@ describe("the CodeMirror editor's live preview", () => {
           }
         : undefined;
     };
-    const editor = codeMirrorEditor(cm, document, { text: "x\n![[photo.png|A|40]] and ![B](other.png)\n![[file.pdf]]", selection: 0, embed }, { made: () => undefined, gone: () => undefined });
+    const editor = parsedEditor(cm, document, { text: "x\n![[photo.png|A|40]] and ![B](other.png)\n![[file.pdf]]", selection: 0, drawing: { embed } }, { made: () => undefined, gone: () => undefined });
     const root = editor.element.shadowRoot!;
     const pictures = () => [...root.querySelectorAll<HTMLImageElement>(".swe-embed > img")].map((one) => one.getAttribute("src"));
     expect(pictures()).toEqual(["/files/photo.png", "/files/other.png"]);
@@ -184,12 +204,68 @@ describe("the CodeMirror editor's live preview", () => {
     editor.destroy();
   });
 
+  it("draws a link's icon before it where the plugin draws one, its markdown the link's to edit", () => {
+    const drawn: string[] = [];
+    const linkIcon = (markdown: string) =>
+      markdown.includes(".pdf")
+        ? {
+            key: markdown,
+            interactive: true,
+            draw: (container: HTMLElement, _signal: AbortSignal, edit?: { replace(markdown: string): boolean }) => {
+              drawn.push(markdown);
+              const icon = Object.assign(container.ownerDocument.createElement("button"), { className: "test-icon" });
+              icon.addEventListener("click", () => edit?.replace("![[a.pdf]]"));
+              container.append(icon);
+            },
+          }
+        : undefined;
+    const editor = parsedEditor(cm, document, { text: "x\n[[a.pdf]] and [[Page]] and [doc](b.pdf)", selection: 0, drawing: { linkIcon } }, { made: () => undefined, gone: () => undefined });
+    const root = editor.element.shadowRoot!;
+    expect(drawn).toEqual(["[[a.pdf]]", "[doc](b.pdf)"]);
+    expect(root.querySelectorAll(".swe-embed .test-icon")).toHaveLength(2);
+    // (The link's text still shown after its icon)
+    expect(root.querySelectorAll(".cm-line")[1]!.textContent).toBe("a.pdf and Page and doc");
+    root.querySelector<HTMLElement>(".test-icon")!.click();
+    expect(editor.getText()).toBe("x\n![[a.pdf]] and [[Page]] and [doc](b.pdf)");
+    editor.destroy();
+  });
+
+  // (An Alt+press is left to CodeMirror, which places the caret by the pointer: jsdom lays nothing out, the UI tests hold it)
+  it("follows a link pressed where its user does (a new tab by Ctrl or the middle button), the caret not moved", () => {
+    const opened: [string, boolean][] = [];
+    const editor = parsedEditor(cm, document, { text: "x\n[[Notes|My notes]] and [site](https://example.com)", selection: 0, openLink: (markdown, how) => opened.push([markdown, how.newTab]) }, { made: () => undefined, gone: () => undefined });
+    const root = editor.element.shadowRoot!;
+    const press = (selector: string, init: MouseEventInit) => root.querySelector(selector)!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, ...init }));
+    press(".swe-wiki-link", { button: 0 });
+    press(".swe-link", { button: 0, ctrlKey: true });
+    press(".swe-wiki-link", { button: 1 });
+    expect(opened).toEqual([
+      ["[[Notes|My notes]]", false],
+      ["[site](https://example.com)", true],
+      ["[[Notes|My notes]]", true],
+    ]);
+    expect(editor.getSelection().from).toBe(0);
+    // (A double press's second press follows it no more)
+    press(".swe-wiki-link", { button: 0, detail: 2 });
+    expect(opened).toHaveLength(3);
+    editor.destroy();
+  });
+
+  it("hides an escape's backslash where the caret is not on it, as the page draws it", () => {
+    const editor = parsedEditor(cm, document, { text: "x\nA \\[estimate: 5] b", selection: 0 }, { made: () => undefined, gone: () => undefined });
+    const line = () => editor.element.shadowRoot!.querySelectorAll(".cm-line")[1]!.textContent;
+    expect(line()).toBe("A [estimate: 5] b");
+    editor.setSelection(5);
+    expect(line()).toBe("A \\[estimate: 5] b");
+    editor.destroy();
+  });
+
   it("puts the page's rules of what an embed draws into its root, by their prefixes, none of the editor's own", async () => {
     const sheet = document.createElement("style");
     sheet.textContent = ".test-picture { color: red } [data-test-view] img { width: 1px } .cm-line { color: blue } @media (min-width: 1px) { .test-picture { margin: 1px } .other { margin: 2px } }";
     document.head.append(sheet);
     const embed = () => ({ key: "k", draw: (container: HTMLElement) => container.append(Object.assign(container.ownerDocument.createElement("i"), { className: "test-picture" })) });
-    const editor = codeMirrorEditor(cm, document, { text: "x\n![[a.png]]", selection: 0, embed }, { made: () => undefined, gone: () => undefined });
+    const editor = parsedEditor(cm, document, { text: "x\n![[a.png]]", selection: 0, drawing: { embed } }, { made: () => undefined, gone: () => undefined });
     await Promise.resolve();
     const styles = editor.element.shadowRoot!.querySelector("style[data-swe-page-styles]")!.textContent!;
     expect(styles).toContain(".test-picture");

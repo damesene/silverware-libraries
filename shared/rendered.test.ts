@@ -5,7 +5,7 @@ import { RENDERED_VERSION, renderedOf } from "./rendered.ts";
 
 describe("renderedOf", () => {
   it("gives the API handed over where it is of this version", () => {
-    const api = { version: RENDERED_VERSION, items: () => [], ranges: () => [{ from: 1, to: 2 }], onChange: () => () => undefined, drawEmbeds: () => () => undefined };
+    const api = { version: RENDERED_VERSION, items: () => [], ranges: () => [{ from: 1, to: 2 }], onChange: () => () => undefined, drawInFields: () => () => undefined };
     expect(renderedOf(api)).toBe(api);
   });
 

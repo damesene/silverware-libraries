@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // Silverware Assets DOCX's preview and reader where docx-preview is not loaded (as in a test: it is a file beside the built
 // bundle, not beside src/), and the sizes they draw by. The document drawn is tested in SilverBullet (ui-tests/).
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ASSET_WIDE_ATTRIBUTE, ASSETS_VERSION, type AssetType } from "../../shared/assets.ts";
 import { init } from "./index.ts";
 import { pageSize } from "./load.ts";
@@ -27,10 +27,14 @@ describe("a document's page", () => {
 
 
 describe("where docx-preview cannot be loaded", () => {
+  // (A file's version and its body answered here, not by the network: jsdom's page is at localhost, where a server of
+  // the machine's may answer or not; what fails is the renderer's loading alone, as named)
+  beforeEach(() => vi.stubGlobal("fetch", async () => new Response("not a document")));
+  afterEach(() => vi.unstubAllGlobals());
   it("a preview stays its icon and name, its title saying why", async () => {
     const preview = docxPreview(document, "/a.docx", "a.docx", "<svg/>", { width: 200, height: 160 }, new AbortController().signal);
     expect(preview.querySelector(".swa-docx-preview-name")!.textContent).toBe("a.docx");
-    await vi.waitFor(() => expect(preview.dataset.swaDocxState).toBe("failed"));
+    await vi.waitFor(() => expect(preview.dataset.swaDocxState).toBe("failed"), { timeout: 5_000 });
     expect(preview.title).toMatch(/^a\.docx: /);
   });
 
@@ -38,7 +42,7 @@ describe("where docx-preview cannot be loaded", () => {
     const reader = docxReader(document, "/b.docx", "b.docx", 480, new AbortController().signal);
     expect(reader.hasAttribute(ASSET_WIDE_ATTRIBUTE)).toBe(true);
     expect(reader.style.height).toBe("calc(480px * var(--sw-content-scale, 1))");
-    await vi.waitFor(() => expect(reader.dataset.swaDocxState).toBe("failed"));
+    await vi.waitFor(() => expect(reader.dataset.swaDocxState).toBe("failed"), { timeout: 5_000 });
     expect(reader.querySelector(".swa-docx-reader-failed")!.textContent).toMatch(/^This document cannot be shown here/);
   });
 });

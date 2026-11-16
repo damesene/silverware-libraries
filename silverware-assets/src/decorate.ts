@@ -4,7 +4,7 @@
 // the type renders none of), replaced by the type's rendering, or by the card. A click on a card or a preview runs the
 // action the user set for it. A render that fails shows the host's drawing (else the card) with an error mark.
 import { type ActionContext, type Asset, assetName, type AssetType, type Capabilities, type RenderContext, type Viewport } from "../../shared/assets.ts";
-import { type Embed, type EmbedChanges, embedAsLink, isFileTarget, readEmbeds, readLinks, writeEmbed } from "../../shared/markdown/embed.ts";
+import { type Embed, type EmbedChanges, embedAsLink, isFileTarget, linkAsEmbed, linkAsText, readEmbeds, readLinks, writeEmbed } from "../../shared/markdown/embed.ts";
 import { actionFor, mimeOf, typeFor, viewFor } from "./core/choose.ts";
 import { closestContext, embedAt, type LineContext, linkAt, outside, placeAmong, type Placed, type Range, sameTarget, writtenContext } from "./core/locate.ts";
 import { metadataOf } from "./core/metadata.ts";
@@ -17,7 +17,7 @@ import { opensMenu } from "../../shared/popupmenu.ts";
 import { writeClipboard, writeClipboardLater } from "../../shared/clipboard.ts";
 import { addMoreButton, type MoreMenu, popupOf, type ShowAs } from "./ui/moremenu.ts";
 import { VIEW_CARD, VIEW_LINK, VIEW_ORIGINAL, VIEW_PREVIEW } from "../../shared/glyphs.ts";
-import type { EditorEmbed, EmbedEdit } from "../../shared/editor.ts";
+import type { EditorEmbed, EmbedEdit, FieldDrawing } from "../../shared/editor.ts";
 import { CONTENT_SCALE, scaledPx } from "../../shared/contentscale.ts";
 import { hasPlainMedium, plainMedium } from "./ui/plainmedium.ts";
 import type { InsertType } from "./ui/insertdialog.ts";
@@ -127,6 +127,16 @@ type FramePlace = {
   readonly writeAlign: (align: string | undefined) => Promise<string | undefined>;
 };
 
+/** How a linked file's menu writes what it changes where the link is (the page's, a field's text) */
+type LinkWrites = {
+  // The link written as an embed of its file, of a view (none: the settings' own); none: no Show as
+  readonly toEmbed?: (view: View | undefined) => void;
+  // The link's markdown as written now
+  readonly markdown: () => Promise<string>;
+  // The file deleted, asked first, the link written as its text after; none: no Delete
+  readonly deleteFile?: (asset: Asset & { readonly kind: "file" }) => void;
+};
+
 export class AssetDecorator {
   // Each frame decorated: what ends its render
   private readonly renders = new WeakMap<HTMLElement, AbortController>();
@@ -179,61 +189,74 @@ export class AssetDecorator {
       const type = asset && typeFor(this.registry.types.all, asset);
       if (!type) continue;
       // Its way into its menu: its type's icon before it, else (the setting off) a small arrow after it
-      let icon: HTMLElement;
-      if (settings.linkIcons) {
-        icon = iconElement(this.doc, type.icon);
-        icon.classList.add(LINK_ICON, "swa-menu-icon");
-        link.element.prepend(icon);
-      } else {
-        icon = menuMarker(this.doc, "link");
-        icon.setAttribute("aria-label", `${assetName(asset)}: its menu`);
-        link.element.append(icon);
-      }
-      icon.title = "Show…";
-      icon.setAttribute("role", "button");
+      const icon = this.linkIconOf(type, asset, settings);
+      if (settings.linkIcons) link.element.prepend(icon);
+      else link.element.append(icon);
       link.element.setAttribute("data-swa-link", type.name);
-      // Its menu: what can be done with the file (a press on the icon the menu's, the link's text still the host's)
+      // Its menu: what can be done with the file (a press on the icon the menu's, the link's text still the host's),
+      // what it changes written into the page, the link found there as it is now
       const control = new AbortController();
       this.linkMenus.set(link.element, control);
-      const drawn = !!type.views?.embed || !!plainMedium(this.doc, asset, mimeOf(asset));
-      const capabilities: Capabilities = { views: ["icon", ...(type.views?.preview ? (["preview"] as const) : []), ...(drawn ? (["embed"] as const) : [])] };
-      const linkActions = this.actionItems(asset, capabilities, (container, as) => this.drawInto(container, as, type, asset, settings, control.signal));
-      opensMenu(
-        this.doc,
-        POPUP,
-        icon,
-        () =>
-          popupOf({
-            title: assetName(asset),
-            // (Shown as a link: an embed of a view chosen in its place, written at once)
-            showAs: this.host.linkToEmbed
-              ? this.showAs("link", settings.views.types[type.name] ?? settings.views.default, (view) => capabilities.views.includes(view), true, (to) => {
-                  if (to !== "link") void this.toEmbed(link, to === (settings.views.types[type.name] ?? settings.views.default) ? undefined : to);
-                })
-              : [],
-            open: linkActions.open,
-            file: [
-              ...linkActions.copy,
-              // Its whole markdown, as the page has it now
-              {
-                label: "Copy markdown",
-                // (Found in the page first: the clipboard given the text as it comes, the click's leave kept)
-                run: () =>
-                  void writeClipboardLater(
-                    this.doc,
-                    this.linkInPage(link).then((found) => {
-                      if (!found) throw new Error("this link was not found in the page");
-                      return found.link.text;
-                    }),
-                  ).catch((error: unknown) => this.host.problem(`Silverware Assets: not copied: ${message(error)}`)),
-              },
-              ...linkActions.file,
-            ],
-            destructive: this.deletable(asset, "link") ? [{ label: "Delete file…", run: () => void this.deleteLinked(link, asset) }] : [],
-          }),
-        control.signal,
-      );
+      const menu = () =>
+        this.linkMenu(asset, type, settings, control.signal, {
+          ...(this.host.linkToEmbed ? { toEmbed: (view: View | undefined) => void this.toEmbed(link, view) } : {}),
+          markdown: () =>
+            this.linkInPage(link).then((found) => {
+              if (!found) throw new Error("this link was not found in the page");
+              return found.link.text;
+            }),
+          ...(this.deletable(asset, "link") ? { deleteFile: (file: Asset & { readonly kind: "file" }) => void this.deleteLinked(link, file) } : {}),
+        });
+      opensMenu(this.doc, POPUP, icon, () => popupOf(menu()), control.signal);
     }
+  }
+
+  /** A link's way into its file's menu: its type's icon (drawn before it), else, the setting off, a small arrow (after it) */
+  private linkIconOf(type: AssetType, asset: Asset, settings: AssetSettings): HTMLElement {
+    let icon: HTMLElement;
+    if (settings.linkIcons) {
+      icon = iconElement(this.doc, type.icon);
+      icon.classList.add(LINK_ICON, "swa-menu-icon");
+    } else {
+      icon = menuMarker(this.doc, "link");
+      icon.setAttribute("aria-label", `${assetName(asset)}: its menu`);
+    }
+    icon.title = "Show…";
+    icon.setAttribute("role", "button");
+    return icon;
+  }
+
+  /**
+   * A linked file's menu (docs/silverware-assets-menu.md), in the page or in a field: how it is shown (an embed of a
+   * view chosen in its place, written at once: `toEmbed`, the settings' own as none), what can be done with it, its
+   * markdown copied, the file deleted; what changes the link written where it is (`writes`: the page's, a field's)
+   */
+  private linkMenu(asset: Asset, type: AssetType, settings: AssetSettings, signal: AbortSignal, writes: LinkWrites): MoreMenu {
+    const drawn = !!type.views?.embed || !!plainMedium(this.doc, asset, mimeOf(asset));
+    const capabilities: Capabilities = { views: ["icon", ...(type.views?.preview ? (["preview"] as const) : []), ...(drawn ? (["embed"] as const) : [])] };
+    const actions = this.actionItems(asset, capabilities, (container, as) => this.drawInto(container, as, type, asset, settings, signal));
+    const settled = settings.views.types[type.name] ?? settings.views.default;
+    const { toEmbed, deleteFile } = writes;
+    return {
+      title: assetName(asset),
+      showAs: toEmbed
+        ? this.showAs("link", settled, (view) => capabilities.views.includes(view), true, (to) => {
+            if (to !== "link") toEmbed(to === settled ? undefined : to);
+          })
+        : [],
+      open: actions.open,
+      file: [
+        ...actions.copy,
+        // Its whole markdown, as it is written now
+        {
+          label: "Copy markdown",
+          // (Read first where it must be found: the clipboard given the text as it comes, the click's leave kept)
+          run: () => void writeClipboardLater(this.doc, writes.markdown()).catch((error: unknown) => this.host.problem(`Silverware Assets: not copied: ${message(error)}`)),
+        },
+        ...actions.file,
+      ],
+      destructive: deleteFile && asset.kind === "file" ? [{ label: "Delete file…", run: () => deleteFile(asset) }] : [],
+    };
   }
 
   /** Whether a file can be deleted here: a file of the space (not a URL), the host deleting files and taking its embed or link out after */
@@ -286,13 +309,21 @@ export class AssetDecorator {
     if (problem) this.host.problem(`Silverware Assets: not removed: ${problem}`);
   }
 
-  /** A file embedded in a field deleted, once confirmed: the file, then its embed taken out of the field's text (`takeOut`) */
-  private async deleteInField(asset: Asset & { readonly kind: "file" }, takeOut: () => string | undefined): Promise<void> {
-    if (!(await this.confirmDelete(asset, "embed"))) return;
+  /**
+   * A file embedded or linked in a field deleted, once confirmed: the file, then its embed taken out of the field's text,
+   * its link written as its text (`takeOut`)
+   */
+  private async deleteInField(asset: Asset & { readonly kind: "file" }, from: "embed" | "link", takeOut: () => string | undefined): Promise<void> {
+    if (!(await this.confirmDelete(asset, from))) return;
     const problem = await this.deleteWithPreviews(asset.path);
     if (problem) return this.host.problem(`Silverware Assets: the file was not deleted: ${problem}`);
     const left = takeOut();
-    if (left) this.host.problem(`Silverware Assets: the file was deleted, its embed not taken out: ${left}`);
+    if (left) this.host.problem(`Silverware Assets: the file was deleted, its ${from} left in the field: ${left}`);
+  }
+
+  /** Whether a file can be deleted from a field: a file of the space, the host deleting files (the field's text written by the field) */
+  private deletableInField(asset: Asset): asset is Asset & { readonly kind: "file" } {
+    return asset.kind === "file" && !!this.host.deleteFile && !!this.host.confirm;
   }
 
   /** A linked file deleted, once confirmed: its link found first (as Show as embedded finds it), the file deleted, the link written as its text */
@@ -410,11 +441,18 @@ export class AssetDecorator {
   }
 
   /**
-   * An embed in an editor of a page's markdown (a grid's cell edited: shared/rendered.ts `EmbedDrawer`; a database's
-   * peek) drawn as in the page: its view, size and label as the settings and its metadata say; where the editor gives
-   * it its markdown to edit (`EmbedEdit`), its menu and a click's action as in the page, what they change written into
-   * the editor's text (an Alt+press the editor's: its markdown shown); else read-only. None for markdown that is not one
-   * embed alone, or of a file no type takes
+   * What is drawn in an editor's field of a page's markdown (a grid's cell edited: shared/rendered.ts `FieldDrawer`; a
+   * database's peek: the API's `fieldDrawing`), as the page draws it: its embeds, its file links' icons
+   */
+  fieldDrawing(page: string): FieldDrawing {
+    return { embed: (markdown) => this.editorEmbed(markdown, page), linkIcon: (markdown) => this.editorLinkIcon(markdown, page) };
+  }
+
+  /**
+   * An embed in an editor of a page's markdown drawn as in the page: its view, size and label as the settings and its
+   * metadata say; where the editor gives it its markdown to edit (`EmbedEdit`), its menu and a click's action as in the
+   * page, what they change written into the editor's text (an Alt+press the editor's: its markdown shown); else
+   * read-only. None for markdown that is not one embed alone, or of a file no type takes
    */
   editorEmbed(markdown: string, page: string): EditorEmbed | undefined {
     const embeds = readEmbeds(markdown);
@@ -459,6 +497,49 @@ export class AssetDecorator {
         });
         signal.addEventListener("abort", () => (clearTimeout(soon), stop()));
       },
+    };
+  }
+
+  /**
+   * A link to a file in an editor of a page's markdown: its way into the file's menu as the page draws it (its type's
+   * icon, the setting off a small arrow), the editor drawing it before the link's text. Where the editor gives it the
+   * link's markdown to edit, the menu as in the page, what it changes written into the editor's text (an embed in its
+   * place, the link as its text once its file is deleted); else the icon alone. None for markdown that is not one link
+   * alone, or not to a file a type takes (a page's)
+   */
+  editorLinkIcon(markdown: string, page: string): EditorEmbed | undefined {
+    const links = readLinks(markdown);
+    const link = links[0];
+    if (links.length !== 1 || !link || link.from !== 0 || link.to !== markdown.length || !isFileTarget(link.target)) return undefined;
+    // (Its file as an embed of it would have it: the link's own form, resolved the same way)
+    const embed = readEmbeds(linkAsEmbed(link))[0];
+    if (!embed) return undefined;
+    const asset = this.host.assetOf(embed, page);
+    const type = typeFor(this.registry.types.all, asset);
+    if (!type) return undefined;
+    return {
+      key: `${page}\n${markdown}`,
+      interactive: true,
+      draw: (container, signal, edit) =>
+        void this.host
+          .settings()
+          .then((settings) => {
+            if (signal.aborted) return;
+            const now = typeFor(this.registry.types.all, asset) ?? type;
+            const icon = this.linkIconOf(now, asset, settings);
+            container.append(icon);
+            if (!edit) return;
+            const inField = (written: string) => (edit.replace(written) ? undefined : NOT_FOUND);
+            const notWritten = (problem: string | undefined) => problem && this.host.problem(`Silverware Assets: not written: ${problem}`);
+            const menu = () =>
+              this.linkMenu(asset, now, settings, signal, {
+                toEmbed: (view) => notWritten(inField(view ? writeEmbed(embed, { metadata: { view } }) : embed.text)),
+                markdown: async () => markdown,
+                ...(this.deletableInField(asset) ? { deleteFile: (file: Asset & { readonly kind: "file" }) => void this.deleteInField(file, "link", () => inField(linkAsText(link))) } : {}),
+              });
+            opensMenu(this.doc, POPUP, icon, () => popupOf(menu()), signal);
+          })
+          .catch(() => undefined),
     };
   }
 
@@ -731,7 +812,7 @@ export class AssetDecorator {
             ? [
                 // (In a field: its markdown there taken out, the file deleted first where asked)
                 { label: "Remove from page", run: () => notWritten(inField("")) },
-                ...(this.deletable(asset, "embed") ? [{ label: "Delete file…", run: () => void this.deleteInField(asset, () => inField("")) }] : []),
+                ...(this.deletableInField(asset) ? [{ label: "Delete file…", run: () => void this.deleteInField(asset, "embed", () => inField("")) }] : []),
               ]
             : [
                 ...(this.host.removeEmbed ? [{ label: "Remove from page", run: () => void this.removeFromPage(drawn) }] : []),

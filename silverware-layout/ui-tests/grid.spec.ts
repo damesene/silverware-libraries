@@ -45,6 +45,24 @@ test("a cell edited in place: its markdown in a field, written as it is left, th
   await expect(page.locator("#sb-main .swl-grid-cell").first().locator("strong")).toHaveText("edited");
 });
 
+test("in a cell's field a file's link has its icon as in the page; a link pressed is followed once the cell is written", async ({ page, space }) => {
+  const links = `See [[${space.folder}/photo.png]] then [[${space.folder}/Other|the other]]`;
+  const grid = `<grid>\n<cell>\n\nLeft text\n\n${links}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n`;
+  await space.open({ Page: `# Page\n\n${grid}\nBelow\n`, Other: "# Other\n" }, "Page", { "photo.png": PIXEL_PNG });
+  await gridsDrawn(page);
+  await page.locator("#sb-main .swl-grid-cell").first().getByText("Left text").click();
+  await expect(cellField(page)).toBeVisible();
+  // The file's link: Silverware Assets' icon before it, as in the page
+  await expect(cellField(page).locator(".swa-link-icon")).toHaveCount(1);
+  // Typed in, then a page's link pressed: the cell written into its own page first, then the other page shown
+  await fillField(page, `Left edited\n\n${links}`);
+  // (The caret away from the links: on them their markdown is shown, as it is to be typed in)
+  await page.keyboard.press("Control+Home");
+  await cellField(page).locator(".swe-wiki-link", { hasText: "the other" }).click();
+  await expect(page).toHaveURL(/\/Other$/);
+  await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n${grid.replace("Left text", "Left edited")}\nBelow\n`);
+});
+
 test("a shortcut of SilverBullet's pressed in a cell's field does nothing there and says so, the cell still edited", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${GRID}\nBelow\n` }, "Page");
   await gridsDrawn(page);

@@ -34,6 +34,20 @@ export type EditorEmbed = {
   readonly interactive?: boolean;
 };
 
+/**
+ * What a plugin draws in another's editor field, as the page draws it (Silverware Assets' files): an embed in place of
+ * its markdown (`![[photo.png|Alt|200]]`, `![Alt](photo.png)`), an icon before a link's text (`[[report.pdf]]`,
+ * `[the report](report.pdf)`: its menu); each none for markdown it does not draw, which the editor shows as it does
+ * without it. Its drawing's `edit` replaces the whole markdown it was given (a link's icon: the link's)
+ */
+export type FieldDrawing = {
+  readonly embed?: (markdown: string) => EditorEmbed | undefined;
+  readonly linkIcon?: (markdown: string) => EditorEmbed | undefined;
+};
+
+/** How a link pressed in an editor is to be followed: in a new tab (Ctrl, Cmd or the middle button) or in place */
+export type LinkOpening = { readonly newTab: boolean };
+
 /** What an embed drawn in an editor may do to its own markdown there */
 export type EmbedEdit = {
   // Its markdown replaced by `markdown` (none: taken out) in the editor's text, one edit (undone as any); false where it
@@ -56,10 +70,12 @@ export type EditorOptions = {
   // stopping keys at its own element, its Esc closing it); none: kept at the editor (the page's editor takes none)
   readonly passKeys?: boolean;
   readonly spellcheck?: boolean;
-  // An embed's markdown (`![[photo.png|Alt|200]]`, `![Alt](photo.png)`) drawn as the page draws it, its markdown
-  // where the caret is: what the plugin says of it (none, or none for it: its markdown, as an editor without a preview
-  // shows every embed)
-  readonly embed?: (markdown: string) => EditorEmbed | undefined;
+  // What a plugin draws in it as the page draws it (an embed, a link's icon), its markdown where the caret is (none:
+  // its markdown, as an editor without a preview shows it)
+  readonly drawing?: FieldDrawing;
+  // A link pressed (its markdown, `[[Page]]`, `[[photo.png|Photo]]`, `[text](url)`): followed by the editor's user, as
+  // the page follows one; an Alt+press puts the caret in it, its markdown shown. None: a press puts the caret there
+  readonly openLink?: (markdown: string, how: LinkOpening) => void;
   // How what it draws as rendered looks where its user knows the page's look (a task's box, a hashtag): as the page's
   // own rendering (none, or a part none: the editor's own look)
   readonly look?: EditorLook;
@@ -175,7 +191,7 @@ export function companionBlur(doc: Document, inside: (node: EventTarget | null) 
 }
 
 // While the focus is in a companion, how often where it is is looked at (the companion taken away tells nothing)
-const COMPANION_LOOK_MS = 500;
+export const COMPANION_LOOK_MS = 500;
 
 /**
  * How the page an editor is in behaves, where an editor allows for it: told by the plugin's binding to its host (its

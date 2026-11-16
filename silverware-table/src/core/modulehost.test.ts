@@ -38,4 +38,14 @@ describe("moduleHost", () => {
     expect(host.name()).toBe("module");
     expect(host.doubled).toBe(2);
   });
+
+  it("gives each module its own members over the one core's, the core's state shared live", () => {
+    const core = new Core();
+    const first = moduleHost(core, { name: () => "first" });
+    const second = moduleHost(core);
+    expect([first.name(), second.name()]).toEqual(["first", "core"]);
+    first.bump();
+    expect(second.doubled).toBe(4);
+    expect(first.bump).toBe(second.bump);
+  });
 });

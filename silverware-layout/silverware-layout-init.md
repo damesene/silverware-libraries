@@ -133,6 +133,8 @@ if js and js.window then
     end,
     -- Whether SilverBullet shows the markdown's syntax (Editor: Toggle Markdown Syntax Rendering): grids hidden then
     getUiOption = editor.getUiOption,
+    -- A link pressed in a cell's field: SilverBullet goes to its page or file
+    navigate = editor.navigate,
     -- SilverBullet's commands and their shortcuts: one pressed in a cell's field, where it does nothing, told
     listCommands = system.listCommands,
     -- A grid's cell edited in Silverware Editor's editor where it is installed (else a plain text field)

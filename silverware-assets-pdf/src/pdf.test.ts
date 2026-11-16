@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 // Silverware Assets PDF's preview where pdf.js is not loaded (as in a test: it is a file beside the built bundle, not beside
 // src/), and the sizes it draws by. The pages drawn are tested in SilverBullet (ui-tests/).
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ASSETS_VERSION, type Assets, type AssetType, type RenderContext } from "../../shared/assets.ts";
 import { init } from "./index.ts";
 import { fittedScale, pdfPreview } from "./preview.ts";
 
 describe("a PDF's preview", () => {
+  // (A file's version and its body answered here, not by the network: jsdom's page is at localhost, where a server of
+  // the machine's may answer or not; what fails is the renderer's loading alone, as named)
+  beforeEach(() => vi.stubGlobal("fetch", async () => new Response("not a document")));
+  afterEach(() => vi.unstubAllGlobals());
   it("is drawn to fit its box, its proportions kept, as sharp as the screen's pixels", () => {
     expect(fittedScale({ width: 200, height: 300 }, { width: 400, height: 160 }, 1)).toBeCloseTo(160 / 300);
     expect(fittedScale({ width: 600, height: 300 }, { width: 300, height: 160 }, 2)).toBeCloseTo((300 / 600) * 2);
@@ -17,7 +21,7 @@ describe("a PDF's preview", () => {
     expect(preview.dataset.swaPdfState).toBe("drawing");
     // (As the content's scale makes it: shared/contentscale.ts)
     expect(preview.style.getPropertyValue("--swa-pdf-box-height")).toBe("calc(160px * var(--sw-content-scale, 1))");
-    await vi.waitFor(() => expect(preview.dataset.swaPdfState).toBe("viewer"));
+    await vi.waitFor(() => expect(preview.dataset.swaPdfState).toBe("viewer"), { timeout: 5_000 });
     expect(preview.querySelector("object")!.getAttribute("data")).toBe("/doc.pdf");
   });
 

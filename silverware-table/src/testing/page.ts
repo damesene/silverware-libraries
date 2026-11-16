@@ -156,7 +156,8 @@ export const clickOn = (target: Element) => {
 export const key = (target: Element, k: string, init: KeyboardEventInit = {}) =>
   target.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...init }));
 
-export const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+/** What is due now run (a task later): under a test's fake timers by moving them, which a timer of 0 would wait for in vain */
+export const flush = (): Promise<unknown> => (vi.isFakeTimers() ? vi.advanceTimersByTimeAsync(0) : new Promise((resolve) => setTimeout(resolve, 0)));
 
 /** An item of the toolbar's ⋯ menu, by its label, the menu opened over the first body row of table `table` */
 export function tableMenuItem(label: RegExp, table = 0): HTMLElement | undefined {

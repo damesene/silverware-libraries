@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import libraryPage from "../../silverware-table.md?raw";
-import { dateTimeFormat, numberFormat } from "./format.ts";
 import { BUILT_IN_TYPES } from "./builtin/index.ts";
 import { columnTypeOf, typeNamed, typeOfTag, withColumnType } from "./index.ts";
 import { readParams } from "./registry.ts";
@@ -11,14 +10,6 @@ const type = (name: string) => typeNamed(name)!;
 const paramsOf = (name: string, written?: string) => typeOfTag(written === undefined ? name : `${name}-${written}`)!.params;
 const show = (name: string, text: string, written?: string, locale = "en-US") => type(name).format(text, paramsOf(name, written), locale);
 const check = (name: string, text: string, written?: string) => type(name).check(text, paramsOf(name, written));
-
-describe("formatters", () => {
-  it("are made once per locale and options (making one is slow, a column formats every cell)", () => {
-    expect(numberFormat("en", { maximumFractionDigits: 2 })).toBe(numberFormat("en", { maximumFractionDigits: 2 }));
-    expect(numberFormat("en", { maximumFractionDigits: 1 })).not.toBe(numberFormat("en", { maximumFractionDigits: 2 }));
-    expect(dateTimeFormat("en", { dateStyle: "short" })).toBe(dateTimeFormat("en", { dateStyle: "short" }));
-  });
-});
 
 describe("BUILT_IN_TYPES", () => {
   it.each(BUILT_IN_TYPES.map((t) => [t.name, t] as const))("%s is described and listed on the library page", (name, t) => {

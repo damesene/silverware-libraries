@@ -42,6 +42,9 @@ export type Bridge = {
   readonly getUiOption?: (name: string) => unknown;
   // Optional: Silverware Editor's API (`silverware.editor.api`), what a grid's cell is edited in (none: a `<textarea>`)
   readonly editor?: unknown;
+  // Optional: SilverBullet goes to a page or a file by its ref (`editor.navigate`): a link pressed in a cell's field
+  // followed (none: a press puts the caret there)
+  readonly navigate?: (ref: string) => unknown;
   // Optional: SilverBullet's commands and their shortcuts (`system.listCommands`): one pressed in a cell's field, where it
   // does nothing, told (none: nothing told)
   readonly listCommands?: () => unknown;

@@ -1,6 +1,6 @@
 // The header held at the top of the page's view as a long table scrolls past
 import type { Page } from "@playwright/test";
-import { expect, setPage, setSettings, settled, table, tableIcon, test } from "./helpers.ts";
+import { expect, setPage, setSettings, settled, startingOn, table, tableIcon, test } from "./helpers.ts";
 
 test.describe("Rows pinned to the bottom", () => {
   test("a scroller with a bottom padding (as SilverBullet's, to scroll past the end): the row at the table's bottom while it is in view", async ({ page }) => {
@@ -46,8 +46,7 @@ test.describe("The held header and the rows pinned to the bottom", () => {
 });
 
 test.describe("The held header", () => {
-  test("a table near the page's top: its header where the table starts, the page not scrolled, its first row not covered", async ({ page }) => {
-    await setPage(page, "Intro\n| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Fig | 2 |\n\nText under.\n");
+  test("a table near the page's top: its header where the table starts, the page not scrolled, its first row not covered", startingOn("Intro\n| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Fig | 2 |\n\nText under.\n"), async ({ page }) => {
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(2);
     const at = await table(page).evaluate((w) => {
       const r = (e: Element) => e.getBoundingClientRect();

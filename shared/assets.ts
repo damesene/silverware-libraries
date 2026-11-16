@@ -3,7 +3,7 @@
 // A type provides renderers; Silverware Assets decides what is rendered (the view, the size, the host's own drawing,
 // the card). A type and an action use only what they are handed, and import nothing of Silverware Assets. As
 // shared/layout.ts: Silverware Assets' API as a plugin's init page hands it over, or a stand-in without it (`assetsOf`).
-import type { EditorEmbed } from "./editor.ts";
+import type { FieldDrawing } from "./editor.ts";
 import type { SheetArea } from "./sheetarea.ts";
 
 /** The version of the assets' API this file is written for: another is taken as none (updated apart) */
@@ -147,11 +147,12 @@ export type Assets = {
   readonly types: { register(type: AssetType): () => void };
   readonly actions: { register(action: AssetAction): () => void };
   /**
-   * Optional: an embed of `markdown` (a page's, its target resolved against `page`) drawn in another plugin's editor's
-   * field as the page draws it (read-only: no menu, nothing written); none where Silverware Assets draws none (not
-   * started yet, not an embed)
+   * Optional: what Silverware Assets draws in another plugin's editor field of a page's markdown (its targets resolved
+   * against `page`), as the page draws it: an embed, a file's link's icon and menu (shared/editor.ts `FieldDrawing`);
+   * what they change written into the field where it gives them their markdown to edit. Each none where it draws none
+   * (not started yet, no file's)
    */
-  readonly drawEmbed?: (markdown: string, page: string) => EditorEmbed | undefined;
+  readonly fieldDrawing?: (page: string) => FieldDrawing;
 };
 
 /** Silverware Assets' API as handed over, where it is of this version; else the stand-in, registering nothing */

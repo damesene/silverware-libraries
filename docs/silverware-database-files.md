@@ -97,7 +97,7 @@ Optional members, the version unchanged (an older Assets without them: the stand
 
 - `drawPreview?(target, page, box: { width, height }, signal): HTMLElement | null`: a file's preview by its type's own
   renderer, its room the box, no frame, label, menu or settings' height; the stored preview where the type keeps one,
-  none drawn anew where `costly` (null: Database draws the icon); what it started ends with `signal`. Not `drawEmbed`:
+  none drawn anew where `costly` (null: Database draws the icon); what it started ends with `signal`. Not `drawEmbed` (now `fieldDrawing`):
   that draws as the page does (the view and height of the settings, the frame, labels), which a 28 px box cannot hold
   without Database styling Assets' classes, and it holds a registry subscription until aborted.
 - `showFile?(target, page)`: a file shown in Assets' side panel (its action `peek`, run without a frame as links

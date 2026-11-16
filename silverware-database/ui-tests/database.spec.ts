@@ -1020,6 +1020,32 @@ test("the peek shows an item beside the page, its content written as it is left,
   expect(await space.saved("Page")).toBe("# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n");
 });
 
+test("in the peek's editor a file's link has its icon and menu as in the page, a link pressed is followed (the peek closed), an escape shows its character alone", async ({ page, space }) => {
+  const content = `${item("Todo", "a0")}\nSee [[${space.folder}/photo.png]] about \\[estimate: 5]\n\nThen [[${space.folder}/Page/db-tasks/Write docs|the docs]]\n`;
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS, "Page/db-tasks/Fix login": content }, "Page");
+  const body = page.locator(".swd-peek .swd-peek-body");
+  // (The editor is loaded once SilverBullet has started, when the browser is idle: a peek opened before has a plain field)
+  await expect(async () => {
+    if (await page.locator(".swd-peek").count()) await page.keyboard.press("Escape");
+    await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
+    await expect(body.locator(".cm-content")).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+  await expect.poll(() => fieldReady(body)).toBe(true);
+  // The file's link: Silverware Assets' icon before it, its menu as in the page; the escape's backslash hidden
+  const icon = body.locator(".swa-link-icon");
+  await expect(icon).toHaveCount(1);
+  await expect(body.locator(".cm-line", { hasText: "estimate" })).toContainText("about [estimate: 5]");
+  await icon.click();
+  await expect(page.locator(".swa-popup")).toBeVisible();
+  await expect(page.locator(".swa-popup .swa-segment")).not.toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".swa-popup")).toHaveCount(0);
+  // A page's link pressed: followed, the peek closed first
+  await body.locator(".swe-wiki-link", { hasText: "the docs" }).click();
+  await expect(page.locator(".swd-peek")).toHaveCount(0);
+  await expect(page).toHaveURL(/Write%20docs$|Write docs$/);
+});
+
 test("a shortcut of SilverBullet's pressed in the peek does nothing there and says so, the peek kept open", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS }, "Page");
   await page.locator(".swd-list-name", { hasText: "Fix login" }).click();

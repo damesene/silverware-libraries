@@ -2,9 +2,10 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { allConditions, allFormats, clearCustomDefinitions } from "../conditions/index.ts";
 import { defineFormats } from "../index.ts";
+import { SAMPLE_DELAY_MS } from "./conditionsdialog.ts";
 import { cell, controller, cursorMoves, editor, flashes, flush, renderPage, setText, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 import { asInLibraryPage } from "../testing/librarypage.ts";
 
@@ -25,7 +26,8 @@ const openColumnMenu = (column: number) => {
   window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, button: 0 }));
 };
 const dialog = () => document.querySelector<HTMLElement>(".swt-cf-dialog");
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+// The dialog's sample drawn anew after its delay: time moved on by the fake timers the test starts before its setup
+const sampled = () => vi.advanceTimersByTimeAsync(SAMPLE_DELAY_MS);
 // The dialog put aside (its eye), and back
 const peek = () => document.querySelector<HTMLElement>(".swt-dialog-peek")!.click();
 const back = () => document.querySelector<HTMLElement>(".swt-dialog-peek-back")!.click();
@@ -103,6 +105,7 @@ describe("Conditional formatting", () => {
   });
 
   it("adds a quick rule from a column's menu: the table as it is while it is edited, shown so as the dialog is put aside, written on Save", async () => {
+    vi.useFakeTimers();
     await setup(TABLE, { "silverware.table.metadata": true });
     await flush();
     openColumnMenu(1);
@@ -113,7 +116,7 @@ describe("Conditional formatting", () => {
     const value = dialog()!.querySelector<HTMLInputElement>('input[aria-label="Value"]')!;
     value.value = "50";
     value.dispatchEvent(new Event("input", { bubbles: true }));
-    await wait(200);
+    await sampled();
     await flush();
     expect([1, 2, 3].map((r) => formatted(r))).toEqual([false, false, false]);
     // Put aside: the table shows the rule before it is saved; back in the dialog, still
@@ -132,12 +135,13 @@ describe("Conditional formatting", () => {
   });
 
   it("leaves the table as it was when the dialog is cancelled", async () => {
+    vi.useFakeTimers();
     await setup(TABLE, { "silverware.table.metadata": true });
     await flush();
     openColumnMenu(1);
     item(/^Conditional formatting/)!.click();
     item("Color scale")!.click();
-    await wait(200);
+    await sampled();
     await flush();
     expect(formatted(1)).toBe(false);
     // Shown in the table by the eye, taken back with the dialog cancelled
@@ -196,6 +200,7 @@ describe("Conditional formatting", () => {
   });
 
   it("previews the rule edited on the table's own cells, across their values, and says how many it formats; anew as it changes", async () => {
+    vi.useFakeTimers();
     await setup(TABLE + META('[{"when":["greater",{"value":50}],"format":"redFill"}]'), { "silverware.table.metadata": true });
     await flush();
     at(2, 1).dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 }));
@@ -212,7 +217,7 @@ describe("Conditional formatting", () => {
     const value = dialog()!.querySelector<HTMLInputElement>('input[aria-label="Value"]')!;
     value.value = "70";
     value.dispatchEvent(new Event("input", { bubbles: true }));
-    await wait(200);
+    await sampled();
     expect(cells().map(([, on]) => on)).toEqual([false, false, true]);
     expect(count()).toBe("Formats 1 of 3 cells");
   });
@@ -296,7 +301,6 @@ describe("Conditional formatting", () => {
       { name: "urgent", label: "Urgent", look: (c: { text: string }) => (/urgent/i.test(c.text) ? { color: palette.red, bold: true } : undefined) },
       { name: "broken", label: "Broken", look: () => 42 },
     ]);
-    await wait(10);
     const page = "| Task |\n|---|\n| URGENT fix |\n| later |\n";
     await setup(page + `| <meta core.table conditions.rules='[{"format":"urgent"},{"format":"broken"}]'> |\n`);
     await flush();

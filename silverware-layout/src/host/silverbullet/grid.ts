@@ -8,13 +8,14 @@
 import { editorsOf } from "../../../../shared/editor.ts";
 import { keptKeys } from "../../../../shared/silverbullet/keptkeys.ts";
 import { resolvedTarget } from "../../../../shared/markdown/embed.ts";
-import type { EditorEmbed } from "../../../../shared/editor.ts";
-import type { EmbedDrawer } from "../../../../shared/rendered.ts";
+import type { FieldDrawing, LinkOpening } from "../../../../shared/editor.ts";
+import type { FieldDrawer } from "../../../../shared/rendered.ts";
+import { followLink } from "../../../../shared/silverbullet/links.ts";
 import { pageChanges } from "../../../../shared/pages/changes.ts";
 import type { PageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
 import { documentUrl } from "../../../../shared/silverbullet/platform.ts";
-import { imageEmbed } from "../../../../shared/silverbullet/embedimage.ts";
+import { withImages } from "../../../../shared/silverbullet/embedimage.ts";
 import { afterPress, SILVERBULLET_EDITORS, textForDrawing } from "./behaviour.ts";
 import { focusPage, isPageText, pressBesideGrid } from "./dom.ts";
 import { ownTasks } from "./tasks.ts";
@@ -61,8 +62,8 @@ type IntoGridWrite = {
   readonly place: { readonly kind: "cells"; readonly at: number } | { readonly kind: "cell"; readonly cell: number; readonly at: number; readonly was?: string };
 };
 
-/** SilverBullet's grid host; `drawer`: what draws embeds in a cell's field as another plugin registered it (Silverware Assets), none: images alone */
-export function silverBulletGridHost(bridge: Bridge, writer: PageWriter, drawer: () => EmbedDrawer | undefined = () => undefined) {
+/** SilverBullet's grid host; `drawer`: what draws in a cell's field as another plugin registered it (Silverware Assets), none: images alone */
+export function silverBulletGridHost(bridge: Bridge, writer: PageWriter, drawer: () => FieldDrawer | undefined = () => undefined) {
   // SilverBullet's shortcuts a cell's field keeps from it, told in its notification (shared/silverbullet/keptkeys.ts)
   const keyKept = keptKeys(bridge.listCommands, (message) => void bridge.flash(message, "info"));
   return {
@@ -90,13 +91,22 @@ export function silverBulletGridHost(bridge: Bridge, writer: PageWriter, drawer:
       const to = Number(selection?.to);
       return Number.isFinite(from) && Number.isFinite(to) ? { from: Math.min(from, to), to: Math.max(from, to) } : undefined;
     },
-    // An embed in a cell drawn in its field as the page draws it: by the plugin drawing files where one registered
-    // (Silverware Assets: every file as in the page), else an image alone, as SilverBullet draws it
-    embeds: async (): Promise<(markdown: string) => EditorEmbed | undefined> => {
+    // What a cell's field draws as the page draws it: by the plugin drawing files where one registered (Silverware
+    // Assets: every file and a file's link as in the page), else an embedded image alone, as SilverBullet draws it
+    fieldDrawing: async (): Promise<FieldDrawing> => {
       const page = String(await bridge.getCurrentPage());
-      const own = drawer();
-      return (markdown) => own?.(markdown, page) ?? imageEmbed(markdown, page);
+      return withImages(drawer()?.(page), page);
     },
+    // A link pressed in a cell's field followed as SilverBullet follows one in the page (none where the init page hands over no `navigate`)
+    ...(bridge.navigate
+      ? {
+          followLink: async (markdown: string, how: LinkOpening): Promise<void> => {
+            const page = String(await bridge.getCurrentPage());
+            const navigate = bridge.navigate!;
+            followLink(markdown, page, how, { navigate, openTab: (url) => void globalThis.open?.(url, "_blank", "noopener") });
+          },
+        }
+      : {}),
     // A move as one change of the page (one edit, one undo): the text taken out first, then each grid's cells
     writeMove: async (move: MoveWrite): Promise<string | undefined> => {
       const page = String(await bridge.getCurrentPage());

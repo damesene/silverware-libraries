@@ -18,7 +18,7 @@ function renderedOf(items: RenderedItem[] = [], ranges: { from: number; to: numb
     version: RENDERED_VERSION,
     items: () => items,
     ranges: (_text: string) => ranges,
-    drawEmbeds: () => () => undefined,
+    drawInFields: () => () => undefined,
     onChange: (listener) => {
       listeners.add(listener);
       return () => void listeners.delete(listener);

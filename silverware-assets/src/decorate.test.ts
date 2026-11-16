@@ -100,6 +100,49 @@ describe("a file drawn in an editor's field", () => {
   });
 });
 
+describe("a link to a file in an editor's field", () => {
+  /** A link's icon drawn into a container of the field's, its markdown edited by `replace` (none: read-only) */
+  const drawIcon = (decorator: AssetDecorator, markdown: string, replace?: (markdown: string) => boolean) => {
+    const container = document.createElement("span");
+    document.body.append(container);
+    const control = new AbortController();
+    decorator.fieldDrawing("P").linkIcon!(markdown)!.draw(container, control.signal, replace ? { replace } : undefined);
+    return { container, control };
+  };
+
+  it("is given its type's icon alone: none for a page's link, for text around it, or for a file no type takes", async () => {
+    const { decorator } = setUp("");
+    const icon = decorator.fieldDrawing("P").linkIcon!;
+    expect(icon("[[Notes]]")).toBeUndefined();
+    expect(icon("[[a.pdf]] and text")).toBeUndefined();
+    expect(icon("[[a.pdf]]")!.key).toBe(icon("[[a.pdf]]")!.key);
+    // Read-only (no markdown to edit): the icon, no menu
+    const { container, control } = drawIcon(decorator, "[the doc](a.pdf)");
+    await vi.waitFor(() => expect(container.querySelector(".swa-link-icon svg")).not.toBeNull());
+    container.querySelector<HTMLElement>(".swa-link-icon")!.click();
+    expect(document.querySelector(".swa-popup")).toBeNull();
+    control.abort();
+  });
+
+  it("opens its file's menu as in the page, what it changes written into the field: an embed of a view, its markdown copied, its file deleted and the link as its text", async () => {
+    const deleted: string[] = [];
+    const { decorator } = setUp("", {}, { deleteFile: async (path) => void deleted.push(path), confirm: async () => true });
+    const written: string[] = [];
+    const { container, control } = drawIcon(decorator, "[[Docs/a.pdf|The doc]]", (markdown) => (written.push(markdown), true));
+    await vi.waitFor(() => expect(container.querySelector(".swa-link-icon")).not.toBeNull());
+    const open = () => container.querySelector<HTMLElement>(".swa-link-icon")!.click();
+    open();
+    expect(showAsRow().find(([, checked]) => checked === "true")?.[0]).toBe("Link");
+    chooseShowAs("Preview");
+    expect(written.at(-1)).toBe("![[Docs/a.pdf|The doc||{ view: preview }]]");
+    open();
+    [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")].find((item) => item.textContent?.includes("Delete file"))!.click();
+    await vi.waitFor(() => expect(deleted).toEqual(["Docs/a.pdf"]));
+    expect(written.at(-1)).toBe("The doc");
+    control.abort();
+  });
+});
+
 describe("embedded media decorated", () => {
   it("leaves an image as the host drew it, its type and view marked", async () => {
     const { decorator } = setUp("![[cat.png|A cat|200]]");

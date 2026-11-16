@@ -1,12 +1,20 @@
 // An image embedded drawn in a plugin's editor's field as SilverBullet's page draws it, where no plugin drawing files
 // (Silverware Assets) is installed: a file of the space by its path, a URL as written; none for another file (its
-// markdown shown). Silverware Layout's cell and Silverware Database's peek fall back on it.
-import type { EditorEmbed } from "../editor.ts";
+// markdown shown). Silverware Layout's cell and Silverware Database's peek fall back on it (`withImages`).
+import type { EditorEmbed, FieldDrawing } from "../editor.ts";
 import { readEmbeds, resolvedTarget } from "../markdown/embed.ts";
 import { documentUrl } from "./platform.ts";
 
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)(\?.*)?$/i;
 const WEB = /^https?:\/\//i;
+
+/**
+ * What a field of a page's markdown draws: what the plugin drawing files draws (`own`, Silverware Assets' for the
+ * page), an embedded image where it draws none (not installed, not started yet)
+ */
+export function withImages(own: FieldDrawing | undefined, page: string): FieldDrawing {
+  return { embed: (markdown) => own?.embed?.(markdown) ?? imageEmbed(markdown, page), ...(own?.linkIcon ? { linkIcon: own.linkIcon } : {}) };
+}
 
 /** An image embed of `markdown` (a page's embed, its target resolved against `page`) drawn; none for another file */
 export function imageEmbed(markdown: string, page: string): EditorEmbed | undefined {

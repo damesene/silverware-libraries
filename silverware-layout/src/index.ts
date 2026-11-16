@@ -9,7 +9,7 @@ import { type PageWriter, pageWriter } from "../../shared/pages/writer.ts";
 import { LayoutApp, type LayoutStore } from "./app.ts";
 import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
 import { Registry } from "./core/registry.ts";
-import { type EmbedDrawer, RENDERED_VERSION, type Rendered, type RenderedItem } from "../../shared/rendered.ts";
+import { type FieldDrawer, RENDERED_VERSION, type Rendered, type RenderedItem } from "../../shared/rendered.ts";
 import { gridInsertion } from "./grid/core/insert.ts";
 import { gridLinks } from "./grid/core/links.ts";
 import { GRID_MODES, isGridMode, isMoveMode, MOVE_MODES, moveIntoGrid, wrapInNewGrid } from "./grid/build.ts";
@@ -56,8 +56,8 @@ export const api = Object.assign(registry.api(), { rendered: renderedApi(), layO
 let grids: Grids | undefined;
 // Who is told what the grids draw (shared/rendered.ts), the grids made or not yet
 const renderedListeners = new Set<(items: readonly RenderedItem[]) => void>();
-// What draws embeds in a cell's field, as the plugin drawing files registered it (none: images alone)
-let embedDrawer: EmbedDrawer | undefined;
+// What draws in a cell's field (embeds, links' icons), as the plugin drawing files registered it (none: images alone)
+let fieldDrawer: FieldDrawer | undefined;
 
 /** What the grids draw outside the editor and where it is in the page, for another plugin to decorate (shared/rendered.ts) */
 function renderedApi(): Rendered {
@@ -69,10 +69,10 @@ function renderedApi(): Rendered {
       renderedListeners.add(listener);
       return () => void renderedListeners.delete(listener);
     },
-    drawEmbeds: (drawer) => {
-      embedDrawer = drawer;
+    drawInFields: (drawer) => {
+      fieldDrawer = drawer;
       return () => {
-        if (embedDrawer === drawer) embedDrawer = undefined;
+        if (fieldDrawer === drawer) fieldDrawer = undefined;
       };
     },
   };
@@ -90,7 +90,7 @@ export async function init(bridge: Bridge): Promise<void> {
   current = bridge;
   const writer = pageWriter(silverBulletPlatform(bridge));
   // One per window (its listeners live as long); its host the bridge handed over now, again with each start
-  const host = silverBulletGridHost(bridge, writer, () => embedDrawer);
+  const host = silverBulletGridHost(bridge, writer, () => fieldDrawer);
   if (grids) grids.useHost(host);
   else {
     grids = new Grids(document, host);

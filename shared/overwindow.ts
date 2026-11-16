@@ -11,7 +11,7 @@ const SELECTOR = `[${OVER_WINDOW_ATTRIBUTE}]`;
 
 // How long nothing is marked before the end is told: a view rendered anew (its element replaced, the new one marked
 // a moment later) does not end
-const ENDED_MS = 100;
+export const ENDED_MS = 100;
 
 /** An element marked as shown over the whole window, or not */
 export function markOverWindow(element: Element, on: boolean): void {

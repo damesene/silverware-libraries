@@ -17,7 +17,7 @@ import { type Drawn, drawnIn, itemsOf } from "./drawn.ts";
 import type { LayoutMenuEntry } from "../../../shared/layout.ts";
 import { addColumnGrips, type CellAction, gridMenu, type GridMenuState } from "./ui/columngrips.ts";
 import { caretWord, type CellEditing, editCell } from "./ui/celleditor.ts";
-import { type EditorEmbed, type EditorLook, type Editors, editorsOf } from "../../../shared/editor.ts";
+import { type EditorLook, type Editors, editorsOf, type FieldDrawing, type LinkOpening } from "../../../shared/editor.ts";
 import { LOOK_SAMPLE, sampleLook } from "../../../shared/editorlook.ts";
 import { addColumnDividers } from "./ui/dividers.ts";
 import { drawGrid, keepBlankLines, plainCell, showBorder, showColumns, showFit } from "./ui/view.ts";
@@ -102,8 +102,10 @@ export type GridHost = {
   writeMove?(move: MoveWrite): Promise<string | undefined>;
   /** The page's blocks moved into a grid as one edit (none: Move into existing grid is not offered); why not, as text */
   moveIntoGrid?(write: IntoGridWrite): Promise<string | undefined>;
-  /** What draws an embed in a cell's field (shared/editor.ts `EditorOptions.embed`), as the page draws it; none: its markdown */
-  embeds?(): Promise<(markdown: string) => EditorEmbed | undefined>;
+  /** What a cell's field draws as the page draws it (shared/editor.ts `FieldDrawing`: an embed, a link's icon); none: its markdown */
+  fieldDrawing?(): Promise<FieldDrawing>;
+  /** A link pressed in a cell's field followed as the page follows one (its markdown; in a new tab or in place); none: a press puts the caret there */
+  followLink?(markdown: string, how: LinkOpening): unknown;
   /** A key a cell's field kept from the page (its editor stops every key), told where it is a shortcut of the host's that does nothing there (none: nothing told) */
   keyKept?(event: KeyboardEvent): void;
 };
@@ -761,7 +763,7 @@ export class Grids {
     const pressed = cellElement;
     // (What draws its embeds asked as its text is read: no wait of its own before the field opens, the grid perhaps
     // drawn anew meanwhile)
-    const embeds = this.host.embeds?.().catch(() => undefined);
+    const drawing = this.host.fieldDrawing?.().catch(() => undefined);
     // (The page's look of a task's box and a hashtag read once, for its field: as the cell is drawn)
     const look = this.lookIn(cellElement);
     let text = await this.host.pageText().catch(() => undefined);
@@ -788,13 +790,17 @@ export class Grids {
     const place: CellPlace = { grid: element, nth, index };
     this.places.add(place);
     let session: CellEditing | undefined;
-    const [embed, shown] = await Promise.all([embeds, look]);
+    const [drawn, shown] = await Promise.all([drawing, look]);
+    const follow = this.host.followLink?.bind(this.host);
     const cellHost = {
       afterPress: (doc: Document) => this.host.afterPress?.(doc) ?? Promise.resolve(),
       focusPage: (cell: HTMLElement) => this.host.focusPage?.(cell),
       ...(this.host.keyKept ? { keyKept: this.host.keyKept.bind(this.host) } : {}),
-      ...(embed ? { embed } : {}),
+      ...(drawn ? { drawing: drawn } : {}),
       ...(shown ? { look: shown } : {}),
+      // A link followed once the cell's text is written (the cell left first, in place): a write after it would find
+      // the page gone; in a new tab at once, the cell edited on
+      ...(follow ? { openLink: (markdown: string, how: LinkOpening) => void (how.newTab ? Promise.resolve() : this.writing).then(() => follow(markdown, how)) } : {}),
       // (Its rendering back in the page: what it drew told again, to be decorated where it was not yet)
       restored: () => {
         this.changedSinceTold = true;

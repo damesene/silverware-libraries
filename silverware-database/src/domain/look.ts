@@ -11,6 +11,11 @@ import { isColor } from "./colors.ts";
 const ICON_MAX = 32;
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
+/** A text's characters as the user sees them (an emoji of several code points one), by the one segmenter made */
+export function graphemes(text: string): string[] {
+  return [...segmenter.segment(text)].map((one) => one.segment);
+}
+
 /** Why something cannot be an item's icon, undefined where it can */
 export function validateIcon(icon: unknown): string | undefined {
   if (typeof icon !== "string" || !icon) return "An icon is a character";

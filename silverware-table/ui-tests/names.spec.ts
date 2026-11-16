@@ -1,5 +1,6 @@
 // The toolbar's row of names: what holds the table (its sheet) and the table, each after its icon button
-import { boxOf, cell, closeNotification, expect, hoverCell, markdown, menu, notification, setPage, setSettings, table, tableIcon, test } from "./helpers.ts";
+import { boxOf, cell, closeNotification, expect, hoverCell, markdown, menu, notification, setPage, setSettings, startingOn, table, tableIcon, test } from "./helpers.ts";
+import { ONE_ROW } from "./pages.ts";
 
 const name = (page: import("@playwright/test").Page, slot: "container" | "table") => page.locator(`.swt-bar.swt-visible .swt-bar-name-${slot} .swt-bar-name`);
 
@@ -9,8 +10,7 @@ async function namesInToolbar(page: import("@playwright/test").Page): Promise<vo
 }
 
 test.describe("Names in the ⋯ menu", () => {
-  test("the ⋯ menu: the table's name its title, centered as every menu's; its views as items, its sheet in a row as a column's type", async ({ page }) => {
-    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n");
+  test("the ⋯ menu: the table's name its title, centered as every menu's; its views as items, its sheet in a row as a column's type", startingOn(ONE_ROW), async ({ page }) => {
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
     await hoverCell(page, cell(page, 1, 0));
     // Not in the toolbar (the setting's default), nor their icons: the menu has them
@@ -61,8 +61,7 @@ test("the setting in the (styled) settings dialog, from a table's ⋯ menu, offe
   await expect(select).toHaveValue("shift");
 });
 
-test("Shift pressed over a table with a long name: the names beside the icons, the toolbar where it is without them", async ({ page }) => {
-  await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='averyveryverylongtablenameindeed'> |\n");
+test("Shift pressed over a table with a long name: the names beside the icons, the toolbar where it is without them", startingOn("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='averyveryverylongtablenameindeed'> |\n"), async ({ page }) => {
   await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
   await hoverCell(page, cell(page, 1, 0));
   const bar = page.locator(".swt-bar.swt-visible");
@@ -81,8 +80,7 @@ test("Shift pressed over a table with a long name: the names beside the icons, t
     .toBe(true);
 });
 
-test("long names in the ⋯ menu are cut, whole in their tooltips, the table's in the title", async ({ page }) => {
-  await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='QuarterlyRevenueByRegionAndProductLine' sheet.name='Sheet1withaverylongnameindeed' sheet.at='A1'> |\n");
+test("long names in the ⋯ menu are cut, whole in their tooltips, the table's in the title", startingOn("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='QuarterlyRevenueByRegionAndProductLine' sheet.name='Sheet1withaverylongnameindeed' sheet.at='A1'> |\n"), async ({ page }) => {
   await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
   await hoverCell(page, cell(page, 1, 0));
   await page.locator(".swt-bar.swt-visible .swt-bar-more").click();
@@ -100,8 +98,7 @@ test("long names in the ⋯ menu are cut, whole in their tooltips, the table's i
 test.describe("Names in the toolbar", () => {
   test.beforeEach(async ({ page }) => namesInToolbar(page));
 
-  test("a table without a name nor a sheet shows both muted; typed into their fields, it is named and put on a sheet", async ({ page }) => {
-    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n");
+  test("a table without a name nor a sheet shows both muted; typed into their fields, it is named and put on a sheet", startingOn(ONE_ROW), async ({ page }) => {
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
     await hoverCell(page, cell(page, 1, 0));
     await expect(name(page, "table")).toHaveText("Table");
@@ -134,8 +131,7 @@ test.describe("Names in the toolbar", () => {
     expect(await markdown(page)).not.toContain("sheet=");
   });
 
-  test("over a table narrower than the toolbar on the sheet: no name wraps, nothing is cut off, the names above", async ({ page }) => {
-    await setPage(page, "# Test\n\n| Name | Qty |\n|---|--:|\n| Apple | 10 |\n| Plum | 6 |\n| Pear | 3 |\n| Total | 19 |\n| <meta core.table core.pin-bottom='1'> |\n");
+  test("over a table narrower than the toolbar on the sheet: no name wraps, nothing is cut off, the names above", startingOn("# Test\n\n| Name | Qty |\n|---|--:|\n| Apple | 10 |\n| Plum | 6 |\n| Pear | 3 |\n| Total | 19 |\n| <meta core.table core.pin-bottom='1'> |\n"), async ({ page }) => {
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(4);
     await hoverCell(page, cell(page, 1, 0));
     await (await tableIcon(page, "Sheet view")).click();
@@ -170,8 +166,7 @@ test.describe("Names in the toolbar", () => {
     await expect(table(page)).toHaveClass(/swt-fullscreen/);
   });
 
-  test("a table of a sheet view moved to another sheet by its name: the view shows that sheet", async ({ page }) => {
-    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| City |\n|---|\n| Brno |\n| <meta core.table core.name='b' sheet.name='Plan' sheet.at='D1'> |\n");
+  test("a table of a sheet view moved to another sheet by its name: the view shows that sheet", startingOn("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| City |\n|---|\n| Brno |\n| <meta core.table core.name='b' sheet.name='Plan' sheet.at='D1'> |\n"), async ({ page }) => {
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
     await hoverCell(page, cell(page, 1, 0));
     await (await tableIcon(page, "Sheet view")).click();
@@ -209,8 +204,7 @@ test.describe("A table name two tables of the page have", () => {
 });
 
 test.describe("Removing a name", () => {
-  test("Remove from sheet under the sheet's name field; none under the table's (an empty name removes it)", async ({ page }) => {
-    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A1'> |\n");
+  test("Remove from sheet under the sheet's name field; none under the table's (an empty name removes it)", startingOn("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A1'> |\n"), async ({ page }) => {
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
     await hoverCell(page, cell(page, 1, 0));
     await page.locator(".swt-bar.swt-visible .swt-bar-more").click();
@@ -226,8 +220,7 @@ test.describe("Removing a name", () => {
 });
 
 test.describe("The sheet's × in the ⋯ menu", () => {
-  test("the × in the sheet's row takes the table off it; disabled on none", async ({ page }) => {
-    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A1'> |\n");
+  test("the × in the sheet's row takes the table off it; disabled on none", startingOn("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A1'> |\n"), async ({ page }) => {
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
     await hoverCell(page, cell(page, 1, 0));
     await page.locator(".swt-bar.swt-visible .swt-bar-more").click();

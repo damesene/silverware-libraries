@@ -80,6 +80,9 @@ const SAMPLE = "Aa 12";
 // The numbers a strip samples a format at (0 to 100): a part for each run of the same look
 const STRIP_STEPS = 11;
 
+/** How long after the rule edited last changes its sample in the dialog is drawn anew (typing does not redraw it on every key) */
+export const SAMPLE_DELAY_MS = 150;
+
 export function openConditionsDialog(host: ModelHost, options: ConditionsDialogOptions): Dialog {
   const doc = host.doc;
   const e = <K extends keyof HTMLElementTagNameMap>(tag: K, props?: Parameters<typeof el>[2], ...children: ElementChild[]) => el(doc, tag, props, ...children);
@@ -143,7 +146,7 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
   let sampling: ReturnType<typeof setTimeout> | undefined;
   const sampleSoon = () => {
     clearTimeout(sampling);
-    sampling = setTimeout(fillSample, 150);
+    sampling = setTimeout(fillSample, SAMPLE_DELAY_MS);
   };
   // A cell of the sample: its text, its look (none: as the table shows it)
   const sampleCell = (text: string, style: Style | undefined) => {

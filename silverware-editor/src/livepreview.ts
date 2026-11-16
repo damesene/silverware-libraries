@@ -1,15 +1,16 @@
 // Markdown shown as SilverBullet's editor shows it (its behaviour, written here: docs/silverware-editor.md): a task's
 // `[ ]` a checkbox toggling it, a done task struck through, a bullet list's `-` a bullet, the marks of emphasis, code,
-// headings, links and `[[wiki links]]` hidden, an embed drawn (by its plugin, as it says: `embed`), a table drawn as
-// one (read-only: its cells edited in its markdown), each shown again as its markdown where the selection touches it.
-// A read-only
-// editor shows none: nothing to edit there. Built over the CodeMirror module loaded beside the bundle (its types alone
-// here), as src/codemirror.ts is.
-import type { EditorState, Range } from "@codemirror/state";
+// headings, links and `[[wiki links]]` hidden, an escape's backslash hidden, an embed drawn and a link's icon before it
+// (by its plugin, as it says: `drawing`), a link followed as it is pressed (by its plugin: `openLink`, docs/silverware-
+// editor-links.md), a table drawn as one (read-only: its cells edited in its markdown), each shown again as its
+// markdown where the selection touches it. A read-only editor shows none: nothing to edit there. Built over the
+// CodeMirror module loaded beside the bundle (its types alone here), as src/codemirror.ts is.
+import type { EditorState, Extension, Range } from "@codemirror/state";
 import type { Decoration, DecorationSet, EditorView } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import type { MarkdownConfig } from "@lezer/markdown";
-import type { EditorEmbed } from "../../shared/editor.ts";
+import type { EditorEmbed, FieldDrawing, LinkOpening } from "../../shared/editor.ts";
+import { isMac } from "../../shared/keys.ts";
 import { inlineMarks } from "../../shared/markdown/inline.ts";
 import type { CodeMirror } from "./codemirror.ts";
 import { keepPageStyles } from "./pagestyles.ts";
@@ -129,8 +130,22 @@ function toggleTask(view: EditorView, at: number): void {
   view.dispatch({ changes: { from: at + 1, to: at + 2, insert: marker[1] === " " ? "x" : " " }, userEvent: "input" });
 }
 
-/** The live preview: decorations of the text, made again on each change of it or of the selection */
-export function livePreview(cm: CodeMirror, embed?: (markdown: string) => EditorEmbed | undefined) {
+// A link as the live preview draws it: what a press on it follows
+const LINK_TEXT = ".swe-link, .swe-wiki-link";
+
+/** The link (a markdown link, a wiki link) a place of the text is in: its markdown, none where it is in none */
+export function linkAt(state: EditorState, tree: { resolveInner(at: number, side: -1 | 0 | 1): SyntaxNode }, at: number): string | undefined {
+  for (let node: SyntaxNode | null = tree.resolveInner(at, 1); node; node = node.parent) {
+    if (node.name === "WikiLink" || node.name === "Link") return state.sliceDoc(node.from, node.to);
+  }
+  return undefined;
+}
+
+/**
+ * The live preview: decorations of the text, made again on each change of it or of the selection; `drawing` what a
+ * plugin draws in it, `openLink` what follows a link pressed
+ */
+export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (markdown: string, how: LinkOpening) => void): Extension {
   class Checkbox extends cm.WidgetType {
     constructor(
       readonly checked: boolean,
@@ -341,6 +356,12 @@ export function livePreview(cm: CodeMirror, embed?: (markdown: string) => Editor
     // (Shown where the selection touches it, its ends too: a caret beside a mark shows it, as it is about to be typed in)
     const shown = (from: number, to: number) => !state.readOnly && state.selection.ranges.some((range) => range.from <= to && from <= range.to);
     const hide = (from: number, to: number) => from < to && out.push(hidden.range(from, to));
+    // A link's icon before its text where the plugin draws one (a file's: its menu), its markdown the link's
+    const linkIcon = (from: number, to: number) => {
+      const markdown = state.sliceDoc(from, to);
+      const drawn = drawing?.linkIcon?.(markdown);
+      if (drawn) out.push(cm.Decoration.widget({ widget: new Embed(drawn, markdown), side: -1 }).range(from));
+    };
     const children = (node: SyntaxNode) => {
       const all: SyntaxNode[] = [];
       for (let child = node.firstChild; child; child = child.nextSibling) all.push(child);
@@ -384,20 +405,21 @@ export function livePreview(cm: CodeMirror, embed?: (markdown: string) => Editor
           return false;
         } else if (name === "Image") {
           // `![Alt](url)`: drawn where the plugin draws it
-          const drawn = shown(from, to) ? undefined : embed?.(state.sliceDoc(from, to));
+          const drawn = shown(from, to) ? undefined : drawing?.embed?.(state.sliceDoc(from, to));
           if (drawn) out.push(cm.Decoration.replace({ widget: new Embed(drawn, state.sliceDoc(from, to)) }).range(from, to));
         } else if (name === "Link") {
           // An inline link with text alone, `[text](url)`: its text shown, the rest hidden (a reference link left as written)
           const parts = children(node);
           const close = parts.find((part, index) => part.name === "LinkMark" && index > 0 && state.sliceDoc(part.from, part.to) === "]");
           if (!close || close.from === from + 1 || !parts.some((part) => part.name === "URL") || shown(from, to)) return;
+          linkIcon(from, to);
           hide(from, from + 1);
           out.push(link.range(from + 1, close.from));
           hide(close.from, to);
         } else if (name === "WikiLink") {
           // `![[…]]`: an embed, drawn where the plugin draws it, else its markdown as written (not a link's)
           if (from > 0 && state.sliceDoc(from - 1, from) === "!") {
-            const drawn = shown(from - 1, to) ? undefined : embed?.(state.sliceDoc(from - 1, to));
+            const drawn = shown(from - 1, to) ? undefined : drawing?.embed?.(state.sliceDoc(from - 1, to));
             if (drawn) out.push(cm.Decoration.replace({ widget: new Embed(drawn, state.sliceDoc(from - 1, to)) }).range(from - 1, to));
             return;
           }
@@ -406,9 +428,13 @@ export function livePreview(cm: CodeMirror, embed?: (markdown: string) => Editor
           const pipe = state.sliceDoc(from + 2, to - 2).indexOf("|");
           const start = pipe < 0 ? from + 2 : from + 2 + pipe + 1;
           if (start >= to - 2) return;
+          linkIcon(from, to);
           hide(from, start);
           out.push(wikiLink.range(start, to - 2));
           hide(to - 2, to);
+        } else if (name === "Escape") {
+          // `\[`: the character alone, as the page draws it
+          if (!shown(from, to)) hide(from, from + 1);
         }
       },
     });
@@ -426,13 +452,30 @@ export function livePreview(cm: CodeMirror, embed?: (markdown: string) => Editor
     return cm.Decoration.set(out, true);
   }
 
-  return cm.StateField.define<DecorationSet>({
+  const field = cm.StateField.define<DecorationSet>({
     create: decorations,
     // (Made again on every transaction: the text, the selection, read-only and the tree's parse all change it; the
     // editors are small, a cell, an item's content)
     update: (_value, transaction) => decorations(transaction.state),
     provide: (field) => cm.EditorView.decorations.from(field),
   });
+  if (!openLink) return field;
+  // A link drawn as a link (its markdown not shown) pressed: followed by the editor's user, the caret not moved; in a
+  // new tab by the middle button, Ctrl (Cmd on a Mac, where Ctrl+press is the context menu's); an Alt+press the
+  // editor's (the caret there, its markdown shown). Followed once: a double press's second press none
+  const mac = isMac();
+  const follow = cm.EditorView.domEventHandlers({
+    mousedown: (event, view) => {
+      if (event.altKey || (event.button !== 0 && event.button !== 1) || (mac && event.ctrlKey)) return false;
+      const text = event.target instanceof Element ? event.target.closest(LINK_TEXT) : null;
+      const markdown = text && view.contentDOM.contains(text) ? linkAt(view.state, cm.syntaxTree(view.state), view.posAtDOM(text)) : undefined;
+      if (!markdown) return false;
+      event.preventDefault();
+      if (event.detail <= 1) openLink(markdown, { newTab: event.button === 1 || (mac ? event.metaKey : event.ctrlKey) });
+      return true;
+    },
+  });
+  return [field, follow];
 }
 
 /** What the live preview's elements look like: SilverBullet's CSS variables where it has them */

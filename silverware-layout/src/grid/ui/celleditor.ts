@@ -4,7 +4,7 @@
 // it; the cell shows its rendering again until the host draws the grid anew. The grid drawn anew while it is edited
 // (another cell written, left by the press that opened this one), the editor goes into the new drawing's cell
 // (`moveTo`), what was typed kept.
-import type { EditorEmbed, EditorLook, Editors, TextEditor, TextSelection } from "../../../../shared/editor.ts";
+import type { EditorLook, Editors, FieldDrawing, LinkOpening, TextEditor, TextSelection } from "../../../../shared/editor.ts";
 
 /** What a cell edited asks of the host (src/grid/grids.ts' `GridHost`, its answers there) */
 export type CellHost = {
@@ -12,8 +12,10 @@ export type CellHost = {
   afterPress(doc: Document): Promise<void>;
   // The page's editor around a cell given the focus back
   focusPage(cell: HTMLElement): void;
-  // What draws an embed in the field as an image (none: its markdown)
-  readonly embed?: (markdown: string) => EditorEmbed | undefined;
+  // What the field draws as the page draws it: an embed, a link's icon (none: its markdown)
+  readonly drawing?: FieldDrawing;
+  // A link pressed in the field followed (none: a press puts the caret there); the cell left first where it is followed in place
+  readonly openLink?: (markdown: string, how: LinkOpening) => void;
   // The page's look of a task's box and a hashtag in the field (none: the editor's own)
   readonly look?: EditorLook;
   // The cell's rendering shown again as it is left: what it draws told again (a rendering it was moved into while
@@ -48,9 +50,10 @@ export function editCell(cell: HTMLElement, markdown: string, at: number | TextS
   let pressing = false;
   const presses = new AbortController();
   let editor: TextEditor | undefined;
-  // Left by a key (Esc, Ctrl/Cmd+Enter) or by the focus gone (a press elsewhere)
-  const leave = (byKey: boolean) => {
-    if (left || moving || !editor) return;
+  // Left by a key (Esc, Ctrl/Cmd+Enter) or by the focus gone (a press elsewhere); whether it was left now (not: left
+  // before, or being moved into the grid drawn anew)
+  const leave = (byKey: boolean): boolean => {
+    if (left || moving || !editor) return false;
     left = true;
     lost = false;
     presses.abort();
@@ -76,12 +79,13 @@ export function editCell(cell: HTMLElement, markdown: string, at: number | TextS
       }, 0);
       // Written when the host says a write may go after a press (the grid drawn anew after it)
       done(text, host.afterPress(doc));
-      return;
+      return true;
     }
     const from = cell;
     close(editor, cell, shown);
     if (hadFocus) host.focusPage(from);
     done(text, Promise.resolve());
+    return true;
   };
   editor = editors.create(doc, {
     text: markdown,
@@ -89,7 +93,19 @@ export function editCell(cell: HTMLElement, markdown: string, at: number | TextS
     label: "The cell's markdown",
     spellcheck: true,
     selection: at,
-    ...(host.embed ? { embed: host.embed } : {}),
+    ...(host.drawing ? { drawing: host.drawing } : {}),
+    // (Followed in place: the cell left first, as by a key, its text handed back before the page goes; after the
+    // editor's own handling of the press, which the editor destroyed as it is left would not finish)
+    ...(host.openLink
+      ? {
+          openLink: (markdown: string, how: LinkOpening) =>
+            queueMicrotask(() => {
+              // (Not left, the cell being moved into the grid drawn anew: not followed, its text not handed back yet)
+              if (!how.newTab && !leave(true)) return;
+              host.openLink!(markdown, how);
+            }),
+        }
+      : {}),
     ...(host.look ? { look: host.look } : {}),
     keys: { Escape: () => (leave(true), true), "Mod-Enter": () => (leave(true), true) },
     onBlur: () => {

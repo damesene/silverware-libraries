@@ -22,6 +22,7 @@ import type { Item } from "../../model/database.ts";
 import { svg } from "../icons.ts";
 import { type ItemSpan, SPAN_META, type SpanChange, spanMenu, viewSpans } from "../spans.ts";
 import { fieldNodes } from "../values.ts";
+import { dateTimeFormat } from "../../../../shared/intl.ts";
 
 const ICON = svg('<rect x="2.5" y="3.5" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3M5 9h1.5M7.5 9H9M10 9h1.5M5 11.5h1.5M7.5 11.5H9"/>');
 const BACK = svg('<path d="m10 4-4 4 4 4"/>');
@@ -84,7 +85,8 @@ function draw(host: ViewHost, element: HTMLElement, drag: Drag): void {
     picked.set(key, day);
     redraw();
   };
-  const fmt = (options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(LOCALE, { ...options, timeZone: "UTC" });
+  // (Formatters kept: shared/intl.ts)
+  const fmt = (options: Intl.DateTimeFormatOptions) => dateTimeFormat(LOCALE, { ...options, timeZone: "UTC" });
   const utc = (day: Day) => new Date(`${day}T00:00:00Z`);
   const longDay = fmt({ weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const shortDay = fmt({ day: "numeric", month: "short" });

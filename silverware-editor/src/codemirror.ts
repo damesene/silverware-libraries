@@ -110,7 +110,7 @@ export function codeMirrorEditor(cm: CodeMirror, doc: Document, options: EditorO
     cm.drawSelection(),
     // (GitHub's markdown, its tasks and strikethrough, as SilverBullet reads them; wiki links read too, for the preview)
     cm.markdown({ base: cm.markdownLanguage, extensions: [wikiLinks] }),
-    livePreview(cm, options.embed),
+    livePreview(cm, options.drawing, options.openLink),
     cm.closeBrackets(),
     cm.keymap.of([...cm.closeBracketsKeymap, ...cm.markdownKeymap, ...cm.historyKeymap, ...cm.completionKeymap.filter(noEscape), cm.indentWithTab, ...usual]),
     cm.EditorView.lineWrapping,

@@ -13,7 +13,7 @@
 // takes it away) until it is written or the user agrees to load the body as it
 // is now. A change made elsewhere draws the panel anew once nothing in it is
 // being edited.
-import { COMPANION_ATTRIBUTE, type TextEditor } from "../../../../shared/editor.ts";
+import { COMPANION_ATTRIBUTE, type LinkOpening, type TextEditor } from "../../../../shared/editor.ts";
 import { el, openedHere } from "../../../../shared/elements.ts";
 import { markOverWindow } from "../../../../shared/overwindow.ts";
 import type { Result } from "../../core/core.ts";
@@ -34,7 +34,7 @@ const WIDTH = 600;
 const MIN_WIDTH = 320;
 const SHARE = 0.8;
 // How long after a press beside the panel its click is waited for (a press moved away, a drag, has none)
-const CLICK_WAIT_MS = 400;
+export const CLICK_WAIT_MS = 400;
 // How far a press beside the panel moves before it is a drag (a card or a row dragged to its place), which leaves it open
 const DRAG_MOVE = 6;
 // An editor's area narrower than this (a phone, a narrow window): the panel takes all of it, as a page of its own
@@ -581,8 +581,9 @@ export class PeekPanel {
           }
         });
       };
-      // (Its embeds drawn as the page draws them, by the item shown then: a field kept takes the next item's)
-      const drawEmbed = this.host.drawEmbed?.bind(this.host);
+      // (Its files and their links drawn as the page draws them, by the item shown then: a field kept takes the next item's)
+      const drawing = this.host.fieldDrawing?.bind(this.host);
+      const follow = this.host.followLink?.bind(this.host);
       const body = this.host.editors.create(doc, {
         text: "",
         className: "swd-peek-body",
@@ -591,7 +592,24 @@ export class PeekPanel {
         readOnly: true,
         passKeys: true,
         onBlur: left,
-        ...(drawEmbed ? { embed: (markdown: string) => drawEmbed(markdown, shown.item) } : {}),
+        ...(drawing
+          ? {
+              drawing: {
+                embed: (markdown: string) => drawing(shown.item).embed?.(markdown),
+                linkIcon: (markdown: string) => drawing(shown.item).linkIcon?.(markdown),
+              },
+            }
+          : {}),
+        // A link pressed followed as the page follows one: in place the panel closed first, as Open closes it (the
+        // content written as it is left); in a new tab the panel left as it is
+        ...(follow
+          ? {
+              openLink: (markdown: string, how: LinkOpening) =>
+                void (async () => {
+                  if (how.newTab || (await this.close())) follow(markdown, shown.item, how);
+                })(),
+            }
+          : {}),
       });
       body.element.dataset.reading = "";
       shown.field = { body, note: el(doc, "div", "swd-peek-note") };

@@ -1,5 +1,6 @@
 import { lineIcon } from "../../icons.ts";
-import { notANumber, numberFormat, numberOf } from "../format.ts";
+import { numberFormat } from "../../../../shared/intl.ts";
+import { notANumber, numberOf } from "../format.ts";
 import { columnType } from "../type.ts";
 
 /**

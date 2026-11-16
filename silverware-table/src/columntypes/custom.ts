@@ -7,7 +7,8 @@
 // column types module), so a mistake never breaks a table.
 import { parseDate } from "../formulas/dates.ts";
 import { lineIcon } from "../icons.ts";
-import { dateTimeFormat, formatNumber, notANumber, numberFormat, numberOf } from "./format.ts";
+import { dateTimeFormat, numberFormat } from "../../../shared/intl.ts";
+import { formatNumber, notANumber, numberOf } from "./format.ts";
 import { readParams } from "./registry.ts";
 import type { Choice, ColumnType, Params, ParamSpec, ParamSpecs, Shown } from "./type.ts";
 

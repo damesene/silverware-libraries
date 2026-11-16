@@ -14,7 +14,8 @@ describe("Lazy saving", () => {
     clickOn(cell(row, column));
     field()!.value = value;
   };
-  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  // Time moved on by the fake timers a test waiting for the delay starts before its setup, not waited for
+  const wait = (ms: number) => vi.advanceTimersByTimeAsync(ms);
 
   it("shows what was typed into an empty cell while it is held", async () => {
     const page = "| A | B |\n|---|---|\n| 1 |  |\n";
@@ -42,6 +43,7 @@ describe("Lazy saving", () => {
   });
 
   it("waits with what it holds for a table no longer rendered, and writes it once the table is rendered again", async () => {
+    vi.useFakeTimers();
     await setup(PAGE, { "silverware.table.modules.lazy.delay": 20, "silverware.table.editor.enterKey": "save" });
     button().click();
     type(1, 1, "4");
@@ -60,6 +62,7 @@ describe("Lazy saving", () => {
   });
 
   it("keeps the cells edited until editing stops for the delay, then writes them in one edit", async () => {
+    vi.useFakeTimers();
     await setup(PAGE, { "silverware.table.modules.lazy.delay": 30, "silverware.table.editor.enterKey": "moveDown" });
     button().click();
     expect(button().getAttribute("aria-pressed")).toBe("true");
@@ -79,8 +82,8 @@ describe("Lazy saving", () => {
     expect(text).toBe(PAGE);
     expect(button().classList.contains("swt-attention")).toBe(true);
     key(field()!, "Escape");
-    // The delay (30 ms) and the write: room to spare when the machine is busy
-    await wait(300);
+    // The delay (30 ms) past, the write done
+    await wait(30);
     expect(text).toBe(PAGE.replace("| Pear | 3 |", "| Pear | 4 |").replace("| apple | 10 |", "| apple | 11 |"));
     await controller.scan();
     expect(button().classList.contains("swt-attention")).toBe(false);

@@ -1,6 +1,7 @@
 // A cell's value as text, as Excel shows it by its number format, near enough (docs/silverware-viewers.md): decimals,
 // thousands' separators, percent, a currency's or any text round the number, dates and times; a formula's result as
 // Excel saved it (nothing is calculated). Pure; the locale the browser's (as Excel shows a workbook in its user's).
+import { dateTimeFormat, numberFormat } from "../../shared/intl.ts";
 
 /** A value as ExcelJS reads a cell's */
 export type CellValue =
@@ -57,7 +58,7 @@ export function formatDate(date: Date, format: string | undefined, locale?: stri
   const options: Intl.DateTimeFormatOptions = { timeZone: "UTC" };
   if (withDate) Object.assign(options, { year: "numeric", month: "numeric", day: "numeric" });
   if (withTime) Object.assign(options, { hour: "numeric", minute: "2-digit", ...(/s/i.test(bare.replace(/m/gi, "")) ? { second: "2-digit" } : {}) });
-  return new Intl.DateTimeFormat(locale, options).format(date);
+  return dateTimeFormat(locale, options).format(date);
 }
 
 /** A number by a number format: its first section (or the negative's where it has one), decimals, separators, percent, text round it */
@@ -97,7 +98,7 @@ export function formatNumber(number: number, format: string | undefined, locale?
   // (Commas right after the last placeholder each scale by a thousand: `#,##0,` shows thousands)
   const scaled = /^,+/.exec(masked.slice(last + 1))?.[0].length ?? 0;
   const value = (Math.abs(number) * (percent ? 100 : 1)) / 1000 ** scaled;
-  const text = new Intl.NumberFormat(locale, { minimumFractionDigits: least, maximumFractionDigits: decimals, useGrouping: grouped }).format(value);
+  const text = numberFormat(locale, { minimumFractionDigits: least, maximumFractionDigits: decimals, useGrouping: grouped }).format(value);
   // (A negative's own section writes its sign or brackets itself; else the minus before all)
   const sign = number < 0 && !negative ? "-" : "";
   return `${sign}${before}${text}${after}`;
@@ -109,16 +110,16 @@ function scientific(number: number, mantissa: string, locale?: string): string {
   const decimals = point < 0 ? 0 : (mantissa.slice(point + 1).match(/[0#?]/g) ?? []).length;
   const [digits, power] = number.toExponential(decimals).split("e");
   const exponent = Number(power);
-  const shown = new Intl.NumberFormat(locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: false }).format(Number(digits));
+  const shown = numberFormat(locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: false }).format(Number(digits));
   return `${shown}E${exponent < 0 ? "-" : "+"}${String(Math.abs(exponent)).padStart(2, "0")}`;
 }
 
 /** A number as Excel's General shows it: whole as it is, else up to ten significant digits */
 function general(number: number, locale?: string): string {
-  if (Number.isInteger(number) && Math.abs(number) < 1e11) return new Intl.NumberFormat(locale, { useGrouping: false }).format(number);
+  if (Number.isInteger(number) && Math.abs(number) < 1e11) return numberFormat(locale, { useGrouping: false }).format(number);
   const rounded = Number(number.toPrecision(10));
   if (Math.abs(rounded) >= 1e11 || (Math.abs(rounded) < 1e-9 && rounded !== 0)) return rounded.toExponential(5).replace("e", "E");
-  return new Intl.NumberFormat(locale, { useGrouping: false, maximumFractionDigits: 10 }).format(rounded);
+  return numberFormat(locale, { useGrouping: false, maximumFractionDigits: 10 }).format(rounded);
 }
 
 /** A date from Excel's serial number (days since 1899-12-30, as Excel counts them) */

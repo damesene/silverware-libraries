@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { answerConfirm, cell, center, columnCells, drag, expect, header, hoverCell, markdown, menu, menuTitle, rendersAnew, setPage, table, test } from "./helpers.ts";
+import { answerConfirm, cell, center, columnCells, drag, expect, header, hoverCell, markdown, menu, menuTitle, rendersAnew, setPage, startingOn, table, test } from "./helpers.ts";
 
 test("one menu at a time: a column's menu open, the ⋯ menu closes it, and the reverse", async ({ page }) => {
   // The column's menu: a right click on its header
@@ -121,8 +121,7 @@ test.describe("Grips", () => {
   });
 });
 
-test("Remove metadata in a cell's menu asks, then takes off that cell's hidden tags only", async ({ page }) => {
-  await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear <meta core.n='pear'> | 3 <meta formulas.f='=1+2'> |\n");
+test("Remove metadata in a cell's menu asks, then takes off that cell's hidden tags only", startingOn("# Test\n\n| Item | Qty |\n|---|---|\n| Pear <meta core.n='pear'> | 3 <meta formulas.f='=1+2'> |\n"), async ({ page }) => {
   await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
   await cell(page, 1, 1).click({ button: "right" });
   const item = menu(page).locator(".swt-menu-item", { hasText: "Remove metadata" });
@@ -135,8 +134,7 @@ test("Remove metadata in a cell's menu asks, then takes off that cell's hidden t
   expect(asked).toBe("Remove the metadata of this cell, what Formulas (1 cell) keeps in it? Cells keep their text, a formula's cell its result. Ctrl+Z brings it back.");
 });
 
-test("Delete table, last in the ⋯ menu, asks and takes the table out of the page; No keeps it", async ({ page }) => {
-  await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n\nBetween.\n\n| City |\n|---|\n| Brno |\n");
+test("Delete table, last in the ⋯ menu, asks and takes the table out of the page; No keeps it", startingOn("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n\nBetween.\n\n| City |\n|---|\n| Brno |\n"), async ({ page }) => {
   await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
   const deleteFirst = (yes: boolean) =>
     answerConfirm(page, yes, async () => {

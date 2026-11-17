@@ -64,28 +64,35 @@ export type MarkdownNode =
  * be none, nor would a table's line of dashes), no span holding its `\r`
  */
 export function parseBlocks(text: string, from = 0): MarkdownNode[] {
+  const { read, place } = readAsParser(text, from);
+  return readTree(read, place);
+}
+
+/** The text from `from` as the parser is given it, a CRLF a line break alone, and where a place of it is in the text given */
+function readAsParser(text: string, from = 0): { readonly read: string; readonly place: (at: number) => number } {
   // Where each line break that had a `\r` before it is in the text read
   const breaks: number[] = [];
   const read = text.slice(from).replace(/\r\n/g, (_, at: number) => {
     breaks.push(at - breaks.length);
     return "\n";
   });
-  return readTree(read, (at) => from + at + below(breaks, at));
+  return { read, place: (at) => from + at + below(breaks, at) };
 }
 
 /**
  * A line of a text (`to` at its line break) with the marks the blocks holding it put on it, as markdown's parser reads
  * them: where each of its quotes' `>` is, whether a list's item starts on it (its marker), where its own text starts
  * past them and the indentation, and whether it holds nothing past them (a quote's empty line, `>`, a blank line). A
- * mark in a code block is its text: none
+ * mark in a code block is its text: none. A CRLF is read as `parseBlocks` reads it, its `\r` in no line
  */
 export type MarkedLine = Span & { readonly quotes: readonly number[]; readonly item: boolean; readonly content: number; readonly empty: boolean };
 
 /** A text's lines, in order, with the marks of the blocks holding them */
 export function markedLines(text: string): MarkedLine[] {
+  const { read, place } = readAsParser(text);
   const marks: { readonly from: number; readonly to: number; readonly quote: boolean }[] = [];
   // (The tree walked in the text's order)
-  parser.parse(text).iterate({
+  parser.parse(read).iterate({
     enter: (node) => {
       if (node.name === "QuoteMark" || node.name === "ListMark") marks.push({ from: node.from, to: node.to, quote: node.name === "QuoteMark" });
     },
@@ -93,20 +100,20 @@ export function markedLines(text: string): MarkedLine[] {
   const lines: MarkedLine[] = [];
   let next = 0;
   for (let from = 0; ; ) {
-    const end = text.indexOf("\n", from);
-    const to = end < 0 ? text.length : end;
+    const end = read.indexOf("\n", from);
+    const to = end < 0 ? read.length : end;
     const quotes: number[] = [];
     let item = false;
     let past = from;
     for (; next < marks.length && marks[next]!.from < to; next++) {
       const mark = marks[next]!;
-      if (mark.quote) quotes.push(mark.from);
+      if (mark.quote) quotes.push(place(mark.from));
       else item = true;
       past = mark.to;
     }
     let content = past;
-    while (content < to && isSpace(text[content])) content++;
-    lines.push({ from, to, quotes, item, content, empty: text.slice(content, to).trim() === "" });
+    while (content < to && isSpace(read[content])) content++;
+    lines.push({ from: place(from), to: place(to), quotes, item, content: place(content), empty: read.slice(content, to).trim() === "" });
     if (end < 0) return lines;
     from = end + 1;
   }

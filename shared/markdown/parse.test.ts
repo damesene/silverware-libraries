@@ -171,6 +171,19 @@ describe("markedLines", () => {
     ]);
   });
 
+  it("reads a CRLF as a line break alone, as parseBlocks does: an empty item's marker before one is a marker, its places the text's", () => {
+    expect(marks("> a\r\n>\r\n-\r\n- b")).toEqual([
+      [0, [0], false, 2, false],
+      [5, [5], false, 6, true],
+      [8, [], true, 9, true],
+      [11, [], true, 13, false],
+    ]);
+    expect(markedLines("a\r\nb").map(({ from, to }) => [from, to])).toEqual([
+      [0, 1],
+      [3, 4],
+    ]);
+  });
+
   it("reads a mark in a code block as its text", () => {
     expect(marks("> a\n>     >\n> b")[1]).toEqual([4, [4], false, 10, false]);
     expect(marks("- a\n\n  ```\n  >\n  ```")[3]).toEqual([11, [], false, 13, false]);

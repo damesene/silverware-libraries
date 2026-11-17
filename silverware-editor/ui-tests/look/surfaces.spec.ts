@@ -6,9 +6,18 @@
 // Measurements fail; pixels are attached to the report (each block cropped on each surface, its share of pixels
 // differing from the page's), not compared yet.
 import type { Locator, Page } from "@playwright/test";
-import { cellField, expect, fieldReady, gridsDrawn, item, peekField, root, test } from "../helpers.ts";
+import { cellField, expect, fieldReady, gridsDrawn, item, peekField, root, type Space, test } from "../helpers.ts";
 
 // The markdown: a paragraph whose text's start is each surface's origin, its blocks, a last line for the caret
+// Text drawn alike wherever it lies: glyphs on whole pixels (a surface's text at 271.3 px and the page's at 271 px drawn
+// the same), smoothed one way, colours in one profile, so that the crops differ by what is drawn, not by where
+test.use({ launchOptions: { args: ["--disable-font-subpixel-positioning", "--font-render-hinting=none", "--disable-lcd-text", "--force-color-profile=srgb"] } });
+
+// The share of a block's pixels differing from the page's past which the run warns (a test's annotation `warning`,
+// told by scripts/ui-tests-summary.ts: GitHub's warning on the run, the console's yellow line), the test passing: a
+// grid's or a peek's block drawn as the page's differs in none to 2 % (a table narrower in the peek)
+const PIXELS_TOLD = 0.05;
+
 const FIXTURE = [
   "Start",
   "- one\n- two\n  - nested",
@@ -99,8 +108,40 @@ function readLook(element: HTMLElement, shadow: boolean): Look {
   })();
   const origin = left("Start");
   const place = (word: string) => Math.round(left(word) - origin);
+  // A task's box against its text: its middle from where its text starts, and from its line's middle
+  const boxPlace = (word: string) => {
+    const box = lineOf(word).querySelector('input[type="checkbox"]')!.getBoundingClientRect();
+    const range = document.createRange();
+    range.selectNodeContents(exact(word));
+    const text = range.getClientRects()[0]!;
+    return { x: Math.round(box.left + box.width / 2 - left(word)), y: Math.round(box.top + box.height / 2 - (text.top + text.height / 2)) };
+  };
+  const [openBox, doneBox] = [boxPlace("open"), boxPlace("done")];
+  // How far a line is under the one before it (the text's rhythm): its text's top from the other's
+  const topOf = (word: string) => {
+    const range = document.createRange();
+    range.selectNodeContents(exact(word));
+    return range.getClientRects()[0]!.top;
+  };
+  const under = (word: string, above: string) => Math.round(topOf(word) - topOf(above));
   return {
-    places: { one: place("one"), nested: place("nested"), first: place("first"), second: place("second"), open: place("open"), done: place("done") },
+    places: {
+      one: place("one"),
+      nested: place("nested"),
+      first: place("first"),
+      second: place("second"),
+      open: place("open"),
+      done: place("done"),
+      "open's box across": openBox.x,
+      "open's box down": openBox.y,
+      "done's box across": doneBox.x,
+      "done's box down": doneBox.y,
+      "two under one": under("two", "one"),
+      "nested under two": under("nested", "two"),
+      "second under first": under("second", "first"),
+      "done under open": under("done", "open"),
+      "Body under Head": under("Body", "Head"),
+    },
     looks: {
       bullet: markOf("one"),
       number: markOf("first"),
@@ -141,7 +182,13 @@ function blockClip(element: HTMLElement, [shadow, first, last]: readonly [boolea
   return { x: Math.max(0, Math.floor(origin - 4)), y: Math.max(0, Math.floor(top - 4)), width: 300, height: Math.ceil(bottom - top + 8) };
 }
 
-/** The share of pixels two images differ in (each channel's difference summed past a threshold), as the browser decodes them */
+/**
+ * How much of what two crops draw differs, as the browser decodes them, as Playwright's own comparison tells
+ * (pixelmatch's: a smoothed edge no difference): each crop's ink, how far each pixel is from its ground (its first
+ * pixel: a panel's ground a shade off the page's is no difference); the crops laid over each other where they match
+ * best, within `SHIFT` pixels (one drawn a pixel lower is no difference); a pixel differs where no pixel within one of
+ * it in the other has ink near its own. The share of the pixels with ink in either. Colours are the measurements'
+ */
 function differing([a, b]: readonly [string, string]): Promise<number> {
   const image = (data: string) =>
     new Promise<HTMLImageElement>((resolve, reject) => {
@@ -150,21 +197,48 @@ function differing([a, b]: readonly [string, string]): Promise<number> {
       one.onerror = reject;
       one.src = `data:image/png;base64,${data}`;
     });
-  return Promise.all([image(a), image(b)]).then(([first, second]) => {
-    const width = Math.min(first.width, second.width);
-    const height = Math.min(first.height, second.height);
-    const pixels = (one: HTMLImageElement) => {
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const context = canvas.getContext("2d")!;
-      context.drawImage(one, 0, 0);
-      return context.getImageData(0, 0, width, height).data;
-    };
-    const [p, q] = [pixels(first), pixels(second)];
+  const SHIFT = 3;
+  // (A pixel with ink: a fifth of the fullest; two inks near: a third of the fullest apart at most)
+  const INKED = 0.2;
+  const NEAR = 0.35;
+  const inks = (one: HTMLImageElement) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = one.width;
+    canvas.height = one.height;
+    const context = canvas.getContext("2d")!;
+    context.drawImage(one, 0, 0);
+    const data = context.getImageData(0, 0, one.width, one.height).data;
+    const ink = new Float32Array(one.width * one.height);
+    for (let i = 0; i < ink.length; i++) ink[i] = (Math.abs(data[i * 4]! - data[0]!) + Math.abs(data[i * 4 + 1]! - data[1]!) + Math.abs(data[i * 4 + 2]! - data[2]!)) / 765;
+    return { ink, width: one.width, height: one.height, at: (x: number, y: number) => (x >= 0 && y >= 0 && x < one.width && y < one.height ? ink[y * one.width + x]! : 0) };
+  };
+  type Inks = ReturnType<typeof inks>;
+  // (Of p's inked pixels, how many have no ink near theirs in q within a pixel, q shifted by dx, dy)
+  const unmatched = (p: Inks, q: Inks, dx: number, dy: number) => {
+    let inked = 0;
     let differ = 0;
-    for (let i = 0; i < p.length; i += 4) if (Math.abs(p[i]! - q[i]!) + Math.abs(p[i + 1]! - q[i + 1]!) + Math.abs(p[i + 2]! - q[i + 2]!) > 96) differ++;
-    return differ / (width * height);
+    for (let y = 0; y < p.height; y++)
+      for (let x = 0; x < p.width; x++) {
+        const value = p.at(x, y);
+        if (value < INKED) continue;
+        inked++;
+        let near = false;
+        for (let oy = -1; oy <= 1 && !near; oy++) for (let ox = -1; ox <= 1 && !near; ox++) near = Math.abs(q.at(x + dx + ox, y + dy + oy) - value) <= NEAR;
+        if (!near) differ++;
+      }
+    return [inked, differ] as const;
+  };
+  return Promise.all([image(a), image(b)]).then(([first, second]) => {
+    const [p, q] = [inks(first), inks(second)];
+    let best = 1;
+    for (let dy = -SHIFT; dy <= SHIFT; dy++)
+      for (let dx = -SHIFT; dx <= SHIFT; dx++) {
+        const [inkedP, differP] = unmatched(p, q, dx, dy);
+        const [inkedQ, differQ] = unmatched(q, p, -dx, -dy);
+        const share = inkedP + inkedQ ? (differP + differQ) / (inkedP + inkedQ) : 0;
+        best = Math.min(best, share);
+      }
+    return best;
   });
 }
 
@@ -195,6 +269,18 @@ async function read(page: Page, surface: Surface): Promise<{ look: Look; crops: 
 }
 
 test("one markdown on the page, in a grid's cell, the cell edited and a database's peek, read and edited: drawn alike", async ({ page, space }) => {
+  await compareSurfaces(page, space);
+});
+
+test("the same, the text zoomed on this device (Silverware Layout's font zoom): drawn alike, a task's box by its text", async ({ page, space }) => {
+  // (This device's zoom, as Ctrl + scroll keeps it: shared by every page opened)
+  await page.addInitScript(() => localStorage.setItem("silverware.layout.fontZoom", "30"));
+  await compareSurfaces(page, space);
+  expect(await page.locator("#sb-main .cm-content").evaluate((content) => getComputedStyle(content).fontSize)).toBe("30px");
+});
+
+/** The fixture opened on every surface, read, its pixels attached, each surface's measurements compared with the page's */
+async function compareSurfaces(page: Page, space: Space): Promise<void> {
   await space.open(
     {
       Plain: `# Plain\n\n${FIXTURE}\n`,
@@ -247,14 +333,19 @@ test("one markdown on the page, in a grid's cell, the cell edited and a database
     for (const [block, crop] of Object.entries(surface.crops)) {
       const share = await page.evaluate(differing, [reference!.crops[block]!.toString("base64"), crop.toString("base64")] as const);
       test.info().annotations.push({ type: "pixels differing from the page", description: `${block}, ${surface.name}: ${(share * 100).toFixed(1)} %` });
+      // (Past the share a run tells: a warning, the test passing; its crops in the report)
+      if (share > PIXELS_TOLD) test.info().annotations.push({ type: "warning", description: `${block} on the ${surface.name} differs from the page's in ${(share * 100).toFixed(1)} % of its pixels (crops "${block} - page" and "${block} - ${surface.name}" in the report)` });
     }
   }
 
-  // The measurements: every surface as the page (places within 2 px: an em rounds otherwise by surface)
+  // The measurements: every surface as the page (places within 2 px: an em rounds otherwise by surface; a task's box
+  // down within 3: SilverBullet 2.12.1 sits it on the text's baseline, a little lower than its line's middle as the font
+  // grows, where a grid's cell puts it, as SilverBullet after it does)
   for (const surface of others) {
     for (const [key, value] of Object.entries(surface.look.places)) {
-      expect.soft(Math.abs(value - reference!.look.places[key]!), `${surface.name}: where "${key}" starts (${value} px, the page ${reference!.look.places[key]} px)`).toBeLessThanOrEqual(2);
+      const within = key.endsWith("box down") ? 3 : 2;
+      expect.soft(Math.abs(value - reference!.look.places[key]!), `${surface.name}: where "${key}" starts (${value} px, the page ${reference!.look.places[key]} px)`).toBeLessThanOrEqual(within);
     }
     for (const [key, value] of Object.entries(surface.look.looks)) if (!alike(value, reference!.look.looks[key])) expect.soft(value, `${surface.name}: ${key}`).toEqual(reference!.look.looks[key]);
   }
-});
+}

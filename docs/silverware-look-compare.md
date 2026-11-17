@@ -99,8 +99,20 @@ Run first on edge and the release, the measurements told what the eye had missed
   card's line now only where the theme gives cards corners (`--ui-radius-xl`).
 - **A number's colour on 2.12.1** a step off (its markup's grey against its bullets'): colours read alike within two
   steps of a channel.
-- The pixels: a grid's cell, read or edited, as the page's (0 to 5 % differing); the peek 2 to 12 %, from its ground a
-  shade off and its text half a pixel lower, which the eye does not see. Informative as planned.
+- **A task's box in a grid's cell** (the user saw it, zoomed, 2026-11-17): placed by its own font's line (an input's),
+  high as the font grows, and at its room's left where the page centres it in the columns of its `[ ]`. Now as the
+  page's, the column and the line read where the text is (registered custom properties); the test measures the box
+  against its text both ways, and runs every surface again at this device's zoom (Silverware Layout's, 30 px).
+- **The peek's lines 3 px further apart than the page's** at that zoom (its field's own `line-height: 1.5`, the page's
+  1.4): the pixels showed it, the lines' spacing is measured since. Now the page's line.
+- **The pixels**: first compared pixel by pixel, then by blocks, both told crops alike to the eye apart (10 to 90 %:
+  text a pixel over, smoothed otherwise). Now as Playwright's comparison (pixelmatch's) tells them: the crops laid
+  over each other where they match best within 3 px, a pixel differing only where none within one of it in the other
+  has ink near its own; with the browser's text on whole pixels (`--disable-font-subpixel-positioning` and others,
+  `test.use`). Alike crops differ in 0 to 2 % (a table narrower in the peek); a known difference shows (2.12.1's box
+  3 px lower at the zoom: 12 %). Past 5 % a block is a **warning**: the test passes, the run tells it
+  (`scripts/ui-tests-summary.ts`: GitHub's yellow warning on the run and the pull request, the job summary's
+  *Warnings*; a yellow line in the console locally).
 
 ### Steps
 
@@ -109,7 +121,8 @@ Run first on edge and the release, the measurements told what the eye had missed
    surfaces), then tables, hashtags, links, quotes and code; that test and *a cell's field draws a task's box…* moved
    into it or left as they are (decided then: no test twice).
 3. Pixel crops attached, informative (`test.info().attach`), compared with a tolerance, no failure.
-4. After a few weeks of green runs on both SilverBullets, pixel differences failing the test.
+4. After a few weeks of green runs on both SilverBullets, pixel differences failing the test. Until then a warning
+   past 5 % (built 2026-11-17).
 
 ### Cost
 

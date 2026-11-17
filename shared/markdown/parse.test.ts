@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type MarkdownNode, markedLines, parseBlocks } from "./parse.ts";
+import { lineIndexAt, type MarkdownNode, markedLines, parseBlocks } from "./parse.ts";
 
 /** Each block as its kind (and what it has of its own) with its text's lines, or its blocks: what a test compares */
 function shape(text: string, from = 0): unknown[] {
@@ -184,6 +184,13 @@ describe("markedLines", () => {
     ]);
   });
 
+  it("gives where a line's own text starts past its marks and indentation, a lazy line's at its text", () => {
+    expect(marks("> - a **b**\n  c")).toEqual([
+      [0, [0], true, 4, false],
+      [12, [], false, 14, false],
+    ]);
+  });
+
   it("reads a line of a non-breaking space as text, as the parser does, not empty", () => {
     expect(marks("a\n \n- b")[1]).toEqual([2, [], false, 2, false]);
     expect(marks("a\n \t\n- b")[1]).toEqual([2, [], false, 4, true]);
@@ -192,5 +199,14 @@ describe("markedLines", () => {
   it("reads a mark in a code block as its text", () => {
     expect(marks("> a\n>     >\n> b")[1]).toEqual([4, [4], false, 10, false]);
     expect(marks("- a\n\n  ```\n  >\n  ```")[3]).toEqual([11, [], false, 13, false]);
+  });
+});
+
+describe("lineIndexAt", () => {
+  it("finds the line a place is on: a line break the end of its line, past the text's end the last", () => {
+    const at = (text: string, place: number) => lineIndexAt(markedLines(text), place);
+    expect([at("ab\ncd", 4), at("ab\ncd", 3), at("ab\ncd", 2), at("ab", 0), at("ab", 9)]).toEqual([1, 1, 0, 0, 0]);
+    // A text starting with a line break: at 0 its first (empty) line, after it the second
+    expect([at("\nab", 0), at("\nab", 1)]).toEqual([0, 1]);
   });
 });

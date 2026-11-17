@@ -76,7 +76,7 @@ function readAsParser(text: string, from = 0): { readonly read: string; readonly
     breaks.push(at - breaks.length);
     return "\n";
   });
-  return { read, place: (at) => from + at + below(breaks, at) };
+  return { read, place: (at) => from + at + below(breaks.length, (i) => breaks[i]!, at) };
 }
 
 /**
@@ -125,17 +125,20 @@ function readTree(text: string, place: (at: number) => number): MarkdownNode[] {
   return new Reader(text, place).children(parser.parse(text).topNode, []);
 }
 
-/** How many of the places in order are before `at` */
-function below(places: readonly number[], at: number): number {
+/** How many of `count` places in order (the `i`th `placeOf(i)`) are before `at` */
+function below(count: number, placeOf: (i: number) => number, at: number): number {
   let low = 0;
-  let high = places.length;
+  let high = count;
   while (low < high) {
     const mid = (low + high) >> 1;
-    if (places[mid]! < at) low = mid + 1;
+    if (placeOf(mid) < at) low = mid + 1;
     else high = mid;
   }
   return low;
 }
+
+/** Which of a text's lines (`markedLines`, in order) a place is on: its index (past the text's end, the last) */
+export const lineIndexAt = (lines: readonly MarkedLine[], at: number): number => Math.max(0, below(lines.length, (i) => lines[i]!.from, at + 1) - 1);
 
 /**
  * What a block holding others puts before each of their lines, outermost first: a quote's marker, a list item's

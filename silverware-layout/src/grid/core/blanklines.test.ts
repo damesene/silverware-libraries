@@ -2,12 +2,11 @@
 // those the host drew.
 import { describe, expect, it } from "vitest";
 import { markedLines } from "../../../../shared/markdown/parse.ts";
-import { blankLinesBefore, blankLinesDrawn, blankLineStarts, lineAt } from "./blanklines.ts";
+import { blankLinesBefore, blankLinesDrawn, blankLineStarts } from "./blanklines.ts";
 
 // (Of a text read line by line first, as a cell's is)
 const countBefore = (text: string, at: number) => blankLinesBefore(markedLines(text), at);
 const startsBefore = (text: string, at: number) => blankLineStarts(markedLines(text), at);
-const lineOf = (text: string, at: number) => lineAt(markedLines(text), at);
 
 // A cell's text: paragraphs a blank line or more apart, a loose list, a heading (drawn in ui/view.test.ts)
 const TEXT = "One\n\nTwo\n\n\nThree\n\n\n\nFour\n- item\n\n- item2\n\n# Head\n\nAfter";
@@ -48,26 +47,9 @@ describe("a cell's blank lines", () => {
     expect(countBefore("- a\n-\n- b", 6)).toBe(0);
   });
 
-  it("tells a place where a line's own text starts, past its marks and indentation, from one in its text", () => {
-    const lines = markedLines("> - a **b**\n  c");
-    const startsLine = (at: number) => at <= lineAt(lines, at).content;
-    expect([0, 2, 4, 6].map(startsLine)).toEqual([true, true, true, false]);
-    expect(startsLine(14)).toBe(true);
-  });
-
   it("reads a mark after four spaces as a code block's line in a quote, no blank line", () => {
     expect(countBefore("> a\n>     >\n> b", 14)).toBe(0);
     expect(countBefore("> a\n>    >\n> b", 13)).toBe(1);
-  });
-
-  it("finds where the line a place is on starts", () => {
-    expect(lineOf("ab\ncd", 4).from).toBe(3);
-    expect(lineOf("ab\ncd", 3).from).toBe(3);
-    expect(lineOf("ab\ncd", 2).from).toBe(0);
-    expect(lineOf("ab", 0).from).toBe(0);
-    // A text starting with a line break: at 0 its first (empty) line, after it the second
-    expect(lineOf("\nab", 0).from).toBe(0);
-    expect(lineOf("\nab", 1).from).toBe(1);
   });
 
   it("counts those drawn: the line breaks, the first only ending an inline element's line", () => {

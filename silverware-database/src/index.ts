@@ -149,9 +149,9 @@ export function init(bridge: Bridge): void {
   };
   bridgeCalls = bridge;
   registerLayout(bridge);
-  // (The sample of the content field's look, rendered as the page renders it; none where it cannot be: the editor's own)
-  let sampled: string | undefined;
-  void bridge.renderMarkdown?.(LOOK_SAMPLE).then((html) => (sampled = html), () => undefined);
+  // (The sample of the content field's look, rendered as the page renders it once a load, as first asked; none where it
+  // cannot be: the editor's own)
+  let sampled: Promise<string | undefined> | undefined;
   kept ??= keptParts();
   const { platform, store, writer, core, ui, own } = kept;
   const modules = new Modules(
@@ -208,9 +208,12 @@ export function init(bridge: Bridge): void {
       editorArea: () => editorArea(document),
       onEditorAreaChanged: (listener) => watchEditorArea(document, listener),
       editorLook: () => editorLook(document),
-      // What an item's content field draws in the page's look: its sample rendered once a load, read as a field is made
+      // What an item's content field draws in the page's look: its sample rendered once a load, read as an item is shown
       // (a theme or zoom changed since read as it is then)
-      fieldLook: () => (sampled ? fieldLook(document, sampled) : undefined),
+      fieldLook: async () => {
+        const html = await (sampled ??= bridge.renderMarkdown?.(LOOK_SAMPLE).catch(() => undefined) ?? Promise.resolve(undefined));
+        return html === undefined ? undefined : fieldLook(document, html);
+      },
       // SilverBullet's shortcuts a panel keeps from it, told in its notification (shared/silverbullet/keptkeys.ts)
       keyKept: keptKeys(bridge.listCommands, (message) => bridge.flash(message, "info")),
       onChanged: (listener) => store.onChanged((change) => listener(change.database)),

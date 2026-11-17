@@ -109,8 +109,8 @@ export type ModuleHost = DocumentsHost & MentionsHost & {
   keyKept?(event: KeyboardEvent): void;
   /** What an item's content field draws as the page draws it (shared/editor.ts `FieldDrawing`: an embed, a file's link's icon and its menu's arrow; targets resolved against the item's document); none: its markdown shown */
   fieldDrawing?(item: Item): FieldDrawing;
-  /** How what an item's content field draws looks where the page's look is known (shared/editor.ts `EditorLook`: a task's box, a hashtag), read as the field is made; none: the editor's own */
-  fieldLook?(): EditorLook | undefined;
+  /** How what an item's content field draws looks where the page's look is known (shared/editor.ts `EditorLook`: a task's box, a hashtag), read as an item is shown; none: the editor's own */
+  fieldLook?(): Promise<EditorLook | undefined>;
   /** A link pressed in an item's content followed as the page follows one, from the item's document (in a new tab or in place); none: a press puts the caret there */
   followLink?(markdown: string, item: Item, how: LinkOpening): void;
   /** One of the module's settings (declared in its `settings`), its default where not set */

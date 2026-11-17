@@ -13,7 +13,7 @@
 // takes it away) until it is written or the user agrees to load the body as it
 // is now. A change made elsewhere draws the panel anew once nothing in it is
 // being edited.
-import { COMPANION_ATTRIBUTE, type LinkOpening, type TextEditor } from "../../../../shared/editor.ts";
+import { COMPANION_ATTRIBUTE, type EditorLook, type LinkOpening, type TextEditor } from "../../../../shared/editor.ts";
 import { el, openedHere } from "../../../../shared/elements.ts";
 import { markOverWindow } from "../../../../shared/overwindow.ts";
 import type { Result } from "../../core/core.ts";
@@ -74,6 +74,8 @@ type Shown = {
   // The body's field and its note: made once for the item shown and left in place as the rest is drawn anew, so a value written
   // shows at once while the body is typed in (drawn anew under it, the field lost its focus and what was typed)
   field?: { readonly body: TextEditor; readonly note: HTMLElement; readonly write: () => void };
+  // The page's look of what its content field draws (a task's box, a hashtag), read as it was asked to be shown
+  readonly look?: EditorLook;
 };
 
 /** A content's field waiting for the content read (`readBody` fills only such a field): read only, marked */
@@ -128,11 +130,12 @@ export class PeekPanel {
     this.asked++;
     const opener = this.shown?.opener ?? this.host.document.activeElement;
     if (!(await this.leave())) return;
-    const read = await this.host.database(database);
+    // (The page's look of what its content field draws read with it: the field is made at once as it is drawn)
+    const [read, look] = await Promise.all([this.host.database(database), this.host.fieldLook?.().catch(() => undefined)]);
     if (!read) return;
     // (The item before's field let go: its editor's own listeners with it)
     this.shown?.field?.body.destroy();
-    this.shown = { database, schema: read.value, item, latest: item, body: undefined, stale: false, opener, ...(from ? { from } : {}) };
+    this.shown = { database, schema: read.value, item, latest: item, body: undefined, stale: false, opener, ...(from ? { from } : {}), ...(look ? { look } : {}) };
     // (The view it was opened from followed: what it hides marked anew as it changes)
     this.stopFrom?.();
     this.stopFrom = from?.onChange(() => this.followFrom());
@@ -589,7 +592,7 @@ export class PeekPanel {
       const drawing = this.host.fieldDrawing?.bind(this.host);
       const follow = this.host.followLink?.bind(this.host);
       // (A task's box, a hashtag drawn as the page draws them where the host knows how)
-      const look = this.host.fieldLook?.();
+      const look = shown.look;
       const body = this.host.editors.create(doc, {
         ...(look ? { look } : {}),
         text: "",

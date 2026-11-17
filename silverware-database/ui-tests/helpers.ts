@@ -10,6 +10,9 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Page, type Locator } from "@playwright/test";
+import { boxOf, commandDefined } from "../../scripts/ui-test-helpers.ts";
+
+export { boxOf };
 import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 
@@ -156,8 +159,8 @@ export function editorText(page: Page): Promise<string> {
 
 /** A command run as the palette would, once Space Lua has defined it (it loads after the page) */
 export async function runCommand(page: Page, name: string): Promise<void> {
-  type Client = { clientSystem: { commandHook: { buildAllCommands(): Map<string, unknown> } }; runCommandByName(name: string): Promise<void> };
-  await page.waitForFunction((command) => (window as unknown as { client: Client }).client.clientSystem.commandHook.buildAllCommands().has(command), name);
+  type Client = { runCommandByName(name: string): Promise<void> };
+  await commandDefined(page, name);
   await page.evaluate((command) => void (window as unknown as { client: Client }).client.runCommandByName(command), name);
 }
 

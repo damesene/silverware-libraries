@@ -7,6 +7,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Page } from "@playwright/test";
+import { commandDefined } from "../../scripts/ui-test-helpers.ts";
 import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 
 export { expect };
@@ -79,13 +80,6 @@ export const test = base.extend<{ space: Space }>({
 
 // (Silverware Assets' command: defined once its init page ran, Silverware Assets PDF's after it)
 const ASSETS_SETTINGS = "Silverware Assets: Settings";
-
-type Client = { clientSystem: { commandHook: { buildAllCommands(): Map<string, unknown> } } };
-
-/** Waits until Space Lua has defined a command (it loads after the page): its plugin started */
-async function commandDefined(page: Page, name: string): Promise<void> {
-  await page.waitForFunction((command) => (window as unknown as { client: Client }).client.clientSystem.commandHook.buildAllCommands().has(command), name);
-}
 
 /**
  * A PDF of pages 200 × 300 pt, each filled with a rectangle of its colour 20 pt in from each edge (no font: pdf.js

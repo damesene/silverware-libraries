@@ -8,6 +8,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Page } from "@playwright/test";
+import { commandDefined } from "../../scripts/ui-test-helpers.ts";
 import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 
@@ -108,12 +109,7 @@ export const MOVED_PREVIEWS = "UiMovedPreviews";
 // (Silverware Layout's, for the cases where the two meet: a file in a grid, its width by Layout's handle)
 export const LAYOUT_SETTINGS = "Silverware Layout: Settings";
 
-type Client = { clientSystem: { commandHook: { buildAllCommands(): Map<string, unknown> } }; runCommandByName(name: string): Promise<void> };
-
-/** Waits until Space Lua has defined a command (it loads after the page): its plugin started */
-async function commandDefined(page: Page, name: string): Promise<void> {
-  await page.waitForFunction((command) => (window as unknown as { client: Client }).client.clientSystem.commandHook.buildAllCommands().has(command), name);
-}
+type Client = { runCommandByName(name: string): Promise<void> };
 
 /** A command run as the palette would */
 export async function runCommand(page: Page, name: string): Promise<void> {

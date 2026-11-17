@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
 import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
-import { boxOf } from "../../scripts/ui-test-helpers.ts";
+import { boxOf, commandDefined } from "../../scripts/ui-test-helpers.ts";
 
 export { boxOf, expect };
 
@@ -26,13 +26,6 @@ export type Space = {
   /** Another of the pages written opened, the plugins started */
   goTo(name: string): Promise<void>;
 };
-
-type Client = { clientSystem: { commandHook: { buildAllCommands(): Map<string, unknown> } } };
-
-/** Waits until Space Lua has defined a command (it loads after the page): its plugin started */
-async function commandDefined(page: Page, name: string): Promise<void> {
-  await page.waitForFunction((command) => (window as unknown as { client: Client }).client.clientSystem.commandHook.buildAllCommands().has(command), name);
-}
 
 /** Tests get `page` and `space`: an error in the page fails the test */
 export const test = base.extend<{ space: Space }>({

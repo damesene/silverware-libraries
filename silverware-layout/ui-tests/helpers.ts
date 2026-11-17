@@ -10,7 +10,7 @@ import { test as base, expect, type Locator, type Page } from "@playwright/test"
 import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 
-import { boxOf } from "../../scripts/ui-test-helpers.ts";
+import { boxOf, commandDefined } from "../../scripts/ui-test-helpers.ts";
 
 export { boxOf };
 
@@ -103,12 +103,7 @@ export const test = base.extend<{ space: Space }>({
 
 export const LAYOUT_SETTINGS = "Silverware Layout: Settings";
 
-type Client = { clientSystem: { commandHook: { buildAllCommands(): Map<string, unknown> } }; runCommandByName(name: string): Promise<void> };
-
-/** Waits until Space Lua has defined a command (it loads after the page): Silverware Layout started */
-async function commandDefined(page: Page, name: string): Promise<void> {
-  await page.waitForFunction((command) => (window as unknown as { client: Client }).client.clientSystem.commandHook.buildAllCommands().has(command), name);
-}
+type Client = { runCommandByName(name: string): Promise<void> };
 
 /** A command run as the palette would */
 export async function runCommand(page: Page, name: string): Promise<void> {

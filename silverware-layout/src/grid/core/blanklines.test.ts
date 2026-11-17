@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { lineStarts } from "../ui/offsets.ts";
 import { keepBlankLines, spaceBefore } from "../ui/view.ts";
-import { blankLinesBefore, blankLinesDrawn, blankLineStart, lineStartOf } from "./blanklines.ts";
+import { blankLinesBefore, blankLinesDrawn, blankLineStarts, lineStartOf } from "./blanklines.ts";
 
 // SilverBullet 2.12.1's markdownToHtml of this text (probed 2026-11-14)
 const TEXT = "One\n\nTwo\n\n\nThree\n\n\n\nFour\n- item\n\n- item2\n\n# Head\n\nAfter";
@@ -25,7 +25,7 @@ describe("a cell's blank lines", () => {
 
   it("counts a quote's blank lines, its marks alone, for a place in a quote as deep or shallower", () => {
     expect(blankLinesBefore("> one\n>\n> two", 10)).toBe(1);
-    expect(blankLineStart("> one\n>\n> two", 10, 1)).toBe(6);
+    expect(blankLineStarts("> one\n>\n> two", 10)).toEqual([6]);
     // A deeper quote's last empty lines, before a place out of that quote (the nested quote of the last at 14)
     expect(blankLinesBefore("> one\n>\ntwo", 8)).toBe(1);
     expect(blankLinesBefore("> > one\n> >\n> two", 14)).toBe(1);
@@ -186,14 +186,10 @@ describe("the lines a cell's rendering starts", () => {
 });
 
 describe("a blank line clicked", () => {
-  it("is where the nth blank line above a place's line starts, the nearest first; none past them", () => {
-    const text = "a\n\n\nb";
-    expect(blankLineStart(text, 4, 1)).toBe(3);
-    expect(blankLineStart(text, 4, 2)).toBe(2);
-    expect(blankLineStart(text, 4, 3)).toBeUndefined();
-    expect(blankLineStart(text, 0, 1)).toBeUndefined();
-    expect(blankLineStart(text, 4, 0)).toBeUndefined();
+  it("is one of the blank lines above a place's line, where each starts, the nearest first", () => {
+    expect(blankLineStarts("a\n\n\nb", 4)).toEqual([3, 2]);
+    expect(blankLineStarts("a\n\n\nb", 0)).toEqual([]);
     // A text starting with blank lines: the first at 0
-    expect(blankLineStart("\n\nb", 2, 2)).toBe(0);
+    expect(blankLineStarts("\n\nb", 2)).toEqual([1, 0]);
   });
 });

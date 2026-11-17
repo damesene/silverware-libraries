@@ -1,6 +1,6 @@
 // Where a point of a cell's rendering is in the cell's markdown (a click, a drop, a selection): the element marked with
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
-import { blankLinesBefore, blankLineStart } from "../core/blanklines.ts";
+import { blankLineStarts } from "../core/blanklines.ts";
 import { lineStarts, offsetOf } from "./offsets.ts";
 import { SPACERS, spaceBefore } from "./view.ts";
 import { positionInCell } from "../core/position.ts";
@@ -72,14 +72,15 @@ export function blankLineAt(content: string, cellElement: HTMLElement, y: number
   const next = lineStarts(cellElement, content).find(({ element }) => element.getBoundingClientRect().top > y);
   if (!next) return undefined;
   const { element, offset } = next;
-  const blanks = blankLinesBefore(content, offset);
-  if (!blanks) return undefined;
+  // (The nearest first)
+  const blanks = blankLineStarts(content, offset);
+  if (!blanks.length) return undefined;
   // The bottom of what is drawn above it (none: the cell's top)
   const above = drawnAbove(element, cellElement);
   const top = element.getBoundingClientRect().top;
   const bottom = above ? above.getBoundingClientRect().bottom : cellElement.getBoundingClientRect().top;
   if (y < bottom || top <= bottom) return undefined;
-  const line = (top - bottom) / blanks;
-  const nth = Math.min(blanks, Math.max(1, Math.ceil((top - y) / line)));
-  return blankLineStart(content, offset, nth);
+  const line = (top - bottom) / blanks.length;
+  const nth = Math.min(blanks.length, Math.max(1, Math.ceil((top - y) / line)));
+  return blanks[nth - 1];
 }

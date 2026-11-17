@@ -1,8 +1,31 @@
 // Where an element of a cell's rendering is in the cell's markdown: the host marks each element with its offset
 // (`data-pos`, `GridHost.renderMarkdown`), and may leave an offset of 0 unmarked (SilverBullet does): read here alone.
-import { lineIndexAt, type MarkedLine } from "../../../../shared/markdown/parse.ts";
+// The cell's markdown read line by line too, which lines its elements start.
+import { lineIndexAt, type MarkedLine, markedLines } from "../../../../shared/markdown/parse.ts";
 
 const POS = "data-pos";
+
+// The cells' markdown read lately, by its text, the latest last: a grid drawn anew asks again for its cells unchanged
+const READ = new Map<string, readonly MarkedLine[]>();
+// How many are kept (the oldest dropped)
+const READ_KEPT = 64;
+
+/**
+ * A cell's markdown read line by line as markdown's parser reads it (`markedLines`), once for the same text: each
+ * drawing of a grid asks for its every cell, and each point found in a cell after (a press, a drop) for that cell
+ */
+export function cellLines(content: string): readonly MarkedLine[] {
+  const read = READ.get(content);
+  if (read) {
+    READ.delete(content);
+    READ.set(content, read);
+    return read;
+  }
+  const lines = markedLines(content);
+  READ.set(content, lines);
+  if (READ.size > READ_KEPT) READ.delete(READ.keys().next().value!);
+  return lines;
+}
 
 /** An element of a cell's rendering that starts a line of its markdown, and its offset there */
 export type LineStart = { readonly element: HTMLElement; readonly offset: number };

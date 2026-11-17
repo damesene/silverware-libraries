@@ -31,9 +31,6 @@ export function blankLinesAbove(lines: readonly MarkedLine[], at: number): reado
   return above;
 }
 
-/** How many blank lines lie right before the line a place is on */
-export const blankLinesBefore = (lines: readonly MarkedLine[], at: number): number => blankLinesAbove(lines, at).length;
-
 /**
  * How many blank lines the host drew right before an element of a cell: the line breaks before it, the first of them
  * only ending the line of what is inline before them (a paragraph, the host's `span`; text), none after a block

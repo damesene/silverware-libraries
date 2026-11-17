@@ -1,35 +1,12 @@
 // A grid drawn: its cells side by side as its column template says (a narrow pane stacks them: the style page's rule),
 // each cell's markdown as the host rendered it.
 import { el } from "../../../../shared/elements.ts";
-import { type MarkedLine, markedLines } from "../../../../shared/markdown/parse.ts";
-import { blankLinesBefore, blankLinesDrawn } from "../core/blanklines.ts";
+import { blankLinesAbove, blankLinesDrawn } from "../core/blanklines.ts";
 import type { BorderStyle } from "../model/border.ts";
 import { BLANK, spaceBefore } from "./cellparts.ts";
-import { lineStarts } from "./offsets.ts";
+import { cellLines, lineStarts } from "./offsets.ts";
 
 const COLUMNS = "--swl-grid-columns";
-
-// The cells' markdown read lately, by its text, the latest last: a grid drawn anew asks again for its cells unchanged
-const READ = new Map<string, readonly MarkedLine[]>();
-// How many are kept (the oldest dropped)
-const READ_KEPT = 64;
-
-/**
- * A cell's markdown read line by line as markdown's parser reads it (`markedLines`), once for the same text: each
- * drawing of a grid asks for its every cell, and each point found in a cell after (a press, a drop) for that cell
- */
-export function cellLines(content: string): readonly MarkedLine[] {
-  const read = READ.get(content);
-  if (read) {
-    READ.delete(content);
-    READ.set(content, read);
-    return read;
-  }
-  const lines = markedLines(content);
-  READ.set(content, lines);
-  if (READ.size > READ_KEPT) READ.delete(READ.keys().next().value!);
-  return lines;
-}
 
 /** A grid's element: a cell per rendered markdown (the host's HTML, its elements marked with their offsets in the cell's text) */
 export function drawGrid(doc: Document, template: string, cells: readonly string[]): HTMLElement {
@@ -87,7 +64,7 @@ export function plainCell(doc: Document, content: string): string {
 export function keepBlankLines(doc: Document, cell: HTMLElement, content: string): void {
   const lines = cellLines(content);
   for (const { element, offset } of lineStarts(cell, lines)) {
-    const wanted = blankLinesBefore(lines, offset);
+    const wanted = blankLinesAbove(lines, offset).length;
     if (!wanted) continue;
     // (Those put back already counted: drawn again over the same, none more)
     const { breaks, blanks, before } = spaceBefore(element);

@@ -2,10 +2,10 @@
 // those the host drew.
 import { describe, expect, it } from "vitest";
 import { markedLines } from "../../../../shared/markdown/parse.ts";
-import { blankLinesAbove, blankLinesBefore, blankLinesDrawn } from "./blanklines.ts";
+import { blankLinesAbove, blankLinesDrawn } from "./blanklines.ts";
 
 // (Of a text read line by line first, as a cell's is)
-const countBefore = (text: string, at: number) => blankLinesBefore(markedLines(text), at);
+const countBefore = (text: string, at: number) => blankLinesAbove(markedLines(text), at).length;
 const startsBefore = (text: string, at: number) => blankLinesAbove(markedLines(text), at).map((line) => line.from);
 const caretsBefore = (text: string, at: number) => blankLinesAbove(markedLines(text), at).map((line) => line.content);
 

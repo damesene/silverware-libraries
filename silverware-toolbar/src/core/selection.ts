@@ -35,6 +35,10 @@ export class SelectionWatcher {
     win.addEventListener("mouseup", this.onUp, true);
     // A drag let go outside the window may send no mouseup: the window losing focus ends it
     win.addEventListener("blur", this.onUp);
+    // A selection made before it started told as well: the toolbar may be started anew after the page got its selection
+    // back (its settings saved, the host loading its scripts again), and the same selection made again then changes
+    // nothing the document would tell
+    if (this.current()) this.settle(0);
   }
 
   stop(): void {

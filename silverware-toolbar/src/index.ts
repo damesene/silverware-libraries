@@ -187,9 +187,11 @@ export async function openSettings(): Promise<void> {
     actions: (toolbars) => [...actions(), switchToolbarAction(toolbars, undefined, () => undefined), MORE_ACTION, SETTINGS_ACTION],
     kinds,
     canSave: canSaveIn(bridge),
-    save: (values) => queued(() => saveSettings(bridge, values)),
+    // Through the bridge handed over last: the host may run the init page again as the settings are saved (a new bridge
+    // then), and a bridge of before reads the settings as they were
+    save: (values) => queued(() => saveSettings(current?.bridge ?? bridge, values)),
     // The toolbar started anew with them (favourites need no reload)
-    saved: () => void init(bridge),
+    saved: () => void init(current?.bridge ?? bridge),
   });
   await settingsDialog.open();
 }
@@ -211,7 +213,7 @@ async function saveSettings(bridge: Bridge, values: Readonly<Record<string, unkn
   const gone = Object.fromEntries(Object.entries(values).filter(([, value]) => value === undefined));
   const tables = { ...gone, ...(PATHS.favorites in values ? { [PATHS.favorites]: favorites } : {}) };
   await saveConfigPage(
-    { readPage: (name) => bridge.readPage!(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) },
+    { configPage: bridge.configPage, readPage: (name) => bridge.readPage!(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) },
     (text) => withConfigSettings(withConfigSettings(text, scalars), tables, OWN_MARKER),
   );
 }

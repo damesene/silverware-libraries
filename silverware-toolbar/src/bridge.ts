@@ -26,6 +26,8 @@ export type Bridge = {
   readonly confirm?: (message: string) => boolean | Promise<boolean>;
   // Optional, for the settings dialog: the CONFIG page read and saved (as SilverBullet's Configuration Manager saves it)
   readonly readPage?: (name: string) => string | Promise<string>;
+  // The configuration page's name (Library/Config, or CONFIG before SilverBullet's tool pages), told by the init page
+  readonly configPage?: string;
   readonly saveConfigPage?: (text: string) => unknown;
   // Optional: a store of its own instead of the CONFIG page (the playground's); values by path, undefined removes one
   readonly saveSettings?: (values: Readonly<Record<string, unknown>>) => unknown;

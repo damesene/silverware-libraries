@@ -49,6 +49,19 @@ export function endAt(content: string, cellElement: HTMLElement, y: number): num
 }
 
 /**
+ * What is drawn right above an element of a cell's rendering, past the space between (line breaks, blank lines put
+ * back): the element before it, or where it is the first in what holds it (a list nested in an item), the one before
+ * that, up to the cell; none where nothing is. What lies between (a nested list's margin) is the blank lines' room
+ */
+function drawnAbove(element: Element, cellElement: Element): Element | undefined {
+  for (let at: Element | null = element; at && at !== cellElement; at = at.parentElement) {
+    const { before } = spaceBefore(at);
+    if (before) return before;
+  }
+  return undefined;
+}
+
+/**
  * Where a click on a blank line of a cell's rendering is in its markdown: the start of that blank line (none where the
  * click is on no blank line). Blank lines are drawn as space, no element marked with its place in it: found by
  * height, between the element drawn before (its bottom) and the one after (its top, its `data-pos`), as many lines
@@ -60,12 +73,10 @@ export function blankLineAt(content: string, cellElement: HTMLElement, y: number
   const { element, offset } = next;
   const blanks = blankLinesBefore(content, offset);
   if (!blanks) return undefined;
-  // The bottom of what is drawn before it (a line break or a put-back blank line is space, not content); where nothing
-  // is, the top of what it is in: the cell, or a list nested in an item (its blank lines inside the list, the item's
-  // text above the list)
-  const { before } = spaceBefore(element);
+  // The bottom of what is drawn above it (none: the cell's top)
+  const above = drawnAbove(element, cellElement);
   const top = element.getBoundingClientRect().top;
-  const bottom = before ? before.getBoundingClientRect().bottom : (element.parentElement ?? cellElement).getBoundingClientRect().top;
+  const bottom = above ? above.getBoundingClientRect().bottom : cellElement.getBoundingClientRect().top;
   if (y < bottom || top <= bottom) return undefined;
   const line = (top - bottom) / blanks;
   const nth = Math.min(blanks, Math.max(1, Math.ceil((top - y) / line)));

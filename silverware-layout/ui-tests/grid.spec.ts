@@ -404,6 +404,20 @@ test("a click on an item's text over the list nested in it after a blank line pu
   await expect.poll(async () => inWord((await fieldState(page)).from)).toBe(true);
 });
 
+test("a click in a nested list's margin over its blank line puts the caret on that blank line", async ({ page, space }) => {
+  const cell = "- first\n\n  - b\n  - c";
+  await space.open({ Page: `# Page\n\n<grid>\n<cell>\n\n${cell}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n` }, "Page");
+  await gridsDrawn(page);
+  const first = page.locator("#sb-main .swl-grid-cell").first();
+  // (A theme's margin over a nested list: room between the item's text and the blank line under it)
+  await first.locator("li > ul").evaluate((list: HTMLElement) => list.style.setProperty("margin-top", "12px", "important"));
+  const word = await boxOf(first.locator(".p").first());
+  expect((await boxOf(first.locator("li > ul"))).y - (word.y + word.height)).toBeGreaterThan(8);
+  await page.mouse.click(word.x + 10, word.y + word.height + 4);
+  await expect(cellField(page)).toBeVisible();
+  await expect.poll(async () => (await fieldState(page)).from).toBe(cell.indexOf("\n\n") + 1);
+});
+
 test("a quote's blank line between a loose list's items is a line, as in the editor, and a click there puts the caret on it", async ({ page, space }) => {
   // (The quote's blank line its mark alone: SilverBullet's rendering leaves it out between the items)
   const cell = "> - a\n>\n> - b";

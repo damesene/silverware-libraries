@@ -13,6 +13,11 @@ import type { BorderStyle } from "../model/border.ts";
 
 // The popup menu's classes: Silverware Layout's
 const POPUP = { base: "swl" } as const;
+// A cell's grip
+const GRIP = "swl-grid-cell-grip";
+
+/** What a grid puts in its cells besides their rendering: each cell's grip */
+export const CELL_CONTROLS = `.${GRIP}`;
 
 /** What a cell's menu or the grid's does */
 export type CellAction =
@@ -144,7 +149,7 @@ export function addCellGrips(
   gridSections: () => readonly (readonly LayoutMenuEntry[])[] = () => [],
 ): void {
   grid.querySelectorAll<HTMLElement>(":scope > .swl-grid-cell").forEach((cell, index) => {
-    const grip = el(doc, "button", { class: "swl-grid-cell-grip", title: "Cell…", attrs: { type: "button", "aria-label": `Cell ${index + 1}: its menu` } });
+    const grip = el(doc, "button", { class: GRIP, title: "Cell…", attrs: { type: "button", "aria-label": `Cell ${index + 1}: its menu` } });
     opensMenu(doc, POPUP, grip, (): PopupMenu => {
       const now = state();
       const sections: GridMenuItem[][] = cellMenu(index, now, (action) => act(index, action));

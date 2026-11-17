@@ -9,8 +9,8 @@ const COLUMNS = "--swl-grid-columns";
 // A blank line of a cell's markdown its rendering left out, put back
 const BLANK = "swl-grid-blank";
 
-/** The blank lines put back in a cell's rendering */
-export const BLANK_LINES = `.${BLANK}`;
+// The blank lines put back in a cell's rendering
+const BLANK_LINES = `.${BLANK}`;
 // The host's line breaks
 const BREAKS = "br";
 /** What a cell's rendering draws as space, not content: the host's line breaks and the blank lines put back */

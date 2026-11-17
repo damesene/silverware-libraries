@@ -8,6 +8,7 @@
 import { el } from "../../../../shared/elements.ts";
 import type { GridPlace } from "../../../../shared/markdown/gridbuild.ts";
 import { type Box, type CellShape, distanceTo, type GridShape, NEAR_PX, pickAt, type PickedPlace, samePick } from "../core/placepick.ts";
+import { CELL_CONTROLS } from "./columngrips.ts";
 import { isMarked, offsetOf } from "./offsets.ts";
 import { SPACERS } from "./view.ts";
 
@@ -33,7 +34,7 @@ const PICKING = "data-swl-picking";
 // A cell the text would go into
 const TARGET_CELL = "swl-grid-pick-cell";
 // What a cell draws that is no block of its markdown
-const NOT_BLOCK = `.swl-grid-cell-grip, ${SPACERS}`;
+const NOT_BLOCK = `${CELL_CONTROLS}, ${SPACERS}`;
 
 /** A grid as drawn now, measured */
 function shapeOf(grid: HTMLElement): GridShape {

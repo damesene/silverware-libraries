@@ -15,7 +15,7 @@ import { columnsWithout, columnTemplate, fitsColumns, minWidthOf, validateMinWid
 import { RENDERED_VERSION, type Rendered, type RenderedItem, type RenderedRange } from "../../../shared/rendered.ts";
 import { type Drawn, drawnIn, itemsOf } from "./drawn.ts";
 import type { LayoutMenuEntry } from "../../../shared/layout.ts";
-import { addCellGrips, type CellAction, gridMenu, type GridMenuState } from "./ui/columngrips.ts";
+import { addCellGrips, CELL_CONTROLS, type CellAction, gridMenu, type GridMenuState } from "./ui/columngrips.ts";
 import { caretWord, type CellEditing, editCell } from "./ui/celleditor.ts";
 import { type EditorLook, type Editors, editorsOf, type FieldDrawing, type LinkOpening } from "../../../shared/editor.ts";
 import { LOOK_SAMPLE, sampleLook } from "../../../shared/editorlook.ts";
@@ -116,8 +116,6 @@ const SETTLE_MS = 50;
 const REDRAWN_MS = 3000;
 // How far a press and its release are apart to be a drag that selects (px)
 const DRAG_PX = 4;
-// What a grid puts in its cells besides their rendering (a cell's grip): never taken over with a cell's rendering
-const OWN_CONTROLS = ".swl-grid-cell-grip";
 // What a click in a cell leaves to the cell's rendering: a link, a tag, a button, a field, an editor open
 const OWN_CLICKS = "a, button, input, textarea, select, label, [data-ref]";
 
@@ -487,7 +485,8 @@ export class Grids {
     const taken = takeOver(
       { element, contents, drawn: this.drawnItems.get(element) ?? [] },
       { element: old, contents: readGridBody(oldBody).map((cell) => cell.content), drawn: this.drawnItems.get(old) ?? [] },
-      OWN_CONTROLS,
+      // (What the grid puts in its cells: never taken over with a cell's rendering)
+      CELL_CONTROLS,
     );
     this.drawnItems.set(element, taken.fresh);
     this.drawnItems.set(old, taken.old);

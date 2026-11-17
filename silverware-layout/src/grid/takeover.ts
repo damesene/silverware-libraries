@@ -12,7 +12,7 @@ import { CELL_CONTROLS, drawnBlocks } from "./ui/cellparts.ts";
 export type Drawing = { readonly element: HTMLElement; readonly contents: readonly string[]; readonly drawn: readonly Drawn[] };
 
 /** A block of a cell's rendering: its element (a child of the cell), where its markdown starts in the cell's, its markdown */
-type Block = { readonly element: HTMLElement; readonly at: number; readonly text: string };
+type Block = { readonly element: Element; readonly at: number; readonly text: string };
 
 const CELL = ":scope > .swl-grid-cell";
 // A cell edited: its field is the editing's, never taken
@@ -25,9 +25,8 @@ const EDITING = "swl-grid-editing";
  * None where another is unmarked (another's drawing): the blocks then unknown
  */
 export function blocksOf(cell: HTMLElement, content: string): Block[] {
-  const found: { readonly element: HTMLElement; readonly at: number }[] = [];
+  const found: { readonly element: Element; readonly at: number }[] = [];
   for (const child of drawnBlocks(cell)) {
-    if (!(child instanceof HTMLElement)) continue;
     const at = isMarked(child) ? offsetOf(child) : found.length ? NaN : 0;
     if (!Number.isInteger(at) || at < 0 || at > content.length || at < (found.at(-1)?.at ?? 0)) return [];
     found.push({ element: child, at });

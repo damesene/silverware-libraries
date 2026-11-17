@@ -11,11 +11,11 @@ import { lineIndexAt, type MarkedLine } from "../../../../shared/markdown/parse.
 const BLOCKS = new Set(["UL", "OL", "LI", "H1", "H2", "H3", "H4", "H5", "H6", "PRE", "TABLE", "BLOCKQUOTE", "HR", "DIV", "P", "DL", "FIGURE", "DETAILS"]);
 
 /**
- * The blank lines right before the line a place is on, the nearest first; a caret put on one goes past its marks
- * (`content`: a quote's empty line, `>`, kept in the quote). In a quote a blank line is one of its marks alone, the
- * editor showing it as an empty line of the quote. One counts for a place in a quote as deep or shallower (a deeper
- * quote's last empty line, before the place, ends that quote), not for a place deeper: a blank line shallower than the
- * place's quote lies before that quote, its own. An empty item's line (its marker alone) is none.
+ * The blank lines right before the line a place is on, the nearest first (`caretOn`: where a caret goes on one). In a
+ * quote a blank line is one of its marks alone, the editor showing it as an empty line of the quote. One counts for a
+ * place in a quote as deep or shallower (a deeper quote's last empty line, before the place, ends that quote), not for
+ * a place deeper: a blank line shallower than the place's quote lies before that quote, its own. An empty item's line
+ * (its marker alone) is none.
  * Read back from that line over them alone, not the text before: a cell's every line is asked for as it is drawn
  */
 export function blankLinesAbove(lines: readonly MarkedLine[], at: number): readonly MarkedLine[] {
@@ -30,6 +30,13 @@ export function blankLinesAbove(lines: readonly MarkedLine[], at: number): reado
   }
   return above;
 }
+
+/**
+ * Where a caret put on a blank line goes: past its last quote's mark (a quote's empty line, `>`: what is typed there
+ * stays in the quote), else at its start (the spaces a line of white space holds not taken: four would make what is
+ * typed a code block)
+ */
+export const caretOn = (line: MarkedLine): number => (line.quotes.length ? line.quotes.at(-1)! + 1 : line.from);
 
 /**
  * How many blank lines the host drew right before an element of a cell: the line breaks before it, the first of them

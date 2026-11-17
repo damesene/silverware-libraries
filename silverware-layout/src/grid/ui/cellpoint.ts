@@ -1,6 +1,6 @@
 // Where a point of a cell's rendering is in the cell's markdown (a click, a drop, a selection): the element marked with
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
-import { blankLinesAbove } from "../core/blanklines.ts";
+import { blankLinesAbove, caretOn } from "../core/blanklines.ts";
 import { drawnBlocks, spaceBefore } from "./cellparts.ts";
 import { cellLines, type LineStart, lineStarts, markedFrom, offsetOf } from "./offsets.ts";
 import { positionInCell } from "../core/position.ts";
@@ -86,5 +86,5 @@ export function blankLineAt(content: string, cellElement: HTMLElement, y: number
   if (y < bottom || top <= bottom) return undefined;
   const line = (top - bottom) / blanks.length;
   const nth = Math.min(blanks.length, Math.max(1, Math.ceil((top - y) / line)));
-  return blanks[nth - 1]!.content;
+  return caretOn(blanks[nth - 1]!);
 }

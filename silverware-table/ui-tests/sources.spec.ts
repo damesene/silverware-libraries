@@ -59,7 +59,7 @@ test.describe("Sources of the space", () => {
     await setOtherPage(page, "UiTests/Alpha", "#uiproject\n");
     await setOtherPage(
       page,
-      "UiTests/QueryScript",
+      "Library/UiTests/QueryScript",
       [
         "```space-lua",
         "local function uiprojects()",

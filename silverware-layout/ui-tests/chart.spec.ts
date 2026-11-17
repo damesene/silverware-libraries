@@ -1,8 +1,7 @@
 // Silverware Chart's charts laid out by Silverware Layout, in SilverBullet: the chart's provider keeps the width in the
 // chart's model, which the Mermaid format writes as a comment of the block (`%% layout.width: 1100`).
-import { boxOf, expect, test } from "./helpers.ts";
+import { boxOf, expect, test, textWidthOf } from "./helpers.ts";
 
-const TEXT = 760;
 const LOREM = "Quisque placerat sollicitudin leo, quis sollicitudin dui pretium in. Donec vulputate a turpis at convallis.";
 const CHART = "```mermaid\nxychart-beta\n  x-axis [a, b, c]\n  bar [3, 5, 2]\n```";
 const PAGE = `# Chart\n\n${LOREM}\n\n${CHART}\n\n${LOREM}\n`;
@@ -22,7 +21,7 @@ test("a chart widened by its handle: the width a comment of its block, drawn ane
   await space.open({ Page: PAGE }, "Page");
   const widget = page.locator(".swc-widget");
   await expect(widget.locator("canvas")).toBeVisible();
-  expect(Math.round((await boxOf(widget)).width)).toBe(TEXT);
+  const TEXT = await textWidthOf(page, widget);
 
   const b = await boxOf(widget);
   await page.mouse.move(b.x + 40, b.y + b.height / 2);

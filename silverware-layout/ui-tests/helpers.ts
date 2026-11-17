@@ -6,13 +6,25 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { test as base, expect, type Page } from "@playwright/test";
-import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
+import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 
 import { boxOf } from "../../scripts/ui-test-helpers.ts";
 
 export { boxOf };
+
+/**
+ * A widget's width as SilverBullet draws it at the text's width, checked against the text's line: SilverBullet's
+ * versions draw the text at their own width (760 px in 2.12.1; 752 px after it, a table 754 px with its border), so a
+ * test measures it rather than knowing it
+ */
+export async function textWidthOf(page: Page, widget: Locator): Promise<number> {
+  const width = Math.round((await boxOf(widget)).width);
+  const line = await page.locator("#sb-main .cm-line").first().evaluate((line) => line.getBoundingClientRect().width);
+  expect(Math.abs(width - line), "the widget at the text's width").toBeLessThanOrEqual(2);
+  return width;
+}
 
 export { expect };
 
@@ -52,7 +64,7 @@ export const test = base.extend<{ space: Space }>({
   space: async ({ page }, use) => {
     const folder = `${FOLDER}/${test.info().title.replace(/[^\w ]/g, "").slice(0, 40).trim()}`;
     const path = (name: string) => join(server().space, folder, `${name}.md`);
-    const configPath = join(server().space, "CONFIG.md");
+    const configPath = configFile(server().space);
     const configBefore = existsSync(configPath) ? await readFile(configPath, "utf8") : undefined;
     let watching = false;
     await use({

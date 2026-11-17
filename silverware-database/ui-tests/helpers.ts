@@ -10,7 +10,8 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Page, type Locator } from "@playwright/test";
-import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
+import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
+import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 
 export { expect };
 
@@ -108,7 +109,8 @@ export const test = base.extend<{ space: Space }>({
   space: async ({ page }, use) => {
     const folder = `${FOLDER}/${test.info().title.replace(/[^\w ]/g, "").slice(0, 40).trim()}`;
     const path = (name: string) => join(server().space, folder, `${name}.md`);
-    const configPath = join(server().space, "CONFIG.md");
+    const configPath = configFile(server().space);
+    const scriptPath = join(server().space, "Library", folder, "Views.md");
     const configBefore = existsSync(configPath) ? await readFile(configPath, "utf8") : undefined;
     await use({
       folder,
@@ -118,17 +120,22 @@ export const test = base.extend<{ space: Space }>({
         await writeFile(views, VIEWS);
         await writeFile(join(server().space, folder, "types.js"), TYPES);
         const lua = `\`\`\`space-lua\nsilverware.database.defineViews(js.importFromSpace("${folder}/views.js"))\nsilverware.database.defineTypes(js.importFromSpace("${folder}/types.js"))\n\`\`\`\n`;
-        await writeFile(path("Views"), `# Views\n\n${lua}`);
+        // Under Library/: SilverBullet after 2.12.1 runs space-lua only there
+        await mkdir(dirname(scriptPath), { recursive: true });
+        await writeFile(scriptPath, `# Views\n\n${lua}`);
         for (const [name, text] of Object.entries(pages)) {
           await mkdir(dirname(path(name)), { recursive: true });
           await writeFile(path(name), text);
         }
+        await watchReloads(page);
         await page.goto(`http://127.0.0.1:${server().port}/${folder}/${open}`);
         await page.waitForFunction(() => !!(window as unknown as { client?: { editorView?: unknown } }).client?.editorView);
         // Once the index has the views' Space Lua block: loaded again, it runs
-        await waitForIndex(page, "space-lua", `${folder}/Views@`);
+        await waitForIndex(page, "space-lua", `Library/${folder}/Views@`);
         await page.reload();
         await page.waitForFunction(() => !!(window as unknown as { client?: { editorView?: unknown } }).client?.editorView);
+        // (The page loaded whole: what SilverBullet draws again once its index is complete drawn by then)
+        await loaded(page);
       },
       saved: async (name) => (existsSync(path(name)) ? (await readFile(path(name), "utf8")).replace(/\r\n/g, "\n") : undefined),
       config: async () => (existsSync(configPath) ? (await readFile(configPath, "utf8")).replace(/\r\n/g, "\n") : undefined),
@@ -136,6 +143,7 @@ export const test = base.extend<{ space: Space }>({
     // (The page closed first: an open client would take CONFIG written under it for a change of its own)
     await page.close();
     await rm(join(server().space, folder), { recursive: true, force: true });
+    await rm(join(server().space, "Library", folder), { recursive: true, force: true });
     if (configBefore === undefined) await rm(configPath, { force: true });
     else await writeFile(configPath, configBefore);
   },

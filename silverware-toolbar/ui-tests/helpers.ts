@@ -17,7 +17,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
-import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
+import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { SETTINGS_STORE } from "../../playground/toolbar-store.ts";
 import { withConfigSettings } from "../../shared/configpage.ts";
 import { OWN_MARKER } from "../src/bridge.ts";
@@ -86,7 +86,7 @@ export const test = base.extend<{ favorites: Favorites | null }>({
       if (m.type() === "error" && !/404/.test(m.text())) errors.push(m.text());
     });
     const name = `UiToolbar/${testInfo.testId}`;
-    const config = join(server().space, "CONFIG.md");
+    const config = configFile(server().space);
     try {
       if (target === "silverbullet") {
         const path = join(server().space, `${name}.md`);

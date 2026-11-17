@@ -146,11 +146,13 @@ test.describe("Formulas from Space Lua", () => {
   });
 
   test("evaluate gives Lua the values, evaluateText the page an error that is no hashtag", async ({ page }) => {
+    // (SilverBullet after 2.12.1 may evaluate a ${…} once before the page's table is there: evaluate gives nil and
+    // its error then, which the sum takes as no values, else it fails as Lua and logs it)
     const values = [
       "# Values",
       "",
       ...ORDERS("values"),
-      'Sum: ${(function() local s = 0 for _, q in ipairs(silverware.table.evaluate("values![qty]")) do s = s + q end return s end)()}',
+      'Sum: ${(function() local s = 0 for _, q in ipairs(silverware.table.evaluate("values![qty]") or {}) do s = s + q end return s end)()}',
       "",
       'Missing: ${(function() local v, e = silverware.table.evaluate("nope!A1") return tostring(v) .. " " .. e.code end)()}',
       "",

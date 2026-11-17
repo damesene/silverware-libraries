@@ -62,6 +62,8 @@ test.describe("The toolbar's defaults on a phone", () => {
     await select(page, "Plain", 0);
     await selectByTouch(page, "Second item");
     await expect(barButton(page, "actions.turnInto")).toContainText("Bullet");
+    // (Measured where it was, scrolled back: what scrolls may hold more than it shows, by a font's width)
+    await items.evaluate((e) => (e.scrollLeft = 0));
     expect((await bar(page).locator(".swb-gesture").first().boundingBox())!.x).toBe(first.x);
   });
 });

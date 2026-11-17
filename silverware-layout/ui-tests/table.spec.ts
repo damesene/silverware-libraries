@@ -1,9 +1,8 @@
 // Silverware Table's tables laid out by Silverware Layout, in SilverBullet: the table's provider (Silverware Table's
 // core/layoutprovider.ts) keeps the width in the table's metadata (`layout.width`), Silverware Layout shows it.
-import { boxOf, expect, test } from "./helpers.ts";
+import { boxOf, expect, test, textWidthOf } from "./helpers.ts";
 
 // SilverBullet's default theme: 800 px of text less 20 px of padding each side
-const TEXT = 760;
 const LOREM = "Quisque placerat sollicitudin leo, quis sollicitudin dui pretium in. Donec vulputate a turpis at convallis.";
 const PAGE = `# Table\n\n${LOREM}\n\n| Name | Amount |\n| --- | --- |\n| a | 1 |\n| b | 2 |\n\n${LOREM}\n`;
 
@@ -23,7 +22,7 @@ test("a table widened by its handle: its width kept in its metadata, drawn anew 
   await space.open({ Page: PAGE }, "Page");
   const table = page.locator(".sb-table-widget.swt-table");
   await expect(table).toBeVisible();
-  expect(Math.round((await boxOf(table)).width)).toBe(TEXT);
+  const TEXT = await textWidthOf(page, table);
 
   const b = await boxOf(table);
   await page.mouse.move(b.x + 40, b.y + b.height / 2);

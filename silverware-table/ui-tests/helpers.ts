@@ -42,7 +42,8 @@ const server = () => silverbulletServer(test.info().parallelIndex, process.env.S
 const TEST_FOLDER = "UiTests";
 
 /** A page in the space holding the settings a test gives with `setSettings` */
-const SETTINGS_PAGE = `${TEST_FOLDER}/Settings`;
+// Under Library/: SilverBullet after 2.12.1 runs space-lua only there
+const SETTINGS_PAGE = `Library/${TEST_FOLDER}/Settings`;
 
 /**
  * Errors SilverBullet itself logs in the browser's console that are not
@@ -321,7 +322,7 @@ export const SAMPLE_SOURCES = [
  */
 export async function defineSources(page: Page, script = SAMPLE_SOURCES): Promise<void> {
   if (target !== "silverbullet") return;
-  await setOtherPage(page, "UiTests/SourcesScript", script);
+  await setOtherPage(page, "Library/UiTests/SourcesScript", script);
   await reload(page);
 }
 

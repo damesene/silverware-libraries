@@ -15,7 +15,8 @@ test("a document's preview is its first page drawn smaller, as high as a preview
   const box = (await shown.boundingBox())!;
   expect(Math.round(box.height)).toBe(160);
   expect(Math.abs(box.width / box.height - 8.5 / 11)).toBeLessThan(0.02);
-  expect(Math.round((await preview.boundingBox())!.width)).toBe(Math.round(box.width));
+  // (Once decorated: SilverBullet after 2.12.1 may draw the embed's content again after its first drawing, decorated again then)
+  await expect.poll(async () => Math.round((await preview.boundingBox())!.width)).toBe(Math.round(box.width));
   await page.evaluate(() => {
     const opened: string[] = [];
     (window as unknown as { opened: string[] }).opened = opened;

@@ -8,7 +8,8 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Page } from "@playwright/test";
-import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
+import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
+import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 
 export { expect };
 
@@ -43,8 +44,10 @@ export const test = base.extend<{ space: Space }>({
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => {
-      // (SilverBullet answers what it looks for and does not find with a 404, which the page logs)
-      if (m.type() === "error" && !/404/.test(m.text())) errors.push(m.text());
+      // (SilverBullet answers what it looks for and does not find with a 404, which the page logs. Its edge, 2026-11,
+      // indexes a file deleted or renamed after it is gone, its index plug's `indexDocument` failing to read it: its
+      // own, not ours)
+      if (m.type() === "error" && !/404|indexDocument|document:index/.test(m.text())) errors.push(m.text());
     });
     try {
       await use(page);
@@ -56,7 +59,7 @@ export const test = base.extend<{ space: Space }>({
   space: async ({ page }, use) => {
     const folder = `${FOLDER}/${test.info().title.replace(/[^\w ]/g, "").slice(0, 40).trim()}`;
     const path = (name: string) => join(server().space, folder, `${name}.md`);
-    const configPath = join(server().space, "CONFIG.md");
+    const configPath = configFile(server().space);
     const configBefore = existsSync(configPath) ? await readFile(configPath, "utf8") : undefined;
     await use({
       folder,
@@ -70,8 +73,11 @@ export const test = base.extend<{ space: Space }>({
           await mkdir(dirname(file), { recursive: true });
           await writeFile(file, content);
         }
+        await watchReloads(page);
         await page.goto(`http://127.0.0.1:${server().port}/${folder}/${open}`);
         await page.waitForFunction(() => !!(window as unknown as { client?: { editorView?: unknown } }).client?.editorView);
+        // (Its first index complete: a rename follows links the index has)
+        await loaded(page);
         await commandDefined(page, ASSETS_SETTINGS);
         await commandDefined(page, LAYOUT_SETTINGS);
       },

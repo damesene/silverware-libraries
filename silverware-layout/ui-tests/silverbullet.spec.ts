@@ -95,8 +95,14 @@ test("a widget dragged wider than the editor is held at the editor's width less 
   await expect.poll(async () => Math.round((await page.locator(".sb-table-widget").boundingBox())?.width ?? Number.NaN)).toBe(Math.round(pane - GUTTER));
   // Centred on the text, within what the scroller shows (its scrollbar not covered)
   const b = await boxOf(page.locator(".sb-table-widget"));
-  const content = await boxOf(page.locator(".cm-content"));
-  expect(Math.abs(b.x + b.width / 2 - (content.x + content.width / 2))).toBeLessThanOrEqual(1);
+  // (The text's middle, its padding left out each side: SilverBullet after 2.12.1 pads it 28 px left and 20 right)
+  const textMiddle = await page.locator(".cm-content").evaluate((content) => {
+    const box = content.getBoundingClientRect();
+    const style = getComputedStyle(content);
+    const left = parseFloat(style.paddingLeft);
+    return box.left + left + (box.width - left - parseFloat(style.paddingRight)) / 2;
+  });
+  expect(Math.abs(b.x + b.width / 2 - textMiddle)).toBeLessThanOrEqual(1);
   const shown = await page.evaluate(() => {
     const scroller = document.querySelector(".cm-scroller")!;
     const box = scroller.getBoundingClientRect();

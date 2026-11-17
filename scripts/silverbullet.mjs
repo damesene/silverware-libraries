@@ -71,7 +71,9 @@ function start({ port, space }) {
   rmSync(space, { recursive: true, force: true });
   mkdirSync(space, { recursive: true });
   execFileSync(process.execPath, [join(import.meta.dirname, "deploy.mjs"), space], { stdio: "ignore" });
-  // SilverBullet loads CONFIG when it boots: missing, it is answered 404, which the page logs as an error
+  // SilverBullet loads CONFIG when it boots: missing, it is answered 404, which the page logs as an error.
+  // SB-2.12-COMPAT: CONFIG.md for SilverBullet 2.12.1; its edge (3.0) renames it to Library/Config.md as it starts (which
+  // configFile in silverbullet-servers.ts tells by). Once 2.12.1 is dropped: Library/Config.md written here
   if (!existsSync(join(space, "CONFIG.md"))) writeFileSync(join(space, "CONFIG.md"), "");
   let server;
   if (binary) {

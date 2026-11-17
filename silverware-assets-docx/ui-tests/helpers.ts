@@ -8,7 +8,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Page } from "@playwright/test";
 import JSZip from "jszip";
-import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
+import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 
 export { expect };
 
@@ -47,7 +47,7 @@ export const test = base.extend<{ space: Space }>({
   space: async ({ page }, use) => {
     const folder = `${FOLDER}/${test.info().title.replace(/[^\w ]/g, "").slice(0, 40).trim()}`;
     const path = (name: string) => join(server().space, folder, `${name}.md`);
-    const configPath = join(server().space, "CONFIG.md");
+    const configPath = configFile(server().space);
     const configBefore = existsSync(configPath) ? await readFile(configPath, "utf8") : undefined;
     await use({
       folder,

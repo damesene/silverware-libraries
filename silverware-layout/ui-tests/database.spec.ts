@@ -1,8 +1,7 @@
 // Silverware Database's places laid out by Silverware Layout, in SilverBullet: the database's provider keeps the width
 // as a line of its block (`layout.width: 1100`), Silverware Layout shows it.
-import { boxOf, expect, test } from "./helpers.ts";
+import { boxOf, expect, test, textWidthOf } from "./helpers.ts";
 
-const TEXT = 760;
 const LOREM = "Quisque placerat sollicitudin leo, quis sollicitudin dui pretium in. Donec vulputate a turpis at convallis.";
 // A database as Silverware Database keeps one (its root page found by its id), and an item of it
 const root = `---\ntags: [db-root]\n_database:\n  id: uilayout\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n---\n`;
@@ -24,7 +23,7 @@ test("a database's place widened by its handle: the width a line of its block, d
   await space.open({ "db-uilayout": root, "db-uilayout/First task": item, Page: PAGE }, "Page");
   const place = page.locator(".swd-place");
   await expect(place.getByText("First task")).toBeVisible();
-  expect(Math.round((await boxOf(place)).width)).toBe(TEXT);
+  const TEXT = await textWidthOf(page, place);
 
   const b = await boxOf(place);
   await page.mouse.move(b.x + 40, b.y + b.height / 2);

@@ -15,7 +15,8 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
 import { SAMPLE_PAGES } from "../../playground/tags-sample.ts";
-import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
+import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
+import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 
 export { expect };
 
@@ -49,8 +50,11 @@ export const test = base.extend({
           await mkdir(dirname(path), { recursive: true });
           await writeFile(path, text);
         }
+        await watchReloads(page);
         await page.goto(`/${pageName("index")}`);
         await page.waitForFunction(() => !!(window as unknown as Window).client);
+        // (Its first index complete: the tags are read of it)
+        await loaded(page);
       } else {
         await page.goto("/tags.html");
         await page.waitForFunction(() => !!(window as unknown as Window).playgroundTags);
@@ -62,7 +66,7 @@ export const test = base.extend({
         await page.close();
         await rm(join(server().space, FOLDER), { recursive: true, force: true });
         // The settings a test saved go with it (CONFIG, written once the page is closed)
-        await writeFile(join(server().space, "CONFIG.md"), "");
+        await writeFile(configFile(server().space), "");
       }
     }
   },
@@ -96,11 +100,21 @@ export async function pageText(page: Page, name: string): Promise<string> {
 /** Pages added to the sample (by their names in it) */
 export async function addPages(page: Page, pages: Readonly<Record<string, string>>): Promise<void> {
   if (onSilverBullet) {
-    for (const [name, text] of Object.entries(pages)) {
-      const path = join(server().space, `${pageName(name)}.md`);
+    // Written through SilverBullet's client and indexed before the test goes on: files written beside it are found a
+    // while later (after 2.12.1 one after another, a window opened meanwhile reading some)
+    const written = Object.entries(pages).map(([name, text]) => [pageName(name), text] as const);
+    // (There before SilverBullet writes it: it reads a page before writing it, a missing one a 404 in the console)
+    for (const [name] of written) {
+      const path = join(server().space, `${name}.md`);
       await mkdir(dirname(path), { recursive: true });
-      await writeFile(path, text);
+      await writeFile(path, "");
     }
+    await page.evaluate(async (written) => {
+      const { client } = window as unknown as { client: { clientSystem: { localSyscall(name: string, args: unknown[]): Promise<unknown> } } };
+      for (const [name, text] of written) await client.clientSystem.localSyscall("space.writePage", [name, text]);
+      for (const [name] of written) await client.clientSystem.localSyscall("mq.send", ["indexQueue", `${name}.md`]);
+      await client.clientSystem.localSyscall("mq.awaitEmptyQueue", ["indexQueue"]);
+    }, written);
     return;
   }
   await page.evaluate((pages) => {

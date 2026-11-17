@@ -1,5 +1,11 @@
 # Silverware Chart: changelog
 
+## 1.2.0 (2026-11-17)
+
+- Works with SilverBullet's next version (3.0) as well as 2.12.1; there, custom formats are given in a `space-lua` block on a page under `Library/`.
+- With Silverware Layout: a chart placed at the left, in the middle or at the right of the text, from the menu of the bar beside it.
+- Menus line up their icons and words, and a row of buttons wraps onto further lines on a narrow screen.
+
 ## 1.1.0 (2026-11-12)
 
 - With Silverware Layout: a chart wider or narrower than the text, by the bar beside it; its width a comment of its block (`%% layout.width`).

@@ -17,6 +17,16 @@ export const CELL_CONTROLS = `.${CELL_GRIP}`;
 // What a cell draws that is no block of its markdown
 const NOT_BLOCKS = `${SPACERS}, ${CELL_CONTROLS}`;
 
+/**
+ * Whether an element of a cell's rendering lies in the cell's own blocks: no inline element round it up to the cell. A
+ * page embedded (`![[Other page]]`) is drawn in the paragraph holding it, its elements marked with that page's
+ * offsets, not the cell's: in an inline element
+ */
+export function inCellBlocks(element: Element, cell: Element): boolean {
+  for (let at = element.parentElement; at && at !== cell; at = at.parentElement) if (!BLOCKS.has(at.tagName.toUpperCase())) return false;
+  return true;
+}
+
 /** The blocks a cell draws of its markdown, in order: its children but the space between them and what the grid puts in it */
 export const drawnBlocks = (cell: Element): Element[] => [...cell.children].filter((child) => !child.matches(NOT_BLOCKS));
 

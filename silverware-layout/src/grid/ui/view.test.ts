@@ -112,4 +112,15 @@ describe("a cell's blank lines put back", () => {
     keepBlankLines(document, cell, text);
     expect(cell.querySelectorAll(".swl-grid-blank")).toHaveLength(0);
   });
+
+  it("puts a blank line back before the cell's own block after a page embedded, none into the page", () => {
+    // SilverBullet 2.12.1's markdownToHtml, the page expanded in the paragraph holding it (probed 2026-11-17)
+    const text = "![[Notes]]\n\n- a";
+    const cell = document.createElement("div");
+    cell.innerHTML =
+      '<span class="p"><span class="p">Some text</span><br><ul data-pos="11"><li data-pos="11"><span class="p" data-pos="13">x</span></li><li data-pos="15"><span class="p" data-pos="17">y</span></li></ul></span><br><ul data-pos="12"><li data-pos="12"><span class="p" data-pos="14">a</span></li></ul>';
+    keepBlankLines(document, cell, text);
+    expect(cell.querySelectorAll(".swl-grid-blank")).toHaveLength(1);
+    expect(cell.querySelector('ul[data-pos="12"]')!.previousElementSibling?.className).toBe("swl-grid-blank");
+  });
 });

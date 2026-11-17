@@ -220,10 +220,11 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
 .sb-table-widget.swt-table table {
   overflow: clip !important;
 }
-/* A table wider than its box scrolls sideways in it (its widths dragged wider, many columns): SilverBullet after
-   2.12.1 clips its tables' box (overflow: clip, its card's corners), which would cut such a table off */
+/* A table wider than its box scrolls sideways in it (its widths dragged wider, many columns), one taller than the
+   Maximum table height up and down: SilverBullet after 2.12.1 clips its tables' box (overflow: clip, its card's
+   corners), which would cut such a table off. Both ways: one way alone turns the other's clip into hidden */
 .sb-table-widget.swt-table {
-  overflow-x: auto !important;
+  overflow: auto !important;
 }
 .sb-table-widget tfoot.swt-stuck {
   position: relative;

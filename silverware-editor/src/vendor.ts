@@ -4,7 +4,7 @@
 export { Compartment, EditorSelection, EditorState, Prec, StateField, Transaction } from "@codemirror/state";
 export { Decoration, drawSelection, EditorView, keymap, placeholder, WidgetType } from "@codemirror/view";
 export { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from "@codemirror/commands";
-export { markdown, markdownKeymap, markdownLanguage } from "@codemirror/lang-markdown";
+export { insertNewlineContinueMarkupCommand, markdown, markdownKeymap, markdownLanguage } from "@codemirror/lang-markdown";
 export { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/language";
 export { autocompletion, closeBrackets, closeBracketsKeymap, closeCompletion, completionKeymap, completionStatus } from "@codemirror/autocomplete";
 export { tags } from "@lezer/highlight";

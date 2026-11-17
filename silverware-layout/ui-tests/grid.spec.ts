@@ -172,6 +172,25 @@ test("text selected in a cell's field dragged onto another cell: moved at once, 
   await expect(cellField(page)).toHaveCount(1);
 });
 
+test("Enter at a bullet item's end above a task list in a cell's field: the next item, no blank line before it (as the page)", async ({ page, space }) => {
+  const list = "* adasdadd\n\n* [ ] asdjl\n* [ ] b";
+  await space.open({ Page: `# Page\n\n<grid>\n<cell>\n\n${list}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n` }, "Page");
+  await gridsDrawn(page);
+  await page.locator("#sb-main .swl-grid-cell").first().getByText("adasdadd").click();
+  await expect(cellField(page)).toBeVisible();
+  // The caret at the item's end
+  await cellField(page).evaluate((root: HTMLElement) => {
+    type View = { state: { doc: { toString(): string } }; dispatch(spec: unknown): void; focus(): void };
+    const view = (root.shadowRoot?.querySelector(".cm-content") as (Element & { cmTile?: { view?: View } }) | null)?.cmTile?.view;
+    if (!view) throw new Error("the field is not Silverware Editor's");
+    const at = view.state.doc.toString().indexOf("adasdadd") + "adasdadd".length;
+    view.dispatch({ selection: { anchor: at } });
+    view.focus();
+  });
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await fieldState(page)).text).toBe("* adasdadd\n* \n\n* [ ] asdjl\n* [ ] b");
+});
+
 test("a drag moves text: the page's selection into a cell, a cell's (its markdown) into another, each one edit undone at once; a cell's into the page taken out of it", async ({ page, space }) => {
   const text = `# Page\n\n<grid>\n<cell>\n\nSome *italic* words\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n\nAfter\n`;
   await space.open({ Page: text }, "Page");

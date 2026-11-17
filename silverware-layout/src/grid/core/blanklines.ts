@@ -7,6 +7,9 @@
 // Elements the host draws as blocks: after one, no line break ends a line first
 const BLOCKS = new Set(["UL", "OL", "LI", "H1", "H2", "H3", "H4", "H5", "H6", "PRE", "TABLE", "BLOCKQUOTE", "HR", "DIV", "P", "DL", "FIGURE", "DETAILS"]);
 
+/** Where the line a place of a text is on starts */
+export const lineStartOf = (text: string, at: number): number => text.lastIndexOf("\n", Math.max(0, at) - 1) + 1;
+
 /** How many blank lines lie right before the line a place of a text is on */
 export function blankLinesBefore(text: string, at: number): number {
   const lines = text.slice(0, Math.max(0, at)).split("\n");
@@ -29,7 +32,7 @@ export function blankLinesDrawn(breaks: number, before: { readonly tagName: stri
 /** Where the `nth` blank line above the line a place of a text is on starts (1: the nearest); none where there are not as many */
 export function blankLineStart(text: string, at: number, nth: number): number | undefined {
   if (nth < 1 || nth > blankLinesBefore(text, at)) return undefined;
-  let start = text.lastIndexOf("\n", Math.max(0, at) - 1) + 1;
+  let start = lineStartOf(text, at);
   for (let i = 0; i < nth; i++) start = text.lastIndexOf("\n", start - 2) + 1;
   return start;
 }

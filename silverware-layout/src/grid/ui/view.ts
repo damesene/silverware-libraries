@@ -3,6 +3,7 @@
 import { el } from "../../../../shared/elements.ts";
 import { blankLinesBefore, blankLinesDrawn } from "../core/blanklines.ts";
 import type { BorderStyle } from "../model/border.ts";
+import { lineStarts } from "./offsets.ts";
 
 const COLUMNS = "--swl-grid-columns";
 // A blank line of a cell's markdown its rendering left out, put back
@@ -59,11 +60,11 @@ export function plainCell(doc: Document, content: string): string {
 /**
  * A cell drawn with the blank lines of its markdown the host's rendering left out (next to a list, a heading, a table,
  * between a loose list's items: core/blanklines.ts): a line of space each before the element it was before, as the
- * editor shows it. Each element told by its offset in the cell's text (the host's `data-pos`)
+ * editor shows it. Each line told by the element that starts it (ui/offsets.ts: a list's, not its first item's)
  */
 export function keepBlankLines(doc: Document, cell: HTMLElement, content: string): void {
-  for (const element of cell.querySelectorAll<HTMLElement>(":scope > [data-pos], :scope li[data-pos]")) {
-    const wanted = blankLinesBefore(content, Number(element.getAttribute("data-pos")));
+  for (const { element, offset } of lineStarts(cell, content)) {
+    const wanted = blankLinesBefore(content, offset);
     if (!wanted) continue;
     // (Those put back already counted: drawn again over the same, none more)
     let breaks = 0;

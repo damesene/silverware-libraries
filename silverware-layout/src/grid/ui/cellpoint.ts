@@ -1,7 +1,7 @@
 // Where a point of a cell's rendering is in the cell's markdown (a click, a drop, a selection): the element marked with
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
 import { blankLinesBefore, blankLineStart } from "../core/blanklines.ts";
-import { offsetOf } from "./offsets.ts";
+import { lineStarts, offsetOf } from "./offsets.ts";
 import { positionInCell } from "../core/position.ts";
 
 /** A caret's place in the rendering: a node and an offset in it */
@@ -54,17 +54,18 @@ export function endAt(content: string, cellElement: HTMLElement, y: number): num
  * there as its markdown has blank lines before it
  */
 export function blankLineAt(content: string, cellElement: HTMLElement, y: number): number | undefined {
-  const marked = [...cellElement.querySelectorAll<HTMLElement>(":scope > [data-pos], :scope li[data-pos]")];
-  const next = marked.find((element) => element.getBoundingClientRect().top > y);
+  const next = lineStarts(cellElement, content).find(({ element }) => element.getBoundingClientRect().top > y);
   if (!next) return undefined;
-  const pos = Number(next.getAttribute("data-pos"));
+  const pos = next.offset;
   const blanks = blankLinesBefore(content, pos);
   if (!blanks) return undefined;
-  // The bottom of what is drawn before it (a line break or a put-back blank line is space, not content)
-  let before = next.previousElementSibling;
+  // The bottom of what is drawn before it (a line break or a put-back blank line is space, not content); where nothing
+  // is, the top of what it is in: the cell, or a list nested in an item (its blank lines inside the list, the item's
+  // text above the list)
+  let before = next.element.previousElementSibling;
   while (before && (before.tagName === "BR" || before.classList.contains("swl-grid-blank"))) before = before.previousElementSibling;
-  const top = next.getBoundingClientRect().top;
-  const bottom = before ? before.getBoundingClientRect().bottom : cellElement.getBoundingClientRect().top;
+  const top = next.element.getBoundingClientRect().top;
+  const bottom = before ? before.getBoundingClientRect().bottom : (next.element.parentElement ?? cellElement).getBoundingClientRect().top;
   if (y < bottom || top <= bottom) return undefined;
   const line = (top - bottom) / blanks;
   const nth = Math.min(blanks, Math.max(1, Math.ceil((top - y) / line)));

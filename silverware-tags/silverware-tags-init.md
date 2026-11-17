@@ -75,6 +75,8 @@ if js and js.window then
           table.insert(records, { name = t.name, page = t.page, parent = t.parent })
         end
       end
+      -- SB-2.12-COMPAT: "header" for SilverBullet 2.12.1, whose headings' hashtags are no `tag` objects (after it they are,
+      -- read twice so, once each kept by tagRecordsOf); once 2.12.1 is dropped: "table" alone
       for _, kind in ipairs({ "table", "header" }) do
         for _, o in ipairs(query[[from index.tag(kind)]]) do
           for _, name in ipairs(o.tags or {}) do

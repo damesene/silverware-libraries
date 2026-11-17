@@ -26,6 +26,8 @@ export async function watchReloads(page: Page): Promise<void> {
     const watch = () => {
       const system = w.client?.clientSystem;
       if (!system?.reloadState) return void setTimeout(watch, 5);
+      // SB-2.12-COMPAT: `reloadState` is what 2.12.1 runs once its first index is complete; after it,
+      // `afterIndexCompleted` (below). Once 2.12.1 is dropped: that one alone, waited for (and `reloadState` no more)
       const reload = system.reloadState.bind(system);
       system.reloadState = () => {
         const done = reload();

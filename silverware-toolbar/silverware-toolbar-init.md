@@ -143,7 +143,8 @@ if js and js.window then
     -- Whether SilverBullet's keyboard bar is on (the settings offer to turn it off on a phone)
     getUiOption = editor.getUiOption,
     -- SilverBullet's own toolbar by a selection (its markup bar's bubble, after 2.12.1, a space's setting), which the
-    -- style page hides: the settings offer turning it off, so it is not drawn at all (config.persist came with it)
+    -- style page hides: the settings offer turning it off, so it is not drawn at all (config.persist came with it).
+    -- SB-2.12-COMPAT: `config.persist and` for 2.12.1, which has neither; once it is dropped, the table alone
     hostSelectionBar = config.persist and {
       shown = function()
         return config.get("markupBar.selectionBubble", true) ~= false

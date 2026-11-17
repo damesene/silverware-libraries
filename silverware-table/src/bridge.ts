@@ -28,6 +28,8 @@ export type Bridge = {
   readonly listPages?: () => unknown;
   // Optional: writes a page's markdown (with readPage), e.g. edits held for a page no longer in the editor
   readonly writePage?: (name: string, text: string) => unknown;
+  // The configuration page's name (Library/Config, or CONFIG before SilverBullet's tool pages), told by the init page
+  readonly configPage?: string;
   // Optional, for the settings dialog: writes the space's configuration page
   // (CONFIG) and loads the configuration again (as SilverBullet's
   // Configuration Manager does); with readPage. Without it (and without

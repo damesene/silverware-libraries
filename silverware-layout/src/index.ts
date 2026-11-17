@@ -127,7 +127,7 @@ export async function init(bridge: Bridge): Promise<void> {
   // The Markdown tab of the settings dialog, made as it opens
   app.dialogTabs = async () => [
     syntaxTab(document, await readSyntaxSettings(bridge), async (saved) => {
-      await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) =>
+      await saveConfigPage({ configPage: bridge.configPage, readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) =>
         withConfigSettings(text, { [PATHS.syntaxHides]: saved.hideGrids ? undefined : false, [PATHS.linkClicks]: saved.clickPlacesCursor ? undefined : false }),
       );
       markdownSettings = saved;
@@ -296,7 +296,7 @@ export function toolbarActions(): unknown[] {
 function silverBulletStore(bridge: Bridge, writer: PageWriter): LayoutStore {
   // A setting saved into CONFIG as SilverBullet's Configuration Manager saves it (indexed, the configuration loaded again)
   const saveConfig = (values: Readonly<Record<string, unknown>>, marker?: string) =>
-    saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values, marker));
+    saveConfigPage({ configPage: bridge.configPage, readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values, marker));
   return {
     canSaveSettings: !!bridge.saveConfigPage,
     readSettings: () => settingsOf(bridge),

@@ -355,7 +355,7 @@ async function openSettings(): Promise<void> {
   const shown = decorator;
   if (!bridge || !shown) return;
   const save = (values: Readonly<Record<string, unknown>>, marker?: string) =>
-    saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values, marker));
+    saveConfigPage({ configPage: bridge.configPage, readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values, marker));
   const [settings, syntax] = await Promise.all([readAssetSettings(bridge.getConfig ? await bridge.getConfig(ASSETS_PATH, undefined) : undefined).settings, readSyntaxSettings(bridge)]);
   const input = {
     settings,

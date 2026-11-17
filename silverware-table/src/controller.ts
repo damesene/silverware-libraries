@@ -1767,7 +1767,7 @@ export class Controller implements TableHost {
       return;
     }
     if (!bridge.saveConfigPage || !bridge.readPage) throw new Error("no configuration page to save to");
-    await saveConfigPage({ readPage: (name) => bridge.readPage!(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values));
+    await saveConfigPage({ configPage: bridge.configPage, readPage: (name) => bridge.readPage!(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values));
   }
 
   /** The "Silverware Table: Remove table metadata" command */

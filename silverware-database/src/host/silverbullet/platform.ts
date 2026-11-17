@@ -58,6 +58,8 @@ export type Bridge = {
   // SilverBullet's commands and their shortcuts (`system.listCommands`): one pressed in a panel of ours, where it does
   // nothing, told (none: nothing told)
   listCommands?(): Promise<unknown>;
+  // The configuration page's name (Library/Config, or CONFIG before SilverBullet's tool pages), told by the init page
+  configPage?: string;
   // The CONFIG page written as the Configuration Manager writes it (synced, indexed, the configuration loaded again)
   // `set`: written and indexed, the configuration not loaded again (which starts the plugin anew), these values set in it
   // as it is (config.set, by path), so SilverBullet's config and the plugin read them alike
@@ -171,7 +173,7 @@ export function silverBulletPlatform(bridge: Bridge): {
         ? {
             // (Not loaded again: the values set in SilverBullet's configuration as it is, as CONFIG has them now)
             save: (values, options) =>
-              saveConfigPage({ readPage: (name) => bridge.readPage(name), saveConfigPage: (text) => bridge.saveConfigPage!(text, options?.reload === false ? values : undefined) }, (text) => withConfigSettings(text, values, OWN_MARKER)),
+              saveConfigPage({ configPage: bridge.configPage, readPage: (name) => bridge.readPage(name), saveConfigPage: (text) => bridge.saveConfigPage!(text, options?.reload === false ? values : undefined) }, (text) => withConfigSettings(text, values, OWN_MARKER)),
           }
         : {}),
     },

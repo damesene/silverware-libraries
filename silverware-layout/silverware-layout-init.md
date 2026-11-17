@@ -6,6 +6,10 @@ tags: meta
 What starts [Silverware Layout](silverware-layout.md) in SilverBullet: its settings (shown in the Configuration Manager), the JavaScript loaded and handed SilverBullet's space and editor API, its command, and the events it follows. It is installed with the library; its Space Lua API is [silverware-layout-api](silverware-layout-api.md).
 
 ```space-lua
+-- SB-2.12-COMPAT: the configuration page, CONFIG in SilverBullet 2.12.1 and older, Library/Config from its 3.0 (edge),
+-- told by index.toolPages (tool pages under Library/ came with the move); once 2.12.1 is dropped, "Library/Config" alone
+local configPage = index.toolPages and "Library/Config" or "CONFIG"
+
 -- Settings, shown in the Configuration Manager (Configuration: Open)
 config.defineCategory({
   name = "Silverware Layout",
@@ -85,12 +89,12 @@ config.define("silverware.layout", {
     },
     guides = {
       type = "array",
-      description = "The widths a drag snaps to and shows a guide at, in px (\"1200px\"), in % of the editor's width (\"80%\"), or full (the editor's width). Set in the settings dialog (Guides), kept in Silverware Layout's own block of CONFIG.",
+      description = "The widths a drag snaps to and shows a guide at, in px (\"1200px\"), in % of the editor's width (\"80%\"), or full (the editor's width). Set in the settings dialog (Guides), kept in Silverware Layout's own block of the configuration page.",
       items = { type = "string" },
     },
     alignments = {
       type = "object",
-      description = "Where each kind of widget stands where it says nothing itself, by its plugin and kind (\"silverware-assets/preview\" = \"right\"): left, center or right. Set in the settings dialog (Alignment), kept in Silverware Layout's own block of CONFIG.",
+      description = "Where each kind of widget stands where it says nothing itself, by its plugin and kind (\"silverware-assets/preview\" = \"right\"): left, center or right. Set in the settings dialog (Alignment), kept in Silverware Layout's own block of the configuration page.",
     },
   },
 })
@@ -140,18 +144,19 @@ if js and js.window then
     -- A grid's cell edited in Silverware Editor's editor where it is installed (else a plain text field)
     editor = silverware.editor and silverware.editor.api,
     -- The dialog's default text width: saved as SilverBullet's Configuration Manager saves
-    -- (the CONFIG page, indexed, the configuration loaded again)
+    -- (the configuration page, indexed, the configuration loaded again)
+    configPage = configPage,
     saveConfigPage = function(text)
-      space.writePage("CONFIG", text)
+      space.writePage(configPage, text)
       -- Written: the rest only loads it; a failure there says so, the page is saved
       local ok, err = pcall(function()
-        if sync and sync.performFileSync then sync.performFileSync("CONFIG.md") end
-        mq.send("indexQueue", "CONFIG.md")
+        if sync and sync.performFileSync then sync.performFileSync(configPage .. ".md") end
+        mq.send("indexQueue", configPage .. ".md")
         mq.awaitEmptyQueue("indexQueue")
         editor.reloadConfigAndCommands()
       end)
       if not ok then
-        editor.flashNotification("Silverware Layout: the setting is saved in CONFIG, but loading it failed (" .. tostring(err) .. "): reload the page", "error")
+        editor.flashNotification("Silverware Layout: the setting is saved in " .. configPage .. ", but loading it failed (" .. tostring(err) .. "): reload the page", "error")
       end
     end,
   })

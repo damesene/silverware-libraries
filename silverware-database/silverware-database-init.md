@@ -7,6 +7,10 @@ What starts [Silverware Database](silverware-database.md) in SilverBullet: its s
 
 ```space-lua
 -- priority: -10
+-- SB-2.12-COMPAT: the configuration page, CONFIG in SilverBullet 2.12.1 and older, Library/Config from its 3.0 (edge),
+-- told by index.toolPages (tool pages under Library/ came with the move); once 2.12.1 is dropped, "Library/Config" alone
+local configPage = index.toolPages and "Library/Config" or "CONFIG"
+
 -- (After the API page, priority 50, and the user's scripts, priority 0: their views and types are defined by now)
 config.defineCategory {
   name = "Silverware Database",
@@ -97,14 +101,15 @@ if js and js.window then
     getConfig = config.get,
     -- SilverBullet's commands and their shortcuts: one pressed in the peek, where it does nothing, told
     listCommands = system.listCommands,
-    -- The settings dialog: saved as SilverBullet's Configuration Manager saves (the CONFIG page, indexed, the configuration loaded again)
+    -- The settings dialog: saved as SilverBullet's Configuration Manager saves (the configuration page, indexed, the configuration loaded again)
     -- `set`: written and indexed, the configuration not loaded again (that runs Space Lua anew and starts Silverware Database
     -- anew: the item's panel closed as its width was saved), these values set in it as it is, by path (config.set)
+    configPage = configPage,
     saveConfigPage = function(text, set)
-      space.writePage("CONFIG", text)
+      space.writePage(configPage, text)
       local ok, err = pcall(function()
-        if sync and sync.performFileSync then sync.performFileSync("CONFIG.md") end
-        mq.send("indexQueue", "CONFIG.md")
+        if sync and sync.performFileSync then sync.performFileSync(configPage .. ".md") end
+        mq.send("indexQueue", configPage .. ".md")
         mq.awaitEmptyQueue("indexQueue")
         if set then
           for path, value in pairs(set) do
@@ -116,9 +121,9 @@ if js and js.window then
         end
       end)
       if not ok and set then
-        editor.flashNotification("Silverware Database: the setting is saved in CONFIG, but indexing it failed (" .. tostring(err) .. ")", "error")
+        editor.flashNotification("Silverware Database: the setting is saved in " .. configPage .. ", but indexing it failed (" .. tostring(err) .. ")", "error")
       elseif not ok then
-        editor.flashNotification("Silverware Database: the settings are saved in CONFIG, but loading them failed (" .. tostring(err) .. "): reload the page", "error")
+        editor.flashNotification("Silverware Database: the settings are saved in " .. configPage .. ", but loading them failed (" .. tostring(err) .. "): reload the page", "error")
       end
     end,
   })

@@ -24,6 +24,8 @@ export type Bridge = {
   // Optional, for a value asked (a grid's min width in px): SilverBullet's prompt, `value` its field's text; none where
   // it is cancelled (`editor.prompt`)
   readonly prompt?: (message: string, value: string) => string | undefined | null | Promise<string | undefined | null>;
+  // The configuration page's name (Library/Config, or CONFIG before SilverBullet's tool pages), told by the init page
+  readonly configPage?: string;
   // Optional, for the dialog's default text width: the CONFIG page saved as SilverBullet's Configuration Manager saves
   // it, the configuration loaded again (readPage reads it)
   readonly saveConfigPage?: (text: string) => unknown;

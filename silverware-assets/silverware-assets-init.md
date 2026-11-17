@@ -6,7 +6,11 @@ tags: meta
 What starts [Silverware Assets](silverware-assets.md) in SilverBullet: its settings, the JavaScript loaded and handed SilverBullet's space and editor API, its command. It is installed with the library; its Space Lua API is [silverware-assets-api](silverware-assets-api.md).
 
 ```space-lua
--- Settings: how files are shown (tables, kept in Silverware Assets' own block of CONFIG: the Configuration Manager
+-- SB-2.12-COMPAT: the configuration page, CONFIG in SilverBullet 2.12.1 and older, Library/Config from its 3.0 (edge),
+-- told by index.toolPages (tool pages under Library/ came with the move); once 2.12.1 is dropped, "Library/Config" alone
+local configPage = index.toolPages and "Library/Config" or "CONFIG"
+
+-- Settings: how files are shown (tables, kept in Silverware Assets' own block of the configuration page: the Configuration Manager
 -- would lose them), and the markdown as written (shown in the Configuration Manager)
 config.defineCategory({
   name = "Silverware Assets",
@@ -76,19 +80,20 @@ if js and js.window then
     confirmDelete = function(message)
       return editor.confirm(message, { destructive = true })
     end,
-    -- The settings window: saved as SilverBullet's Configuration Manager saves (the CONFIG page, indexed, the
+    -- The settings window: saved as SilverBullet's Configuration Manager saves (the configuration page, indexed, the
     -- configuration loaded again)
+    configPage = configPage,
     saveConfigPage = function(text)
-      space.writePage("CONFIG", text)
+      space.writePage(configPage, text)
       -- Written: the rest only loads it; a failure there says so, the page is saved
       local ok, err = pcall(function()
-        if sync and sync.performFileSync then sync.performFileSync("CONFIG.md") end
-        mq.send("indexQueue", "CONFIG.md")
+        if sync and sync.performFileSync then sync.performFileSync(configPage .. ".md") end
+        mq.send("indexQueue", configPage .. ".md")
         mq.awaitEmptyQueue("indexQueue")
         editor.reloadConfigAndCommands()
       end)
       if not ok then
-        editor.flashNotification("Silverware Assets: the setting is saved in CONFIG, but loading it failed (" .. tostring(err) .. "): reload the page", "error")
+        editor.flashNotification("Silverware Assets: the setting is saved in " .. configPage .. ", but loading it failed (" .. tostring(err) .. "): reload the page", "error")
       end
     end,
     layout = silverware.layout and silverware.layout.api,

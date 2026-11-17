@@ -76,7 +76,8 @@ function readAsParser(text: string, from = 0): { readonly read: string; readonly
     breaks.push(at - breaks.length);
     return "\n";
   });
-  return { read, place: (at) => from + at + below(breaks.length, (i) => breaks[i]!, at) };
+  const breakAt = (i: number) => breaks[i]!;
+  return { read, place: (at) => from + at + below(breaks.length, breakAt, at) };
 }
 
 /**

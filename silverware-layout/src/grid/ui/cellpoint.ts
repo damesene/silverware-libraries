@@ -1,9 +1,9 @@
 // Where a point of a cell's rendering is in the cell's markdown (a click, a drop, a selection): the element marked with
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
-import { blankLineStarts, cellLines } from "../core/blanklines.ts";
+import { blankLineStarts } from "../core/blanklines.ts";
 import { lineStarts, markedFrom, offsetOf } from "./offsets.ts";
 import { CELL_CONTROLS } from "./columngrips.ts";
-import { spaceBefore } from "./view.ts";
+import { linesOf, spaceBefore } from "./view.ts";
 import { positionInCell } from "../core/position.ts";
 
 /** A caret's place in the rendering: a node and an offset in it */
@@ -70,7 +70,7 @@ function drawnAbove(element: Element, cellElement: Element): Element | undefined
  * there as its markdown has blank lines before it
  */
 export function blankLineAt(content: string, cellElement: HTMLElement, y: number): number | undefined {
-  const lines = cellLines(content);
+  const lines = linesOf(cellElement, content);
   const next = lineStarts(cellElement, lines).find(({ element }) => element.getBoundingClientRect().top > y);
   if (!next) return undefined;
   const { element, offset } = next;

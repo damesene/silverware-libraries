@@ -1,6 +1,7 @@
 // Where an element of a cell's rendering is in the cell's markdown: the host marks each element with its offset
 // (`data-pos`, `GridHost.renderMarkdown`), and may leave an offset of 0 unmarked (SilverBullet does): read here alone.
-import { type CellLines, lineStartOf, startsLine } from "../core/blanklines.ts";
+import type { MarkedLine } from "../../../../shared/markdown/parse.ts";
+import { lineAt } from "../core/blanklines.ts";
 
 const POS = "data-pos";
 
@@ -14,15 +15,14 @@ export type LineStart = { readonly element: HTMLElement; readonly offset: number
  * rather than its text); none in a line's text (a link, emphasis). Whatever holds a block (the cell, a quote, a list's
  * item), what lies before that line (its blank lines) lies before that element, not inside it
  */
-export function lineStarts(cell: HTMLElement, lines: CellLines): readonly LineStart[] {
+export function lineStarts(cell: HTMLElement, lines: readonly MarkedLine[]): readonly LineStart[] {
   const taken = new Set<number>();
   const starts: LineStart[] = [];
   for (const element of cell.querySelectorAll<HTMLElement>(`[${POS}]`)) {
     const offset = offsetOf(element);
-    if (!startsLine(lines, offset)) continue;
-    const line = lineStartOf(lines, offset);
-    if (taken.has(line)) continue;
-    taken.add(line);
+    const line = lineAt(lines, offset);
+    if (offset > line.content || taken.has(line.from)) continue;
+    taken.add(line.from);
     starts.push({ element, offset });
   }
   return starts;

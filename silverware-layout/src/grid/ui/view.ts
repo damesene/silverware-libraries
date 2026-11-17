@@ -1,7 +1,8 @@
 // A grid drawn: its cells side by side as its column template says (a narrow pane stacks them: the style page's rule),
 // each cell's markdown as the host rendered it.
 import { el } from "../../../../shared/elements.ts";
-import { blankLinesBefore, blankLinesDrawn, cellLines } from "../core/blanklines.ts";
+import { type MarkedLine, markedLines } from "../../../../shared/markdown/parse.ts";
+import { blankLinesBefore, blankLinesDrawn } from "../core/blanklines.ts";
 import type { BorderStyle } from "../model/border.ts";
 import { lineStarts } from "./offsets.ts";
 
@@ -76,13 +77,28 @@ export function plainCell(doc: Document, content: string): string {
   return pre.outerHTML;
 }
 
+// Each cell's markdown read line by line, for the markdown it was read of
+const readLines = new WeakMap<Element, { readonly content: string; readonly lines: readonly MarkedLine[] }>();
+
+/**
+ * A cell's markdown read line by line as markdown's parser reads it (`markedLines`): once for its drawing and every
+ * point found in it after (a press, a drop), read again only where its markdown is another
+ */
+export function linesOf(cell: Element, content: string): readonly MarkedLine[] {
+  const read = readLines.get(cell);
+  if (read?.content === content) return read.lines;
+  const lines = markedLines(content);
+  readLines.set(cell, { content, lines });
+  return lines;
+}
+
 /**
  * A cell drawn with the blank lines of its markdown the host's rendering left out (next to a list, a heading, a table,
  * between a loose list's items: core/blanklines.ts): a line of space each before the element it was before, as the
  * editor shows it. Each line told by the element that starts it (ui/offsets.ts: a list's, not its first item's)
  */
 export function keepBlankLines(doc: Document, cell: HTMLElement, content: string): void {
-  const lines = cellLines(content);
+  const lines = linesOf(cell, content);
   for (const { element, offset } of lineStarts(cell, lines)) {
     const wanted = blankLinesBefore(lines, offset);
     if (!wanted) continue;

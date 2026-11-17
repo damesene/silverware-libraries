@@ -5,19 +5,13 @@
 // its marks alone (`>`: kept as line breaks but between a loose list's items, probed 2026-11-17). What a rendered
 // element misses of the blank lines before it in the markdown is counted here, its lines read once as markdown's parser
 // reads them (shared/markdown/parse.ts: a quote's marks, a list item's, none in a code block). Pure.
-import { type MarkedLine, markedLines } from "../../../../shared/markdown/parse.ts";
+import type { MarkedLine } from "../../../../shared/markdown/parse.ts";
 
 // Elements the host draws as blocks: after one, no line break ends a line first
 const BLOCKS = new Set(["UL", "OL", "LI", "H1", "H2", "H3", "H4", "H5", "H6", "PRE", "TABLE", "BLOCKQUOTE", "HR", "DIV", "P", "DL", "FIGURE", "DETAILS"]);
 
-/** A cell's markdown read line by line, each with the marks of the blocks holding it, in order */
-export type CellLines = readonly MarkedLine[];
-
-/** A cell's markdown read line by line: once for all its places asked */
-export const cellLines = (text: string): CellLines => markedLines(text);
-
-/** The line a place is on: its index (a place past the text's end on its last line) */
-function lineIndex(lines: CellLines, at: number): number {
+/** The line a place is on: its index in a text's lines (a place past the text's end on its last line) */
+function lineIndex(lines: readonly MarkedLine[], at: number): number {
   let low = 0;
   let high = lines.length - 1;
   while (low < high) {
@@ -28,11 +22,11 @@ function lineIndex(lines: CellLines, at: number): number {
   return low;
 }
 
-/** Where the line a place is on starts */
-export const lineStartOf = (lines: CellLines, at: number): number => lines[lineIndex(lines, at)]!.from;
-
-/** Whether nothing but its line's marks (a quote's, a list item's) and indentation lies before a place: a block starts there */
-export const startsLine = (lines: CellLines, at: number): boolean => at <= lines[lineIndex(lines, at)]!.content;
+/**
+ * The line a place of a text is on, of its lines read once (shared/markdown/parse.ts `markedLines`): where it starts,
+ * where its own text does past its marks (a block starting at a place up to there starts the line)
+ */
+export const lineAt = (lines: readonly MarkedLine[], at: number): MarkedLine => lines[lineIndex(lines, at)]!;
 
 /**
  * Where the blank lines right before the line a place is on start, the nearest first. In a quote a blank line is one of
@@ -41,7 +35,7 @@ export const startsLine = (lines: CellLines, at: number): boolean => at <= lines
  * line shallower than the place's quote lies before that quote, its own. An empty item's line (its marker alone) is none.
  * Read back from that line over them alone, not the text before: a cell's every line is asked for as it is drawn
  */
-export function blankLineStarts(lines: CellLines, at: number): readonly number[] {
+export function blankLineStarts(lines: readonly MarkedLine[], at: number): readonly number[] {
   const index = lineIndex(lines, at);
   // (The quotes the place is in on its line: those whose marks are before it)
   const depth = lines[index]!.quotes.filter((quote) => quote < at).length;
@@ -55,7 +49,7 @@ export function blankLineStarts(lines: CellLines, at: number): readonly number[]
 }
 
 /** How many blank lines lie right before the line a place is on */
-export const blankLinesBefore = (lines: CellLines, at: number): number => blankLineStarts(lines, at).length;
+export const blankLinesBefore = (lines: readonly MarkedLine[], at: number): number => blankLineStarts(lines, at).length;
 
 /**
  * How many blank lines the host drew right before an element of a cell: the line breaks before it, the first of them

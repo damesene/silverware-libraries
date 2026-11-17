@@ -2,7 +2,7 @@
 // A cell drawn with its blank lines as the editor shows them: those the host's rendering left out (next to a block,
 // between a loose list's items) put back, those it kept (between paragraphs, as line breaks) left as they are.
 import { describe, expect, it } from "vitest";
-import { keepBlankLines, spaceBefore } from "./view.ts";
+import { keepBlankLines, linesOf, spaceBefore } from "./view.ts";
 
 // SilverBullet 2.12.1's markdownToHtml of this text (probed 2026-11-14)
 const TEXT = "One\n\nTwo\n\n\nThree\n\n\n\nFour\n- item\n\n- item2\n\n# Head\n\nAfter";
@@ -111,6 +111,17 @@ describe("a cell's blank lines put back", () => {
     cell.innerHTML = `<span class="p">Text</span><br><div>a</div><div>hi <strong data-pos="${text.indexOf("**")}">b</strong></div>`;
     keepBlankLines(document, cell, text);
     expect(cell.querySelectorAll(".swl-grid-blank")).toHaveLength(0);
+  });
+});
+
+describe("a cell's lines", () => {
+  it("are read once for its markdown, again only for another", () => {
+    const cell = document.createElement("div");
+    const lines = linesOf(cell, "a\n\nb");
+    expect(lines.map(({ from }) => from)).toEqual([0, 2, 3]);
+    expect(linesOf(cell, "a\n\nb")).toBe(lines);
+    expect(linesOf(cell, "a\nb")).not.toBe(lines);
+    expect(linesOf(document.createElement("div"), "a\n\nb")).not.toBe(lines);
   });
 });
 

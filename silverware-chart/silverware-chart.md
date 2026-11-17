@@ -64,7 +64,7 @@ xychart-beta
 
 A setting it does not know is kept as you wrote it.
 
-With [Silverware Layout](https://github.com/damesene/silverware-libraries/blob/main/silverware-layout/silverware-layout.md) installed, a chart can be wider (or narrower) than the page's text, centred on it: drag the bar Silverware Layout shows beside its right edge, and the chart is drawn as wide. The width is kept in the block, a comment `%% layout.width: 1200`.
+With [Silverware Layout](https://github.com/damesene/silverware-libraries/blob/main/silverware-layout/silverware-layout.md) installed, a chart can be wider (or narrower) than the page's text: drag the bar Silverware Layout shows beside its right edge, and the chart is drawn as wide. A click on the bar opens its menu, which puts the chart at the left, in the middle or at the right of the text (where charts stand by default is set in Silverware Layout's settings). Both are kept in the block, comments `%% layout.width: 1200` and `%% layout.align: right`.
 
 ## Data from a table
 

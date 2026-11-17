@@ -2,7 +2,7 @@
 name: Library/damesene/silverware-layout
 tags: meta/library
 version: 1.0.0
-description: "Silverware Layout: Columns in a page (/grid), the width of a page's text (its own or a default for every page) and of its tables, databases, charts and grids, wider or narrower than the text by a handle beside them that snaps to guides of your own; the editor's font size, and font zoom with Ctrl + scroll."
+description: "Silverware Layout: Columns in a page (/grid), the width of a page's text (its own or a default for every page) and of its tables, databases, charts and grids, wider or narrower than the text by a handle beside them that snaps to guides of your own, and placed at the left, in the middle or at the right; the editor's font size, and font zoom with Ctrl + scroll or a pinch, files zooming with the text."
 files:
 - silverware-layout.js
 - silverware-layout-init.md
@@ -11,7 +11,7 @@ files:
 ---
 # Silverware Layout
 
-The layout of your pages: columns side by side, how wide a page's text is, how wide each of its tables, databases and charts is, and how large the editor's font is. Give one page a wider text (a page of tables), all of them a width of your own without touching your theme, one table or chart more room than the text has, or zoom the text with Ctrl + scroll.
+The layout of your pages: columns side by side, how wide a page's text is, how wide each of its tables, databases and charts is and where it stands, and how large the editor's font is. Give one page a wider text (a page of tables), all of them a width of your own without touching your theme, one table or chart more room than the text has or put it at the right, or zoom the text with Ctrl + scroll or a pinch, its files with it.
 
 ## Page width
 

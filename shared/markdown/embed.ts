@@ -152,7 +152,7 @@ function fromAlias(alias: string | undefined): Pick<Embed, "alt" | "width" | "he
   return { alt: segments[0]!, ...size, metadata, segments };
 }
 
-/** The embeds of a text, in order: not in a fenced code block or a code span */
+/** The embeds of a text, in order: not in a fenced code block or a code span, nor escaped (`\![[x]]`) */
 export function readEmbeds(text: string): Embed[] {
   const embeds: Embed[] = [];
   let fence: string | undefined;
@@ -168,19 +168,27 @@ export function readEmbeds(text: string): Embed[] {
   return embeds;
 }
 
+/** Whether the character at `i` of a line is escaped: an odd run of backslashes right before it */
+function escapedAt(line: string, i: number): boolean {
+  let run = 0;
+  while (i - run - 1 >= 0 && line[i - run - 1] === "\\") run++;
+  return run % 2 === 1;
+}
+
 function embedsOfLine(line: string, at: number): Embed[] {
   const code = [...line.matchAll(CODE_SPAN)].map((m) => [m.index!, m.index! + m[0].length] as const);
-  const inCode = (i: number) => code.some(([from, to]) => i >= from && i < to);
+  // (In a code span, or escaped: its `!` after an odd run of backslashes, `\![[x]]`, its text shown as it is)
+  const shownAsText = (i: number) => code.some(([from, to]) => i >= from && i < to) || escapedAt(line, i);
   const found: Embed[] = [];
   for (const m of line.matchAll(WIKI)) {
-    if (inCode(m.index!)) continue;
+    if (shownAsText(m.index!)) continue;
     const inner = m[1]!;
     const bar = inner.indexOf("|");
     const target = bar < 0 ? inner : inner.slice(0, bar);
     found.push({ from: at + m.index!, to: at + m.index! + m[0].length, text: m[0], style: "wiki", target, ...fromAlias(bar < 0 ? undefined : inner.slice(bar + 1)) });
   }
   for (const m of line.matchAll(MARKDOWN)) {
-    if (inCode(m.index!)) continue;
+    if (shownAsText(m.index!)) continue;
     // (A wiki embed's `![[x]]` is no markdown image)
     if (line[m.index! + 2] === "[") continue;
     const alias = m[1]!;

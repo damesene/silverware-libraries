@@ -1,5 +1,12 @@
 # Silverware Table: changelog
 
+## 1.3.0 (2026-11-17)
+
+- Works with SilverBullet's next version (3.0) as well as 2.12.1: settings are saved in `Library/Config` there; a table scrolls sideways in its box, scrolls up and down again where it has a maximum height, and keeps its look at full screen where SilverBullet draws tables as cards. Your own functions, types, series, menu entries, conditions and themes go in a block on a page under `Library/` there.
+- With Silverware Layout: a table placed at the left, in the middle or at the right of the text, from the menu of the bar beside it.
+- Fixed: after a touch, a selection's handles no longer lie under the held header, and stay inside the table's edges in the middle of a whole row or column.
+- Menus line up their icons and words, and a row of buttons wraps onto further lines on a narrow screen instead of running out of the menu; a page with tables opens faster.
+
 ## 1.2.0 (2026-11-12)
 
 - Inserting rows and columns with +: a small dot marks each border while a cell of the table is selected or edited, and turns into a + as the pointer reaches it. Hovering a table shows none, so they stay out of the way while you write.

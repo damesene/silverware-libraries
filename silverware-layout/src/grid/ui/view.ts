@@ -21,8 +21,11 @@ export const CELL_GRIP = "swl-grid-cell-grip";
 /** What a grid puts in its cells besides their rendering: each cell's grip */
 export const CELL_CONTROLS = `.${CELL_GRIP}`;
 
+// What a cell draws that is no block of its markdown
+const NOT_BLOCKS = `${SPACERS}, ${CELL_CONTROLS}`;
+
 /** The blocks a cell draws of its markdown, in order: its children but the space between them and what the grid puts in it */
-export const drawnBlocks = (cell: Element): Element[] => [...cell.children].filter((child) => !child.matches(`${SPACERS}, ${CELL_CONTROLS}`));
+export const drawnBlocks = (cell: Element): Element[] => [...cell.children].filter((child) => !child.matches(NOT_BLOCKS));
 
 /**
  * The space drawn right before an element of a cell's rendering, by kind, and what is drawn before that in what holds
@@ -97,7 +100,7 @@ const readLines = new WeakMap<Element, { readonly content: string; readonly line
  * A cell's markdown read line by line as markdown's parser reads it (`markedLines`): once for its drawing and every
  * point found in it after (a press, a drop), read again only where its markdown is another
  */
-export function linesOf(cell: Element, content: string): readonly MarkedLine[] {
+export function cellLines(cell: Element, content: string): readonly MarkedLine[] {
   const read = readLines.get(cell);
   if (read?.content === content) return read.lines;
   const lines = markedLines(content);
@@ -111,7 +114,7 @@ export function linesOf(cell: Element, content: string): readonly MarkedLine[] {
  * editor shows it. Each line told by the element that starts it (ui/offsets.ts: a list's, not its first item's)
  */
 export function keepBlankLines(doc: Document, cell: HTMLElement, content: string): void {
-  const lines = linesOf(cell, content);
+  const lines = cellLines(cell, content);
   for (const { element, offset } of lineStarts(cell, lines)) {
     const wanted = blankLinesBefore(lines, offset);
     if (!wanted) continue;

@@ -2,7 +2,7 @@
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
 import { blankLineStarts } from "../core/blanklines.ts";
 import { lineStarts, markedFrom, offsetOf } from "./offsets.ts";
-import { drawnBlocks, linesOf, spaceBefore } from "./view.ts";
+import { cellLines, drawnBlocks, spaceBefore } from "./view.ts";
 import { positionInCell } from "../core/position.ts";
 
 /** A caret's place in the rendering: a node and an offset in it */
@@ -68,7 +68,7 @@ function blankRoomTop(element: Element, cellElement: Element): number {
  * there as its markdown has blank lines before it
  */
 export function blankLineAt(content: string, cellElement: HTMLElement, y: number): number | undefined {
-  const lines = linesOf(cellElement, content);
+  const lines = cellLines(cellElement, content);
   const next = lineStarts(cellElement, lines).find(({ element }) => element.getBoundingClientRect().top > y);
   if (!next) return undefined;
   const { element, offset } = next;

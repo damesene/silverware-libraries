@@ -190,7 +190,7 @@ export function editCell(cell: HTMLElement, markdown: string, at: number | TextS
  * menu too (on a phone, the grips shown while the grid has the focus: the cell tapped into was the one without)
  */
 function keptWhileEdited(cell: HTMLElement): HTMLElement[] {
-  return [...cell.children].filter((child): child is HTMLElement => child instanceof HTMLElement && child.matches(CELL_CONTROLS));
+  return [...cell.querySelectorAll<HTMLElement>(`:scope > :is(${CELL_CONTROLS})`)];
 }
 
 // How long an editor that lost the focus to nothing waits before taking it back, in the page still (`moveTo` gives it

@@ -1,8 +1,10 @@
 // Where a point of a cell's rendering is in the cell's markdown (a click, a drop, a selection): the element marked with
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
+import type { MarkedLine } from "../../../../shared/markdown/parse.ts";
 import { blankLinesAbove, caretOn } from "../core/blanklines.ts";
+import { cellLines } from "../core/celllines.ts";
 import { drawnBlocks, spaceBefore } from "./cellparts.ts";
-import { cellLines, type LineStart, lineStarts, markedFrom, offsetOf } from "./offsets.ts";
+import { lineStarts, markedFrom, offsetOf } from "./offsets.ts";
 import { positionInCell } from "../core/position.ts";
 
 /** A caret's place in the rendering: a node and an offset in it */
@@ -61,6 +63,12 @@ function blankRoomTop(element: Element, cellElement: Element): number {
   return range.getBoundingClientRect().bottom;
 }
 
+/** The first line of a cell starting under a point: its element and offset (none further looked for) */
+function lineStartBelow(cellElement: HTMLElement, lines: readonly MarkedLine[], y: number) {
+  for (const start of lineStarts(cellElement, lines)) if (start.element.getBoundingClientRect().top > y) return start;
+  return undefined;
+}
+
 /**
  * Where a click on a blank line of a cell's rendering is in its markdown: that blank line, past its marks (a quote's
  * empty line: in the quote; none where the click is on no blank line). Blank lines are drawn as space, no element
@@ -69,13 +77,7 @@ function blankRoomTop(element: Element, cellElement: Element): number {
  */
 export function blankLineAt(content: string, cellElement: HTMLElement, y: number): number | undefined {
   const lines = cellLines(content);
-  // The first line starting under the point (none further looked for)
-  let next: LineStart | undefined;
-  for (const start of lineStarts(cellElement, lines)) {
-    if (start.element.getBoundingClientRect().top <= y) continue;
-    next = start;
-    break;
-  }
+  const next = lineStartBelow(cellElement, lines, y);
   if (!next) return undefined;
   const { element, offset } = next;
   // (The nearest first)

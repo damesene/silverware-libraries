@@ -2,9 +2,10 @@
 // each cell's markdown as the host rendered it.
 import { el } from "../../../../shared/elements.ts";
 import { blankLinesAbove, blankLinesDrawn } from "../core/blanklines.ts";
+import { cellLines } from "../core/celllines.ts";
 import type { BorderStyle } from "../model/border.ts";
 import { BLANK, spaceBefore } from "./cellparts.ts";
-import { cellLines, lineStarts } from "./offsets.ts";
+import { lineStarts } from "./offsets.ts";
 
 const COLUMNS = "--swl-grid-columns";
 

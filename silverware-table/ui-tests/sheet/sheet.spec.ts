@@ -1047,12 +1047,15 @@ test("the sheet's scrollbars stay as they are through writes that widen a column
   const drawn = page.locator(".sb-table-widget.swt-drawn.swt-sheet-table:not(.swt-stand-in)").first();
   await expect(drawn).toBeVisible();
   const board = page.locator(".swt-sheet-board");
+  const size = () => board.evaluate((b) => [b.scrollTop, b.scrollLeft, b.scrollWidth, b.scrollHeight]);
+  const unscrolled = await size();
   await board.evaluate((b) => {
     b.scrollTop = 400;
     b.scrollLeft = 30;
   });
-  const size = () => board.evaluate((b) => [b.scrollTop, b.scrollLeft, b.scrollWidth, b.scrollHeight]);
-  await expect.poll(size).toEqual([400, 30, expect.any(Number), expect.any(Number)]);
+  // (The board's grid grown for the view as scrolled, a frame after the scroll: as far again as it scrolled sideways;
+  // read before, the scrollbars measured were those before it grew)
+  await expect.poll(size).toEqual([400, 30, unscrolled[2]! + 30, expect.any(Number)]);
   const before = await size();
   await drawn.locator("tr[data-swt-row='15'] > td").nth(1).dblclick();
   for (let i = 0; i < 3; i++) {

@@ -1,7 +1,7 @@
 // Where a point of a cell's rendering is in the cell's markdown (a click, a drop, a selection): the element marked with
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
-import { blankLineStarts } from "../core/blanklines.ts";
-import { lineStarts, offsetOf } from "./offsets.ts";
+import { blankLineStarts, cellLines } from "../core/blanklines.ts";
+import { lineStarts, markedFrom, offsetOf } from "./offsets.ts";
 import { BLANK_LINES, spaceBefore } from "./view.ts";
 import { positionInCell } from "../core/position.ts";
 
@@ -25,7 +25,7 @@ export function selectionInCell(content: string, cellElement: HTMLElement, selec
  */
 export function offsetInCell(content: string, cellElement: HTMLElement, target: Element, caret: Caret | undefined): number {
   const from = caret ? (caret.node instanceof Element ? caret.node : caret.node.parentElement) ?? target : target;
-  const marked = from.closest("[data-pos]");
+  const marked = markedFrom(from);
   const element = marked && cellElement.contains(marked) ? marked : ([...cellElement.children].find((child) => child.contains(from)) ?? cellElement);
   const elementPos = element === marked ? offsetOf(marked) : 0;
   if (!caret || !element.contains(caret.node)) return positionInCell(content, elementPos, "", 0);
@@ -69,11 +69,12 @@ function drawnAbove(element: Element, cellElement: Element): Element | undefined
  * there as its markdown has blank lines before it
  */
 export function blankLineAt(content: string, cellElement: HTMLElement, y: number): number | undefined {
-  const next = lineStarts(cellElement, content).find(({ element }) => element.getBoundingClientRect().top > y);
+  const lines = cellLines(content);
+  const next = lineStarts(cellElement, lines).find(({ element }) => element.getBoundingClientRect().top > y);
   if (!next) return undefined;
   const { element, offset } = next;
   // (The nearest first)
-  const blanks = blankLineStarts(content, offset);
+  const blanks = blankLineStarts(lines, offset);
   if (!blanks.length) return undefined;
   // The bottom of what is drawn above it (none: the cell's top)
   const above = drawnAbove(element, cellElement);

@@ -104,6 +104,14 @@ describe("a cell's blank lines put back", () => {
     expect(cell.querySelectorAll(".swl-grid-blank")).toHaveLength(1);
     expect(cell.querySelector('ul[data-pos="7"]')!.previousElementSibling?.className).toBe("swl-grid-blank");
   });
+
+  it("puts nothing into a line's text where its block is unmarked (HTML of more than one element): no line starts there", () => {
+    const text = "Text\n\n<div>a</div><div>hi **b**</div>";
+    const cell = document.createElement("div");
+    cell.innerHTML = `<span class="p">Text</span><br><div>a</div><div>hi <strong data-pos="${text.indexOf("**")}">b</strong></div>`;
+    keepBlankLines(document, cell, text);
+    expect(cell.querySelectorAll(".swl-grid-blank")).toHaveLength(0);
+  });
 });
 
 describe("the space drawn before an element of a cell", () => {

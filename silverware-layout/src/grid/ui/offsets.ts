@@ -1,6 +1,6 @@
 // Where an element of a cell's rendering is in the cell's markdown: the host marks each element with its offset
 // (`data-pos`, `GridHost.renderMarkdown`), and may leave an offset of 0 unmarked (SilverBullet does): read here alone.
-import { lineStartOf } from "../core/blanklines.ts";
+import { type CellLines, lineStartOf, startsLine } from "../core/blanklines.ts";
 
 const POS = "data-pos";
 
@@ -9,22 +9,27 @@ export type LineStart = { readonly element: HTMLElement; readonly offset: number
 
 /**
  * The elements of a cell's rendering that start a line of its markdown, in their order, one per line: of the elements
- * marked with their offsets on a line, the outermost, the first in the document's order (a list rather than its first
- * item, a quote rather than the list in it, an item rather than its text). Whatever holds a block (the cell, a quote, a
- * list's item), what lies before that line (its blank lines) lies before that element, not inside it
+ * marked with their offsets where a line's own text starts (past its marks: a quote's, a list item's), the outermost,
+ * the first in the document's order (a list rather than its first item, a quote rather than the list in it, an item
+ * rather than its text); none in a line's text (a link, emphasis). Whatever holds a block (the cell, a quote, a list's
+ * item), what lies before that line (its blank lines) lies before that element, not inside it
  */
-export function lineStarts(cell: HTMLElement, content: string): readonly LineStart[] {
-  const lines = new Set<number>();
+export function lineStarts(cell: HTMLElement, lines: CellLines): readonly LineStart[] {
+  const taken = new Set<number>();
   const starts: LineStart[] = [];
   for (const element of cell.querySelectorAll<HTMLElement>(`[${POS}]`)) {
     const offset = offsetOf(element);
-    const line = lineStartOf(content, offset);
-    if (lines.has(line)) continue;
-    lines.add(line);
+    if (!startsLine(lines, offset)) continue;
+    const line = lineStartOf(lines, offset);
+    if (taken.has(line)) continue;
+    taken.add(line);
     starts.push({ element, offset });
   }
   return starts;
 }
+
+/** The element marked with its offset that an element of a cell's rendering is in, itself or the nearest round it */
+export const markedFrom = (element: Element): Element | null => element.closest(`[${POS}]`);
 
 /** An element's offset in its cell's markdown (unmarked: 0) */
 export const offsetOf = (element: Element): number => Number(element.getAttribute(POS)) || 0;

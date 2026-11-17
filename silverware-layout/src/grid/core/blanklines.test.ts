@@ -1,7 +1,12 @@
 // A cell's blank lines in its markdown: those right before a line (in a quote, its marks alone), where each starts, and
 // those the host drew.
 import { describe, expect, it } from "vitest";
-import { blankLinesBefore, blankLinesDrawn, blankLineStarts, lineStartOf } from "./blanklines.ts";
+import { blankLinesBefore as countIn, blankLinesDrawn, blankLineStarts as startsIn, cellLines, lineStartOf as lineStartIn, startsLine } from "./blanklines.ts";
+
+// (Each asked of a text read line by line first, as a cell's is)
+const blankLinesBefore = (text: string, at: number) => countIn(cellLines(text), at);
+const blankLineStarts = (text: string, at: number) => startsIn(cellLines(text), at);
+const lineStartOf = (text: string, at: number) => lineStartIn(cellLines(text), at);
 
 // A cell's text: paragraphs a blank line or more apart, a loose list, a heading (drawn in ui/view.test.ts)
 const TEXT = "One\n\nTwo\n\n\nThree\n\n\n\nFour\n- item\n\n- item2\n\n# Head\n\nAfter";
@@ -32,6 +37,20 @@ describe("a cell's blank lines", () => {
     expect(blankLinesBefore("> one\n\n> two", 7)).toBe(1);
     expect(blankLinesBefore("Para\n\n>\n> one", 10)).toBe(1);
     expect(blankLinesBefore("> one\n> >\n>\n> > two", 16)).toBe(0);
+  });
+
+  it("reads a quote's marks in a list's item as deep as the item's content, an empty item's line no blank line", () => {
+    const text = "- a\n  - b\n    > - c\n    >\n    > - d";
+    expect(blankLinesBefore(text, text.indexOf("- d"))).toBe(1);
+    const numbered = "10. x\n\n    > q\n    >\n    > r";
+    expect(blankLinesBefore(numbered, numbered.indexOf("r"))).toBe(1);
+    expect(blankLinesBefore("- a\n-\n- b", 6)).toBe(0);
+  });
+
+  it("tells a place where a line's own text starts, past its marks and indentation, from one in its text", () => {
+    const lines = cellLines("> - a **b**\n  c");
+    expect([0, 2, 4, 6].map((at) => startsLine(lines, at))).toEqual([true, true, true, false]);
+    expect(startsLine(lines, 14)).toBe(true);
   });
 
   it("reads a mark after four spaces as a code block's line in a quote, no blank line", () => {

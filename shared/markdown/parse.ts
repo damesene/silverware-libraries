@@ -73,6 +73,45 @@ export function parseBlocks(text: string, from = 0): MarkdownNode[] {
   return readTree(read, (at) => from + at + below(breaks, at));
 }
 
+/**
+ * A line of a text (`to` at its line break) with the marks the blocks holding it put on it, as markdown's parser reads
+ * them: where each of its quotes' `>` is, whether a list's item starts on it (its marker), where its own text starts
+ * past them and the indentation, and whether it holds nothing past them (a quote's empty line, `>`, a blank line). A
+ * mark in a code block is its text: none
+ */
+export type MarkedLine = Span & { readonly quotes: readonly number[]; readonly item: boolean; readonly content: number; readonly empty: boolean };
+
+/** A text's lines, in order, with the marks of the blocks holding them */
+export function markedLines(text: string): MarkedLine[] {
+  const marks: { readonly from: number; readonly to: number; readonly quote: boolean }[] = [];
+  // (The tree walked in the text's order)
+  parser.parse(text).iterate({
+    enter: (node) => {
+      if (node.name === "QuoteMark" || node.name === "ListMark") marks.push({ from: node.from, to: node.to, quote: node.name === "QuoteMark" });
+    },
+  });
+  const lines: MarkedLine[] = [];
+  let next = 0;
+  for (let from = 0; ; ) {
+    const end = text.indexOf("\n", from);
+    const to = end < 0 ? text.length : end;
+    const quotes: number[] = [];
+    let item = false;
+    let past = from;
+    for (; next < marks.length && marks[next]!.from < to; next++) {
+      const mark = marks[next]!;
+      if (mark.quote) quotes.push(mark.from);
+      else item = true;
+      past = mark.to;
+    }
+    let content = past;
+    while (content < to && isSpace(text[content])) content++;
+    lines.push({ from, to, quotes, item, content, empty: text.slice(content, to).trim() === "" });
+    if (end < 0) return lines;
+    from = end + 1;
+  }
+}
+
 /** A text's blocks, `place` giving where a place in it is in the text given */
 function readTree(text: string, place: (at: number) => number): MarkdownNode[] {
   return new Reader(text, place).children(parser.parse(text).topNode, []);

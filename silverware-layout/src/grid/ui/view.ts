@@ -1,7 +1,7 @@
 // A grid drawn: its cells side by side as its column template says (a narrow pane stacks them: the style page's rule),
 // each cell's markdown as the host rendered it.
 import { el } from "../../../../shared/elements.ts";
-import { blankLinesBefore, blankLinesDrawn } from "../core/blanklines.ts";
+import { blankLinesBefore, blankLinesDrawn, cellLines } from "../core/blanklines.ts";
 import type { BorderStyle } from "../model/border.ts";
 import { lineStarts } from "./offsets.ts";
 
@@ -82,8 +82,9 @@ export function plainCell(doc: Document, content: string): string {
  * editor shows it. Each line told by the element that starts it (ui/offsets.ts: a list's, not its first item's)
  */
 export function keepBlankLines(doc: Document, cell: HTMLElement, content: string): void {
-  for (const { element, offset } of lineStarts(cell, content)) {
-    const wanted = blankLinesBefore(content, offset);
+  const lines = cellLines(content);
+  for (const { element, offset } of lineStarts(cell, lines)) {
+    const wanted = blankLinesBefore(lines, offset);
     if (!wanted) continue;
     // (Those put back already counted: drawn again over the same, none more)
     const { breaks, blanks, before } = spaceBefore(element);

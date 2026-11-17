@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type MarkdownNode, parseBlocks } from "./parse.ts";
+import { type MarkdownNode, markedLines, parseBlocks } from "./parse.ts";
 
 /** Each block as its kind (and what it has of its own) with its text's lines, or its blocks: what a test compares */
 function shape(text: string, from = 0): unknown[] {
@@ -134,5 +134,45 @@ describe("parseBlocks", () => {
       ["table", [["x"], ["#y"]]],
     ]);
     expect(shape("<!-- a\r\n#c -->")).toEqual([["comment", " a\r\n#c ", [["paragraph", ["a", "#c "]]]]]);
+  });
+});
+
+describe("markedLines", () => {
+  /** Each line as its quotes' marks, an item's marker, where its text starts and whether it is empty past its marks */
+  const marks = (text: string) => markedLines(text).map(({ from, quotes, item, content, empty }) => [from, quotes, item, content, empty]);
+
+  it("gives each line's quote marks, where its text starts past them, and whether it holds nothing past them", () => {
+    expect(marks("> one\n>\n> two")).toEqual([
+      [0, [0], false, 2, false],
+      [6, [6], false, 7, true],
+      [8, [8], false, 10, false],
+    ]);
+    expect(marks("> > one\n>\n\ntwo")).toEqual([
+      [0, [0, 2], false, 4, false],
+      [8, [8], false, 9, true],
+      [10, [], false, 10, true],
+      [11, [], false, 11, false],
+    ]);
+  });
+
+  it("gives a list item's marker, a quote in an item indented as deep as its content", () => {
+    expect(marks("- a\n  - b\n    > - c\n    >\n    > - d")).toEqual([
+      [0, [], true, 2, false],
+      [4, [], true, 8, false],
+      [10, [14], true, 18, false],
+      [20, [24], false, 25, true],
+      [26, [30], true, 34, false],
+    ]);
+    // An empty item's line: its marker, nothing past it, no blank line
+    expect(marks("10. x\n\n-")).toEqual([
+      [0, [], true, 4, false],
+      [6, [], false, 6, true],
+      [7, [], true, 8, true],
+    ]);
+  });
+
+  it("reads a mark in a code block as its text", () => {
+    expect(marks("> a\n>     >\n> b")[1]).toEqual([4, [4], false, 10, false]);
+    expect(marks("- a\n\n  ```\n  >\n  ```")[3]).toEqual([11, [], false, 13, false]);
   });
 });

@@ -1,4 +1,4 @@
-import { editorText, expect, fieldReady, fieldText, item, root, runCommand, test, waitForIndex } from "./helpers.ts";
+import { boxOf, editorText, expect, fieldReady, fieldText, item, root, runCommand, test, waitForIndex } from "./helpers.ts";
 
 // (The test's own view named: the built-in ones come first in the switcher)
 const BLOCK = "```silverware-database\nid: tasks\nview: names\n```\n";
@@ -14,6 +14,20 @@ async function pickView(page: import("@playwright/test").Page, label: string, pl
 async function choose(page: import("@playwright/test").Page, label: string): Promise<void> {
   await page.locator(".swd-menu .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: new RegExp(`^${label}(:|$)`) }) }).first().click();
 }
+
+test("a block whose database the index has not yet (its root page indexed after the page opened) draws it once it has", async ({ page, space }) => {
+  // The page alone: its database's pages come after it is drawn, as the index has them later (SilverBullet indexing a
+  // space as a page opens). An id of its own: another test's database of the server's space is none of this one's
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: latecomer\nview: list\n```\n" }, "Page");
+  await expect(page.locator(".swd-place")).toContainText('No database "latecomer"');
+  type Client = { clientSystem: { localSyscall(name: string, args: unknown[]): Promise<unknown> } };
+  const pages = { "Page/db-latecomer": root("latecomer", "Latecomer"), "Page/db-latecomer/Fix login": item("Todo", "a0"), "Page/db-latecomer/Write docs": item("Done", "a1") };
+  for (const [name, text] of Object.entries(pages)) {
+    await page.evaluate(([name, text]) => (window as unknown as { client: Client }).client.clientSystem.localSyscall("space.writePage", [name, text]), [`${space.folder}/${name}`, text] as const);
+  }
+  // Drawn as the index has its root page and items, nothing else done
+  await expect(page.locator(".swd-list-name")).toHaveText(["Fix login", "Write docs"]);
+});
 
 test("a block draws its database: the view shown in its picker, the views on in its menu, the one shown its items", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${BLOCK}`, ...TASKS }, "Page");
@@ -228,21 +242,26 @@ ${BLOCK}`, ...TASKS }, "Page");
 test("a press beside the block, on its lines, does not show its markdown", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${BLOCK}\nAfter\n`, ...TASKS }, "Page");
   await expect(page.locator(".test-item")).toHaveCount(2);
-  const widget = (await page.locator(".swd-widget").boundingBox())!;
-  const place = (await page.locator(".swd-place").boundingBox())!;
-  const closing = (await page.locator(".cm-line.sb-fenced-code-hide").first().boundingBox())!;
-  const content = (await page.locator(".cm-content").boundingBox())!;
+  type Box = { x: number; y: number; width: number; height: number };
   // In the widget's margin above the place, on the closing fence hidden under it, and left and right of the block in the
-  // editor, on none of its lines (the content's padding, the room beside it), which CodeMirror puts on the block's line
-  const middle = widget.y + widget.height / 2;
-  for (const [where, x, y] of [
-    ["the widget's margin", widget.x + 40, (widget.y + place.y) / 2],
-    ["the closing fence", closing.x + 40, closing.y + closing.height / 2],
-    ["the content's padding, left", Math.max(content.x + 2, widget.x - 8), middle],
-    ["the content's padding, right", Math.min(content.x + content.width - 2, widget.x + widget.width + 8), middle],
-    ["right of the content", content.x + content.width + 20, middle],
-  ] as const) {
+  // editor, on none of its lines (the content's padding, the room beside it), which CodeMirror puts on the block's line.
+  // Each measured as it is pressed: a press before may have the block drawn anew, or laid out again (its width)
+  const points: readonly (readonly [string, (b: { widget: Box; place: Box; closing: Box; content: Box }) => readonly [number, number]])[] = [
+    ["the widget's margin", ({ widget, place }) => [widget.x + 40, (widget.y + place.y) / 2]],
+    ["the closing fence", ({ closing }) => [closing.x + 40, closing.y + closing.height / 2]],
+    ["the content's padding, left", ({ widget, content }) => [Math.max(content.x + 2, widget.x - 8), widget.y + widget.height / 2]],
+    ["the content's padding, right", ({ widget, content }) => [Math.min(content.x + content.width - 2, widget.x + widget.width + 8), widget.y + widget.height / 2]],
+    ["right of the content", ({ widget, content }) => [content.x + content.width + 20, widget.y + widget.height / 2]],
+  ];
+  for (const [where, at] of points) {
     await test.step(where, async () => {
+      const boxes = {
+        widget: await boxOf(page.locator(".swd-widget")),
+        place: await boxOf(page.locator(".swd-place")),
+        closing: await boxOf(page.locator(".cm-line.sb-fenced-code-hide").first()),
+        content: await boxOf(page.locator(".cm-content")),
+      };
+      const [x, y] = at(boxes);
       await page.mouse.click(x, y);
       await expect(page.locator(".swd-place")).toBeVisible();
       await expect(page.locator(".cm-line", { hasText: "```silverware-database" })).toHaveCount(0);

@@ -1,21 +1,15 @@
 // A grid drawn: its cells side by side as its column template says (a narrow pane stacks them: the style page's rule),
 // each cell's markdown as the host rendered it.
 import { el } from "../../../../shared/elements.ts";
-import { type MarkedLine, markedLines } from "../../../../shared/markdown/parse.ts";
-import { blankLinesBefore, blankLinesDrawn } from "../core/blanklines.ts";
+import { blankLinesBefore, blankLinesDrawn, cellLines } from "../core/blanklines.ts";
 import type { BorderStyle } from "../model/border.ts";
 import { lineStarts } from "./offsets.ts";
 
 const COLUMNS = "--swl-grid-columns";
 // A blank line of a cell's markdown its rendering left out, put back
 const BLANK = "swl-grid-blank";
-
-// The blank lines put back in a cell's rendering
-const BLANK_LINES = `.${BLANK}`;
-// The host's line breaks
-const BREAKS = "br";
-/** What a cell's rendering draws as space, not content: the host's line breaks and the blank lines put back */
-export const SPACERS = `${BREAKS}, ${BLANK_LINES}`;
+// What a cell's rendering draws as space, not content: the host's line breaks (`br`) and the blank lines put back
+const SPACERS = `br, .${BLANK}`;
 /** A cell's grip, its class (ui/columngrips.ts draws it) */
 export const CELL_GRIP = "swl-grid-cell-grip";
 /** What a grid puts in its cells besides their rendering: each cell's grip */
@@ -38,8 +32,8 @@ export function spaceBefore(element: Element): { readonly breaks: number; readon
   for (let node = element.previousSibling; node; node = node.previousSibling) {
     if (node instanceof Element) {
       if (!node.matches(SPACERS)) return { breaks, blanks, before: node };
-      if (node.matches(BREAKS)) breaks++;
-      else blanks++;
+      if (node.classList.contains(BLANK)) blanks++;
+      else breaks++;
     } else if (node.nodeType === node.TEXT_NODE && /[^ \t\r\n]/.test(node.textContent ?? "")) return { breaks, blanks, before: node as Text };
   }
   return { breaks, blanks, before: undefined };
@@ -93,28 +87,13 @@ export function plainCell(doc: Document, content: string): string {
   return pre.outerHTML;
 }
 
-// Each cell's markdown read line by line, for the markdown it was read of
-const readLines = new WeakMap<Element, { readonly content: string; readonly lines: readonly MarkedLine[] }>();
-
-/**
- * A cell's markdown read line by line as markdown's parser reads it (`markedLines`): once for its drawing and every
- * point found in it after (a press, a drop), read again only where its markdown is another
- */
-export function cellLines(cell: Element, content: string): readonly MarkedLine[] {
-  const read = readLines.get(cell);
-  if (read?.content === content) return read.lines;
-  const lines = markedLines(content);
-  readLines.set(cell, { content, lines });
-  return lines;
-}
-
 /**
  * A cell drawn with the blank lines of its markdown the host's rendering left out (next to a list, a heading, a table,
  * between a loose list's items: core/blanklines.ts): a line of space each before the element it was before, as the
  * editor shows it. Each line told by the element that starts it (ui/offsets.ts: a list's, not its first item's)
  */
 export function keepBlankLines(doc: Document, cell: HTMLElement, content: string): void {
-  const lines = cellLines(cell, content);
+  const lines = cellLines(content);
   for (const { element, offset } of lineStarts(cell, lines)) {
     const wanted = blankLinesBefore(lines, offset);
     if (!wanted) continue;

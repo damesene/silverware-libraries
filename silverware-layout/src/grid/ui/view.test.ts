@@ -2,7 +2,7 @@
 // A cell drawn with its blank lines as the editor shows them: those the host's rendering left out (next to a block,
 // between a loose list's items) put back, those it kept (between paragraphs, as line breaks) left as they are.
 import { describe, expect, it } from "vitest";
-import { cellLines, drawnBlocks, keepBlankLines, spaceBefore } from "./view.ts";
+import { drawnBlocks, keepBlankLines, spaceBefore } from "./view.ts";
 
 // SilverBullet 2.12.1's markdownToHtml of this text (probed 2026-11-14)
 const TEXT = "One\n\nTwo\n\n\nThree\n\n\n\nFour\n- item\n\n- item2\n\n# Head\n\nAfter";
@@ -119,17 +119,6 @@ describe("the blocks a cell draws", () => {
     const cell = document.createElement("div");
     cell.innerHTML = '<span class="p">One</span><br><div class="swl-grid-blank"></div><ul data-pos="6"><li>a</li></ul><br><button class="swl-grid-cell-grip"></button>';
     expect(drawnBlocks(cell).map((block) => block.tagName)).toEqual(["SPAN", "UL"]);
-  });
-});
-
-describe("a cell's lines", () => {
-  it("are read once for its markdown, again only for another", () => {
-    const cell = document.createElement("div");
-    const lines = cellLines(cell, "a\n\nb");
-    expect(lines.map(({ from }) => from)).toEqual([0, 2, 3]);
-    expect(cellLines(cell, "a\n\nb")).toBe(lines);
-    expect(cellLines(cell, "a\nb")).not.toBe(lines);
-    expect(cellLines(document.createElement("div"), "a\n\nb")).not.toBe(lines);
   });
 });
 

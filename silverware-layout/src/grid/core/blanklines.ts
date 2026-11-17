@@ -5,10 +5,32 @@
 // its marks alone (`>`: kept as line breaks but between a loose list's items, probed 2026-11-17). What a rendered
 // element misses of the blank lines before it in the markdown is counted here, its lines read once as markdown's parser
 // reads them (shared/markdown/parse.ts: a quote's marks, a list item's, none in a code block). Pure.
-import { lineIndexAt, type MarkedLine } from "../../../../shared/markdown/parse.ts";
+import { lineIndexAt, type MarkedLine, markedLines } from "../../../../shared/markdown/parse.ts";
 
 // Elements the host draws as blocks: after one, no line break ends a line first
 const BLOCKS = new Set(["UL", "OL", "LI", "H1", "H2", "H3", "H4", "H5", "H6", "PRE", "TABLE", "BLOCKQUOTE", "HR", "DIV", "P", "DL", "FIGURE", "DETAILS"]);
+
+// The cells' markdown read lately, by its text, the latest last: a grid drawn anew asks again for its cells unchanged
+const READ = new Map<string, readonly MarkedLine[]>();
+// How many are kept (the oldest dropped)
+const READ_KEPT = 64;
+
+/**
+ * A cell's markdown read line by line as markdown's parser reads it (`markedLines`), once for the same text: each
+ * drawing of a grid asks for its every cell, and each point found in a cell after (a press, a drop) for that cell
+ */
+export function cellLines(content: string): readonly MarkedLine[] {
+  const read = READ.get(content);
+  if (read) {
+    READ.delete(content);
+    READ.set(content, read);
+    return read;
+  }
+  const lines = markedLines(content);
+  READ.set(content, lines);
+  if (READ.size > READ_KEPT) READ.delete(READ.keys().next().value!);
+  return lines;
+}
 
 /**
  * Where the blank lines right before the line a place is on start, the nearest first. In a quote a blank line is one of

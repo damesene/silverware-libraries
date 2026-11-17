@@ -7,9 +7,6 @@
 // reads them (shared/markdown/parse.ts: a quote's marks, a list item's, none in a code block). Pure.
 import { lineIndexAt, type MarkedLine } from "../../../../shared/markdown/parse.ts";
 
-// Elements the host draws as blocks: after one, no line break ends a line first
-const BLOCKS = new Set(["UL", "OL", "LI", "H1", "H2", "H3", "H4", "H5", "H6", "PRE", "TABLE", "BLOCKQUOTE", "HR", "DIV", "P", "DL", "FIGURE", "DETAILS"]);
-
 /**
  * The blank lines right before the line a place is on, the nearest first (`caretOn`: where a caret goes on one). In a
  * quote a blank line is one of its marks alone, the editor showing it as an empty line of the quote. One counts for a
@@ -40,9 +37,6 @@ export const caretOn = (line: MarkedLine): number => (line.quotes.length ? line.
 
 /**
  * How many blank lines the host drew right before an element of a cell: the line breaks before it, the first of them
- * only ending the line of what is inline before them (a paragraph, the host's `span`; text), none after a block
+ * only ending the line of what is inline before them (`afterInline`: a paragraph, text), none after a block
  */
-export function blankLinesDrawn(breaks: number, before: { readonly nodeName: string } | undefined): number {
-  const inline = !!before && !BLOCKS.has(before.nodeName.toUpperCase());
-  return inline ? Math.max(0, breaks - 1) : breaks;
-}
+export const blankLinesDrawn = (breaks: number, afterInline: boolean): number => (afterInline ? Math.max(0, breaks - 1) : breaks);

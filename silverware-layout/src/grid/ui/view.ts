@@ -68,7 +68,7 @@ export function keepBlankLines(doc: Document, cell: HTMLElement, content: string
     const wanted = blankLinesAbove(lines, offset).length;
     if (!wanted) continue;
     // (Those put back already counted: drawn again over the same, none more)
-    const { breaks, blanks, before } = spaceBefore(element);
-    for (let missing = wanted - blanks - blankLinesDrawn(breaks, before); missing > 0; missing--) element.before(el(doc, "div", { class: BLANK, attrs: { "aria-hidden": "true" } }));
+    const { breaks, blanks, afterInline } = spaceBefore(element);
+    for (let missing = wanted - blanks - blankLinesDrawn(breaks, afterInline); missing > 0; missing--) element.before(el(doc, "div", { class: BLANK, attrs: { "aria-hidden": "true" } }));
   }
 }

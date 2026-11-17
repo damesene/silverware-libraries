@@ -59,14 +59,13 @@ describe("a cell's blank lines", () => {
     expect(countBefore("> a\n>    >\n> b", 13)).toBe(1);
   });
 
-  it("counts those drawn: the line breaks, the first only ending an inline element's line", () => {
-    expect(blankLinesDrawn(2, { nodeName: "SPAN" })).toBe(1);
-    expect(blankLinesDrawn(1, { nodeName: "SPAN" })).toBe(0);
-    expect(blankLinesDrawn(1, { nodeName: "H1" })).toBe(1);
-    expect(blankLinesDrawn(0, { nodeName: "UL" })).toBe(0);
-    // Text the host left unwrapped: inline
-    expect(blankLinesDrawn(2, { nodeName: "#text" })).toBe(1);
-    expect(blankLinesDrawn(0, undefined)).toBe(0);
+  it("counts those drawn: the line breaks, the first only ending the line of what is inline before them", () => {
+    expect(blankLinesDrawn(2, true)).toBe(1);
+    expect(blankLinesDrawn(1, true)).toBe(0);
+    expect(blankLinesDrawn(0, true)).toBe(0);
+    // After a block, or nothing: each a blank line
+    expect(blankLinesDrawn(1, false)).toBe(1);
+    expect(blankLinesDrawn(0, false)).toBe(0);
   });
 });
 

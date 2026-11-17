@@ -447,6 +447,18 @@ test("a blank line before a block in a list's item is a line, as in the editor",
   expect(Math.round((second.y - a.y) / a.height)).toBe(2);
 });
 
+test("a page embedded in a cell keeps its own lines, the cell's blank line put back before the cell's list alone", async ({ page, space }) => {
+  // (The page drawn in the cell carries no offsets of its own page's: the cell's lines are the cell's)
+  const cell = `![[${space.folder}/Notes]]\n\n- a`;
+  await space.open({ Page: `# Page\n\n<grid>\n<cell>\n\n${cell}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n`, Notes: "Some text\n\n- x\n- y\n" }, "Page");
+  await gridsDrawn(page);
+  const first = page.locator("#sb-main .swl-grid-cell").first();
+  await expect(first.getByText("Some text")).toBeVisible();
+  await expect(first.locator(".swl-grid-blank")).toHaveCount(1);
+  await expect(first.locator(":scope > .swl-grid-blank + ul > li").filter({ hasText: /^a$/ })).toHaveCount(1);
+  await expect(first.locator("[data-pos] [data-pos]").filter({ hasText: /^x$/ })).toHaveCount(0);
+});
+
 test("an empty cell is a line high, clicked into to write in it", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n<grid>\n<cell>\n\nLeft\n\n</cell>\n<cell>\n\n\n</cell>\n</grid>\n" }, "Page");
   await gridsDrawn(page);

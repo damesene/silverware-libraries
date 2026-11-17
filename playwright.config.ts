@@ -36,7 +36,8 @@ const servers = Array.from({ length: workers ?? 0 }, (_, index) => silverbulletS
 // Each target's results and report in a folder of its own: a run against the playground and one against SilverBullet at
 // once do not write over each other's (two runs of one target at once still would, their servers' ports too)
 const html: ReporterDescription = ["html", { open: "never", outputFolder: `playwright-report/${target}` }];
-const reporter: ReporterDescription[] = process.env.CI ? [["list"], ["github"], html, ["./scripts/ui-tests-summary.ts"]] : [["list"], html];
+// (The summary reporter locally too: its warnings in the console)
+const reporter: ReporterDescription[] = process.env.CI ? [["list"], ["github"], html, ["./scripts/ui-tests-summary.ts"]] : [["list"], html, ["./scripts/ui-tests-summary.ts"]];
 
 export default defineConfig({
   // Each plugin's interaction tests, in its own folder (<plugin>/ui-tests/)

@@ -1118,6 +1118,48 @@ test("in the peek's editor an item's images are drawn as the page draws them, an
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("**First** words here");
 });
 
+test("in the peek's editor a file's view picked in its menu, the editor never focused, is written as the peek closes", async ({ page, space }) => {
+  const url = "https://images.example.test/pics/dog.svg";
+  await page.route(url, (route) => route.fulfill({ status: 200, contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect width="300" height="200" fill="#888"/></svg>' }));
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS, "Page/db-tasks/Fix login": `${item("Todo", "a0")}\nWords\n\n![](${url})\n` }, "Page");
+  const body = page.locator(".swd-peek .swd-peek-body");
+  await expect(async () => {
+    if (await page.locator(".swd-peek").count()) await page.keyboard.press("Escape");
+    await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
+    await expect(body.locator(".cm-content")).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+  await expect.poll(() => fieldReady(body)).toBe(true);
+  const frame = body.locator(".swa-frame", { has: page.locator(`img[src="${url}"]`) });
+  await frame.hover();
+  await frame.locator(".swa-more").click();
+  await page.locator('.swa-popup .swa-segment[aria-label^="Card"]').click();
+  await expect.poll(() => fieldText(body)).toContain(`![||{ view: card }](${url})`);
+  // Closed by its ×, nothing typed in its editor
+  await page.locator(".swd-peek-close").click();
+  await expect(page.locator(".swd-peek")).toHaveCount(0);
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain(`![||{ view: card }](${url})`);
+});
+
+test("in the peek's editor a task's box looks as the page's, though the peek hangs outside the page", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n- [ ] in the page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS, "Page/db-tasks/Fix login": `${item("Todo", "a0")}\n- [ ] in the item\n` }, "Page");
+  const body = page.locator(".swd-peek .swd-peek-body");
+  await expect(async () => {
+    if (await page.locator(".swd-peek").count()) await page.keyboard.press("Escape");
+    await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
+    await expect(body.locator(".cm-content")).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+  await expect.poll(() => fieldReady(body)).toBe(true);
+  const look = (box: import("@playwright/test").Locator) =>
+    box.evaluate((one) => {
+      const style = getComputedStyle(one);
+      return [Math.round(parseFloat(style.width)), Math.round(parseFloat(style.height)), style.borderTopLeftRadius, style.borderTopColor, style.backgroundColor];
+    });
+  const inPage = page.locator("#sb-main .cm-content input[type=checkbox]").first();
+  const inPeek = body.locator("input[type=checkbox]").first();
+  await expect(inPeek).toBeVisible();
+  expect(await look(inPeek)).toEqual(await look(inPage));
+});
+
 test("Delete database… in ⋯ deletes its pages and its blocks on every page once its name is typed; Undo brings them back", async ({ page, space }) => {
   const other = "# Other\n\nBefore.\n\n```silverware-database\nid: tasks\nview: board\n```\n\nAfter.\n";
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS, "Page/Other": other }, "Page");

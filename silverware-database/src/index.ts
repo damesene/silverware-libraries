@@ -39,7 +39,8 @@ import type { PropertyType } from "./domain/types/type.ts";
 import { BLOCK_LANGUAGE, BlockState, readBlock, writeBlock as blockWithState } from "./host/silverbullet/block.ts";
 import { blockPlaces } from "./host/silverbullet/places.ts";
 import { layoutEntries, withLayout } from "./host/silverbullet/layout.ts";
-import { type Bridge, editorArea, editorLook, silverBulletPlatform, watchEditorArea } from "./host/silverbullet/platform.ts";
+import { type Bridge, editorArea, editorLook, fieldLook, silverBulletPlatform, watchEditorArea } from "./host/silverbullet/platform.ts";
+import { LOOK_SAMPLE } from "../../shared/editorlook.ts";
 import { PagesStore } from "./store/pages/store.ts";
 import { BUILT_IN_MODULES } from "./modules/builtin.ts";
 import { BUILT_IN_VIEWS } from "./views/builtin/index.ts";
@@ -148,6 +149,9 @@ export function init(bridge: Bridge): void {
   };
   bridgeCalls = bridge;
   registerLayout(bridge);
+  // (The sample of the content field's look, rendered as the page renders it; none where it cannot be: the editor's own)
+  let sampled: string | undefined;
+  void bridge.renderMarkdown?.(LOOK_SAMPLE).then((html) => (sampled = html), () => undefined);
   kept ??= keptParts();
   const { platform, store, writer, core, ui, own } = kept;
   const modules = new Modules(
@@ -204,6 +208,9 @@ export function init(bridge: Bridge): void {
       editorArea: () => editorArea(document),
       onEditorAreaChanged: (listener) => watchEditorArea(document, listener),
       editorLook: () => editorLook(document),
+      // What an item's content field draws in the page's look: its sample rendered once a load, read as a field is made
+      // (a theme or zoom changed since read as it is then)
+      fieldLook: () => (sampled ? fieldLook(document, sampled) : undefined),
       // SilverBullet's shortcuts a panel keeps from it, told in its notification (shared/silverbullet/keptkeys.ts)
       keyKept: keptKeys(bridge.listCommands, (message) => bridge.flash(message, "info")),
       onChanged: (listener) => store.onChanged((change) => listener(change.database)),

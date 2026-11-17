@@ -73,7 +73,7 @@ type Shown = {
   hiddenAt?: string;
   // The body's field and its note: made once for the item shown and left in place as the rest is drawn anew, so a value written
   // shows at once while the body is typed in (drawn anew under it, the field lost its focus and what was typed)
-  field?: { readonly body: TextEditor; readonly note: HTMLElement };
+  field?: { readonly body: TextEditor; readonly note: HTMLElement; readonly write: () => void };
 };
 
 /** A content's field waiting for the content read (`readBody` fills only such a field): read only, marked */
@@ -205,7 +205,11 @@ export class PeekPanel {
   /** The field being edited left (written by its own handlers), the body's write waited for: whether the panel may go (no body typed kept) */
   private async leave(): Promise<boolean> {
     const active = this.host.document.activeElement;
+    const field = this.shown?.field;
     if (this.element && active instanceof HTMLElement && this.element.contains(active)) active.blur();
+    // (Its content changed with its editor never focused, so never left: a file's look picked in its menu, the focus on the
+    // menu's button; written now, after a write its blur began, if any: one in turn, nothing left to write then)
+    if (field?.body.element.isConnected && field.body.element.dataset.reading === undefined && field.body.getText() !== (this.shown?.body?.was ?? "")) field.write();
     await this.writing;
     // (A value or the name being written too: done, with its following, before another item is shown)
     await Promise.all([...this.edits]).catch(() => undefined);
@@ -584,7 +588,10 @@ export class PeekPanel {
       // (Its files and their links drawn as the page draws them, by the item shown then: a field kept takes the next item's)
       const drawing = this.host.fieldDrawing?.bind(this.host);
       const follow = this.host.followLink?.bind(this.host);
+      // (A task's box, a hashtag drawn as the page draws them where the host knows how)
+      const look = this.host.fieldLook?.();
       const body = this.host.editors.create(doc, {
+        ...(look ? { look } : {}),
         text: "",
         className: "swd-peek-body",
         label: `Content of ${item.name}`,
@@ -613,7 +620,7 @@ export class PeekPanel {
           : {}),
       });
       body.element.dataset.reading = "";
-      shown.field = { body, note: el(doc, "div", "swd-peek-note") };
+      shown.field = { body, note: el(doc, "div", "swd-peek-note"), write: left };
     }
     const field = shown.field;
     if (field) {

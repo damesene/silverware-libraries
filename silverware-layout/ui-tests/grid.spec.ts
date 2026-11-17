@@ -384,9 +384,9 @@ test("a blank line before a list is a line, as in the editor, and a click there 
   await expect(first.locator(".swl-grid-blank")).toHaveCount(1);
   const plan = await boxOf(first.locator(".p").first());
   const item = await boxOf(first.locator("li").first());
-  // The first item two lines under "Plan": a blank line between
-  expect(Math.round((item.y - plan.y) / item.height)).toBe(2);
-  await page.mouse.click(item.x + 30, item.y - item.height / 2);
+  // The first item two lines of text under "Plan": a blank line between
+  expect(Math.round((item.y - plan.y) / plan.height)).toBe(2);
+  await page.mouse.click(item.x + 30, item.y - plan.height / 2);
   await expect(cellField(page)).toBeVisible();
   await expect.poll(async () => (await fieldState(page)).from).toBe(cell.indexOf("\n- a"));
 });
@@ -400,8 +400,8 @@ test("a click on an item's text over the list nested in it after a blank line pu
   await page.mouse.click(word.x + word.width - 2, word.y + word.height / 2);
   await expect(cellField(page)).toBeVisible();
   // In "first", not on the blank line under it
-  await expect.poll(async () => (await fieldState(page)).from).toBeGreaterThan(cell.indexOf("first"));
-  expect((await fieldState(page)).from).toBeLessThanOrEqual(cell.indexOf("\n"));
+  const inWord = (at: number) => at > cell.indexOf("first") && at <= cell.indexOf("\n");
+  await expect.poll(async () => inWord((await fieldState(page)).from)).toBe(true);
 });
 
 test("an empty cell is a line high, clicked into to write in it", async ({ page, space }) => {

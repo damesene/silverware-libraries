@@ -25,6 +25,9 @@ describe("a cell's blank lines", () => {
     expect(lineStartOf("ab\ncd", 3)).toBe(3);
     expect(lineStartOf("ab\ncd", 2)).toBe(0);
     expect(lineStartOf("ab", 0)).toBe(0);
+    // A text starting with a line break: at 0 its first (empty) line, after it the second
+    expect(lineStartOf("\nab", 0)).toBe(0);
+    expect(lineStartOf("\nab", 1)).toBe(1);
   });
 
   it("counts those drawn: the line breaks, the first only ending an inline element's line", () => {

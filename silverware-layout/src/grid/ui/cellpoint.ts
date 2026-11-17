@@ -56,18 +56,18 @@ export function endAt(content: string, cellElement: HTMLElement, y: number): num
 export function blankLineAt(content: string, cellElement: HTMLElement, y: number): number | undefined {
   const next = lineStarts(cellElement, content).find(({ element }) => element.getBoundingClientRect().top > y);
   if (!next) return undefined;
-  const pos = next.offset;
-  const blanks = blankLinesBefore(content, pos);
+  const { element, offset } = next;
+  const blanks = blankLinesBefore(content, offset);
   if (!blanks) return undefined;
   // The bottom of what is drawn before it (a line break or a put-back blank line is space, not content); where nothing
   // is, the top of what it is in: the cell, or a list nested in an item (its blank lines inside the list, the item's
   // text above the list)
-  let before = next.element.previousElementSibling;
+  let before = element.previousElementSibling;
   while (before && (before.tagName === "BR" || before.classList.contains("swl-grid-blank"))) before = before.previousElementSibling;
-  const top = next.element.getBoundingClientRect().top;
-  const bottom = before ? before.getBoundingClientRect().bottom : (next.element.parentElement ?? cellElement).getBoundingClientRect().top;
+  const top = element.getBoundingClientRect().top;
+  const bottom = before ? before.getBoundingClientRect().bottom : (element.parentElement ?? cellElement).getBoundingClientRect().top;
   if (y < bottom || top <= bottom) return undefined;
   const line = (top - bottom) / blanks;
   const nth = Math.min(blanks, Math.max(1, Math.ceil((top - y) / line)));
-  return blankLineStart(content, pos, nth);
+  return blankLineStart(content, offset, nth);
 }

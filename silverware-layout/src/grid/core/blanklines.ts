@@ -8,7 +8,8 @@
 const BLOCKS = new Set(["UL", "OL", "LI", "H1", "H2", "H3", "H4", "H5", "H6", "PRE", "TABLE", "BLOCKQUOTE", "HR", "DIV", "P", "DL", "FIGURE", "DETAILS"]);
 
 /** Where the line a place of a text is on starts */
-export const lineStartOf = (text: string, at: number): number => text.lastIndexOf("\n", Math.max(0, at) - 1) + 1;
+// (At 0 the first line, whatever it holds: `lastIndexOf` would read a from-index of -1 as 0 and find a line break there)
+export const lineStartOf = (text: string, at: number): number => (at <= 0 ? 0 : text.lastIndexOf("\n", at - 1) + 1);
 
 /** How many blank lines lie right before the line a place of a text is on */
 export function blankLinesBefore(text: string, at: number): number {

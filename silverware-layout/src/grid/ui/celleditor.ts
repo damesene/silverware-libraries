@@ -5,7 +5,7 @@
 // (another cell written, left by the press that opened this one), the editor goes into the new drawing's cell
 // (`moveTo`), what was typed kept.
 import type { EditorLook, Editors, FieldDrawing, LinkOpening, TextEditor, TextSelection } from "../../../../shared/editor.ts";
-import { CELL_CONTROLS } from "./columngrips.ts";
+import { CELL_CONTROLS } from "./view.ts";
 
 /** What a cell edited asks of the host (src/grid/grids.ts' `GridHost`, its answers there) */
 export type CellHost = {
@@ -190,7 +190,7 @@ export function editCell(cell: HTMLElement, markdown: string, at: number | TextS
  * menu too (on a phone, the grips shown while the grid has the focus: the cell tapped into was the one without)
  */
 function keptWhileEdited(cell: HTMLElement): HTMLElement[] {
-  return [...cell.querySelectorAll<HTMLElement>(`:scope > ${CELL_CONTROLS}`)];
+  return [...cell.children].filter((child): child is HTMLElement => child instanceof HTMLElement && child.matches(CELL_CONTROLS));
 }
 
 // How long an editor that lost the focus to nothing waits before taking it back, in the page still (`moveTo` gives it

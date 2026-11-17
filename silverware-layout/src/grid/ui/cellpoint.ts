@@ -2,8 +2,7 @@
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
 import { blankLineStarts } from "../core/blanklines.ts";
 import { lineStarts, markedFrom, offsetOf } from "./offsets.ts";
-import { CELL_CONTROLS } from "./columngrips.ts";
-import { linesOf, spaceBefore } from "./view.ts";
+import { drawnBlocks, linesOf, spaceBefore } from "./view.ts";
 import { positionInCell } from "../core/position.ts";
 
 /** A caret's place in the rendering: a node and an offset in it */
@@ -42,9 +41,7 @@ export function offsetInCell(content: string, cellElement: HTMLElement, target: 
  * under its text: the caret after its last character); none where it is not
  */
 export function endAt(content: string, cellElement: HTMLElement, y: number): number | undefined {
-  // (The rendering's own elements: not what the grid puts in the cell, its grip)
-  const drawn = [...cellElement.children].filter((child) => !child.matches(CELL_CONTROLS));
-  const last = drawn.at(-1);
+  const last = drawnBlocks(cellElement).at(-1);
   if (last && y <= last.getBoundingClientRect().bottom) return undefined;
   return content.replace(/\s+$/, "").length;
 }

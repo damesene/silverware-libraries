@@ -15,7 +15,7 @@ import { columnsWithout, columnTemplate, fitsColumns, minWidthOf, validateMinWid
 import { RENDERED_VERSION, type Rendered, type RenderedItem, type RenderedRange } from "../../../shared/rendered.ts";
 import { type Drawn, drawnIn, itemsOf } from "./drawn.ts";
 import type { LayoutMenuEntry } from "../../../shared/layout.ts";
-import { addCellGrips, CELL_CONTROLS, type CellAction, gridMenu, type GridMenuState } from "./ui/columngrips.ts";
+import { addCellGrips, type CellAction, gridMenu, type GridMenuState } from "./ui/columngrips.ts";
 import { caretWord, type CellEditing, editCell } from "./ui/celleditor.ts";
 import { type EditorLook, type Editors, editorsOf, type FieldDrawing, type LinkOpening } from "../../../shared/editor.ts";
 import { LOOK_SAMPLE, sampleLook } from "../../../shared/editorlook.ts";
@@ -485,8 +485,6 @@ export class Grids {
     const taken = takeOver(
       { element, contents, drawn: this.drawnItems.get(element) ?? [] },
       { element: old, contents: readGridBody(oldBody).map((cell) => cell.content), drawn: this.drawnItems.get(old) ?? [] },
-      // (What the grid puts in its cells: never taken over with a cell's rendering)
-      CELL_CONTROLS,
     );
     this.drawnItems.set(element, taken.fresh);
     this.drawnItems.set(old, taken.old);

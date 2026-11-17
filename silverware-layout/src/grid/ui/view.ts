@@ -16,6 +16,13 @@ const BLANK_LINES = `.${BLANK}`;
 const BREAKS = "br";
 /** What a cell's rendering draws as space, not content: the host's line breaks and the blank lines put back */
 export const SPACERS = `${BREAKS}, ${BLANK_LINES}`;
+/** A cell's grip, its class (ui/columngrips.ts draws it) */
+export const CELL_GRIP = "swl-grid-cell-grip";
+/** What a grid puts in its cells besides their rendering: each cell's grip */
+export const CELL_CONTROLS = `.${CELL_GRIP}`;
+
+/** The blocks a cell draws of its markdown, in order: its children but the space between them and what the grid puts in it */
+export const drawnBlocks = (cell: Element): Element[] => [...cell.children].filter((child) => !child.matches(`${SPACERS}, ${CELL_CONTROLS}`));
 
 /** The space drawn right before an element of a cell's rendering, by kind, and the element drawn before that (none: it is first) */
 export function spaceBefore(element: Element): { readonly breaks: number; readonly blanks: number; readonly before: Element | undefined } {

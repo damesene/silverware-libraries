@@ -6,7 +6,7 @@
 // what it drew (`Drawn`: told as drawn, never taken again from what another may have decorated since).
 import type { Drawn } from "./drawn.ts";
 import { isMarked, offsetOf, shiftOffsets } from "./ui/offsets.ts";
-import { SPACERS } from "./ui/view.ts";
+import { CELL_CONTROLS, drawnBlocks } from "./ui/view.ts";
 
 /** A grid drawn: its element, its cells' markdown, what it drew in them */
 export type Drawing = { readonly element: HTMLElement; readonly contents: readonly string[]; readonly drawn: readonly Drawn[] };
@@ -21,14 +21,13 @@ const EDITING = "swl-grid-editing";
 /**
  * The blocks of a cell drawn, by the offsets marked on its children (a paragraph, a list, a heading; the first's 0 may
  * be unmarked): each its markdown, from its offset to the next one's (the cell's end for the last), its blank lines
- * round it left out. The space between them (`SPACERS`: the host's line breaks, the blank lines put back) is none,
- * nor a control of the grid's (`controls`). None where another child is unmarked (another's drawing): the blocks
- * then unknown
+ * round it left out: those it draws (`drawnBlocks`: not the space between them, nor what the grid puts in the cell).
+ * None where another is unmarked (another's drawing): the blocks then unknown
  */
-export function blocksOf(cell: HTMLElement, content: string, controls: string): Block[] {
+export function blocksOf(cell: HTMLElement, content: string): Block[] {
   const found: { readonly element: HTMLElement; readonly at: number }[] = [];
-  for (const child of cell.children) {
-    if (!(child instanceof HTMLElement) || child.matches(`${SPACERS}, ${controls}`)) continue;
+  for (const child of drawnBlocks(cell)) {
+    if (!(child instanceof HTMLElement)) continue;
     const at = isMarked(child) ? offsetOf(child) : found.length ? NaN : 0;
     if (!Number.isInteger(at) || at < 0 || at > content.length || at < (found.at(-1)?.at ?? 0)) return [];
     found.push({ element: child, at });
@@ -45,11 +44,11 @@ function exchange(a: Node, b: Node): void {
 }
 
 /**
- * The rendering of `old` taken over by `fresh` where its markdown is the same (`controls`: what the grid puts in its
- * cells besides their rendering, each drawing's own); what each drew after it, as the two drawings now hold it
+ * The rendering of `old` taken over by `fresh` where its markdown is the same (what the grid puts in its cells besides
+ * their rendering, `CELL_CONTROLS`, each drawing's own); what each drew after it, as the two drawings now hold it
  */
-export function takeOver(fresh: Drawing, old: Drawing, controls: string): { readonly fresh: Drawn[]; readonly old: Drawn[] } {
-  const own = (node: Node): boolean => node instanceof Element && node.matches(controls);
+export function takeOver(fresh: Drawing, old: Drawing): { readonly fresh: Drawn[]; readonly old: Drawn[] } {
+  const own = (node: Node): boolean => node instanceof Element && node.matches(CELL_CONTROLS);
   const oldCells = [...old.element.querySelectorAll<HTMLElement>(CELL)];
   const freshCells = [...fresh.element.querySelectorAll<HTMLElement>(CELL)];
   let here = [...fresh.drawn];
@@ -84,8 +83,8 @@ export function takeOver(fresh: Drawing, old: Drawing, controls: string): { read
     const cell = freshCells[index]!;
     if (content === undefined || oldContent === undefined || !oldCell || takenWhole.has(index) || oldCell.classList.contains(EDITING)) continue;
     const oldBlocks = new Map<string, Block[]>();
-    for (const block of blocksOf(oldCell, oldContent, controls)) oldBlocks.set(block.text, [...(oldBlocks.get(block.text) ?? []), block]);
-    for (const block of blocksOf(cell, content, controls)) {
+    for (const block of blocksOf(oldCell, oldContent)) oldBlocks.set(block.text, [...(oldBlocks.get(block.text) ?? []), block]);
+    for (const block of blocksOf(cell, content)) {
       const kept = oldBlocks.get(block.text)?.shift();
       if (!kept) continue;
       exchange(kept.element, block.element);

@@ -18,7 +18,7 @@ A manager of the space's tags (prefix `swg-`, settings and API under `silverware
 
 ## Meta pages
 
-- `silverware.tags.protectMeta` (on by default, decided 2026-10-31): a meta page (tag `meta` or under it, `isMetaTag` in shared/pages/tags/names.ts, as SilverBullet's plug-api/lib/tags.ts) is out of the catalog (`catalogOf`'s `hideMeta`), and the plan's `Guard` (core/plan.ts, the writer's `leaveAlone`) leaves one alone as read, since the index may lag. So renaming `#auto` skips meta pages.
+- `silverware.tags.protectMeta` (on by default, decided 2026-10-31): a meta page (under `Library/`, SilverBullet's tool page from its 3.0, or with an own tag `meta` or under it, as 2.12.1 tells them: `isSilverBulletPage` in shared/pages/tags/names.ts; docs/silverware-sb-edge.md) is out of the catalog (`catalogOf`'s `hideMeta`), and the plan's `Guard` (core/plan.ts, the writer's `leaveAlone`) leaves one alone as read, since the index may lag. So renaming `#auto` skips meta pages.
 - Off: meta tags are shown apart, as SilverBullet's own tree does (its 2.12.1 segments: All and Pages without meta pages, Meta with them alone): panel segments All, Page tags, Tasks without them and Meta; the window's Tags | Meta; By page without meta pages.
 
 ## Gotchas

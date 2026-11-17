@@ -164,7 +164,7 @@ export default () => [
 ];
 ```
 
-and in a `space-lua` block of any page (with a priority of its own, one below 50):
+and in a `space-lua` block on a page under `Library/` (any page in SilverBullet 2.12 and before) (with a priority of its own, one below 50):
 
 ```lua
 silverware.table.defineSeries(js.importFromSpace("Library/me/series.js"))
@@ -559,7 +559,7 @@ export default ({ toNumber, isError }) => [
 ];
 ```
 
-and in a `space-lua` block of any page (your [[CONFIG]], say; a block with a priority of its own must have one below 50, Silverware Table's own):
+and in a `space-lua` block on a page under `Library/` (any page in SilverBullet 2.12 and before) (your configuration page, say; a block with a priority of its own must have one below 50, Silverware Table's own):
 
 ```lua
 silverware.table.defineFunctions(js.importFromSpace("Library/me/functions.js"))
@@ -776,7 +776,7 @@ export default ({ numberOf, notANumber, formatNumber, lineIcon }) => [
 ];
 ```
 
-and in a `space-lua` block of any page (with a priority of its own, one below 50):
+and in a `space-lua` block on a page under `Library/` (any page in SilverBullet 2.12 and before) (with a priority of its own, one below 50):
 
 ```lua
 silverware.table.defineTypes(js.importFromSpace("Library/me/types.js"))
@@ -874,7 +874,7 @@ Hover a cell to show two grips: ⠿ left of its row, and ⠿ above its column; m
 
 ### Custom menu entries
 
-Your own entries in a row's or a column's menu (or another plugin's) are written in JavaScript in a file of your space and given in a `space-lua` block of any page:
+Your own entries in a row's or a column's menu (or another plugin's) are written in JavaScript in a file of your space and given in a `space-lua` block on a page under `Library/` (any page in SilverBullet 2.12 and before):
 
 ```js
 // Library/me/menus.js
@@ -1028,7 +1028,7 @@ A rule as the table stores it (in its metadata row), here a column's rule colori
 
 ### Custom conditions and formats
 
-Your own conditions and formats are written in JavaScript in a file of your space, in the form the built-in ones are written in (each built-in one could be copied into your file as it is), and given in a `space-lua` block of any page:
+Your own conditions and formats are written in JavaScript in a file of your space, in the form the built-in ones are written in (each built-in one could be copied into your file as it is), and given in a `space-lua` block on a page under `Library/` (any page in SilverBullet 2.12 and before):
 
 ```js
 // Library/me/formats.js
@@ -1100,7 +1100,7 @@ A theme sets how tables look: their header, the lines between rows and columns, 
 
 ### Your own theme
 
-A theme is a `space-style` block on any page of your space; Silverware Table finds it there and offers it in the setting and in a table's menu by its name. Set the variables you want, in a block for the light look and one for the dark; any you leave out stay as SilverBullet has them:
+A theme is a `space-style` block on a page under `Library/` (any page in SilverBullet 2.12 and before); Silverware Table finds it there and offers it in the setting and in a table's menu by its name. Set the variables you want, in a block for the light look and one for the dark; any you leave out stay as SilverBullet has them:
 
 ```css
 .sb-table-widget[data-swt-theme="sand"] {
@@ -1204,9 +1204,9 @@ Everything else works as in the page: editing, selecting, menus, formulas. A tab
 
 These settings are for every table in the space (a table's own sorting, filters, widths and names are in its menus).
 
-**Silverware Table settings** (*Silverware Table settings…* in a table's ⋯ menu, or the *Silverware Table: Settings* command) shows them all in one dialog: *General*, then the modules by kind (*Editing*, *Data*, *Look*, *View*, *Export*), each with its switch and its own settings under it. Nothing changes until *Save*: then they are written into SilverBullet's configuration, where the Configuration Manager keeps its settings (the managed block of your [[CONFIG]] page), so both always show the same. Turning a module on or off saves and reloads the page (*Save and reload*), as modules start with Silverware Table. *Cancel* (or Esc) closes it unsaved.
+**Silverware Table settings** (*Silverware Table settings…* in a table's ⋯ menu, or the *Silverware Table: Settings* command) shows them all in one dialog: *General*, then the modules by kind (*Editing*, *Data*, *Look*, *View*, *Export*), each with its switch and its own settings under it. Nothing changes until *Save*: then they are written into SilverBullet's configuration, where the Configuration Manager keeps its settings (the managed block of your configuration page (`Library/Config`; `CONFIG` in SilverBullet 2.12 and before)), so both always show the same. Turning a module on or off saves and reloads the page (*Save and reload*), as modules start with Silverware Table. *Cancel* (or Esc) closes it unsaved.
 
-You can also open *Configuration: Open* (Ctrl+, / Cmd+,) and find the *Silverware Table* and *Silverware Table: Modules* categories, or set them in your [[CONFIG]]. Settings of whole tables are `silverware.table.<setting>`, those of a part of Silverware Table `silverware.table.<part>.<setting>`, and those of a module (a part that can be turned off) `silverware.table.modules.<module>.<setting>`. A part is set in one go, with only what you change (the rest keeps its default):
+You can also open *Configuration: Open* (Ctrl+, / Cmd+,) and find the *Silverware Table* and *Silverware Table: Modules* categories, or set them in your configuration page. Settings of whole tables are `silverware.table.<setting>`, those of a part of Silverware Table `silverware.table.<part>.<setting>`, and those of a module (a part that can be turned off) `silverware.table.modules.<module>.<setting>`. A part is set in one go, with only what you change (the rest keeps its default):
 
 ```lua
 config.set("silverware.table.metadata", true)

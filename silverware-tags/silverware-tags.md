@@ -47,7 +47,7 @@ Hashtags are found as SilverBullet finds them: not in code (blocks and `inline`)
 
 ## Settings
 
-**Silverware Tags: Settings** (or the gear at the bottom of the window): *Hide and protect meta pages* on the *General* tab, each part on the *Modules* tab. They are saved in CONFIG (shown in *Configuration: Open* too); a module turned on or off applies after a reload, which *Save and reload* does. In CONFIG:
+**Silverware Tags: Settings** (or the gear at the bottom of the window): *Hide and protect meta pages* on the *General* tab, each part on the *Modules* tab. They are saved in your configuration page (`Library/Config`; `CONFIG` in SilverBullet 2.12 and before), shown in *Configuration: Open* too; a module turned on or off applies after a reload, which *Save and reload* does. In your configuration page:
 
 ```lua
 config.set("silverware.tags.protectMeta", true)

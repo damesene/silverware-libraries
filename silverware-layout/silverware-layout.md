@@ -110,9 +110,9 @@ What you should know:
 
 Both settings below change how SilverBullet itself behaves; turn one off to get SilverBullet's own behaviour back. They are in the **Markdown** tab of **Silverware Layout: Settings**.
 
-**Links shown as markdown** (the cursor in a link, so you see its `[[`, `]]` or `](…)`, and every link in the plain markdown view): SilverBullet opens such a link on a click too, which makes it hard to edit. With *A click only places the cursor; Ctrl+click opens the link* on, a click places the cursor there and Ctrl+click opens it; off, a click opens it. A link drawn as a link opens on a click as ever (or `silverware.layout.links.clickPlacesCursor` in your CONFIG).
+**Links shown as markdown** (the cursor in a link, so you see its `[[`, `]]` or `](…)`, and every link in the plain markdown view): SilverBullet opens such a link on a click too, which makes it hard to edit. With *A click only places the cursor; Ctrl+click opens the link* on, a click places the cursor there and Ctrl+click opens it; off, a click opens it. A link drawn as a link opens on a click as ever (or `silverware.layout.links.clickPlacesCursor` in your configuration page (`Library/Config`; `CONFIG` in SilverBullet 2.12 and before)).
 
-**Plain markdown view** (SilverBullet shows a page as plain markdown, without formatting: *Editor: Toggle Markdown Syntax Rendering*): SilverBullet still draws grids there, under their markdown. With *Hide grids in this view* on, `<grid>` and `<cell>` stay plain text, like the rest of the page; off, the grid is drawn under its markdown (or `silverware.layout.syntaxMode.hideGrids` in your CONFIG).
+**Plain markdown view** (SilverBullet shows a page as plain markdown, without formatting: *Editor: Toggle Markdown Syntax Rendering*): SilverBullet still draws grids there, under their markdown. With *Hide grids in this view* on, `<grid>` and `<cell>` stay plain text, like the rest of the page; off, the grid is drawn under its markdown (or `silverware.layout.syntaxMode.hideGrids` in your configuration page).
 
 ## Embedded files
 
@@ -130,13 +130,13 @@ The dialog's **Font** tab sets the editor's font size: **All pages** for every p
 
 ## Guides
 
-The widths a widget snaps to, and the page's sliders are marked with. Change them in the dialog's **Guides** tab: set a width in its row by its slider (held, it shows the guides on the page as it moves) or type it, in **px** or in **%** of the editor's width (the px / % switch beside it), × takes one away, **+ Add guide** adds one. They show from the narrowest; the last row, **Full width**, is the editor's whole width (the whole pane), a box to tick. A widget snapped to a guide in % keeps that share of the editor (`layout.width: 80%`): in a wider or narrower window it is still at the guide. Saved into your CONFIG, in a block of Silverware Layout's own.
+The widths a widget snaps to, and the page's sliders are marked with. Change them in the dialog's **Guides** tab: set a width in its row by its slider (held, it shows the guides on the page as it moves) or type it, in **px** or in **%** of the editor's width (the px / % switch beside it), × takes one away, **+ Add guide** adds one. They show from the narrowest; the last row, **Full width**, is the editor's whole width (the whole pane), a box to tick. A widget snapped to a guide in % keeps that share of the editor (`layout.width: 80%`): in a wider or narrower window it is still at the guide. Saved into your configuration page, in a block of Silverware Layout's own.
 
 Press and hold **Hold to preview** (or hold Space or Enter on it) to see the guides on the page as you typed them, the dialog out of the way meanwhile. **Restore defaults** puts the default ones back (900 px, 1200 px and Full width) once you confirm; **Save** keeps them, as everything in the dialog.
 
 ## Settings
 
-In the Configuration Manager (Configuration: Open), under Silverware Layout, or in your CONFIG:
+In the Configuration Manager (Configuration: Open), under Silverware Layout, or in your configuration page:
 
 ```lua
 config.set("silverware.layout.textWidth", "1100px")
@@ -155,7 +155,7 @@ config.set("silverware.layout.fontZoom.enabled", true)
 - `fontZoom.scaleFiles`: whether the files a page shows zoom with the font (see above); on by default.
 - `links.clickPlacesCursor`: whether a click on a link shown as markdown only places the cursor (see above); on by default.
 - `syntaxMode.hideGrids`: whether grids stay plain text in the plain markdown view (see above); on by default.
-- `alignments`: where each kind of widget stands without its own, as the **Alignment** tab sets it (kept in a block of Silverware Layout's own in your CONFIG).
+- `alignments`: where each kind of widget stands without its own, as the **Alignment** tab sets it (kept in a block of Silverware Layout's own in your configuration page).
 
 ## Good to know
 

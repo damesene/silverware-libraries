@@ -11,7 +11,7 @@ Written 2026-11-14 so that a new session can start from here; brought up to date
 ## Left before the merge
 
 1. ~~The Page layout dialog closed when another plugin saved the configuration~~: fixed 2026-11-14. Started again, Silverware Layout took the page it had for none (`start` set it `""`), and `pageOpened` closed the dialog as over another page; the page is kept now, and what the open dialog shows is not undone (`app.test.ts`, and Assets' markdown-as-written test with Layout's dialog open as Assets saves).
-2. **SilverBullet after 2.12.1 (edge)**: [silverware-library-prefix.md](silverware-library-prefix.md) plans the change for every plugin (scripts only under `Library/`, CONFIG moved to `Library/Config`). Silverware Assets' init page has its own `saveConfigPage` writing `CONFIG`: add Assets to that plan. The grid and the assets were never tried on edge.
+2. **SilverBullet after 2.12.1 (edge)**: [silverware-sb-edge.md](silverware-sb-edge.md) plans the change for every plugin (scripts only under `Library/`, CONFIG moved to `Library/Config`). Silverware Assets' init page has its own `saveConfigPage` writing `CONFIG`: add Assets to that plan. The grid and the assets were never tried on edge.
 3. **Releases** (on the user's word only, the last commit of the branch, root `CLAUDE.md` *Versions*). No tag exists yet: a
    plugin's history since its last release is `git diff origin/main..HEAD -- silverware-<name>/ shared/`. Proposed at the
    review before the release (2026-11-16):

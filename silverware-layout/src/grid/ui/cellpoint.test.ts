@@ -35,4 +35,19 @@ describe("a blank line clicked", () => {
     expect(blankLineAt(content, cell, 22)).toBe(content.indexOf("\n\n") + 1);
     expect(blankLineAt(content, cell, 45)).toBe(content.indexOf("\n\n") + 1);
   });
+
+  it("in a quote, after its empty first lines, lies within the quote: the blank line before the quote is the quote's", () => {
+    // A blank line before the quote (put back), two empty lines of the quote (drawn as line breaks in it), its text
+    const content = "Para\n\n>\n>\n> one";
+    const cell = document.createElement("div");
+    cell.innerHTML = '<span class="p">Para</span><br><blockquote data-pos="6"><br><br> <span class="p" data-pos="12">one</span></blockquote>';
+    keepBlankLines(document, cell, content);
+    expect(cell.querySelectorAll(".swl-grid-blank")).toHaveLength(1);
+    const quote = cell.querySelector("blockquote")!;
+    laidOut(new Map<Element, readonly [number, number]>([[cell, [0, 120]], [cell.querySelector(".p")!, [0, 20]], [quote, [45, 120]], [quote.querySelector(".p")!, [95, 120]]]), [0, 0]);
+    // The quote's lines, 25 high each: its first empty line (6), its second (8); the blank line before it (5)
+    expect(blankLineAt(content, cell, 60)).toBe(6);
+    expect(blankLineAt(content, cell, 80)).toBe(8);
+    expect(blankLineAt(content, cell, 30)).toBe(5);
+  });
 });

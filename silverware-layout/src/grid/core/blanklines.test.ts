@@ -71,10 +71,12 @@ describe("a cell's blank lines", () => {
   });
 
   it("counts those drawn: the line breaks, the first only ending an inline element's line", () => {
-    expect(blankLinesDrawn(2, { tagName: "SPAN" })).toBe(1);
-    expect(blankLinesDrawn(1, { tagName: "SPAN" })).toBe(0);
-    expect(blankLinesDrawn(1, { tagName: "H1" })).toBe(1);
-    expect(blankLinesDrawn(0, { tagName: "UL" })).toBe(0);
+    expect(blankLinesDrawn(2, { nodeName: "SPAN" })).toBe(1);
+    expect(blankLinesDrawn(1, { nodeName: "SPAN" })).toBe(0);
+    expect(blankLinesDrawn(1, { nodeName: "H1" })).toBe(1);
+    expect(blankLinesDrawn(0, { nodeName: "UL" })).toBe(0);
+    // Text the host left unwrapped: inline
+    expect(blankLinesDrawn(2, { nodeName: "#text" })).toBe(1);
     expect(blankLinesDrawn(0, undefined)).toBe(0);
   });
 });

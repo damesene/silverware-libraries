@@ -138,7 +138,14 @@ describe("the space drawn before an element of a cell", () => {
     const cell = document.createElement("div");
     cell.innerHTML = '<span class="p">One</span><br><div class="swl-grid-blank"></div><br><ul data-pos="6"><li>a</li></ul>';
     const { breaks, blanks, before } = spaceBefore(cell.querySelector("ul")!);
-    expect([breaks, blanks, before?.tagName]).toEqual([2, 1, "SPAN"]);
+    expect([breaks, blanks, before?.nodeName]).toEqual([2, 1, "SPAN"]);
     expect(spaceBefore(cell.querySelector("span")!)).toEqual({ breaks: 0, blanks: 0, before: undefined });
+  });
+
+  it("is text the host left unwrapped too, not the HTML's own white space", () => {
+    const item = document.createElement("li");
+    item.innerHTML = 'first<br>\n <ul data-pos="9"><li>b</li></ul>';
+    const { breaks, before } = spaceBefore(item.querySelector("ul")!);
+    expect([breaks, before?.nodeName, before?.textContent]).toEqual([1, "#text", "first"]);
   });
 });

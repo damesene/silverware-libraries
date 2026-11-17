@@ -24,16 +24,22 @@ export const CELL_CONTROLS = `.${CELL_GRIP}`;
 /** The blocks a cell draws of its markdown, in order: its children but the space between them and what the grid puts in it */
 export const drawnBlocks = (cell: Element): Element[] => [...cell.children].filter((child) => !child.matches(`${SPACERS}, ${CELL_CONTROLS}`));
 
-/** The space drawn right before an element of a cell's rendering, by kind, and the element drawn before that (none: it is first) */
-export function spaceBefore(element: Element): { readonly breaks: number; readonly blanks: number; readonly before: Element | undefined } {
+/**
+ * The space drawn right before an element of a cell's rendering, by kind, and what is drawn before that in what holds
+ * it: an element, or text the host left unwrapped (an item's text); none where the element is the first there. Text
+ * of white space alone (the HTML's own) is none
+ */
+export function spaceBefore(element: Element): { readonly breaks: number; readonly blanks: number; readonly before: Element | Text | undefined } {
   let breaks = 0;
   let blanks = 0;
-  let before = element.previousElementSibling;
-  for (; before?.matches(SPACERS); before = before.previousElementSibling) {
-    if (before.matches(BREAKS)) breaks++;
-    else blanks++;
+  for (let node = element.previousSibling; node; node = node.previousSibling) {
+    if (node instanceof Element) {
+      if (!node.matches(SPACERS)) return { breaks, blanks, before: node };
+      if (node.matches(BREAKS)) breaks++;
+      else blanks++;
+    } else if (node.nodeType === node.TEXT_NODE && /[^ \t\r\n]/.test(node.textContent ?? "")) return { breaks, blanks, before: node as Text };
   }
-  return { breaks, blanks, before: before ?? undefined };
+  return { breaks, blanks, before: undefined };
 }
 
 /** A grid's element: a cell per rendered markdown (the host's HTML, its elements marked with their offsets in the cell's text) */

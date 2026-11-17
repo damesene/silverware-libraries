@@ -53,9 +53,9 @@ export const blankLinesBefore = (lines: readonly MarkedLine[], at: number): numb
 
 /**
  * How many blank lines the host drew right before an element of a cell: the line breaks before it, the first of them
- * only ending the line of an inline element before them (a paragraph, the host's `span`), none after a block
+ * only ending the line of what is inline before them (a paragraph, the host's `span`; text), none after a block
  */
-export function blankLinesDrawn(breaks: number, before: { readonly tagName: string } | undefined): number {
-  const inline = !!before && !BLOCKS.has(before.tagName.toUpperCase());
+export function blankLinesDrawn(breaks: number, before: { readonly nodeName: string } | undefined): number {
+  const inline = !!before && !BLOCKS.has(before.nodeName.toUpperCase());
   return inline ? Math.max(0, breaks - 1) : breaks;
 }

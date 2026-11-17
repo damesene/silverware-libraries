@@ -2,7 +2,7 @@
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
 import { blankLineStarts } from "../core/blanklines.ts";
 import { lineStarts, markedFrom, offsetOf } from "./offsets.ts";
-import { drawnBlocks, linesOf, SPACERS } from "./view.ts";
+import { drawnBlocks, linesOf, spaceBefore } from "./view.ts";
 import { positionInCell } from "../core/position.ts";
 
 /** A caret's place in the rendering: a node and an offset in it */
@@ -47,24 +47,18 @@ export function endAt(content: string, cellElement: HTMLElement, y: number): num
 }
 
 /**
- * The bottom of what is drawn right above an element of a cell's rendering, past the space between (line breaks, blank
- * lines put back): what is before it, an element or text (an item's text the host left unwrapped), or where it is the
- * first in what holds it (a quote's first block, after the quote's empty first line), what is before that, up to the
- * cell; the cell's top where nothing is. What lies between (a margin) is the blank lines' room
+ * Where the room of the blank lines before an element of a cell's rendering starts: the bottom of what is drawn before
+ * it past the space between (`spaceBefore`: an element, or text the host left unwrapped), a margin between theirs too;
+ * where nothing is, the top of what holds it (a quote's first block after the quote's empty first lines; the cell),
+ * the blank lines before that its holder's own
  */
-function bottomAbove(element: Element, cellElement: Element): number {
-  for (let at: Element | null = element; at && at !== cellElement; at = at.parentElement) {
-    for (let node = at.previousSibling; node; node = node.previousSibling) {
-      if (node instanceof Element) {
-        if (!node.matches(SPACERS)) return node.getBoundingClientRect().bottom;
-      } else if (node.nodeType === node.TEXT_NODE && node.textContent?.trim()) {
-        const range = cellElement.ownerDocument.createRange();
-        range.selectNodeContents(node);
-        return range.getBoundingClientRect().bottom;
-      }
-    }
-  }
-  return cellElement.getBoundingClientRect().top;
+function blankRoomTop(element: Element, cellElement: Element): number {
+  const { before } = spaceBefore(element);
+  if (!before) return (element.parentElement ?? cellElement).getBoundingClientRect().top;
+  if (before instanceof Element) return before.getBoundingClientRect().bottom;
+  const range = cellElement.ownerDocument.createRange();
+  range.selectNodeContents(before);
+  return range.getBoundingClientRect().bottom;
 }
 
 /**
@@ -82,7 +76,7 @@ export function blankLineAt(content: string, cellElement: HTMLElement, y: number
   const blanks = blankLineStarts(lines, offset);
   if (!blanks.length) return undefined;
   const top = element.getBoundingClientRect().top;
-  const bottom = bottomAbove(element, cellElement);
+  const bottom = blankRoomTop(element, cellElement);
   if (y < bottom || top <= bottom) return undefined;
   const line = (top - bottom) / blanks.length;
   const nth = Math.min(blanks.length, Math.max(1, Math.ceil((top - y) / line)));

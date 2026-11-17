@@ -47,9 +47,10 @@ describe("readEmbeds", () => {
     expect(readEmbeds("```\n![[a.png]]\n```\n`![[b.png]]` [[c.png]] [d](e.png)")).toEqual([]);
   });
 
-  it("reads none escaped (an odd run of backslashes before its `!`), one after an escaped backslash", () => {
+  it("reads none escaped (an odd run of backslashes before its `!`), one after an escaped backslash; an escaped one's link a link", () => {
     expect(readEmbeds("\\![[a.png]] \\![b](c.png) \\\\\\![[d.png]]")).toEqual([]);
     expect(readEmbeds("\\\\![[e.png]]").map(({ target }) => target)).toEqual(["e.png"]);
+    expect(readLinks("\\![[a.pdf]] \\![b](c.pdf) ![[d.pdf]] \\\\![[e.pdf]]").map(({ target }) => target)).toEqual(["a.pdf", "c.pdf"]);
   });
 });
 

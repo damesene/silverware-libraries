@@ -1443,6 +1443,8 @@ li:hover .swd-row-grip,
   margin-left: 6px;
   padding: 0 4px;
   border: 0;
+  /* (The row's font, zoomed with it: a button's own is the browser's, which a host may not change) */
+  font: inherit;
   color: inherit;
   background: none;
   opacity: 0.4;

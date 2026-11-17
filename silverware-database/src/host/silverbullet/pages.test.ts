@@ -27,5 +27,7 @@ describe("the pages a reference may name", () => {
   it("are the index's pages by name, meta ones (a tag meta or under it) left out", () => {
     const pages = [{ name: "Zeta" }, { name: "CONFIG", tags: ["meta"] }, { name: "Library/x", tags: ["meta/library"] }, { name: "Alpha", tags: ["project", "metal"] }, { tags: ["x"] }];
     expect(referablePages(pages)).toEqual(["Alpha", "Zeta"]);
+    // SilverBullet's 3.0: its pages told by their place, without tags
+    expect(referablePages([{ name: "Library/Config" }, { name: "Library/Std/Index" }, { name: "Alpha" }])).toEqual(["Alpha"]);
   });
 });

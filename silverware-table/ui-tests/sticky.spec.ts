@@ -107,6 +107,84 @@ test.describe("The held header", () => {
     expect((await look()).held).toBe(false);
   });
 
+  test("a table with a maximum height scrolled in its box: its header held at the box's top by the browser at once, no frame of it scrolled away", async ({ page }) => {
+    await setSettings(page, { "silverware.table.maxHeight": 300 });
+    const rows = Array.from({ length: 40 }, (_, i) => `| Row ${i + 1} | ${i * 3} |`).join("\n");
+    await setPage(page, `# Test\n\nText above.\n\n| Name | Qty |\n|---|---|\n${rows}\n\nText below.\n`);
+    await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(40);
+    // Scrolled and read in one go, before any scroll event's script: where the browser alone holds the header
+    const at = await table(page).evaluate((w) => {
+      w.scrollTop = 250;
+      return { head: w.querySelector("thead")!.getBoundingClientRect().top, box: w.getBoundingClientRect().top + w.clientTop };
+    });
+    expect(Math.abs(at.head - at.box)).toBeLessThan(1);
+  });
+
+  test("a table with a maximum height whose header the page holds: at the view's top, no room above it, scrolled in its box or not", async ({ page }) => {
+    await setSettings(page, { "silverware.table.maxHeight": 300 });
+    const rows = Array.from({ length: 40 }, (_, i) => `| Row ${i + 1} | ${i * 3} |`).join("\n");
+    const filler = Array.from({ length: 30 }, (_, i) => `Line ${i + 1}.`).join("\n\n");
+    await setPage(page, `# Test\n\nText above.\n\n| Name | Qty |\n|---|---|\n${rows}\n\n${filler}\n`);
+    await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(40);
+    for (const inner of [0, 200]) {
+      await table(page).evaluate((w, inner) => (w.scrollTop = inner), inner);
+      // The page scrolled so the box's top is 100 px above the view's top
+      await page.evaluate(() => {
+        const scroller = document.querySelector(".cm-scroller")!;
+        const box = document.querySelector(".sb-table-widget")!;
+        scroller.scrollTop += box.getBoundingClientRect().top - scroller.getBoundingClientRect().top + 100;
+      });
+      await settled(page);
+      await expect(table(page).locator("thead")).toHaveClass(/swt-stuck/);
+      const at = await table(page).evaluate((w) => ({ head: w.querySelector("thead")!.getBoundingClientRect().top, view: document.querySelector(".cm-scroller")!.getBoundingClientRect().top }));
+      expect(Math.abs(at.head - at.view), `scrolled ${inner} px in its box`).toBeLessThan(2);
+      // (Back where the box's top is in view, for the next)
+      await page.evaluate(() => (document.querySelector(".cm-scroller")!.scrollTop = 0));
+      await settled(page);
+    }
+  });
+
+  test("a table of the plain theme (no header color) scrolled in its box: its header held in the page's color, no row showing through it", async ({ page }) => {
+    await setSettings(page, { "silverware.table.maxHeight": 300, "silverware.table.modules.themes.theme": "plain" });
+    const rows = Array.from({ length: 40 }, (_, i) => `| Row ${i + 1} | ${i * 3} |`).join("\n");
+    await setPage(page, `# Test\n\nText above.\n\n| Name | Qty |\n|---|---|\n${rows}\n\nText below.\n`);
+    await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(40);
+    await expect(table(page)).toHaveAttribute("data-swt-theme", "plain");
+    // (Held against its box: the path of a table scrolling in one)
+    await expect(table(page)).toHaveClass(/swt-sticky-inside/);
+    await table(page).evaluate((w) => (w.scrollTop = 250));
+    await settled(page);
+    await expect(table(page).locator("thead")).toHaveClass(/swt-stuck/);
+    // What lies under the header's cells, its own ground: the page's color, opaque
+    const grounds = await table(page).evaluate((w) => {
+      const sample = document.createElement("div");
+      sample.style.backgroundColor = "var(--root-background-color, #fff)";
+      document.body.append(sample);
+      const color = getComputedStyle(sample).backgroundColor;
+      sample.remove();
+      return { head: getComputedStyle(w.querySelector("thead")!).backgroundColor, page: color };
+    });
+    expect(grounds.head).not.toMatch(/^(transparent|rgba\(0, 0, 0, 0\))$/);
+    expect(grounds.head).toBe(grounds.page);
+  });
+
+  test("a table wider than its box (scrolling sideways) whose header the page holds: at the view's top, sticky against its box", async ({ page }) => {
+    const head = Array.from({ length: 18 }, (_, i) => `Column ${i + 1}`);
+    const rows = Array.from({ length: 40 }, (_, r) => `| ${head.map((_, c) => `r${r}c${c}`).join(" | ")} |`).join("\n");
+    await setPage(page, `# Test\n\nText above.\n\n| ${head.join(" | ")} |\n|${head.map(() => "---").join("|")}|\n${rows}\n\nText below.\n`);
+    await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(40);
+    await expect(table(page)).toHaveClass(/swt-sticky-inside/);
+    await page.evaluate(() => {
+      const scroller = document.querySelector(".cm-scroller")!;
+      const box = document.querySelector(".sb-table-widget")!;
+      scroller.scrollTop += box.getBoundingClientRect().top - scroller.getBoundingClientRect().top + 300;
+    });
+    await settled(page);
+    await expect(table(page).locator("thead")).toHaveClass(/swt-stuck/);
+    const at = await table(page).evaluate((w) => ({ head: w.querySelector("thead")!.getBoundingClientRect().top, view: document.querySelector(".cm-scroller")!.getBoundingClientRect().top }));
+    expect(Math.abs(at.head - at.view)).toBeLessThan(2);
+  });
+
   test("a table with a maximum height, its box taken up past the view's top: its header held no further than the box, gone with it, no dot of the + left", async ({ page }) => {
     await setSettings(page, { "silverware.table.maxHeight": 300 });
     const rows = Array.from({ length: 40 }, (_, i) => `| Row ${i + 1} | ${i * 3} |`).join("\n");

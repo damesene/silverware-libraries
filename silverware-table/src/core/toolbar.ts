@@ -315,12 +315,11 @@ export class Toolbar {
     const widest = Math.max(0, ...Array.from(bar.children, (row) => (row as HTMLElement).offsetWidth));
     bar.style.maxWidth = `${Math.ceil(Math.max(widest, right - left))}px`;
     const above = headerRect.top - bar.offsetHeight - BAR_GAP;
-    // No room above the header: over the header's right end instead. A header
-    // held at the top of the view has the room (STICKY_GAP): the toolbar goes
-    // there, so it never covers a column's name while the page scrolls
-    const held = info.table.tHead?.classList.contains("swt-stuck") ?? false;
+    // No room above the header: over the header's right end instead. A header held below the top of the view has the
+    // room (STICKY_GAP): the toolbar goes there, so it never covers a column's name while the page scrolls; one held at
+    // the view's top (a table scrolling in a box of its own) has none
     // (A table near the page's top, its header where it starts: above it with less of a gap, where the toolbar fits)
-    const fits = held || above >= shown.top + 2 || headerRect.top - bar.offsetHeight >= shown.top;
+    const fits = above >= shown.top + 2 || headerRect.top - bar.offsetHeight >= shown.top;
     const top = fits ? Math.max(above, shown.top) : headerRect.top + (headerRect.height - bar.offsetHeight) / 2;
     // At the table's right edge, or its box's when the table scrolls in it,
     // as far as it is in view: the page around a wide table may scroll

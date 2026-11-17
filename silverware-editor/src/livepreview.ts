@@ -142,10 +142,13 @@ export function linkAt(state: EditorState, tree: { resolveInner(at: number, side
 }
 
 /**
- * The room a list's marks take before its text, in ems, the space after each in it: where a page draws its text (a
- * bullet's, a number's, a task's box after either); a rendered list's of Silverware Layout's grid the same
+ * A list's marks and indent laid out in the page's columns, as SilverBullet's editor does (`--editor-column`, after
+ * 2.12.1; else a character's width): each mark the columns its source takes, the space after it among them (a bullet's
+ * `- ` 2, a number's `1. ` 3, a task's box `[ ] ` 4), an indent its own; a rendered list's of Silverware Layout's grid
+ * the same
  */
-export const LIST_ROOM = { bullet: 1, number: 1.5, task: 2 } as const;
+export const COLUMN = "var(--editor-column, 1ch)";
+export const LIST_COLUMNS = { bullet: 2, task: 4 } as const;
 
 /**
  * The live preview: decorations of the text, made again on each change of it or of the selection; `drawing` what a
@@ -355,16 +358,22 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
   // mark drawn or shown as written): a bullet, a number, a task's box
   const bullet = cm.Decoration.replace({ widget: new Bullet() });
   const bulletMark = cm.Decoration.mark({ class: "swe-list-mark" });
-  const numberMark = cm.Decoration.mark({ class: "swe-list-mark swe-list-number" });
   const taskMark = cm.Decoration.mark({ class: "swe-task-mark" });
+  // (A number's and an indent's room by their columns: as many as the source has)
+  const slots = new Map<string, ReturnType<typeof cm.Decoration.mark>>();
+  const slot = (className: string, columns: number) => {
+    const key = `${className}/${columns}`;
+    let mark = slots.get(key);
+    if (!mark) slots.set(key, (mark = cm.Decoration.mark({ class: className, attributes: { style: `min-width: calc(${columns} * ${COLUMN})` } })));
+    return mark;
+  };
   const done = cm.Decoration.mark({ class: "swe-task-done" });
-  // A list's line by what comes before its text (its indent in columns, its marks' room): its next lines hang that far
-  // in (`--swe-list-hang`)
-  const listLines = new Map<string, ReturnType<typeof cm.Decoration.line>>();
-  const listLine = (columns: number, room: number) => {
-    const key = `${columns}/${room}`;
-    let line = listLines.get(key);
-    if (!line) listLines.set(key, (line = cm.Decoration.line({ class: "swe-list-line", attributes: { style: `--swe-list-hang: calc(${columns}ch + ${room}em)` } })));
+  // A list's line by the columns before its text (its indent, its marks): its next lines hang that far in
+  // (`--swe-list-hang`)
+  const listLines = new Map<number, ReturnType<typeof cm.Decoration.line>>();
+  const listLine = (columns: number) => {
+    let line = listLines.get(columns);
+    if (!line) listLines.set(columns, (line = cm.Decoration.line({ class: "swe-list-line", attributes: { style: `--swe-list-hang: calc(${columns} * ${COLUMN})` } })));
     return line;
   };
   // (A line's columns before a place, a tab to its stop)
@@ -414,8 +423,12 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
           const end = after.startsWith(" ") ? to + 1 : to;
           const ordered = !/^[-+*]$/.test(state.sliceDoc(from, to));
           const task = /^ \[[ xX]\](?= |$)/.test(after);
-          out.push(listLine(columnsBefore(state, line.from, from), (ordered ? LIST_ROOM.number : LIST_ROOM.bullet) + (task ? LIST_ROOM.task : 0)).range(line.from));
-          if (ordered) out.push(numberMark.range(from, end));
+          const indent = columnsBefore(state, line.from, from);
+          const mark = ordered ? to - from + 1 : LIST_COLUMNS.bullet;
+          out.push(listLine(indent + mark + (task ? LIST_COLUMNS.task : 0)).range(line.from));
+          // (An indent of spaces alone in its columns, as the page's: a nested item's mark where the page has it)
+          if (indent && /^[ \t]+$/.test(state.sliceDoc(line.from, from))) out.push(slot("swe-list-indent", indent).range(line.from, from));
+          if (ordered) out.push(slot("swe-list-mark swe-list-number", mark).range(from, end));
           else out.push((shown(from, to) ? bulletMark : bullet).range(from, end));
         } else if (name === "TaskMarker") {
           const checked = /x/i.test(state.sliceDoc(from, to));
@@ -513,7 +526,7 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
 
 /** What the live preview's elements look like: SilverBullet's CSS variables where it has them */
 export const PREVIEW_THEME = {
-  ".swe-checkbox": { margin: "0 0.3em 0 0", verticalAlign: "middle", accentColor: "var(--ui-accent-color, #464cfc)", cursor: "pointer" },
+  ".swe-checkbox": { margin: "0 0.15em 0 0", verticalAlign: "0.02em", accentColor: "var(--ui-accent-color, #464cfc)", cursor: "pointer" },
   ".swe-checkbox:disabled": { cursor: "default" },
   ".swe-task-done": { textDecoration: "line-through" },
   ".swe-embed": { display: "inline-block", maxWidth: "100%", verticalAlign: "bottom" },
@@ -524,7 +537,9 @@ export const PREVIEW_THEME = {
     overflowX: "auto",
     margin: "0.25em 0",
     cursor: "text",
-    border: "1px solid var(--ui-surface-border-color, transparent)",
+    // (Its line only where the theme gives cards corners: SilverBullet 2.12.1 has the line's colour for other things,
+    // and no card)
+    border: "clamp(0px, var(--ui-radius-xl, 0px) * 1000, 1px) solid var(--ui-surface-border-color, transparent)",
     borderRadius: "var(--ui-radius-xl, 0)",
     boxShadow: "var(--ui-shadow-card, none)",
     background: "var(--root-background-color, transparent)",
@@ -542,12 +557,14 @@ export const PREVIEW_THEME = {
   // (A list's line from the editor's edge, as the page's; its next lines after its marks, `--swe-list-hang`)
   "& .cm-line.swe-list-line": { paddingLeft: "var(--swe-list-hang, 0px)", textIndent: "calc(-1 * var(--swe-list-hang, 0px))" },
   // (Each mark in its room, the space after it in it; its colour the page's bullets', a number's too)
-  ".swe-bullet, .swe-list-mark": { display: "inline-block", minWidth: `${LIST_ROOM.bullet}em`, textIndent: "0", whiteSpace: "pre" },
+  ".swe-bullet, .swe-list-mark, .swe-list-indent": { display: "inline-block", minWidth: `calc(${LIST_COLUMNS.bullet} * ${COLUMN})`, textIndent: "0", whiteSpace: "pre" },
   // (A number's text the mark's colour, not its syntax's)
   ".swe-bullet, .swe-list-number, .swe-list-number *": { color: "var(--editor-list-bullet-color, inherit)" },
-  // (A number in its room alone however wide its font draws it, as a rendered list's: a monospace font's "1. " is wider)
-  ".swe-list-number": { minWidth: "0", width: `${LIST_ROOM.number}em` },
-  ".swe-task-box, .swe-task-mark": { display: "inline-block", minWidth: `${LIST_ROOM.task}em`, textIndent: "0", whiteSpace: "pre" },
+  // (A number right in its room, the space after it held, as an ordered list's mark is)
+  ".swe-list-number": { textAlign: "right", fontVariantNumeric: "tabular-nums" },
+  ".swe-task-box, .swe-task-mark": { display: "inline-block", minWidth: `calc(${LIST_COLUMNS.task} * ${COLUMN})`, textIndent: "0", whiteSpace: "pre" },
+  // (The box in the middle of the columns of its `[ ]`, the space's after them, on a line of its own height, as the page's)
+  ".swe-task-box": { boxSizing: "content-box", minWidth: `calc(${LIST_COLUMNS.task - 1} * ${COLUMN})`, paddingRight: COLUMN, textAlign: "center", lineHeight: "1" },
   ".swe-link": { color: "var(--editor-link-color, var(--link-color, #0969da))", textDecoration: "underline" },
   ".swe-wiki-link": { color: "var(--editor-wiki-link-page-color, var(--link-color, #0969da))" },
   // (A hashtag as SilverBullet 2.12.1 draws one rendered, a grid's cell's too: its theme's colours and corners, the

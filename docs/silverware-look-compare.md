@@ -1,6 +1,7 @@
 # Look compare tests: one markdown, every surface alike
 
-Status: planned (2026-11-17), nothing built. The user's question: screenshot tests, a few, that catch what was
+Status: steps 1 to 3 built (2026-11-17, `silverware-editor/ui-tests/look/surfaces.spec.ts`, see *What it found*); step 4
+and kind 2 not. The user's question: screenshot tests, a few, that catch what was
 found by hand again and again (a task's box in the peek, a number's colour and room in a grid's field, a table not a
 card while edited), without going red for what does not matter (the peek's padding moving it a few pixels) and without
 old screenshots to refresh all the time.
@@ -83,6 +84,36 @@ the peek share; the folder makes it a CI job of its own by `scripts/ui-test-grou
 in the space, as the test servers have (every plugin deployed). Mouse project only; a phone's layout is another
 question.
 
+### What it found (2026-11-17), and what was done
+
+Run first on edge and the release, the measurements told what the eye had missed:
+
+- **A task's text 4 px further than the page's, a nested item's 7 px nearer**: SilverBullet lays a list's marks out in
+  columns (`--editor-column`, set on its editor's content; a bullet's `- ` 2, a number's `1. ` 3, a task's `[ ] ` 4, an
+  indent its own), our rules in ems. Now both in its columns (Silverware Editor's `COLUMN`, `LIST_COLUMNS`; Silverware
+  Layout's style page), `1ch` where SilverBullet sets none (2.12.1); Silverware Database hands the page's
+  `--editor-column` to its peek, which hangs outside the editor.
+- **The peek's table in 18 px** where the page's is in 13.5 and 15.8 px: its look's sample read in the editor's content,
+  where SilverBullet's rules for a rendered block's table do not reach. Now read in a database's place in the page.
+- **A table's line on 2.12.1**, which draws no card: `--ui-surface-border-color` is set there for other things. The
+  card's line now only where the theme gives cards corners (`--ui-radius-xl`).
+- **A number's colour on 2.12.1** a step off (its markup's grey against its bullets'): colours read alike within two
+  steps of a channel.
+- **A task's box in a grid's cell** (the user saw it, zoomed, 2026-11-17): placed by its own font's line (an input's),
+  high as the font grows, and at its room's left where the page centres it in the columns of its `[ ]`. Now as the
+  page's, the column and the line read where the text is (registered custom properties); the test measures the box
+  against its text both ways, and runs every surface again at this device's zoom (Silverware Layout's, 30 px).
+- **The peek's lines 3 px further apart than the page's** at that zoom (its field's own `line-height: 1.5`, the page's
+  1.4): the pixels showed it, the lines' spacing is measured since. Now the page's line.
+- **The pixels**: first compared pixel by pixel, then by blocks, both told crops alike to the eye apart (10 to 90 %:
+  text a pixel over, smoothed otherwise). Now as Playwright's comparison (pixelmatch's) tells them: the crops laid
+  over each other where they match best within 3 px, a pixel differing only where none within one of it in the other
+  has ink near its own; with the browser's text on whole pixels (`--disable-font-subpixel-positioning` and others,
+  `test.use`). Alike crops differ in 0 to 2 % (a table narrower in the peek); a known difference shows (2.12.1's box
+  3 px lower at the zoom: 12 %). Past 5 % a block is a **warning**: the test passes, the run tells it
+  (`scripts/ui-tests-summary.ts`: GitHub's yellow warning on the run and the pull request, the job summary's
+  *Warnings*; a yellow line in the console locally).
+
 ### Steps
 
 1. The fixture and the five surfaces opened from it, each block found on each (a test that only finds them).
@@ -90,7 +121,8 @@ question.
    surfaces), then tables, hashtags, links, quotes and code; that test and *a cell's field draws a task's box…* moved
    into it or left as they are (decided then: no test twice).
 3. Pixel crops attached, informative (`test.info().attach`), compared with a tolerance, no failure.
-4. After a few weeks of green runs on both SilverBullets, pixel differences failing the test.
+4. After a few weeks of green runs on both SilverBullets, pixel differences failing the test. Until then a warning
+   past 5 % (built 2026-11-17).
 
 ### Cost
 

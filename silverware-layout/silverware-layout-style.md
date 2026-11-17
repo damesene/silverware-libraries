@@ -1004,7 +1004,8 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
 .swl-grid-cell > table:not(#swl-none):not(#swl-none) {
   border-collapse: separate;
   border-spacing: 0;
-  border: 1px solid var(--ui-surface-border-color, transparent);
+  /* (Its line only where the theme gives cards corners: 2.12.1 has the line's colour for other things, and no card) */
+  border: clamp(0px, var(--ui-radius-xl, 0px) * 1000, 1px) solid var(--ui-surface-border-color, transparent);
   border-radius: var(--ui-radius-xl, 0);
   box-shadow: var(--ui-shadow-card, none);
   background: var(--root-background-color);
@@ -1040,44 +1041,63 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   border-radius: 0;
   background: none;
 }
-/* A cell's lists as the page draws them in its editor: each mark at the list's edge in its room, the text after it
-   (a bullet's 1em, a number's 1.5em, a task's box 2em after either: Silverware Editor's LIST_ROOM, its field's look of
-   the same cell), the marks in the theme's colour of the page's bullets, a done task's text struck through. The cell's
-   own lists and those in them alone */
+/* A cell's lists as the page draws them in its editor: each mark at the list's edge in the page's columns, as many as
+   its source takes with the space after it (`--editor-column`, SilverBullet's after 2.12.1, else a character's width: a
+   bullet's `- ` 2, a number's `1. ` 3, a task's box `[ ] ` 4 after either; Silverware Editor's LIST_COLUMNS, its field's
+   look of the same cell), a nested list a mark's columns in, the marks in the theme's colour of the page's bullets, a
+   done task's text struck through. The cell's own lists and those in them alone */
 :is(.swl-grid-cell > :is(ul, ol), .swl-grid-cell > :is(ul, ol) :is(ul, ol)):not(#swl-none):not(#swl-none) {
-  padding-left: 1em;
+  padding-left: calc(2 * var(--editor-column, 1ch));
   list-style: none;
 }
 :is(.swl-grid-cell > ol, .swl-grid-cell > :is(ul, ol) ol):not(#swl-none):not(#swl-none) {
-  padding-left: 1.5em;
+  padding-left: calc(3 * var(--editor-column, 1ch));
 }
 :is(.swl-grid-cell > :is(ul, ol), .swl-grid-cell > :is(ul, ol) :is(ul, ol)):not(#swl-none):not(#swl-none) > li::before {
   content: "•";
   display: inline-block;
-  width: 1em;
-  margin-left: -1em;
+  width: calc(2 * var(--editor-column, 1ch));
+  margin-left: calc(-2 * var(--editor-column, 1ch));
   color: var(--editor-list-bullet-color, inherit);
   text-decoration: none;
 }
-/* (A number as the list counts it, its own start too) */
+/* (A number as the list counts it, its own start too, right in its room with the space after it, as the page's) */
 :is(.swl-grid-cell > ol, .swl-grid-cell > :is(ul, ol) ol):not(#swl-none):not(#swl-none) > li::before {
-  content: counter(list-item) ".";
-  width: 1.5em;
-  margin-left: -1.5em;
+  content: counter(list-item) ". ";
+  white-space: pre;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  width: calc(3 * var(--editor-column, 1ch));
+  margin-left: calc(-3 * var(--editor-column, 1ch));
 }
-/* (A task's box in its room at its text's start, its text after the room, its next lines under its first) */
+/* (A task's box in its room at its text's start, as the page's: in the middle of the columns of its `[ ]`, the space's
+   after them, its text after the room, its next lines under its first; at its first line's middle. The column and the
+   line read where the text is, as lengths: the box's own font, an input's, is not the text's) */
+@property --swl-task-column {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --swl-task-line {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
 :is(.swl-grid-cell > :is(ul, ol), .swl-grid-cell > :is(ul, ol) :is(ul, ol)) > li > :has(> input[type="checkbox"]:first-child):not(#swl-none) {
+  --swl-task-column: var(--editor-column, 1ch);
+  --swl-task-line: 1lh;
   position: relative;
   display: inline-block;
-  padding-left: 2em;
+  padding-left: calc(4 * var(--swl-task-column));
   text-indent: 0;
 }
 :is(.swl-grid-cell > :is(ul, ol), .swl-grid-cell > :is(ul, ol) :is(ul, ol)) > li > :has(> input[type="checkbox"]:first-child) > input[type="checkbox"]:first-child:not(#swl-none) {
   position: absolute;
-  left: 0;
-  top: 0.5lh;
+  left: calc(1.5 * var(--swl-task-column));
+  top: calc(0.5 * var(--swl-task-line));
   margin: 0;
-  transform: translateY(-50%);
+  /* (Its middle there, less half the page's gap after it: the page centres the box and its gap together) */
+  transform: translate(calc(-50% - 0.075em), -50%);
 }
 :is(.swl-grid-cell > :is(ul, ol), .swl-grid-cell > :is(ul, ol) :is(ul, ol)) > li > :has(> input[type="checkbox"]:first-child:checked):not(#swl-none) {
   text-decoration-line: line-through;

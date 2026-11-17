@@ -169,10 +169,10 @@ describe("the CodeMirror editor's live preview", () => {
     editor.destroy();
   });
 
-  it("hangs a list's next lines after its marks' room: a bullet's, a number's, a task's box after either, after a nested one's indent, a tab to its stop", () => {
+  it("hangs a list's next lines after its columns, as the page's: its indent (a tab to its stop), its mark and the space after it, a task's box", () => {
     const { editor, root } = make("x\n- item\n1. first\n- [ ] top\n  - [ ] nested\n1. [ ] numbered\n\t- [ ] tabbed", 0);
     const hangs = [...root.querySelectorAll<HTMLElement>(".cm-line.swe-list-line")].map((line) => line.style.getPropertyValue("--swe-list-hang"));
-    expect(hangs).toEqual(["calc(0ch + 1em)", "calc(0ch + 1.5em)", "calc(0ch + 3em)", "calc(2ch + 3em)", "calc(0ch + 3.5em)", "calc(4ch + 3em)"]);
+    expect(hangs).toEqual([2, 3, 6, 8, 7, 10].map((columns) => `calc(${columns} * var(--editor-column, 1ch))`));
     editor.destroy();
   });
 

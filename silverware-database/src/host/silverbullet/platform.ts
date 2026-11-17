@@ -200,11 +200,12 @@ export { editorArea, watchEditorArea } from "../../../../shared/silverbullet/edi
 
 /**
  * The page's look of what an item's content field draws as rendered (shared/editorlook.ts): the sample rendered (`html`)
- * read in SilverBullet's editor's content, where its rules for a task's box apply; none where the editor is not there
+ * read where a database's place is drawn in the page (SilverBullet's rules for what a block renders reach it there: a
+ * table's cells, a task's box), else in its editor's content; none where the editor is not there
  */
 export function fieldLook(doc: Document, html: string): EditorLook | undefined {
-  const content = doc.querySelector<HTMLElement>(".cm-content");
-  return content ? sampleLook(content, html) : undefined;
+  const place = doc.querySelector<HTMLElement>(".cm-content .swd-place") ?? doc.querySelector<HTMLElement>(".cm-content");
+  return place ? sampleLook(place, html) : undefined;
 }
 
 /**
@@ -217,5 +218,7 @@ export function editorLook(doc: Document): Readonly<Record<string, string>> | un
   const view = doc.defaultView;
   if (!content || !view) return undefined;
   const style = view.getComputedStyle(content);
-  return { "font-family": style.fontFamily, "font-size": style.fontSize, "line-height": style.lineHeight, color: style.color };
+  // (Its column too, where SilverBullet sets one: what a list's marks are laid out by, in the page and the peek's field)
+  const column = style.getPropertyValue("--editor-column").trim();
+  return { "font-family": style.fontFamily, "font-size": style.fontSize, "line-height": style.lineHeight, color: style.color, ...(column ? { "--editor-column": column } : {}) };
 }

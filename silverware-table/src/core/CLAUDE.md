@@ -41,7 +41,7 @@ The model of layers, hosts and the write pipeline is in `silverware-table/CLAUDE
 
 ## Sticky header and pinned rows (`modules/sticky.ts`)
 
-- Native `position: sticky` for a table that fits its width (smooth on a phone, where a header moved after scroll events lags); a transform after each scroll for one that scrolls in its box; `position: sticky` against the box for a table laid over the window.
+- Native `position: sticky` for a table that fits its width (smooth on a phone, where a header moved after scroll events lags); `position: sticky` against its own box for one that scrolls in it (`swt-sticky-inside`; held at the view's top, no room for the toolbar, where the page has the box's top above the view: `--swt-box-top`, set by script); `position: sticky` against the box for a table laid over the window.
 - Held `STICKY_GAP` (66 px, kept in step with the CSS) below the view's top, or less for a table near the page's top (`--swt-sticky-top`). Bottom rows subtract the scroller's bottom padding (`--swt-sticky-bottom`: SilverBullet's 360 px pushed them to the table's top).
 
 ## Cells and headers

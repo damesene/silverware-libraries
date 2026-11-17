@@ -8,7 +8,7 @@ import { Controller } from "./core/controller.ts";
 import { PANEL_OFFER, type PanelActionInfo, type PanelOffer, type PanelRow } from "./core/offers.ts";
 import { createModules } from "./modules.ts";
 import type { Notifier, Space, WritingPlatform } from "./space/space.ts";
-import { silverBulletNotifier, silverBulletPlatform, silverBulletSpace } from "./space/silverbullet.ts";
+import { refocusNavigator, silverBulletNotifier, silverBulletPlatform, silverBulletSpace, watchNavigatorPresses } from "./space/silverbullet.ts";
 import { SettingsDialog, type SettingsStore } from "./settings.ts";
 import { customOperationsAnew, defineCustomOperations, operationsOf, setNewTagsForm } from "./custom.ts";
 
@@ -25,12 +25,13 @@ export async function init(bridge: Bridge): Promise<void> {
     return;
   }
   const space = silverBulletSpace(bridge);
+  watchNavigatorPresses(document);
   const notifier = silverBulletNotifier(bridge);
   const store: SettingsStore = {
     read: () => readSettings(bridge),
     canSave: !!bridge.saveConfigPage,
     // In the Configuration Manager's block of CONFIG (it shows them, Ctrl-,), as the other plugins save theirs
-    save: (values) => saveConfigPage({ readPage: (name) => bridge.readPage(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values)),
+    save: (values) => saveConfigPage({ configPage: bridge.configPage, readPage: (name) => bridge.readPage(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values)),
     reload: async () => {
       if (bridge.reloadUI) await bridge.reloadUI();
       else globalThis.location?.reload();
@@ -101,8 +102,10 @@ export function panelRun(id: string, tag: string): Promise<void> {
 }
 
 /** A row clicked (every click: two on a row soon after open the window at it) */
-export function panelClicked(tag: string): Promise<void> {
-  return panel()?.clicked(tag) ?? Promise.resolve();
+export async function panelClicked(tag: string): Promise<void> {
+  await panel()?.clicked(tag);
+  // (Nothing opened: the navigator's keys on the row picked again, F2 among them)
+  refocusNavigator(document);
 }
 
 export function panelMove(tag: string, to: string): Promise<void> {

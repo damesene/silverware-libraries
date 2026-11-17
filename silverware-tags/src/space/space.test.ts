@@ -3,7 +3,7 @@ import type { Bridge } from "../bridge.ts";
 import { MODULE_NAMES, missingBridgeFunctions, readSettings } from "../bridge.ts";
 import { pageChanges } from "../../../shared/pages/changes.ts";
 import { pageWriter } from "../../../shared/pages/writer.ts";
-import { silverBulletPlatform, silverBulletSpace } from "./silverbullet.ts";
+import { silverBulletPlatform, silverBulletSpace, tagRecordsOf } from "./silverbullet.ts";
 
 function bridge(pages: Record<string, string>, current: string) {
   let editor = pages[current] ?? "";
@@ -52,5 +52,25 @@ describe("SilverBullet's space", () => {
     expect(missingBridgeFunctions({})).toContain("listPages");
     const settings = await readSettings({ getConfig: (path: string, fallback: unknown) => (path === "silverware.tags.modules.remove.enabled" ? false : fallback) });
     expect([...settings.modules]).toEqual(MODULE_NAMES.filter((name) => name !== "remove"));
+  });
+});
+
+describe("the index's tag records", () => {
+  it("count a paragraph's hashtag on the page, each record once (SilverBullet after 2.12.1: 'paragraph', headings' tags as tag objects too)", () => {
+    const records = [
+      { name: "a", page: "P", parent: "paragraph" },
+      { name: "a", page: "P", parent: "page" },
+      { name: "h", page: "P", parent: "header" },
+      { name: "h", page: "P", parent: "header" },
+      { name: "t", page: "P", parent: "task" },
+      { name: "x", page: "P" },
+      { name: 1, page: "P" },
+    ];
+    expect(tagRecordsOf(records)).toEqual([
+      { name: "a", page: "P", parent: "page" },
+      { name: "h", page: "P", parent: "header" },
+      { name: "t", page: "P", parent: "task" },
+      { name: "x", page: "P", parent: "page" },
+    ]);
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { addPageTags, pageTags, removePageTags, removeTags, renameTags, tagUses } from "./edit.ts";
 import { readFrontmatter, writeTags } from "./frontmatter.ts";
 import { hashtagOf } from "../../markdown/inline.ts";
-import { cleanName, isMetaTag, isWithin, validateName, renamedTag } from "./names.ts";
+import { cleanName, isMetaTag, isSilverBulletPage, isToolPage, isWithin, validateName, renamedTag } from "./names.ts";
 import { scanHashtags } from "./scan.ts";
 
 const names = (text: string) => scanHashtags(text, readFrontmatter(text).bodyStart).map((t) => `${t.name}:${t.context}`);
@@ -23,6 +23,13 @@ describe("names", () => {
   });
   it("tells SilverBullet's own tags", () => {
     expect([isMetaTag("meta"), isMetaTag("meta/library"), isMetaTag("metal"), isMetaTag("meta-notes")]).toEqual([true, true, false, false]);
+  });
+  it("tells SilverBullet's own pages: under Library/, or with a meta tag of their own", () => {
+    expect([isToolPage("Library/Config"), isToolPage("Library/Std/Pages/Index"), isToolPage("Library"), isToolPage("LibraryNotes/x"), isToolPage("CONFIG")]).toEqual([true, true, false, false, false]);
+    expect(isSilverBulletPage("Library/Config", [])).toBe(true);
+    // SB-2.12-COMPAT: a meta tag tells them in SilverBullet 2.12.1
+    expect(isSilverBulletPage("CONFIG", ["meta"])).toBe(true);
+    expect(isSilverBulletPage("Notes", ["metal", "project"])).toBe(false);
   });
   it("reads a typed name and says what is wrong with one", () => {
     expect(cleanName(" #todo ")).toBe("todo");

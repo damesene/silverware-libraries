@@ -6,6 +6,50 @@
 import { type Bridge, listOf } from "../bridge.ts";
 import type { Notifier, Space, TagRecord, WritingPlatform } from "./space.ts";
 
+/**
+ * The tags' records as the init page reads them (the index's `tag` objects, and its tables' and headings' tags): a
+ * paragraph's hashtag counted on the page (SilverBullet after 2.12.1 says `paragraph` where 2.12.1 said `page`),
+ * each record once (after 2.12.1 a heading's tags are `tag` objects too, which the init page reads of headings as well)
+ */
+export function tagRecordsOf(records: readonly unknown[]): TagRecord[] {
+  const seen = new Set<string>();
+  return records.flatMap((record): TagRecord[] => {
+    const { name, page, parent } = (record ?? {}) as { name?: unknown; page?: unknown; parent?: unknown };
+    if (typeof name !== "string" || typeof page !== "string") return [];
+    const context = typeof parent !== "string" || parent === "paragraph" ? "page" : parent;
+    const key = JSON.stringify([name, page, context]);
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [{ name, page, parent: context }];
+  });
+}
+
+// SilverBullet's navigator (the panel's view): its root, its filter field (the keys of a view's keymap reach the row
+// picked while that has the focus)
+const NAV_ROOT = ".sb-nav-root";
+const NAV_INPUT = ".sb-nav-input";
+// The navigator a press was last in
+let pressedIn: Element | undefined;
+let watching = false;
+
+/** Presses followed, so a click in the panel that opened nothing can give its navigator the focus back */
+export function watchNavigatorPresses(doc: Document): void {
+  if (watching) return;
+  watching = true;
+  doc.addEventListener("mousedown", (event) => (pressedIn = (event.target instanceof Element && event.target.closest(NAV_ROOT)) || undefined), true);
+}
+
+/**
+ * The focus given back to the navigator a press was in, where nothing has it (the page's body): SilverBullet after
+ * 2.12.1 lets a press on a row that can be dragged take it from the filter field, and gives it back only where the
+ * click opens nothing of the view's own, which a click on a tag of the panel (it opens nothing) is not taken for:
+ * F2 on the row picked reached nothing
+ */
+export function refocusNavigator(doc: Document): void {
+  const input = pressedIn?.isConnected ? pressedIn.querySelector<HTMLInputElement>(NAV_INPUT) : null;
+  if (input && (doc.activeElement === doc.body || !doc.activeElement)) input.focus();
+}
+
 export function silverBulletSpace(bridge: Bridge): Space {
   const current = async () => {
     try {
@@ -17,11 +61,7 @@ export function silverBulletSpace(bridge: Bridge): Space {
   const read = async (page: string) => ((await current()) === page ? String(await bridge.getText()) : String(await bridge.readPage(page)));
   return {
     pageNames: () => pageNamesOf(bridge),
-    tagRecords: async () =>
-      listOf(await bridge.queryTags()).flatMap((record): TagRecord[] => {
-        const { name, page, parent } = (record ?? {}) as { name?: unknown; page?: unknown; parent?: unknown };
-        return typeof name === "string" && typeof page === "string" ? [{ name, page, parent: typeof parent === "string" ? parent : "page" }] : [];
-      }),
+    tagRecords: async () => tagRecordsOf(listOf(await bridge.queryTags())),
     read,
     currentPage: current,
     navigate: async (page) => {

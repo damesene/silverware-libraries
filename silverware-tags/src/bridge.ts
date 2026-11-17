@@ -23,6 +23,8 @@ export type Bridge = {
   readonly getConfig?: (path: string, defaultValue: unknown) => unknown;
   // Optional, for the settings dialog: asks before closing it with changes (else the browser's confirm)
   readonly confirm?: (message: string) => boolean | Promise<boolean>;
+  // The configuration page's name (Library/Config, or CONFIG before SilverBullet's tool pages), told by the init page
+  readonly configPage?: string;
   // Optional, for the settings dialog: the CONFIG page saved as SilverBullet's Configuration Manager saves it (readPage reads it)
   readonly saveConfigPage?: (text: string) => unknown;
   // Optional: the page loaded anew, as a module turned on or off needs (else the window reloaded)

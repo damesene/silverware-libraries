@@ -5,7 +5,7 @@
 import type { Notifier, Space, WritingPlatform } from "../space/space.ts";
 import { TAGS_VIEW, Workspace } from "../ui/workspace.ts";
 import type { FrontmatterForm } from "../../../shared/pages/tags/frontmatter.ts";
-import { isMetaTag } from "../../../shared/pages/tags/names.ts";
+import { isSilverBulletPage } from "../../../shared/pages/tags/names.ts";
 import { indexCaughtUp, readCatalog } from "./catalog.ts";
 import { PageHistory } from "../../../shared/pages/history.ts";
 import { pageWriter, type PageWriter } from "../../../shared/pages/writer.ts";
@@ -58,7 +58,10 @@ export class Controller {
     const catalog = () => readCatalog(space, { hideMeta: this.options.protectMeta });
     // A meta page as read now is never changed (the index may not have caught up with it); its tags as the
     // index has the page's (the catalog hides by them): the frontmatter's, tag lines', a paragraph's hashtags
-    const meta: Guard = (page) => (page.tagUses().some((use) => (use.context === "page" || use.context === "paragraph") && isMetaTag(use.name)) ? "a meta page: left alone (Hide and protect meta pages)" : undefined);
+    const meta: Guard = (page) =>
+      isSilverBulletPage(page.name, page.tagUses().filter((use) => use.context === "page" || use.context === "paragraph").map((use) => use.name))
+        ? "a meta page: left alone (Hide and protect meta pages)"
+        : undefined;
     this.guard = this.options.protectMeta ? meta : undefined;
     // The one page writer of Silverware Tags (the setting: how a page's tags are written where it has none yet)
     this.writer = pageWriter(platform, { newTagsForm: this.options.newTagsForm ?? "flow" });

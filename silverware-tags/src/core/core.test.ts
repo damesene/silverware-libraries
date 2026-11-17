@@ -34,6 +34,13 @@ describe("meta", () => {
     const space = memorySpace({ Lib: "---\ntags: meta/library\n---\n", Mine: "#meta-notes\n\n#metal", Tpl: "#meta" });
     expect([...metaPages(await readCatalog(space))].sort()).toEqual(["Lib", "Tpl"]);
   });
+  it("tells them by their place too: a page under Library/ without a tag (SilverBullet's 3.0)", async () => {
+    const space = memorySpace({ "Library/Config": "Settings", "Library/Std/Thing": "#auto", Car: "#auto" });
+    expect([...metaPages(await readCatalog(space))].sort()).toEqual(["Library/Config", "Library/Std/Thing"]);
+    const catalog = await readCatalog(space, { hideMeta: true });
+    expect(catalog.pages).toEqual(["Car"]);
+    expect([...catalog.tags.get("auto")!.pages]).toEqual(["Car"]);
+  });
 });
 
 describe("plans", () => {

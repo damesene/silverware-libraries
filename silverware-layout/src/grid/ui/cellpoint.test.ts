@@ -65,3 +65,15 @@ describe("a point in a page the cell embeds", () => {
     expect(offsetInCell(content, cell, own, { node: own.firstChild!, offset: 1 })).toBe(15);
   });
 });
+
+describe("a point after a page the cell embeds, in the same paragraph", () => {
+  it("is followed through the cell's markdown, the page's text left out, its embed passed over", () => {
+    const content = "x\n\nSee ![[Notes]] and more";
+    const cell = document.createElement("div");
+    cell.innerHTML =
+      '<span class="p">x</span><br><br><span class="p" data-pos="3">See <span class="swl-embedded" data-swl-embedded="Notes" data-pos="7"><span class="p">Some text</span></span> and more</span>';
+    const after = cell.querySelector('span[data-pos="3"]')!.lastChild!;
+    // (Clicked between "mo" and "re")
+    expect(offsetInCell(content, cell, after.parentElement!, { node: after, offset: " and mo".length })).toBe(content.indexOf("re"));
+  });
+});

@@ -1,7 +1,9 @@
+// @vitest-environment jsdom
 // Embeds SilverBullet's HTML draws none of (2.12.1: a PDF left out, a zip left as its text) kept as places in a cell's
 // HTML, the offsets of what follows them the text's.
 import { describe, expect, it } from "vitest";
 import { isFileTarget } from "../../../../shared/markdown/embed.ts";
+import { inEmbeddedPage, isEmbeddedPage } from "../../grid/ui/offsets.ts";
 import { drawnInHtml, keepEmbeds } from "./undrawn.ts";
 
 /** SilverBullet's HTML as 2.12.1 renders a paragraph (its offset, 0 left out) and an image embed (`data:`: no source; its offset) */
@@ -82,5 +84,25 @@ describe("embeds SilverBullet's HTML draws none of", () => {
   it("keeps a PDF as a place where no URL is given", () => {
     const kept = keepEmbeds("![[a.pdf]]");
     expect(kept.restore(render(kept.text))).toContain('data-swl-embed="a.pdf"');
+  });
+});
+
+describe("a page embedded as the grid takes one", () => {
+  it("is an element the grid tells as a page embedded, what is in it none of the cell's (the contract of GridHost.renderMarkdown)", () => {
+    const kept = keepEmbeds("![[Notes]]");
+    const cell = document.createElement("div");
+    cell.innerHTML = kept.restore('<span class="p"><img alt="swl-page-start-0"><ul data-pos="11"><li data-pos="11">x</li></ul><img alt="swl-page-end-0" data-pos="41"></span>');
+    const page = cell.querySelector("span > span")!;
+    expect(isEmbeddedPage(page)).toBe(true);
+    expect(inEmbeddedPage(cell.querySelector("li")!)).toBe(true);
+    expect(cell.querySelectorAll("li [data-pos], ul[data-pos]")).toHaveLength(0);
+  });
+});
+
+describe("a stand-in SilverBullet shows as text", () => {
+  it("is its embed's text again (an indented code block)", () => {
+    const kept = keepEmbeds("Text\n\n    ![[a.zip]]");
+    expect(kept.text).toContain("![swl-embed-0](data:,.png)");
+    expect(kept.restore('<span class="p">Text</span><pre data-pos="10">![swl-embed-0](data:,.png)</pre>')).toBe('<span class="p">Text</span><pre data-pos="10">![[a.zip]]</pre>');
   });
 });

@@ -297,7 +297,8 @@ export class Grids {
       (event) => {
         const box = event.target instanceof Element ? event.target.closest<HTMLInputElement>('input[type="checkbox"]') : null;
         const at = box ? this.gridOf(box) : undefined;
-        if (!box || !at?.cell || at.cell.classList.contains("swl-grid-editing")) return;
+        // (A task of a page the cell embeds: that page's, the host's to handle as it does)
+        if (!box || inEmbeddedPage(box) || !at?.cell || at.cell.classList.contains("swl-grid-editing")) return;
         event.preventDefault();
         event.stopPropagation();
         void this.toggleTask(at.element, at.cell, box);
@@ -745,8 +746,6 @@ export class Grids {
 
   /** A task's box in a cell clicked: its state in the cell's markdown toggled (`[ ]` done `[x]`, any other undone), written */
   async toggleTask(element: HTMLElement, cellElement: HTMLElement, box: HTMLElement): Promise<void> {
-    // (A task of a page the cell embeds: that page's, none of the cell's to toggle)
-    if (inEmbeddedPage(box)) return;
     const index = Number(cellElement.getAttribute("data-swl-cell"));
     const text = await this.host.pageText().catch(() => undefined);
     const found = text === undefined ? undefined : this.found(text, element);

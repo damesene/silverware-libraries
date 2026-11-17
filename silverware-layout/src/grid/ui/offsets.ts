@@ -29,8 +29,8 @@ export function* lineStarts(cell: HTMLElement, lines: readonly MarkedLine[]): Ge
   }
 }
 
-/** Whether an element of a cell's rendering is in a page the cell embeds: none of the cell's markdown */
-export const inEmbeddedPage = (element: Element): boolean => !!element.parentElement?.closest(`[${EMBEDDED}]`);
+/** Whether a node of a cell's rendering (an element, a text) is in a page the cell embeds: none of the cell's markdown */
+export const inEmbeddedPage = (node: Node): boolean => !!node.parentElement?.closest(`[${EMBEDDED}]`);
 
 /** Whether an element of a cell's rendering is a page the cell embeds, drawn as one: a point in it is at its offset */
 export const isEmbeddedPage = (element: Element): boolean => element.hasAttribute(EMBEDDED);

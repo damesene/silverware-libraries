@@ -2,7 +2,9 @@
 // another page (2.12.1, probed 2026-11-13: `span.sb-task[data-external-task-ref="<page>@<offset>"]`, a wiki link to
 // that ref before its text, the offset the cell's, not the page's), as a query's result shows one. In a cell it is the
 // page's own: the link taken out (the user saw `page@30` before the task's text), the ref too (a click on its box
-// would have SilverBullet toggle the task at that offset of the page, another place), its box the grid's to toggle.
+// would have SilverBullet toggle the task at that offset of the page, another place), its box the grid's to toggle. A
+// task of a page the cell embeds (in its element, ./undrawn.ts) is that page's: left as SilverBullet drew it.
+import { EMBEDDED_PAGE } from "./undrawn.ts";
 
 /** A cell's HTML with its tasks as the page's own: no link to their ref, no ref, their box enabled (the grid toggles it) */
 export function ownTasks(html: string): string {
@@ -10,8 +12,10 @@ export function ownTasks(html: string): string {
   const template = document.createElement("template");
   template.innerHTML = html;
   // (SilverBullet draws a task's box disabled where it cannot toggle it itself: a click would reach nothing)
-  for (const box of template.content.querySelectorAll<HTMLInputElement>('.sb-task > input[type="checkbox"]')) box.removeAttribute("disabled");
+  const own = (element: Element) => !element.closest(`[${EMBEDDED_PAGE}]`);
+  for (const box of template.content.querySelectorAll<HTMLInputElement>('.sb-task > input[type="checkbox"]')) if (own(box)) box.removeAttribute("disabled");
   for (const task of template.content.querySelectorAll<HTMLElement>("[data-external-task-ref]")) {
+    if (!own(task)) continue;
     const ref = task.getAttribute("data-external-task-ref");
     task.removeAttribute("data-external-task-ref");
     const link = [...task.querySelectorAll(":scope > a[data-ref]")].find((one) => one.getAttribute("data-ref") === ref);

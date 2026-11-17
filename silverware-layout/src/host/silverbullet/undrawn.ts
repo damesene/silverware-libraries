@@ -12,8 +12,8 @@
 // the cell's lines (its blank lines put back into the other page), a click there would land elsewhere, a task's box
 // toggle the cell's. Marked out by an image before and after it, and what lies between them given as the grid takes a
 // page embedded (`GridHost.renderMarkdown`): in an element `data-swl-embedded` at the embed's offset, nothing in it
-// marked. One the text shows as it is (escaped, `\![[…]]`) is left so; a mark SilverBullet shows as text (in an
-// indented code block, in HTML) taken out.
+// marked. A stand-in or a mark SilverBullet shows as text (in an indented code block, in HTML) is its embed's text
+// again, or nothing.
 //
 // The offsets after what was put in set back by its length, so `data-pos` is the text's. Pure.
 import { type Embed, isFileTarget, readEmbeds } from "../../../../shared/markdown/embed.ts";
@@ -24,6 +24,8 @@ const DRAWN = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico",
 const IMAGE = (alt: string) => `![${alt}](data:,.png)`;
 const STAND_IN = (n: number) => IMAGE(`swl-embed-${n}`);
 const STAND_IN_DRAWN = /<img\b[^>]*?\balt="swl-embed-(\d+)"[^>]*>/gi;
+// A stand-in shown as its text (in an indented code block, in HTML)
+const STAND_IN_TEXT = /!\[swl-embed-(\d+)\]\(data:,\.png\)/g;
 const PAGE_START = (n: number) => IMAGE(`swl-page-start-${n}`);
 const PAGE_END = (n: number) => IMAGE(`swl-page-end-${n}`);
 // A page embedded as drawn: the images round it, what lies between them
@@ -31,6 +33,8 @@ const PAGE_DRAWN = /<img\b[^>]*?\balt="swl-page-start-(\d+)"[^>]*>([\s\S]*?)<img
 // A mark left over (one drawn without the other), or shown as its text where SilverBullet draws no image: never shown
 const PAGE_MARK_DRAWN = /<img\b[^>]*?\balt="swl-page-(?:start|end)-\d+"[^>]*>|!\[swl-page-(?:start|end)-\d+\]\(data:,\.png\)/gi;
 const POSITION = /\bdata-pos="(\d+)"/g;
+/** A page embedded as the grid takes one (`GridHost.renderMarkdown`): the attribute of the element it is drawn in */
+export const EMBEDDED_PAGE = "data-swl-embedded";
 const MARKED = /\sdata-pos="\d+"/g;
 
 /** Whether SilverBullet's HTML draws an embed of this target */
@@ -48,13 +52,9 @@ const escaped = (text: string) => text.replace(/&/g, "&amp;").replace(/"/g, "&qu
  * own, at the embed's offset, nothing in it marked
  */
 export function keepEmbeds(text: string, urlOf?: (embed: Embed) => string): { readonly text: string; readonly restore: (html: string) => string } {
-  const kept = readEmbeds(text).filter((embed) =>
-    isFileTarget(embed.target)
-      ? !drawnInHtml(embed.target)
-      : // (A page, as a wiki embed or as an image of no file, which SilverBullet expands alike, probed 2026-11-17; one
-        // escaped its text)
-        text[embed.from - 1] !== "\\",
-  );
+  // (A page, as a wiki embed or as an image of no file, which SilverBullet expands alike, probed 2026-11-17; none
+  // escaped: readEmbeds reads none)
+  const kept = readEmbeds(text).filter((embed) => !isFileTarget(embed.target) || !drawnInHtml(embed.target));
   if (!kept.length) return { text, restore: (html) => html };
   let shown = "";
   let at = 0;
@@ -102,7 +102,7 @@ export function keepEmbeds(text: string, urlOf?: (embed: Embed) => string): { re
         .replace(PAGE_DRAWN, (all, n: string, page: string) => {
           const embed = pages[Number(n)];
           if (!embed) return all;
-          return `<span class="swl-embedded" data-swl-embedded="${escaped(embed.target)}" data-pos="${embed.from}">${page.replace(MARKED, "")}</span>`;
+          return `<span class="swl-embedded" ${EMBEDDED_PAGE}="${escaped(embed.target)}" data-pos="${embed.from}">${page.replace(MARKED, "")}</span>`;
         })
         .replace(PAGE_MARK_DRAWN, "")
         .replace(STAND_IN_DRAWN, (all, n: string) => {
@@ -112,6 +112,10 @@ export function keepEmbeds(text: string, urlOf?: (embed: Embed) => string): { re
             return `<object type="application/pdf" data="${escaped(urlOf(embed))}" data-pos="${embed.from}" style="width: 100%; max-width: 100%;"></object>`;
           // (Its text in it, as SilverBullet's HTML had it: what shows where nothing decorates it)
           return `<span class="swl-embed" data-swl-embed="${escaped(embed.target)}" data-pos="${embed.from}">${escaped(embed.text)}</span>`;
+        })
+        .replace(STAND_IN_TEXT, (all, n: string) => {
+          const embed = standIns[Number(n)];
+          return embed ? escaped(embed.text) : all;
         }),
   };
 }

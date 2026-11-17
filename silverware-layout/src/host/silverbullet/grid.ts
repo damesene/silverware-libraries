@@ -19,7 +19,7 @@ import { withImages } from "../../../../shared/silverbullet/embedimage.ts";
 import { afterPress, SILVERBULLET_EDITORS, textForDrawing } from "./behaviour.ts";
 import { focusPage, isPageText, pressBesideGrid } from "./dom.ts";
 import { ownTasks } from "./tasks.ts";
-import { keepEmbeds } from "./undrawn.ts";
+import { keepUndrawn } from "./undrawn.ts";
 
 // SilverBullet's frame of a grid (its custom syntax's, the class the init page gives it), and its button bar in it
 // (2.12.1: .button-bar, in a div of the frame beside the widget's content, probed 2026-11-13; its main: .sb-widget-menu-bar)
@@ -72,10 +72,9 @@ export function silverBulletGridHost(bridge: Bridge, writer: PageWriter, drawer:
     ...(keyKept ? { keyKept } : {}),
     renderMarkdown: async (text: string): Promise<string> => {
       if (!bridge.renderMarkdown) throw new Error("the init page hands over no renderMarkdown");
-      // (An embed SilverBullet's HTML draws none of, a PDF, a zip, kept as a place: the page's widget draws it; a page
-      // embedded drawn without its own page's offsets)
+      // (An embed SilverBullet's HTML draws none of, a PDF, a zip, kept as a place: the page's widget draws it)
       const page = String(await bridge.getCurrentPage());
-      const kept = keepEmbeds(text, (embed) => documentUrl(resolvedTarget(embed, page)));
+      const kept = keepUndrawn(text, (embed) => documentUrl(resolvedTarget(embed, page)));
       // (Its tasks the page's own, not a query's: no link to their ref)
       return ownTasks(kept.restore(String(await bridge.renderMarkdown(kept.text))));
     },

@@ -77,10 +77,10 @@ export function resolvedTarget(embed: Pick<Embed, "target" | "style">, page: str
 }
 
 const WIKI = /!\[\[([^\]\n]+?)\]\]/g;
-// A link (one after a `!` an embed's, but where the `!` is escaped: `embeddedAt`)
-const WIKI_LINK = /\[\[([^\]\n]+?)\]\]/g;
+// A link: no `!` before it (that is an embed's)
+const WIKI_LINK = /(?<!!)\[\[([^\]\n]+?)\]\]/g;
 // (A title after the URL, `[x](a.pdf "Title")`, read with it, as the grid's index reads it)
-const MARKDOWN_LINK = /(?<!\])\[([^\]\n]*)\]\(([^)\s]+)(?:\s+"[^"\n]*")?\)/g;
+const MARKDOWN_LINK = /(?<![!\]])\[([^\]\n]*)\]\(([^)\s]+)(?:\s+"[^"\n]*")?\)/g;
 const MARKDOWN = /!\[([^\]\n]*)\]\(([^)\s]+)(\s+"[^"\n]*")?\)/g;
 const CODE_SPAN = /`+[^`\n]*`+/g;
 
@@ -152,7 +152,7 @@ function fromAlias(alias: string | undefined): Pick<Embed, "alt" | "width" | "he
   return { alt: segments[0]!, ...size, metadata, segments };
 }
 
-/** The embeds of a text, in order: not in a fenced code block or a code span, nor escaped (`\![[x]]`) */
+/** The embeds of a text, in order: not in a fenced code block or a code span */
 export function readEmbeds(text: string): Embed[] {
   const embeds: Embed[] = [];
   let fence: string | undefined;
@@ -168,30 +168,19 @@ export function readEmbeds(text: string): Embed[] {
   return embeds;
 }
 
-/** Whether a link's brackets at `i` of a line are an embed's: a `!` before them, not escaped */
-const embeddedAt = (line: string, i: number): boolean => line[i - 1] === "!" && !escapedAt(line, i - 1);
-
-/** Whether the character at `i` of a line is escaped: an odd run of backslashes right before it */
-function escapedAt(line: string, i: number): boolean {
-  let run = 0;
-  while (i - run - 1 >= 0 && line[i - run - 1] === "\\") run++;
-  return run % 2 === 1;
-}
-
 function embedsOfLine(line: string, at: number): Embed[] {
   const code = [...line.matchAll(CODE_SPAN)].map((m) => [m.index!, m.index! + m[0].length] as const);
-  // (In a code span, or escaped: its `!` after an odd run of backslashes, `\![[x]]`, its text shown as it is)
-  const shownAsText = (i: number) => code.some(([from, to]) => i >= from && i < to) || escapedAt(line, i);
+  const inCode = (i: number) => code.some(([from, to]) => i >= from && i < to);
   const found: Embed[] = [];
   for (const m of line.matchAll(WIKI)) {
-    if (shownAsText(m.index!)) continue;
+    if (inCode(m.index!)) continue;
     const inner = m[1]!;
     const bar = inner.indexOf("|");
     const target = bar < 0 ? inner : inner.slice(0, bar);
     found.push({ from: at + m.index!, to: at + m.index! + m[0].length, text: m[0], style: "wiki", target, ...fromAlias(bar < 0 ? undefined : inner.slice(bar + 1)) });
   }
   for (const m of line.matchAll(MARKDOWN)) {
-    if (shownAsText(m.index!)) continue;
+    if (inCode(m.index!)) continue;
     // (A wiki embed's `![[x]]` is no markdown image)
     if (line[m.index! + 2] === "[") continue;
     const alias = m[1]!;
@@ -236,7 +225,7 @@ export type Link = {
   readonly alias: string;
 };
 
-/** The links of a text, in order (embeds not among them, an escaped one's link among them): not in a fenced code block or a code span */
+/** The links of a text, in order (embeds not among them): not in a fenced code block or a code span */
 export function readLinks(text: string): Link[] {
   const links: Link[] = [];
   let fence: string | undefined;
@@ -250,14 +239,14 @@ export function readLinks(text: string): Link[] {
       const inCode = (i: number) => code.some(([from, to]) => i >= from && i < to);
       const found: Link[] = [];
       for (const m of line.matchAll(WIKI_LINK)) {
-        if (inCode(m.index!) || embeddedAt(line, m.index!)) continue;
+        if (inCode(m.index!)) continue;
         const inner = m[1]!;
         const bar = inner.indexOf("|");
         found.push({ from: at + m.index!, to: at + m.index! + m[0].length, text: m[0], style: "wiki", target: bar < 0 ? inner : inner.slice(0, bar), alias: bar < 0 ? "" : inner.slice(bar + 1) });
       }
       for (const m of line.matchAll(MARKDOWN_LINK)) {
         // (A wiki link's `[[x]]` read above; a link in a wiki link's brackets is none of its own)
-        if (inCode(m.index!) || embeddedAt(line, m.index!) || line[m.index! + 1] === "[" || found.some((one) => at + m.index! >= one.from && at + m.index! < one.to)) continue;
+        if (inCode(m.index!) || line[m.index! + 1] === "[" || found.some((one) => at + m.index! >= one.from && at + m.index! < one.to)) continue;
         found.push({ from: at + m.index!, to: at + m.index! + m[0].length, text: m[0], style: "markdown", target: m[2]!, alias: m[1]! });
       }
       links.push(...found.sort((a, b) => a.from - b.from));

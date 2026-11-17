@@ -22,7 +22,7 @@ import { LOOK_SAMPLE, sampleLook } from "../../../shared/editorlook.ts";
 import { addColumnDividers } from "./ui/dividers.ts";
 import { drawGrid, keepBlankLines, plainCell, showBorder, showColumns, showFit } from "./ui/view.ts";
 import { takeOver } from "./takeover.ts";
-import { inEmbeddedPage, offsetOf } from "./ui/offsets.ts";
+import { offsetOf } from "./ui/offsets.ts";
 import { blankLineAt, type Caret, type CellPoint, endAt, offsetInCell, selectionInCell } from "./ui/cellpoint.ts";
 import { GridDrag } from "./drag.ts";
 import type { GridPlace, MoveMode } from "../../../shared/markdown/gridbuild.ts";
@@ -67,11 +67,7 @@ export type GridHost = {
   confirmDelete?(question: string): Promise<boolean>;
   /** A value asked of the user, `value` given as it is now, in the host's dialog (none: the browser's); none where it is cancelled */
   ask?(question: string, value: string): Promise<string | undefined>;
-  /**
-   * A cell's markdown rendered as the host renders a page (its elements marked with `data-pos`, their offsets in it;
-   * an offset of 0 may be left unmarked). A page it embeds is drawn in an element marked `data-swl-embedded`, at the
-   * embed's offset, nothing in it marked: what it draws is that page's, none of the cell's (ui/offsets.ts)
-   */
+  /** A cell's markdown rendered as the host renders a page (its elements marked with `data-pos`, their offsets in it; an offset of 0 may be left unmarked) */
   renderMarkdown(text: string): Promise<string>;
   /** The page's text now */
   pageText(): Promise<string>;
@@ -297,8 +293,7 @@ export class Grids {
       (event) => {
         const box = event.target instanceof Element ? event.target.closest<HTMLInputElement>('input[type="checkbox"]') : null;
         const at = box ? this.gridOf(box) : undefined;
-        // (A task of a page the cell embeds: that page's, the host's to handle as it does)
-        if (!box || inEmbeddedPage(box) || !at?.cell || at.cell.classList.contains("swl-grid-editing")) return;
+        if (!box || !at?.cell || at.cell.classList.contains("swl-grid-editing")) return;
         event.preventDefault();
         event.stopPropagation();
         void this.toggleTask(at.element, at.cell, box);

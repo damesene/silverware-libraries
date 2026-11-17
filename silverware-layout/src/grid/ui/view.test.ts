@@ -112,15 +112,4 @@ describe("a cell's blank lines put back", () => {
     keepBlankLines(document, cell, text);
     expect(cell.querySelectorAll(".swl-grid-blank")).toHaveLength(0);
   });
-
-  it("puts a blank line back before the cell's own block after a page embedded, none into the page", () => {
-    // A page embedded as the grid takes one (`GridHost.renderMarkdown`): in an element at the embed, nothing in it marked
-    const text = "![[Notes]]\n\n- a";
-    const cell = document.createElement("div");
-    cell.innerHTML =
-      '<span class="p"><span class="swl-embedded" data-swl-embedded="Notes" data-pos="0"><span class="p">Some text</span><br><ul><li><span class="p">x</span></li></ul></span></span><br><ul data-pos="12"><li data-pos="12"><span class="p" data-pos="14">a</span></li></ul>';
-    keepBlankLines(document, cell, text);
-    expect(cell.querySelectorAll(".swl-grid-blank")).toHaveLength(1);
-    expect(cell.querySelector('ul[data-pos="12"]')!.previousElementSibling?.className).toBe("swl-grid-blank");
-  });
 });

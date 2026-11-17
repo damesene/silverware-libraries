@@ -3,11 +3,11 @@
 // media (<img>, <video>, <audio>, <object>), the place its grid host draws for a file it draws none of
 // (`[data-swl-embed]`), its links (<a href>), each with the offset of its markdown in the cell (the host's `data-pos`,
 // 0 left out); matched later with the cell's markdown (its embeds and links read there) once the cell's place in the
-// page is known. What a page the cell embeds draws is that page's, not the cell's: none of it.
+// page is known.
 import { isFileTarget, readEmbeds, readLinks } from "../../../shared/markdown/embed.ts";
 import type { Grid } from "../../../shared/markdown/grid.ts";
 import type { RenderedItem } from "../../../shared/rendered.ts";
-import { inEmbeddedPage, offsetOf } from "./ui/offsets.ts";
+import { offsetOf } from "./ui/offsets.ts";
 
 const MEDIA = "img, video, audio, object, [data-swl-embed]";
 const LINKS = "a[href]";
@@ -20,7 +20,7 @@ export function drawnIn(grid: HTMLElement): Drawn[] {
   const drawn: Drawn[] = [];
   grid.querySelectorAll<HTMLElement>(":scope > .swl-grid-cell").forEach((cell, index) => {
     for (const [kind, selector] of [["embed", MEDIA], ["link", LINKS]] as const) {
-      for (const element of cell.querySelectorAll<HTMLElement>(selector)) if (!inEmbeddedPage(element)) drawn.push({ cell: index, kind, element, offset: offsetOf(element) });
+      for (const element of cell.querySelectorAll<HTMLElement>(selector)) drawn.push({ cell: index, kind, element, offset: offsetOf(element) });
     }
   });
   return drawn;

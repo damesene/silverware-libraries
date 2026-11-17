@@ -3,8 +3,6 @@
 import { lineIndexAt, type MarkedLine } from "../../../../shared/markdown/lines.ts";
 
 const POS = "data-pos";
-// A page the cell embeds, drawn in it (`GridHost.renderMarkdown`): its offset the embed's, nothing in it the cell's
-const EMBEDDED = "data-swl-embedded";
 
 /** An element of a cell's rendering that starts a line of its markdown, and its offset there */
 export type LineStart = { readonly element: HTMLElement; readonly offset: number };
@@ -15,8 +13,7 @@ export type LineStart = { readonly element: HTMLElement; readonly offset: number
  * the first in the document's order (a list rather than its first item, a quote rather than the list in it, an item
  * rather than its text); none past where a line's text starts (a link, emphasis further in). Whatever holds a block
  * (the cell, a quote, a list's item), what lies before that line (its blank lines) lies before that element, not
- * inside it. Every offset marked is the cell's (a page embedded is drawn unmarked: the host's `renderMarkdown`). Found
- * as they are asked for: what looks for one (a press) stops there
+ * inside it. Found as they are asked for: what looks for one (a press) stops there
  */
 export function* lineStarts(cell: HTMLElement, lines: readonly MarkedLine[]): Generator<LineStart> {
   const taken = new Set<number>();
@@ -28,15 +25,6 @@ export function* lineStarts(cell: HTMLElement, lines: readonly MarkedLine[]): Ge
     yield { element, offset };
   }
 }
-
-/** Whether a node of a cell's rendering (an element, a text) is in a page the cell embeds: none of the cell's markdown */
-export const inEmbeddedPage = (node: Node): boolean => !!node.parentElement?.closest(`[${EMBEDDED}]`);
-
-/** The pages an element of a cell's rendering embeds, in order */
-export const embeddedPagesIn = (element: Element): Element[] => [...element.querySelectorAll(`[${EMBEDDED}]`)];
-
-/** Whether an element of a cell's rendering is a page the cell embeds, drawn as one: a point in it is at its offset */
-export const isEmbeddedPage = (element: Element): boolean => element.hasAttribute(EMBEDDED);
 
 /** The element marked with its offset that an element of a cell's rendering is in, itself or the nearest round it */
 export const markedFrom = (element: Element): Element | null => element.closest(`[${POS}]`);

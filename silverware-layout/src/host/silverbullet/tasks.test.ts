@@ -3,7 +3,6 @@
 // the page's own, the link and the ref gone.
 import { describe, expect, it } from "vitest";
 import { ownTasks } from "./tasks.ts";
-import { EMBEDDED_PAGE } from "./undrawn.ts";
 
 describe("a cell's tasks", () => {
   it("lose the link to their ref and the ref, their box and text kept", () => {
@@ -20,13 +19,5 @@ describe("a cell's tasks", () => {
     const html = '<span class="sb-task" data-external-task-ref="P@0"><input type="checkbox"> <a href="/P%400" class="wiki-link" data-ref="P@0">P@0</a> see <a class="wiki-link" data-ref="Other">Other</a></span>';
     expect(ownTasks(html)).toContain('<a class="wiki-link" data-ref="Other">Other</a>');
     expect(ownTasks("<p>plain</p>")).toBe("<p>plain</p>");
-  });
-});
-
-describe("a task of a page a cell embeds", () => {
-  it("is left as SilverBullet drew it, its ref and its box's state its page's", () => {
-    const task = '<span class="sb-task" data-external-task-ref="Todo@2"><input type="checkbox" data-state=" " disabled=""> <a href="/Todo%402" class="wiki-link" data-ref="Todo@2">Todo@2</a> buy</span>';
-    const html = `<span class="p"><span class="swl-embedded" ${EMBEDDED_PAGE}="Todo" data-pos="0"><ul><li>${task}</li></ul></span></span>`;
-    expect(ownTasks(html)).toBe(html);
   });
 });

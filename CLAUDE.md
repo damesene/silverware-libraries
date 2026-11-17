@@ -14,7 +14,7 @@
 | Silverware Assets PDF | `silverware-assets-pdf/` | `swa-pdf-` | `silverware-assets-pdf/CLAUDE.md`, docs/silverware-assets-pdf.md (a PDF's preview, its first page, through Silverware Assets' API), docs/silverware-viewers.md (with DOCX and XLSX) |
 | Silverware Assets DOCX | `silverware-assets-docx/` | `swa-docx-` | `silverware-assets-docx/CLAUDE.md`, docs/silverware-viewers.md |
 | Silverware Assets XLSX | `silverware-assets-xlsx/` | `swa-xlsx-` | `silverware-assets-xlsx/CLAUDE.md`, docs/silverware-viewers.md |
-| Silverware Editor | `silverware-editor/` | `swe-` | `silverware-editor/CLAUDE.md`, docs/silverware-editor.md (a markdown editor for the other plugins, `shared/editor.ts`) |
+| Silverware Editor | `silverware-editor/` | `swe-` | `silverware-editor/CLAUDE.md`, docs/silverware-editor.md (a markdown editor for the other plugins, `shared/editor.ts`), docs/silverware-look-compare.md (planned: the page, a grid's cell and a database's peek compared, edited or not) |
 | Silverware Layout | `silverware-layout/` | `swl-` | `silverware-layout/CLAUDE.md`, docs/silverware-layout.md, docs/silverware-layout-font-size.md, docs/silverware-layout-grid.md, docs/silverware-layout-grid-handles.md (a grid's handles in place of its cells' "…"), docs/silverware-layout-assets-next.md (what is left before the merge) |
 
 docs/ holds each plugin's plan and decision log; a plugin's library page (`silverware-<name>.md`) is its user documentation.

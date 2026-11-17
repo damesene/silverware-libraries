@@ -23,14 +23,25 @@ describe("a cell's blank lines", () => {
     expect(blankLinesBefore("\n\nb", 2)).toBe(2);
   });
 
-  it("counts a quote's blank lines, its marks alone, for a place in the quote as deep or deeper, not outside it", () => {
+  it("counts a quote's blank lines, its marks alone, for a place in a quote as deep or shallower", () => {
     expect(blankLinesBefore("> one\n>\n> two", 10)).toBe(1);
-    expect(blankLinesBefore("> one\n> >\n>\n> > two", 16)).toBe(2);
-    expect(blankLinesBefore("> one\n\n> two", 9)).toBe(1);
-    // (A quote's empty line is no blank line of the text after the quote, nor of a shallower quote)
-    expect(blankLinesBefore("> one\n>\ntwo", 8)).toBe(0);
-    expect(blankLinesBefore("> > one\n> >\n> two", 14)).toBe(0);
     expect(blankLineStart("> one\n>\n> two", 10, 1)).toBe(6);
+    // A deeper quote's last empty lines, before a place out of that quote (the nested quote of the last at 14)
+    expect(blankLinesBefore("> one\n>\ntwo", 8)).toBe(1);
+    expect(blankLinesBefore("> > one\n> >\n> two", 14)).toBe(1);
+    expect(blankLinesBefore("> one\n> >\n>\n> > two", 14)).toBe(2);
+  });
+
+  it("counts no blank line shallower than a place's quote: it lies before that quote, the quote's own", () => {
+    expect(blankLinesBefore("> one\n\n> two", 9)).toBe(0);
+    expect(blankLinesBefore("> one\n\n> two", 7)).toBe(1);
+    expect(blankLinesBefore("Para\n\n>\n> one", 10)).toBe(1);
+    expect(blankLinesBefore("> one\n> >\n>\n> > two", 16)).toBe(0);
+  });
+
+  it("reads a mark after four spaces as a code block's line in a quote, no blank line", () => {
+    expect(blankLinesBefore("> a\n>     >\n> b", 14)).toBe(0);
+    expect(blankLinesBefore("> a\n>    >\n> b", 13)).toBe(1);
   });
 
   it("finds where the line a place is on starts", () => {
@@ -104,6 +115,11 @@ describe("a cell's blank lines", () => {
       { text: "> - a\n>\n> - b", html: '<blockquote> <ul data-pos="2"><li data-pos="2"><span class="p" data-pos="4">a</span></li><li data-pos="10"><span class="p" data-pos="12">b</span></li></ul></blockquote>', blanks: 1 },
       { text: "> one\n>\n> two", html: '<blockquote> <span class="p" data-pos="2">one</span><br><br> <span class="p" data-pos="10">two</span></blockquote>', blanks: 0 },
       { text: "> # Head\n>\n> - a", html: '<blockquote> <h1 data-pos="2">Head</h1><br> <ul data-pos="13"><li data-pos="13"><span class="p" data-pos="15">a</span></li></ul></blockquote>', blanks: 0 },
+      // A quote's first line empty, after a blank line: the blank line put back before the quote, its empty line drawn in it
+      { text: "Para\n\n>\n> one", html: '<span class="p">Para</span><br><blockquote data-pos="6"><br> <span class="p" data-pos="10">one</span></blockquote>', blanks: 1 },
+      // A quote's last line empty: drawn after it
+      { text: "> one\n>\ntwo", html: '<blockquote> <span class="p" data-pos="2">one</span><br></blockquote><br><span class="p" data-pos="8">two</span>', blanks: 0 },
+      { text: "> > one\n> >\n> two", html: '<blockquote> <blockquote data-pos="2"> <span class="p" data-pos="4">one</span><br> </blockquote><br> <span class="p" data-pos="14">two</span></blockquote>', blanks: 0 },
     ];
     for (const { text, html, blanks } of cases) {
       const cell = document.createElement("div");

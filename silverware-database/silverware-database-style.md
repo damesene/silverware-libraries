@@ -4132,7 +4132,8 @@ button.swd-peek-label:hover {
   color: inherit;
   background: transparent;
   font: inherit;
-  line-height: 1.5;
+  /* (The page's text's line, as the panel has it from the editor's: the content's lines as far apart as the page's) */
+  line-height: inherit;
 }
 /* (The stand-in's field focused, or Silverware Editor's editor holding the focus within it) */
 .swd-peek-body:is(:focus, :focus-within) {

@@ -996,6 +996,16 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   width: fit-content;
   max-width: 100%;
   border: none !important;
+  /* (SilverBullet after 2.12.1 draws an embed as a Lua directive's block, and one of no image, video, audio or object
+     as an embedded page's card: padded, its ground and corners its own, its source named above it, which made the
+     frame as wide as the file's path. A file is as wide as it shows, drawn as Silverware Assets draws it) */
+  padding: 0 !important;
+  background: none !important;
+  border-radius: 0 !important;
+  min-height: 0 !important;
+}
+[data-swa-type]::before {
+  content: none !important;
 }
 [data-swa-type]:has(object.swa-medium:not(.swa-native-hidden, .swa-native-hidden *), .swa-pdf) {
   display: block;

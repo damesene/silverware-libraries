@@ -75,8 +75,10 @@ The look of [Silverware Assets XLSX](silverware-assets-xlsx.md): a workbook's pr
 }
 
 /* A sheet (src/table.ts) as a spreadsheet shows it: a workbook's own font where its cells name none (Calibri 11 pt,
-   black on white), Excel's grid, the columns' letters and the rows' numbers on a quiet ground, held as it scrolls */
-.swa-xlsx-sheet {
+   black on white), Excel's grid, the columns' letters and the rows' numbers on a quiet ground, held as it scrolls. Of more weight
+   than SilverBullet's rules for a table in an embed after 2.12.1 (its card's striped rows, header, padding, an id and
+   more), less than a cell's own look (inline): `:not(#swa-xlsx-none)` an id more, matching every sheet */
+:is(#sb-main, html) .swa-xlsx-sheet:not(#swa-xlsx-none) {
   --swa-xlsx-font: Calibri, Carlito, "Segoe UI", Arial, sans-serif;
   table-layout: fixed;
   border-collapse: separate;
@@ -87,7 +89,7 @@ The look of [Silverware Assets XLSX](silverware-assets-xlsx.md): a workbook's pr
   color: #000;
   background: #fff;
 }
-.swa-xlsx-sheet :is(td, th) {
+:is(#sb-main, html) .swa-xlsx-sheet:not(#swa-xlsx-none) :is(td, th) {
   box-sizing: border-box;
   padding: 1px 4px;
   overflow: hidden;
@@ -97,10 +99,11 @@ The look of [Silverware Assets XLSX](silverware-assets-xlsx.md): a workbook's pr
   border-right: 1px solid #d4d4d4;
   border-bottom: 1px solid #d4d4d4;
 }
-.swa-xlsx-sheet td {
+:is(#sb-main, html) .swa-xlsx-sheet:not(#swa-xlsx-none) td {
+  font-weight: normal;
   background: #fff;
 }
-.swa-xlsx-sheet th {
+:is(#sb-main, html) .swa-xlsx-sheet:not(#swa-xlsx-none) th {
   font-weight: normal;
   font-size: 9pt;
   text-align: center;
@@ -109,17 +112,17 @@ The look of [Silverware Assets XLSX](silverware-assets-xlsx.md): a workbook's pr
   background: #f3f3f3;
   border-color: #c8c8c8;
 }
-.swa-xlsx-sheet-letters th {
+:is(#sb-main, html) .swa-xlsx-sheet:not(#swa-xlsx-none) .swa-xlsx-sheet-letters th {
   position: sticky;
   top: 0;
   z-index: 4;
 }
-.swa-xlsx-sheet-number {
+:is(#sb-main, html) .swa-xlsx-sheet:not(#swa-xlsx-none) .swa-xlsx-sheet-number {
   position: sticky;
   left: 0;
   z-index: 1;
 }
-.swa-xlsx-sheet-corner {
+:is(#sb-main, html) .swa-xlsx-sheet:not(#swa-xlsx-none) .swa-xlsx-sheet-corner {
   left: 0;
   z-index: 5 !important;
 }

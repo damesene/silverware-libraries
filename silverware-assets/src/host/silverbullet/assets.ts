@@ -92,6 +92,11 @@ function depthIn(frame: HTMLElement, element: HTMLElement): number {
   return depth;
 }
 
+/** What SilverBullet drew in an embed's frame: its content's element (2.12.1 and after: `div > div.content`), none where it drew it so */
+function drawingIn(frame: HTMLElement): Element | null {
+  return frame.querySelector(":scope > * > .content, :scope > .content");
+}
+
 /** The target an embed's frame was drawn of: its medium's path in the space (or its URL), or the name it could not draw */
 export function drawnTarget(frame: HTMLElement): { readonly target: string; readonly native: HTMLElement | undefined } | undefined {
   // (The frame's own medium, in its content (2.12.1, probed 2026-11-14: `div > div.content > img`); one deeper is in a
@@ -102,7 +107,8 @@ export function drawnTarget(frame: HTMLElement): { readonly target: string; read
     return { target: decoded(source.replace(/^\.?\/?\.fs\//, "")), native };
   }
   // (Its words keep a run of spaces by no-break ones, `a\u00a0 b` for `a  b`, 2.12.1: the target's spaces again)
-  const unsupported = UNSUPPORTED.exec(frame.textContent?.replace(/\u00a0/g, " ").trim() ?? "");
+  // (Its drawing's words alone where it has one: a card of ours put in the frame has words too)
+  const unsupported = UNSUPPORTED.exec((drawingIn(frame) ?? frame).textContent?.replace(/\u00a0/g, " ").trim() ?? "");
   return unsupported ? { target: unsupported[1]!.trim(), native: undefined } : undefined;
 }
 
@@ -123,7 +129,11 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
   return {
     // (The function given back stops it)
     watch: (drawn: (embeds: readonly Drawn[]) => void): (() => void) => {
-      const seen = new WeakSet<HTMLElement>();
+      // What SilverBullet drew in each frame as it was offered (its content's element): SilverBullet after 2.12.1 draws
+      // an embed as a Lua directive's block and may draw its content anew in the same frame (its attributes kept, ours
+      // too), which takes out what was decorated in it: a frame holding another drawing than it was offered with is
+      // offered again
+      const offeredWith = new WeakMap<HTMLElement, Element | null>();
       const look = (root: ParentNode) => {
         const found: Drawn[] = [];
         const frames = new Set<HTMLElement>();
@@ -134,11 +144,14 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
         }
         root.querySelectorAll<HTMLElement>(FRAME).forEach((frame) => frames.add(frame));
         for (const frame of frames) {
-          if (seen.has(frame)) continue;
           const target = drawnTarget(frame);
           // (Its content comes after the frame: looked at again as it does)
           if (!target) continue;
-          seen.add(frame);
+          const drawing = drawingIn(frame);
+          // (None found: SilverBullet's drawing of another shape, offered once as before)
+          if (!drawing && offeredWith.has(frame)) continue;
+          if (offeredWith.has(frame) && offeredWith.get(frame) === drawing) continue;
+          offeredWith.set(frame, drawing);
           for (const bar of frame.parentElement?.querySelectorAll<HTMLElement>(BARS) ?? []) bar.style.setProperty("display", "none", "important");
           found.push({ frame, ...target });
         }

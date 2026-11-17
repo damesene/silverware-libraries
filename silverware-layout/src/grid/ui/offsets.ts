@@ -12,19 +12,18 @@ export type LineStart = { readonly element: HTMLElement; readonly offset: number
  * marked with their offsets where a line's own text starts (past its marks: a quote's, a list item's), the outermost,
  * the first in the document's order (a list rather than its first item, a quote rather than the list in it, an item
  * rather than its text); none in a line's text (a link, emphasis). Whatever holds a block (the cell, a quote, a list's
- * item), what lies before that line (its blank lines) lies before that element, not inside it
+ * item), what lies before that line (its blank lines) lies before that element, not inside it. Found as they are asked
+ * for: what looks for one (a press) stops there
  */
-export function lineStarts(cell: HTMLElement, lines: readonly MarkedLine[]): readonly LineStart[] {
+export function* lineStarts(cell: HTMLElement, lines: readonly MarkedLine[]): Generator<LineStart> {
   const taken = new Set<number>();
-  const starts: LineStart[] = [];
   for (const element of cell.querySelectorAll<HTMLElement>(`[${POS}]`)) {
     const offset = offsetOf(element);
     const line = lines[lineIndexAt(lines, offset)]!;
     if (offset > line.content || taken.has(line.from)) continue;
     taken.add(line.from);
-    starts.push({ element, offset });
+    yield { element, offset };
   }
-  return starts;
 }
 
 /** The element marked with its offset that an element of a cell's rendering is in, itself or the nearest round it */

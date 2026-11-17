@@ -2,7 +2,7 @@
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
 import { blankLinesAbove } from "../core/blanklines.ts";
 import { drawnBlocks, spaceBefore } from "./cellparts.ts";
-import { lineStarts, markedFrom, offsetOf } from "./offsets.ts";
+import { type LineStart, lineStarts, markedFrom, offsetOf } from "./offsets.ts";
 import { cellLines } from "./view.ts";
 import { positionInCell } from "../core/position.ts";
 
@@ -71,7 +71,13 @@ function blankRoomTop(element: Element, cellElement: Element): number {
  */
 export function blankLineAt(content: string, cellElement: HTMLElement, y: number): number | undefined {
   const lines = cellLines(content);
-  const next = lineStarts(cellElement, lines).find(({ element }) => element.getBoundingClientRect().top > y);
+  // The first line starting under the point (none further looked for)
+  let next: LineStart | undefined;
+  for (const start of lineStarts(cellElement, lines)) {
+    if (start.element.getBoundingClientRect().top <= y) continue;
+    next = start;
+    break;
+  }
   if (!next) return undefined;
   const { element, offset } = next;
   // (The nearest first)

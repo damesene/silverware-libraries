@@ -1,8 +1,11 @@
 // Where a point of a cell's rendering is in the cell's markdown (a click, a drop, a selection): the element marked with
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
-import { blankLinesBefore, blankLineStart } from "../core/blanklines.ts";
-import { offsetOf } from "./offsets.ts";
+import type { MarkedLine } from "../../../../shared/markdown/lines.ts";
+import { blankLinesAbove, caretOn, holdsBlankLine } from "../core/blanklines.ts";
 import { positionInCell } from "../core/position.ts";
+import { cellLines } from "./celllines.ts";
+import { drawnBlocks, spaceBefore } from "./cellparts.ts";
+import { lineStarts, markedFrom, offsetOf } from "./offsets.ts";
 
 /** A caret's place in the rendering: a node and an offset in it */
 export type Caret = { readonly node: Node; readonly offset: number };
@@ -24,7 +27,7 @@ export function selectionInCell(content: string, cellElement: HTMLElement, selec
  */
 export function offsetInCell(content: string, cellElement: HTMLElement, target: Element, caret: Caret | undefined): number {
   const from = caret ? (caret.node instanceof Element ? caret.node : caret.node.parentElement) ?? target : target;
-  const marked = from.closest("[data-pos]");
+  const marked = markedFrom(from);
   const element = marked && cellElement.contains(marked) ? marked : ([...cellElement.children].find((child) => child.contains(from)) ?? cellElement);
   const elementPos = element === marked ? offsetOf(marked) : 0;
   if (!caret || !element.contains(caret.node)) return positionInCell(content, elementPos, "", 0);
@@ -40,33 +43,52 @@ export function offsetInCell(content: string, cellElement: HTMLElement, target: 
  * under its text: the caret after its last character); none where it is not
  */
 export function endAt(content: string, cellElement: HTMLElement, y: number): number | undefined {
-  // (The rendering's own elements: not the cell's "…", nor a blank line put back after its last block)
-  const drawn = [...cellElement.children].filter((child) => !child.matches("button, .swl-grid-blank"));
-  const last = drawn.at(-1);
+  const last = drawnBlocks(cellElement).at(-1);
   if (last && y <= last.getBoundingClientRect().bottom) return undefined;
   return content.replace(/\s+$/, "").length;
 }
 
 /**
- * Where a click on a blank line of a cell's rendering is in its markdown: the start of that blank line (none where the
- * click is on no blank line). Blank lines are drawn as space, no element marked with its place in it: found by
- * height, between the element drawn before (its bottom) and the one after (its top, its `data-pos`), as many lines
- * there as its markdown has blank lines before it
+ * Where the room of the blank lines before an element of a cell's rendering starts: the bottom of what is drawn before
+ * it past the space between (`spaceBefore`: an element, or text the host left unwrapped), a margin between theirs too;
+ * where nothing is, the top of what holds it (a quote's first block after the quote's empty first lines; the cell),
+ * the blank lines before that its holder's own
+ */
+function blankRoomTop(element: Element, cellElement: Element): number {
+  const { before } = spaceBefore(element);
+  if (!before) return (element.parentElement ?? cellElement).getBoundingClientRect().top;
+  if (before instanceof Element) return before.getBoundingClientRect().bottom;
+  const range = cellElement.ownerDocument.createRange();
+  range.selectNodeContents(before);
+  return range.getBoundingClientRect().bottom;
+}
+
+/** The first line of a cell starting under a point: its element and offset (none further looked for) */
+function lineStartBelow(cellElement: HTMLElement, lines: readonly MarkedLine[], y: number) {
+  for (const start of lineStarts(cellElement, lines)) if (start.element.getBoundingClientRect().top > y) return start;
+  return undefined;
+}
+
+/**
+ * Where a click on a blank line of a cell's rendering is in its markdown: that blank line, past its marks (a quote's
+ * empty line: in the quote; none where the click is on no blank line). Blank lines are drawn as space, no element
+ * marked with its place in it: found by height, between what is drawn before (`blankRoomTop`) and the line after (its
+ * element's top, its `data-pos`), as many lines there as its markdown has blank lines before it
  */
 export function blankLineAt(content: string, cellElement: HTMLElement, y: number): number | undefined {
-  const marked = [...cellElement.querySelectorAll<HTMLElement>(":scope > [data-pos], :scope li[data-pos]")];
-  const next = marked.find((element) => element.getBoundingClientRect().top > y);
+  const lines = cellLines(content);
+  // (A cell without a blank line has none to click: its rendering not measured)
+  if (!holdsBlankLine(lines)) return undefined;
+  const next = lineStartBelow(cellElement, lines, y);
   if (!next) return undefined;
-  const pos = Number(next.getAttribute("data-pos"));
-  const blanks = blankLinesBefore(content, pos);
-  if (!blanks) return undefined;
-  // The bottom of what is drawn before it (a line break or a put-back blank line is space, not content)
-  let before = next.previousElementSibling;
-  while (before && (before.tagName === "BR" || before.classList.contains("swl-grid-blank"))) before = before.previousElementSibling;
-  const top = next.getBoundingClientRect().top;
-  const bottom = before ? before.getBoundingClientRect().bottom : cellElement.getBoundingClientRect().top;
+  const { element, offset } = next;
+  // (The nearest first)
+  const blanks = blankLinesAbove(lines, offset);
+  if (!blanks.length) return undefined;
+  const top = element.getBoundingClientRect().top;
+  const bottom = blankRoomTop(element, cellElement);
   if (y < bottom || top <= bottom) return undefined;
-  const line = (top - bottom) / blanks;
-  const nth = Math.min(blanks, Math.max(1, Math.ceil((top - y) / line)));
-  return blankLineStart(content, pos, nth);
+  const line = (top - bottom) / blanks.length;
+  const nth = Math.min(blanks.length, Math.max(1, Math.ceil((top - y) / line)));
+  return caretOn(blanks[nth - 1]!);
 }

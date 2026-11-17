@@ -1,12 +1,13 @@
 // A grid drawn: its cells side by side as its column template says (a narrow pane stacks them: the style page's rule),
 // each cell's markdown as the host rendered it.
 import { el } from "../../../../shared/elements.ts";
-import { blankLinesBefore, blankLinesDrawn } from "../core/blanklines.ts";
+import { blankLinesAbove, holdsBlankLine } from "../core/blanklines.ts";
 import type { BorderStyle } from "../model/border.ts";
+import { cellLines } from "./celllines.ts";
+import { BLANK, spaceBefore } from "./cellparts.ts";
+import { lineStarts } from "./offsets.ts";
 
 const COLUMNS = "--swl-grid-columns";
-// A blank line of a cell's markdown its rendering left out, put back
-const BLANK = "swl-grid-blank";
 
 /** A grid's element: a cell per rendered markdown (the host's HTML, its elements marked with their offsets in the cell's text) */
 export function drawGrid(doc: Document, template: string, cells: readonly string[]): HTMLElement {
@@ -59,21 +60,17 @@ export function plainCell(doc: Document, content: string): string {
 /**
  * A cell drawn with the blank lines of its markdown the host's rendering left out (next to a list, a heading, a table,
  * between a loose list's items: core/blanklines.ts): a line of space each before the element it was before, as the
- * editor shows it. Each element told by its offset in the cell's text (the host's `data-pos`)
+ * editor shows it. Each line told by the element that starts it (ui/offsets.ts: a list's, not its first item's)
  */
 export function keepBlankLines(doc: Document, cell: HTMLElement, content: string): void {
-  for (const element of cell.querySelectorAll<HTMLElement>(":scope > [data-pos], :scope li[data-pos]")) {
-    const wanted = blankLinesBefore(content, Number(element.getAttribute("data-pos")));
+  const lines = cellLines(content);
+  // (A cell without a blank line has none to put back: its rendering not looked through)
+  if (!holdsBlankLine(lines)) return;
+  for (const { element, offset } of lineStarts(cell, lines)) {
+    const wanted = blankLinesAbove(lines, offset).length;
     if (!wanted) continue;
     // (Those put back already counted: drawn again over the same, none more)
-    let breaks = 0;
-    let kept = 0;
-    let before = element.previousElementSibling;
-    while (before?.tagName === "BR" || before?.classList.contains(BLANK)) {
-      if (before.tagName === "BR") breaks++;
-      else kept++;
-      before = before.previousElementSibling;
-    }
-    for (let missing = wanted - kept - blankLinesDrawn(breaks, before ?? undefined); missing > 0; missing--) element.before(el(doc, "div", { class: BLANK, attrs: { "aria-hidden": "true" } }));
+    const { drawn, blanks } = spaceBefore(element);
+    for (let missing = wanted - blanks - drawn; missing > 0; missing--) element.before(el(doc, "div", { class: BLANK, attrs: { "aria-hidden": "true" } }));
   }
 }

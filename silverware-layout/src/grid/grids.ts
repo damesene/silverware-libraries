@@ -116,8 +116,6 @@ const SETTLE_MS = 50;
 const REDRAWN_MS = 3000;
 // How far a press and its release are apart to be a drag that selects (px)
 const DRAG_PX = 4;
-// What a grid puts in its cells besides their rendering (a cell's grip): never taken over with a cell's rendering
-const OWN_CONTROLS = ".swl-grid-cell-grip";
 // What a click in a cell leaves to the cell's rendering: a link, a tag, a button, a field, an editor open
 const OWN_CLICKS = "a, button, input, textarea, select, label, [data-ref]";
 
@@ -487,7 +485,6 @@ export class Grids {
     const taken = takeOver(
       { element, contents, drawn: this.drawnItems.get(element) ?? [] },
       { element: old, contents: readGridBody(oldBody).map((cell) => cell.content), drawn: this.drawnItems.get(old) ?? [] },
-      OWN_CONTROLS,
     );
     this.drawnItems.set(element, taken.fresh);
     this.drawnItems.set(old, taken.old);

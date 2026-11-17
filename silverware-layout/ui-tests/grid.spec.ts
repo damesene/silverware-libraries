@@ -375,6 +375,78 @@ test("a click on a blank line of a cell puts the field's caret on that line, not
   await expect.poll(caret).toBe(cell.indexOf("\n- b"));
 });
 
+test("a blank line before a list is a line, as in the editor, and a click there puts the caret on it", async ({ page, space }) => {
+  // (A list and its first item start on one line: the blank line before it once, not twice)
+  const cell = "Plan\n\n- a\n- b";
+  await space.open({ Page: `# Page\n\n<grid>\n<cell>\n\n${cell}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n` }, "Page");
+  await gridsDrawn(page);
+  const first = page.locator("#sb-main .swl-grid-cell").first();
+  await expect(first.locator(".swl-grid-blank")).toHaveCount(1);
+  const plan = await boxOf(first.locator(".p").first());
+  const item = await boxOf(first.locator("li").first());
+  // The first item two lines of text under "Plan": a blank line between
+  expect(Math.round((item.y - plan.y) / plan.height)).toBe(2);
+  await page.mouse.click(item.x + 30, item.y - plan.height / 2);
+  await expect(cellField(page)).toBeVisible();
+  await expect.poll(async () => (await fieldState(page)).from).toBe(cell.indexOf("\n- a"));
+});
+
+test("a click on an item's text over the list nested in it after a blank line puts the caret in that text", async ({ page, space }) => {
+  const cell = "- first\n\n  - b\n  - c";
+  await space.open({ Page: `# Page\n\n<grid>\n<cell>\n\n${cell}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n` }, "Page");
+  await gridsDrawn(page);
+  const first = page.locator("#sb-main .swl-grid-cell").first();
+  const word = await boxOf(first.locator(".p").first());
+  await page.mouse.click(word.x + word.width - 2, word.y + word.height / 2);
+  await expect(cellField(page)).toBeVisible();
+  // In "first", not on the blank line under it
+  const inWord = (at: number) => at > cell.indexOf("first") && at <= cell.indexOf("\n");
+  await expect.poll(async () => inWord((await fieldState(page)).from)).toBe(true);
+});
+
+test("a click in a nested list's margin over its blank line puts the caret on that blank line", async ({ page, space }) => {
+  const cell = "- first\n\n  - b\n  - c";
+  await space.open({ Page: `# Page\n\n<grid>\n<cell>\n\n${cell}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n` }, "Page");
+  await gridsDrawn(page);
+  // (A theme's margin over a nested list: room between the item's text and the blank line under it; a style of the
+  // page's, so a grid drawn anew has it too)
+  await page.addStyleTag({ content: "#sb-main .swl-grid-cell li > ul { margin-top: 12px !important; }" });
+  const first = page.locator("#sb-main .swl-grid-cell").first();
+  const word = await boxOf(first.locator(".p").first());
+  expect((await boxOf(first.locator("li > ul"))).y - (word.y + word.height)).toBeGreaterThan(8);
+  await page.mouse.click(word.x + 10, word.y + word.height + 4);
+  await expect(cellField(page)).toBeVisible();
+  await expect.poll(async () => (await fieldState(page)).from).toBe(cell.indexOf("\n\n") + 1);
+});
+
+test("a quote's blank line between a loose list's items is a line, as in the editor, and a click there puts the caret on it, in the quote", async ({ page, space }) => {
+  // (The quote's blank line its mark alone: SilverBullet's rendering leaves it out between the items)
+  const cell = "> - a\n>\n> - b";
+  await space.open({ Page: `# Page\n\n<grid>\n<cell>\n\n${cell}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n` }, "Page");
+  await gridsDrawn(page);
+  const first = page.locator("#sb-main .swl-grid-cell").first();
+  await expect(first.locator(".swl-grid-blank")).toHaveCount(1);
+  const a = await boxOf(first.locator("li .p").first());
+  const b = await boxOf(first.locator("li .p").nth(1));
+  expect(Math.round((b.y - a.y) / a.height)).toBe(2);
+  await page.mouse.click(b.x + 30, b.y - a.height / 2);
+  await expect(cellField(page)).toBeVisible();
+  // (Past its mark: what is typed there stays in the quote)
+  await expect.poll(async () => (await fieldState(page)).from).toBe(cell.indexOf("\n>\n") + 2);
+});
+
+test("a blank line before a block in a list's item is a line, as in the editor", async ({ page, space }) => {
+  // (SilverBullet's rendering draws the item's second paragraph right under its first)
+  const cell = "- a\n\n  para2";
+  await space.open({ Page: `# Page\n\n<grid>\n<cell>\n\n${cell}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n` }, "Page");
+  await gridsDrawn(page);
+  const first = page.locator("#sb-main .swl-grid-cell").first();
+  await expect(first.locator(".swl-grid-blank")).toHaveCount(1);
+  const a = await boxOf(first.locator("li .p").first());
+  const second = await boxOf(first.locator("li .p").nth(1));
+  expect(Math.round((second.y - a.y) / a.height)).toBe(2);
+});
+
 test("an empty cell is a line high, clicked into to write in it", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n<grid>\n<cell>\n\nLeft\n\n</cell>\n<cell>\n\n\n</cell>\n</grid>\n" }, "Page");
   await gridsDrawn(page);

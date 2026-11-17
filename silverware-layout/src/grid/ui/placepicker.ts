@@ -9,6 +9,7 @@ import { el } from "../../../../shared/elements.ts";
 import type { GridPlace } from "../../../../shared/markdown/gridbuild.ts";
 import { type Box, type CellShape, distanceTo, type GridShape, NEAR_PX, pickAt, type PickedPlace, samePick } from "../core/placepick.ts";
 import { isMarked, offsetOf } from "./offsets.ts";
+import { drawnBlocks } from "./cellparts.ts";
 
 /** What is picked for */
 export type PickRequest = {
@@ -31,9 +32,6 @@ export type Picking = { readonly picked: Promise<Picked | undefined>; cancel(): 
 const PICKING = "data-swl-picking";
 // A cell the text would go into
 const TARGET_CELL = "swl-grid-pick-cell";
-// What a cell draws that is no block of its markdown
-const NOT_BLOCK = ".swl-grid-cell-grip, .swl-grid-blank, br";
-
 /** A grid as drawn now, measured */
 function shapeOf(grid: HTMLElement): GridShape {
   const win = grid.ownerDocument.defaultView;
@@ -42,8 +40,8 @@ function shapeOf(grid: HTMLElement): GridShape {
   const cells: CellShape[] = [...grid.querySelectorAll<HTMLElement>(":scope > .swl-grid-cell")].map((cell) => ({
     box: cell.getBoundingClientRect(),
     // (Its blocks as its rendering has them: the first at the cell's start, each other one marked with its offset)
-    blocks: [...cell.children]
-      .filter((child, i) => !child.matches(NOT_BLOCK) && (i === 0 || isMarked(child)))
+    blocks: drawnBlocks(cell)
+      .filter((child, i) => i === 0 || isMarked(child))
       .map((child) => ({ offset: offsetOf(child), box: child.getBoundingClientRect() }))
       .filter((block) => block.box.bottom > block.box.top),
   }));

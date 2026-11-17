@@ -1,52 +1,77 @@
-// @vitest-environment jsdom
-// A cell's blank lines as the editor shows them: those the host's rendering left out (next to a block, between a
-// loose list's items) put back, those it kept (between paragraphs, as line breaks) left as they are.
+// A cell's blank lines in its markdown: those right before a line (in a quote, its marks alone), where each starts, and
+// those the host drew.
 import { describe, expect, it } from "vitest";
-import { keepBlankLines } from "../ui/view.ts";
-import { blankLinesBefore, blankLinesDrawn, blankLineStart } from "./blanklines.ts";
+import { markedLines } from "../../../../shared/markdown/parse.ts";
+import { blankLinesAbove, caretOn, holdsBlankLine } from "./blanklines.ts";
 
-// SilverBullet 2.12.1's markdownToHtml of this text (probed 2026-11-14)
+// (Of a text read line by line first, as a cell's is)
+const countBefore = (text: string, at: number) => blankLinesAbove(markedLines(text), at).length;
+const startsBefore = (text: string, at: number) => blankLinesAbove(markedLines(text), at).map((line) => line.from);
+const caretsBefore = (text: string, at: number) => blankLinesAbove(markedLines(text), at).map(caretOn);
+
+// A cell's text: paragraphs a blank line or more apart, a loose list, a heading (drawn in ui/view.test.ts)
 const TEXT = "One\n\nTwo\n\n\nThree\n\n\n\nFour\n- item\n\n- item2\n\n# Head\n\nAfter";
-const HTML =
-  '<span class="p">One</span><br><br><span class="p" data-pos="5">Two</span><br><br><br><span class="p" data-pos="11">Three</span><br><br><br><br><span class="p" data-pos="20">Four</span><br><ul data-pos="25"><li data-pos="25"><span class="p" data-pos="27">item</span></li><li data-pos="33"><span class="p" data-pos="35">item2</span></li></ul><h1 data-pos="42">Head</h1><br><span class="p" data-pos="50">After</span>';
 
 describe("a cell's blank lines", () => {
   it("counts the blank lines right before a place's line", () => {
-    expect(blankLinesBefore(TEXT, 5)).toBe(1);
-    expect(blankLinesBefore(TEXT, 20)).toBe(3);
-    expect(blankLinesBefore(TEXT, 25)).toBe(0);
-    expect(blankLinesBefore(TEXT, 33)).toBe(1);
-    expect(blankLinesBefore(TEXT, 0)).toBe(0);
+    expect(countBefore(TEXT, 5)).toBe(1);
+    expect(countBefore(TEXT, 20)).toBe(3);
+    expect(countBefore(TEXT, 25)).toBe(0);
+    expect(countBefore(TEXT, 33)).toBe(1);
+    expect(countBefore(TEXT, 0)).toBe(0);
+    // Blank lines of spaces too; a text starting with them
+    expect(countBefore("a\n  \n\t\nb", 7)).toBe(2);
+    expect(countBefore("\n\nb", 2)).toBe(2);
   });
 
-  it("counts those drawn: the line breaks, the first only ending an inline element's line", () => {
-    expect(blankLinesDrawn(2, { tagName: "SPAN" })).toBe(1);
-    expect(blankLinesDrawn(1, { tagName: "SPAN" })).toBe(0);
-    expect(blankLinesDrawn(1, { tagName: "H1" })).toBe(1);
-    expect(blankLinesDrawn(0, { tagName: "UL" })).toBe(0);
-    expect(blankLinesDrawn(0, undefined)).toBe(0);
+  it("counts a quote's blank lines, its marks alone, for a place in a quote as deep or shallower", () => {
+    expect(countBefore("> one\n>\n> two", 10)).toBe(1);
+    expect(startsBefore("> one\n>\n> two", 10)).toEqual([6]);
+    // A caret put on it past its mark, in the quote; on a blank line out of a quote at its start
+    expect(caretsBefore("> one\n>\n> two", 10)).toEqual([7]);
+    expect(caretsBefore("a\n\nb", 3)).toEqual([2]);
+    // On a line of white space at its start, its spaces not taken (four would make what is typed a code block)
+    expect(caretsBefore("a\n    \nb", 7)).toEqual([2]);
+    expect(caretsBefore("> one\n>   \n> two", 13)).toEqual([7]);
+    // A deeper quote's last empty lines, before a place out of that quote (the nested quote of the last at 14)
+    expect(countBefore("> one\n>\ntwo", 8)).toBe(1);
+    expect(countBefore("> > one\n> >\n> two", 14)).toBe(1);
+    expect(countBefore("> one\n> >\n>\n> > two", 14)).toBe(2);
   });
 
-  it("puts back those the rendering left out, before a heading after a list and between a loose list's items alone", () => {
-    const cell = document.createElement("div");
-    cell.innerHTML = HTML;
-    keepBlankLines(document, cell, TEXT);
-    const before = (selector: string) => cell.querySelector(selector)!.previousElementSibling?.className;
-    expect(before("h1")).toBe("swl-grid-blank");
-    expect(before('li[data-pos="33"]')).toBe("swl-grid-blank");
-    expect(cell.querySelectorAll(".swl-grid-blank")).toHaveLength(2);
-    // Drawn again over the same: none more
-    keepBlankLines(document, cell, TEXT);
-    expect(cell.querySelectorAll(".swl-grid-blank")).toHaveLength(2);
+  it("counts no blank line shallower than a place's quote: it lies before that quote, the quote's own", () => {
+    expect(countBefore("> one\n\n> two", 9)).toBe(0);
+    expect(countBefore("> one\n\n> two", 7)).toBe(1);
+    expect(countBefore("Para\n\n>\n> one", 10)).toBe(1);
+    expect(countBefore("> one\n> >\n>\n> > two", 16)).toBe(0);
+  });
+
+  it("reads a quote's marks in a list's item as deep as the item's content, an empty item's line no blank line", () => {
+    const text = "- a\n  - b\n    > - c\n    >\n    > - d";
+    expect(countBefore(text, text.indexOf("- d"))).toBe(1);
+    const numbered = "10. x\n\n    > q\n    >\n    > r";
+    expect(countBefore(numbered, numbered.indexOf("r"))).toBe(1);
+    expect(countBefore("- a\n-\n- b", 6)).toBe(0);
+  });
+
+  it("reads a mark after four spaces as a code block's line in a quote, no blank line", () => {
+    expect(countBefore("> a\n>     >\n> b", 14)).toBe(0);
+    expect(countBefore("> a\n>    >\n> b", 13)).toBe(1);
   });
 });
 
 describe("a blank line clicked", () => {
-  it("is where the nth blank line above a place's line starts, the nearest first; none past them", () => {
-    const text = "a\n\n\nb";
-    expect(blankLineStart(text, 4, 1)).toBe(3);
-    expect(blankLineStart(text, 4, 2)).toBe(2);
-    expect(blankLineStart(text, 4, 3)).toBeUndefined();
-    expect(blankLineStart(text, 0, 1)).toBeUndefined();
+  it("is one of the blank lines above a place's line, where each starts, the nearest first", () => {
+    expect(startsBefore("a\n\n\nb", 4)).toEqual([3, 2]);
+    expect(startsBefore("a\n\n\nb", 0)).toEqual([]);
+    // A text starting with blank lines: the first at 0
+    expect(startsBefore("\n\nb", 2)).toEqual([1, 0]);
+  });
+});
+
+describe("a text holding a blank line", () => {
+  it("holds one empty past its marks, an empty item's line none", () => {
+    const holds = (text: string) => holdsBlankLine(markedLines(text));
+    expect([holds("a\nb"), holds("a\n\nb"), holds("> a\n>\n> b"), holds("- a\n-\n- b")]).toEqual([false, true, true, false]);
   });
 });

@@ -14,6 +14,7 @@
 // (SilverBullet's own table keeps a wiki link's `|` in its cell); a footnote's
 // definition (`[^1]: …`) is a paragraph. Pure, synchronous.
 import { parser as commonMark, Table } from "@lezer/markdown";
+import { countBelow, type MarkedLine } from "./lines.ts";
 import { readTaskState } from "./task.ts";
 
 const parser = commonMark.configure([Table]);
@@ -64,30 +65,58 @@ export type MarkdownNode =
  * be none, nor would a table's line of dashes), no span holding its `\r`
  */
 export function parseBlocks(text: string, from = 0): MarkdownNode[] {
+  const { read, place } = readAsParser(text, from);
+  return readTree(read, place);
+}
+
+/** The text from `from` as the parser is given it, a CRLF a line break alone, and where a place of it is in the text given */
+function readAsParser(text: string, from = 0): { readonly read: string; readonly place: (at: number) => number } {
   // Where each line break that had a `\r` before it is in the text read
   const breaks: number[] = [];
   const read = text.slice(from).replace(/\r\n/g, (_, at: number) => {
     breaks.push(at - breaks.length);
     return "\n";
   });
-  return readTree(read, (at) => from + at + below(breaks, at));
+  const breakAt = (i: number) => breaks[i]!;
+  return { read, place: (at) => from + at + countBelow(breaks.length, breakAt, at) };
+}
+
+/** A text's lines, in order, with the marks of the blocks holding them (lines.ts `MarkedLine`), as the parser reads them */
+export function markedLines(text: string): MarkedLine[] {
+  const { read, place } = readAsParser(text);
+  const marks: { readonly from: number; readonly to: number; readonly quote: boolean }[] = [];
+  // (The tree walked in the text's order)
+  parser.parse(read).iterate({
+    enter: (node) => {
+      if (node.name === "QuoteMark" || node.name === "ListMark") marks.push({ from: node.from, to: node.to, quote: node.name === "QuoteMark" });
+    },
+  });
+  const lines: MarkedLine[] = [];
+  let next = 0;
+  for (let from = 0; ; ) {
+    const end = read.indexOf("\n", from);
+    const to = end < 0 ? read.length : end;
+    const quotes: number[] = [];
+    let item = false;
+    let past = from;
+    for (; next < marks.length && marks[next]!.from < to; next++) {
+      const mark = marks[next]!;
+      if (mark.quote) quotes.push(place(mark.from));
+      else item = true;
+      past = mark.to;
+    }
+    let content = past;
+    while (content < to && isSpace(read[content])) content++;
+    // (Empty past its marks as the parser reads it: spaces and tabs alone, a non-breaking space its text)
+    lines.push({ from: place(from), to: place(to), quotes, item, content: place(content), empty: content === to });
+    if (end < 0) return lines;
+    from = end + 1;
+  }
 }
 
 /** A text's blocks, `place` giving where a place in it is in the text given */
 function readTree(text: string, place: (at: number) => number): MarkdownNode[] {
   return new Reader(text, place).children(parser.parse(text).topNode, []);
-}
-
-/** How many of the places in order are before `at` */
-function below(places: readonly number[], at: number): number {
-  let low = 0;
-  let high = places.length;
-  while (low < high) {
-    const mid = (low + high) >> 1;
-    if (places[mid]! < at) low = mid + 1;
-    else high = mid;
-  }
-  return low;
 }
 
 /**

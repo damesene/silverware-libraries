@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { closesFence, fenceOf, fenceOpenAt, linesOf, linesUnder, nextFence } from "./lines.ts";
+import { closesFence, fenceOf, fenceOpenAt, lineIndexAt, linesOf, linesUnder, nextFence } from "./lines.ts";
+import { markedLines } from "./parse.ts";
 
 const TEXT = "# Title\n\nOne line\n- item a\n- item b\n\n```\ncode here\n```\nlast";
 
@@ -55,5 +56,14 @@ describe("Fences", () => {
     expect(fenceOpenAt(TEXT, TEXT.indexOf("code here"))).toBe("```");
     expect(fenceOpenAt(TEXT, TEXT.indexOf("last"))).toBeUndefined();
     expect(fenceOpenAt(TEXT, TEXT.indexOf("- item b"))).toBeUndefined();
+  });
+});
+
+describe("lineIndexAt", () => {
+  it("finds the line a place is on: a line break the end of its line, past the text's end the last", () => {
+    const at = (text: string, place: number) => lineIndexAt(markedLines(text), place);
+    expect([at("ab\ncd", 4), at("ab\ncd", 3), at("ab\ncd", 2), at("ab", 0), at("ab", 9)]).toEqual([1, 1, 0, 0, 0]);
+    // A text starting with a line break: at 0 its first (empty) line, after it the second
+    expect([at("\nab", 0), at("\nab", 1)]).toEqual([0, 1]);
   });
 });

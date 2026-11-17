@@ -10,6 +10,7 @@ import type { LayoutMenuEntry } from "../../../../shared/layout.ts";
 import { opensMenu, type PopupItem, type PopupMenu, showPopup } from "../../../../shared/popupmenu.ts";
 import { columnCount, FIT, fitsColumns, MAX_COLUMNS, MIN_WIDTHS, type MinWidthName, minWidthChoice } from "../model/columns.ts";
 import type { BorderStyle } from "../model/border.ts";
+import { CELL_GRIP } from "./cellparts.ts";
 
 // The popup menu's classes: Silverware Layout's
 const POPUP = { base: "swl" } as const;
@@ -144,7 +145,7 @@ export function addCellGrips(
   gridSections: () => readonly (readonly LayoutMenuEntry[])[] = () => [],
 ): void {
   grid.querySelectorAll<HTMLElement>(":scope > .swl-grid-cell").forEach((cell, index) => {
-    const grip = el(doc, "button", { class: "swl-grid-cell-grip", title: "Cell…", attrs: { type: "button", "aria-label": `Cell ${index + 1}: its menu` } });
+    const grip = el(doc, "button", { class: CELL_GRIP, title: "Cell…", attrs: { type: "button", "aria-label": `Cell ${index + 1}: its menu` } });
     opensMenu(doc, POPUP, grip, (): PopupMenu => {
       const now = state();
       const sections: GridMenuItem[][] = cellMenu(index, now, (action) => act(index, action));

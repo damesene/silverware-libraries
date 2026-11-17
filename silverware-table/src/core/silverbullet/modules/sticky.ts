@@ -10,21 +10,30 @@
 // script lags and shakes. Here they only get `swt-stuck` (their look while
 // held). Other tables sit in a box that scrolls (sideways, or inside a maximum
 // height), which captures sticky positioning: their header and footer are
-// moved with a transform after each scroll, never past each other. A table
-// whose box is laid over the window (position: fixed: full screen) scrolls in
-// that box only, the page never moves it: its header and footer are sticky
-// against the box (`swt-sticky-box`), moved by the browser too.
+// sticky against that box (`swt-sticky-inside`), held by the browser as the box
+// scrolls (moved by script after each scroll, a fast scroll in the box showed
+// the header jump and flicker); where the page has scrolled the box's top above
+// the view's, the script holds the header that much lower, at the view's top
+// (`--swt-box-top`; no room kept above it for the toolbar, which goes over the
+// header's end then: a box drawn as a card showed its sides beside that room),
+// the bottom rows that much higher (`--swt-box-bottom`). A table whose box is
+// laid over the window (position: fixed: full screen) scrolls in that box only,
+// the page never moves it: its header and footer are sticky against the box
+// (`swt-sticky-box`), moved by the browser too.
 //
-// A table in a box of its own whose header the page holds (the page scrolled into the table: the header below the view's
+// A table in a box of its own whose header the page holds (the page scrolled into the table: the header at the view's
 // top, the box's top above it, under SilverBullet's top bar) is marked `swt-held-by-page`: its box's scrollbar runs up
-// past the header there, beside the room covered for the toolbar, and the CSS makes it clear until the box's top is
-// in view again (its width kept: the table does not move).
+// past the header there, and the CSS makes it clear until the box's top is in view again (its width kept: the table
+// does not move).
 import type { AdapterFeature, TableHost } from "../../feature.ts";
 import { STICKY_GAP } from "../../layout.ts";
 import { renderedTable, WIDGET_SELECTOR } from "../../../dom.ts";
 
 // A box's table whose header the page holds, above the box's top: its scrollbar hidden (the CSS)
 const HELD_BY_PAGE = "swt-held-by-page";
+// A table scrolling in a box of its own: its header and bottom rows sticky against the box (the CSS), held lower or
+// higher by where the page has the box (`--swt-box-top`, `--swt-box-bottom`)
+const STICKY_INSIDE = "swt-sticky-inside";
 
 export class Sticky implements AdapterFeature {
   constructor(private readonly host: TableHost) {}
@@ -46,7 +55,7 @@ export class Sticky implements AdapterFeature {
       const native = !overWindow && !inside && widget.clientWidth > 0 && info.table.offsetWidth <= widget.clientWidth + 1;
       widget.classList.toggle("swt-sticky-native", native);
       widget.classList.toggle("swt-sticky-box", overWindow);
-      if (native || overWindow) widget.classList.remove(HELD_BY_PAGE);
+      if (native || overWindow) widget.classList.remove(HELD_BY_PAGE, STICKY_INSIDE);
       // Held below the view's top by the room for the toolbar (STICKY_GAP), but never lower than the table lies in the
       // page: a table nearer the page's top had its header pushed down over its first rows, the page not even scrolled
       const gap = overWindow ? STICKY_GAP : this.gapFor(widget, info.table, scroller.top);
@@ -76,31 +85,27 @@ export class Sticky implements AdapterFeature {
         }
         continue;
       }
+      // A table in a box of its own that scrolls (sideways, or inside a maximum height): its header and its bottom
+      // rows sticky against that box, held by the browser as the box scrolls (moved by script after each scroll, a
+      // fast scroll in the box showed the header jump and flicker); where the page has scrolled the box's top above the
+      // view's, the header held that much lower, at the view's top (no room kept above it: a box drawn as a card
+      // showed its sides beside that room), its bottom rows that much higher where the box's bottom is below it
       const box = this.host.innerBox(widget);
-      const pageTop = scroller.top + gap;
-      const boxTop = inside ? box.top : -Infinity;
-      const boxBottom = inside ? box.bottom : Infinity;
+      // (Never past the box's other edge: the box gone up past the view's top takes its header with it)
+      const top = `${Math.max(0, Math.round(Math.min(scroller.top - box.top, box.bottom - box.top - head.offsetHeight)))}px`;
+      const bottom = `${Math.max(0, Math.round(Math.min(box.bottom - scroller.bottom, box.bottom - box.top - (foot?.offsetHeight ?? 0))))}px`;
+      widget.classList.add(STICKY_INSIDE);
+      if (widget.style.getPropertyValue("--swt-box-top") !== top) widget.style.setProperty("--swt-box-top", top);
+      if (widget.style.getPropertyValue("--swt-box-bottom") !== bottom) widget.style.setProperty("--swt-box-bottom", bottom);
+      head.style.transform = "";
       const table = info.table.getBoundingClientRect();
-      // Rows pinned to the bottom first: held at the bottom of the view (the
-      // page, or the table's box), never above the header's own place
-      const footHeight = foot?.offsetHeight ?? 0;
-      let footTop = table.bottom - footHeight;
-      if (foot && footHeight > 0) {
-        const pageBottom = scroller.bottom;
-        const lift = Math.min(
-          0,
-          Math.max(Math.min(pageBottom, boxBottom) - table.bottom, -(table.height - head.offsetHeight - footHeight)),
-        );
-        foot.style.transform = lift < 0 ? `translateY(${lift}px)` : "";
-        foot.classList.toggle("swt-stuck", lift < 0);
-        footTop += lift;
+      const held = head.getBoundingClientRect().top > table.top + 0.5;
+      head.classList.toggle("swt-stuck", held);
+      if (foot) {
+        foot.style.transform = "";
+        foot.classList.toggle("swt-stuck", foot.rows.length > 0 && foot.getBoundingClientRect().bottom < table.bottom - 0.5);
       }
-      // The header (with the rows pinned to the top): never past the bottom rows, nor out of the table's box (a box
-      // scrolling its table up and down ends before the table: held past it, the header still measured in view, cut)
-      const offset = Math.max(0, Math.min(Math.max(pageTop, boxTop), footTop - head.offsetHeight, boxBottom - head.offsetHeight) - table.top);
-      head.style.transform = offset > 0 ? `translateY(${offset}px)` : "";
-      head.classList.toggle("swt-stuck", offset > 0);
-      widget.classList.toggle(HELD_BY_PAGE, inside && offset > 0 && pageTop > boxTop + 0.5);
+      widget.classList.toggle(HELD_BY_PAGE, held && scroller.top > box.top + 0.5);
     }
   }
 

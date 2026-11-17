@@ -164,6 +164,30 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
   bottom: 0;
   z-index: 3;
 }
+/* A table scrolling in a box of its own (sideways, or inside a maximum height; swt-sticky-inside): its header and
+   bottom rows sticky against the box, held by the browser as the box scrolls; where the page has scrolled the box's
+   top above the view's, the header that much lower, at the view's top (the script: --swt-box-top), the bottom rows
+   that much higher (--swt-box-bottom). Its header opaque at all times: the browser holds it at once, the script marks
+   it held a frame later */
+.sb-table-widget.swt-sticky-inside thead,
+.sb-table-widget.swt-sticky-inside thead.swt-stuck {
+  position: sticky;
+  top: var(--swt-box-top, 0px);
+  z-index: 3;
+}
+.sb-table-widget.swt-sticky-inside tfoot,
+.sb-table-widget.swt-sticky-inside tfoot.swt-stuck {
+  position: sticky;
+  bottom: var(--swt-box-bottom, 0px);
+  z-index: 3;
+}
+.sb-table-widget.swt-sticky-inside :where(thead td) {
+  background: linear-gradient(
+      var(--editor-table-head-background-color, transparent),
+      var(--editor-table-head-background-color, transparent)
+    ),
+    var(--root-background-color, #fff);
+}
 /* The room above a held header (STICKY_GAP) covered in the page's color: a
    band above each of the header's top cells (positioned: relative, or sticky
    where pinned), under the cell's own content (the columns' letters) as it is
@@ -172,7 +196,7 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
    has the browser paint no cell's box-shadow, and rows showed there. Only the
    top row has it: from the filter row it would cover the header row. */
 .sb-table-widget.swt-sticky-box thead tr:first-child > td::after,
-.sb-table-widget thead.swt-stuck tr:first-child > td::after {
+.sb-table-widget:not(.swt-sticky-inside) thead.swt-stuck tr:first-child > td::after {
   content: "";
   position: absolute;
   left: -1px;

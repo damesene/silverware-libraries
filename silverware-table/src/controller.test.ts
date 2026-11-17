@@ -886,7 +886,7 @@ describe("Controller", () => {
       expect(reached).toEqual(["click", "mouseup", "click"]);
     });
 
-    it("leaves holding the header to the browser (position: sticky) for a table that fits its width, to the script for a wide one", async () => {
+    it("leaves holding the header to the browser (position: sticky) for a table that fits its width (against the page) and for a wide one (against its box)", async () => {
       await setup(PAGE);
       layOut(5000);
       scroller.scrollTop = 1100;
@@ -908,11 +908,13 @@ describe("Controller", () => {
       expect(widget.classList.contains("swt-sticky-native")).toBe(true);
       expect(document.querySelector<HTMLElement>("thead")!.style.transform).toBe("");
       expect(document.querySelector("thead")!.classList.contains("swt-stuck")).toBe(true);
-      // Wider than its box (it scrolls sideways in it): moved by the script
+      // Wider than its box (it scrolls sideways in it): sticky against its box, held as low as the page has it
       Object.defineProperty(table, "offsetWidth", { configurable: true, value: 1200 });
+      Object.defineProperty(widget, "scrollWidth", { configurable: true, value: 1200 });
       await settle();
       expect(widget.classList.contains("swt-sticky-native")).toBe(false);
-      expect(document.querySelector<HTMLElement>("thead")!.style.transform).toMatch(/^translateY\(/);
+      expect(widget.classList.contains("swt-sticky-inside")).toBe(true);
+      expect(document.querySelector<HTMLElement>("thead")!.style.transform).toBe("");
     });
 
     it("holds the header of a table scrolling in a box of its own no further than the box's bottom, as the page takes the box up past the view", async () => {
@@ -928,8 +930,9 @@ describe("Controller", () => {
       scroller.scrollTop = 1150;
       scroller.dispatchEvent(new Event("scroll"));
       for (let i = 0; i < 3; i++) await new Promise((resolve) => requestAnimationFrame(resolve));
-      // Held at the box's bottom (100 less the header's 30), not at the view's top (150 + STICKY_GAP): out of view with its box
-      expect(document.querySelector<HTMLElement>("thead")!.style.transform).toBe("translateY(70px)");
+      // Held at the box's bottom (100 less the header's 30), not at the view's top (150 in): out of view with its box
+      expect(widget.classList.contains("swt-sticky-inside")).toBe(true);
+      expect(widget.style.getPropertyValue("--swt-box-top")).toBe("70px");
     });
 
     it("keeps the toolbar above a header held at the top while the page scrolls, not over a column's name", async () => {

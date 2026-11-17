@@ -526,7 +526,7 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
 
 /** What the live preview's elements look like: SilverBullet's CSS variables where it has them */
 export const PREVIEW_THEME = {
-  ".swe-checkbox": { margin: "0 0.3em 0 0", verticalAlign: "middle", accentColor: "var(--ui-accent-color, #464cfc)", cursor: "pointer" },
+  ".swe-checkbox": { margin: "0 0.15em 0 0", verticalAlign: "0.02em", accentColor: "var(--ui-accent-color, #464cfc)", cursor: "pointer" },
   ".swe-checkbox:disabled": { cursor: "default" },
   ".swe-task-done": { textDecoration: "line-through" },
   ".swe-embed": { display: "inline-block", maxWidth: "100%", verticalAlign: "bottom" },
@@ -563,6 +563,8 @@ export const PREVIEW_THEME = {
   // (A number right in its room, the space after it held, as an ordered list's mark is)
   ".swe-list-number": { textAlign: "right", fontVariantNumeric: "tabular-nums" },
   ".swe-task-box, .swe-task-mark": { display: "inline-block", minWidth: `calc(${LIST_COLUMNS.task} * ${COLUMN})`, textIndent: "0", whiteSpace: "pre" },
+  // (The box in the middle of the columns of its `[ ]`, the space's after them, on a line of its own height, as the page's)
+  ".swe-task-box": { boxSizing: "content-box", minWidth: `calc(${LIST_COLUMNS.task - 1} * ${COLUMN})`, paddingRight: COLUMN, textAlign: "center", lineHeight: "1" },
   ".swe-link": { color: "var(--editor-link-color, var(--link-color, #0969da))", textDecoration: "underline" },
   ".swe-wiki-link": { color: "var(--editor-wiki-link-page-color, var(--link-color, #0969da))" },
   // (A hashtag as SilverBullet 2.12.1 draws one rendered, a grid's cell's too: its theme's colours and corners, the

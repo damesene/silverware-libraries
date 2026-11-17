@@ -148,6 +148,9 @@ export class PagesStore implements DatabaseStore {
   private readonly listeners = new Set<(change: { readonly database: string }) => void>();
   // Each database's root page as last read, to tell which database a page changed is of
   private readonly roots = new Map<string, string>();
+  // Databases read and not found (their root not in the index yet, as a page opens while the index is still being
+  // built): told once the index has their root, so what shows one reads it again
+  private readonly missing = new Set<string>();
   // Each item's page's facts as last read (its dates, its tags): its system properties' values, and what a page the store
   // wrote keeps of them until the index has it
   private readonly facts = new Map<string, SystemFacts>();
@@ -194,7 +197,19 @@ export class PagesStore implements DatabaseStore {
         }
       };
       tell();
+      // A database not found yet told once the index has its root (any page may be it): the roots read once for every
+      // one missing, none told while none is found (a block's id mistyped, a database deleted: one query a change)
+      if (this.missing.size) void this.tellFound();
     });
+  }
+
+  /** The databases not found before whose root the index has now: told, so what shows one reads it */
+  private async tellFound(): Promise<void> {
+    for (const object of await this.objects(ROOT_TAG)) {
+      const read = this.versionNamed(versionOf(object)).readRoot(object, versionOf(object));
+      if ("problem" in read || !this.missing.delete(read.record.database.id)) continue;
+      for (const listener of this.listeners) listener({ database: read.record.database.id });
+    }
   }
 
   async databases(): Promise<readonly DatabaseSummary[]> {
@@ -205,6 +220,7 @@ export class PagesStore implements DatabaseStore {
       if ("problem" in read || seen.has(read.record.database.id)) continue;
       seen.add(read.record.database.id);
       this.roots.set(read.record.database.id, String(object.name));
+      this.missing.delete(read.record.database.id);
       out.push({ id: read.record.database.id, name: read.record.database.name });
     }
     return out;
@@ -657,6 +673,7 @@ export class PagesStore implements DatabaseStore {
       if ("problem" in read || read.record.database.id !== id) continue;
       const root = String(object.name);
       this.roots.set(id, root);
+      this.missing.delete(id);
       const items = new Map<ItemKey, { page: string; item: ItemState; revision: string }>();
       // (This database's pages' facts read anew: one gone forgets its own, so a page made again under its name is not given them)
       for (const page of [...this.facts.keys()]) if (page.startsWith(`${root}/`)) this.facts.delete(page);
@@ -679,9 +696,10 @@ export class PagesStore implements DatabaseStore {
       }
       return { root, folder: root, made: this.makingOf(root), version, record: read.record, recordRevision: revisionOf(read.record), items };
     }
-    // No root of the id: a root made again later is another making
+    // No root of the id: a root made again later is another making; told as the index changes until it is found
     const root = this.roots.get(id);
     if (root) this.makings.delete(root);
+    this.missing.add(id);
     return undefined;
   }
 

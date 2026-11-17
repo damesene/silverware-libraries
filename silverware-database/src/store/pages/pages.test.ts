@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { pageChanges } from "../../../../shared/pages/changes.ts";
 import { pageWriter } from "../../../../shared/pages/writer.ts";
 import { writeYamlEntry } from "../../../../shared/yaml/tree.ts";
@@ -116,6 +116,32 @@ describe("the pages store", () => {
     expect(await shown()).toEqual(before);
     const [fix] = (await store.items("tasks")).value;
     expect((await store.apply(await store.plan({ ...changes("tasks", { kind: "setValue", item: fix!.key, key: "status", value: "Todo" }), expects: { items: { [fix!.key]: fix!.revision } } }))).written).toHaveLength(1);
+  });
+
+  it("tells a database read before the index had its root page once a page is indexed, until it is found", async () => {
+    const { memory, store } = harness([]);
+    const told: string[] = [];
+    store.onChanged((change) => told.push(change.database));
+    // (Read as a page opens, the index still being built: not there)
+    expect(await store.database("tasks")).toBeUndefined();
+    memory.writeOutside("db-tasks", "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n---\n");
+    await vi.waitFor(() => expect(told).toEqual(["tasks"]));
+    expect((await store.database("tasks"))?.value.name).toBe("Tasks");
+    // Found: told only as its own pages change
+    memory.writeOutside("Elsewhere", "x");
+    expect(told).toEqual(["tasks"]);
+  });
+
+  it("tells a database never found (its id mistyped) at no page indexed", async () => {
+    const { memory, store } = harness(SEED);
+    const told: string[] = [];
+    store.onChanged((change) => told.push(change.database));
+    expect(await store.database("taks")).toBeUndefined();
+    memory.writeOutside("Elsewhere", "x");
+    memory.writeOutside("Another", "y");
+    // (The roots read as the store reads them for a missing one, after its own reading: that one done by then)
+    await store.databases();
+    expect(told).toEqual([]);
   });
 
   it("tells a change of a database's pages made outside it, and reads a page renamed outside as another item", async () => {

@@ -9,7 +9,7 @@ import { el } from "../../../../shared/elements.ts";
 import type { GridPlace } from "../../../../shared/markdown/gridbuild.ts";
 import { type Box, type CellShape, distanceTo, type GridShape, NEAR_PX, pickAt, type PickedPlace, samePick } from "../core/placepick.ts";
 import { isMarked, offsetOf } from "./offsets.ts";
-import { drawnBlocks } from "./view.ts";
+import { drawnBlocks } from "./cellparts.ts";
 
 /** What is picked for */
 export type PickRequest = {

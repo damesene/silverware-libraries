@@ -1,8 +1,9 @@
 // Where a point of a cell's rendering is in the cell's markdown (a click, a drop, a selection): the element marked with
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
-import { blankLinesAbove, cellLines } from "../core/blanklines.ts";
+import { blankLinesAbove } from "../core/blanklines.ts";
+import { drawnBlocks, spaceBefore } from "./cellparts.ts";
 import { lineStarts, markedFrom, offsetOf } from "./offsets.ts";
-import { drawnBlocks, spaceBefore } from "./view.ts";
+import { cellLines } from "./view.ts";
 import { positionInCell } from "../core/position.ts";
 
 /** A caret's place in the rendering: a node and an offset in it */

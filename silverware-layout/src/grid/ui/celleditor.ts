@@ -5,7 +5,7 @@
 // (another cell written, left by the press that opened this one), the editor goes into the new drawing's cell
 // (`moveTo`), what was typed kept.
 import type { EditorLook, Editors, FieldDrawing, LinkOpening, TextEditor, TextSelection } from "../../../../shared/editor.ts";
-import { CELL_CONTROLS } from "./view.ts";
+import { CELL_CONTROLS } from "./cellparts.ts";
 
 /** What a cell edited asks of the host (src/grid/grids.ts' `GridHost`, its answers there) */
 export type CellHost = {

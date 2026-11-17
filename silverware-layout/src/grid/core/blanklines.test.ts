@@ -2,7 +2,7 @@
 // those the host drew.
 import { describe, expect, it } from "vitest";
 import { markedLines } from "../../../../shared/markdown/parse.ts";
-import { blankLinesAbove, blankLinesBefore, blankLinesDrawn, cellLines } from "./blanklines.ts";
+import { blankLinesAbove, blankLinesBefore, blankLinesDrawn } from "./blanklines.ts";
 
 // (Of a text read line by line first, as a cell's is)
 const countBefore = (text: string, at: number) => blankLinesBefore(markedLines(text), at);
@@ -64,15 +64,6 @@ describe("a cell's blank lines", () => {
     // Text the host left unwrapped: inline
     expect(blankLinesDrawn(2, { nodeName: "#text" })).toBe(1);
     expect(blankLinesDrawn(0, undefined)).toBe(0);
-  });
-});
-
-describe("a cell's lines", () => {
-  it("are read once for the same markdown, whichever cell asks, again for another", () => {
-    const lines = cellLines("a\n\nb");
-    expect(lines.map(({ from }) => from)).toEqual([0, 2, 3]);
-    expect(cellLines("a\n\nb")).toBe(lines);
-    expect(cellLines("a\nb")).not.toBe(lines);
   });
 });
 

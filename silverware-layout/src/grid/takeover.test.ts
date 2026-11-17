@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { blocksOf, takeOver } from "./takeover.ts";
-import { CELL_CONTROLS as CONTROLS } from "./ui/view.ts";
+import { CELL_CONTROLS as CONTROLS } from "./ui/cellparts.ts";
 
 /** A grid drawn of cells' HTML, each cell marked with its index as the grids draw one */
 function grid(...cells: string[]): HTMLElement {

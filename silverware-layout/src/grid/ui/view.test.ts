@@ -2,7 +2,7 @@
 // A cell drawn with its blank lines as the editor shows them: those the host's rendering left out (next to a block,
 // between a loose list's items) put back, those it kept (between paragraphs, as line breaks) left as they are.
 import { describe, expect, it } from "vitest";
-import { drawnBlocks, keepBlankLines, spaceBefore } from "./view.ts";
+import { cellLines, keepBlankLines } from "./view.ts";
 
 // SilverBullet 2.12.1's markdownToHtml of this text (probed 2026-11-14)
 const TEXT = "One\n\nTwo\n\n\nThree\n\n\n\nFour\n- item\n\n- item2\n\n# Head\n\nAfter";
@@ -114,27 +114,11 @@ describe("a cell's blank lines put back", () => {
   });
 });
 
-describe("the blocks a cell draws", () => {
-  it("are its children but the space between them and the grid's grip", () => {
-    const cell = document.createElement("div");
-    cell.innerHTML = '<span class="p">One</span><br><div class="swl-grid-blank"></div><ul data-pos="6"><li>a</li></ul><br><button class="swl-grid-cell-grip"></button>';
-    expect(drawnBlocks(cell).map((block) => block.tagName)).toEqual(["SPAN", "UL"]);
-  });
-});
-
-describe("the space drawn before an element of a cell", () => {
-  it("is the host's line breaks and the blank lines put back right before it, by kind, and what is drawn before them", () => {
-    const cell = document.createElement("div");
-    cell.innerHTML = '<span class="p">One</span><br><div class="swl-grid-blank"></div><br><ul data-pos="6"><li>a</li></ul>';
-    const { breaks, blanks, before } = spaceBefore(cell.querySelector("ul")!);
-    expect([breaks, blanks, before?.nodeName]).toEqual([2, 1, "SPAN"]);
-    expect(spaceBefore(cell.querySelector("span")!)).toEqual({ breaks: 0, blanks: 0, before: undefined });
-  });
-
-  it("is text the host left unwrapped too, not the HTML's own white space", () => {
-    const item = document.createElement("li");
-    item.innerHTML = 'first<br>\n <ul data-pos="9"><li>b</li></ul>';
-    const { breaks, before } = spaceBefore(item.querySelector("ul")!);
-    expect([breaks, before?.nodeName, before?.textContent]).toEqual([1, "#text", "first"]);
+describe("a cell's lines", () => {
+  it("are read once for the same markdown, whichever cell asks, again for another", () => {
+    const lines = cellLines("a\n\nb");
+    expect(lines.map(({ from }) => from)).toEqual([0, 2, 3]);
+    expect(cellLines("a\n\nb")).toBe(lines);
+    expect(cellLines("a\nb")).not.toBe(lines);
   });
 });

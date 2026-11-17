@@ -10,7 +10,7 @@ import type { LayoutMenuEntry } from "../../../../shared/layout.ts";
 import { opensMenu, type PopupItem, type PopupMenu, showPopup } from "../../../../shared/popupmenu.ts";
 import { columnCount, FIT, fitsColumns, MAX_COLUMNS, MIN_WIDTHS, type MinWidthName, minWidthChoice } from "../model/columns.ts";
 import type { BorderStyle } from "../model/border.ts";
-import { CELL_GRIP } from "./view.ts";
+import { CELL_GRIP } from "./cellparts.ts";
 
 // The popup menu's classes: Silverware Layout's
 const POPUP = { base: "swl" } as const;

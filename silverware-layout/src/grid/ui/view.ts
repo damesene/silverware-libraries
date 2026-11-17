@@ -1,42 +1,34 @@
 // A grid drawn: its cells side by side as its column template says (a narrow pane stacks them: the style page's rule),
 // each cell's markdown as the host rendered it.
 import { el } from "../../../../shared/elements.ts";
-import { blankLinesBefore, blankLinesDrawn, cellLines } from "../core/blanklines.ts";
+import { type MarkedLine, markedLines } from "../../../../shared/markdown/parse.ts";
+import { blankLinesBefore, blankLinesDrawn } from "../core/blanklines.ts";
 import type { BorderStyle } from "../model/border.ts";
+import { BLANK, spaceBefore } from "./cellparts.ts";
 import { lineStarts } from "./offsets.ts";
 
 const COLUMNS = "--swl-grid-columns";
-// A blank line of a cell's markdown its rendering left out, put back
-const BLANK = "swl-grid-blank";
-// What a cell's rendering draws as space, not content: the host's line breaks (`br`) and the blank lines put back
-const SPACERS = `br, .${BLANK}`;
-/** A cell's grip, its class (ui/columngrips.ts draws it) */
-export const CELL_GRIP = "swl-grid-cell-grip";
-/** What a grid puts in its cells besides their rendering: each cell's grip */
-export const CELL_CONTROLS = `.${CELL_GRIP}`;
 
-// What a cell draws that is no block of its markdown
-const NOT_BLOCKS = `${SPACERS}, ${CELL_CONTROLS}`;
-
-/** The blocks a cell draws of its markdown, in order: its children but the space between them and what the grid puts in it */
-export const drawnBlocks = (cell: Element): Element[] => [...cell.children].filter((child) => !child.matches(NOT_BLOCKS));
+// The cells' markdown read lately, by its text, the latest last: a grid drawn anew asks again for its cells unchanged
+const READ = new Map<string, readonly MarkedLine[]>();
+// How many are kept (the oldest dropped)
+const READ_KEPT = 64;
 
 /**
- * The space drawn right before an element of a cell's rendering, by kind, and what is drawn before that in what holds
- * it: an element, or text the host left unwrapped (an item's text); none where the element is the first there. Text
- * of white space alone (the HTML's own) is none
+ * A cell's markdown read line by line as markdown's parser reads it (`markedLines`), once for the same text: each
+ * drawing of a grid asks for its every cell, and each point found in a cell after (a press, a drop) for that cell
  */
-export function spaceBefore(element: Element): { readonly breaks: number; readonly blanks: number; readonly before: Element | Text | undefined } {
-  let breaks = 0;
-  let blanks = 0;
-  for (let node = element.previousSibling; node; node = node.previousSibling) {
-    if (node instanceof Element) {
-      if (!node.matches(SPACERS)) return { breaks, blanks, before: node };
-      if (node.classList.contains(BLANK)) blanks++;
-      else breaks++;
-    } else if (node.nodeType === node.TEXT_NODE && /[^ \t\r\n]/.test(node.textContent ?? "")) return { breaks, blanks, before: node as Text };
+export function cellLines(content: string): readonly MarkedLine[] {
+  const read = READ.get(content);
+  if (read) {
+    READ.delete(content);
+    READ.set(content, read);
+    return read;
   }
-  return { breaks, blanks, before: undefined };
+  const lines = markedLines(content);
+  READ.set(content, lines);
+  if (READ.size > READ_KEPT) READ.delete(READ.keys().next().value!);
+  return lines;
 }
 
 /** A grid's element: a cell per rendered markdown (the host's HTML, its elements marked with their offsets in the cell's text) */

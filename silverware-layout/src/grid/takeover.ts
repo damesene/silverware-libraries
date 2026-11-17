@@ -6,7 +6,7 @@
 // what it drew (`Drawn`: told as drawn, never taken again from what another may have decorated since).
 import type { Drawn } from "./drawn.ts";
 import { isMarked, offsetOf, shiftOffsets } from "./ui/offsets.ts";
-import { CELL_CONTROLS, drawnBlocks } from "./ui/view.ts";
+import { CELL_CONTROLS, drawnBlocks } from "./ui/cellparts.ts";
 
 /** A grid drawn: its element, its cells' markdown, what it drew in them */
 export type Drawing = { readonly element: HTMLElement; readonly contents: readonly string[]; readonly drawn: readonly Drawn[] };

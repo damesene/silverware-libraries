@@ -64,8 +64,7 @@ The look of [Silverware Assets XLSX](silverware-assets-xlsx.md): a workbook's pr
   max-width: min(100%, var(--swa-xlsx-box-width, 100%));
   padding: 0;
   background: #fff;
-  border-radius: 0;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--root-color, #000) 14%, transparent);
+  /* (Its corners and outline Silverware Assets' own for every preview a type draws: as the theme gives a picture) */
 }
 .swa-xlsx-preview-sheet {
   overflow: hidden;
@@ -77,8 +76,9 @@ The look of [Silverware Assets XLSX](silverware-assets-xlsx.md): a workbook's pr
 /* A sheet (src/table.ts) as a spreadsheet shows it: a workbook's own font where its cells name none (Calibri 11 pt,
    black on white), Excel's grid, the columns' letters and the rows' numbers on a quiet ground, held as it scrolls. Of more weight
    than SilverBullet's rules for a table in an embed after 2.12.1 (its card's striped rows, header, padding, an id and
-   more), less than a cell's own look (inline): `:not(#swa-xlsx-none)` an id more, matching every sheet */
-:is(#sb-main, html) .swa-xlsx-sheet:not(#swa-xlsx-none) {
+   more), less than a cell's own look (inline): `:not(#swa-xlsx-none)` twice, two ids more, matching every sheet, and no
+   ancestor named (a sheet drawn in an editor's shadow root, a grid's cell edited, has none of the page's) */
+.swa-xlsx-sheet:not(#swa-xlsx-none):not(#swa-xlsx-none) {
   --swa-xlsx-font: Calibri, Carlito, "Segoe UI", Arial, sans-serif;
   table-layout: fixed;
   border-collapse: separate;
@@ -89,7 +89,7 @@ The look of [Silverware Assets XLSX](silverware-assets-xlsx.md): a workbook's pr
   color: #000;
   background: #fff;
 }
-:is(#sb-main, html) .swa-xlsx-sheet:not(#swa-xlsx-none) :is(td, th) {
+.swa-xlsx-sheet:not(#swa-xlsx-none):not(#swa-xlsx-none) :is(td, th) {
   box-sizing: border-box;
   padding: 1px 4px;
   overflow: hidden;
@@ -99,11 +99,11 @@ The look of [Silverware Assets XLSX](silverware-assets-xlsx.md): a workbook's pr
   border-right: 1px solid #d4d4d4;
   border-bottom: 1px solid #d4d4d4;
 }
-:is(#sb-main, html) .swa-xlsx-sheet:not(#swa-xlsx-none) td {
+.swa-xlsx-sheet:not(#swa-xlsx-none):not(#swa-xlsx-none) td {
   font-weight: normal;
   background: #fff;
 }
-:is(#sb-main, html) .swa-xlsx-sheet:not(#swa-xlsx-none) th {
+.swa-xlsx-sheet:not(#swa-xlsx-none):not(#swa-xlsx-none) th {
   font-weight: normal;
   font-size: 9pt;
   text-align: center;
@@ -112,17 +112,17 @@ The look of [Silverware Assets XLSX](silverware-assets-xlsx.md): a workbook's pr
   background: #f3f3f3;
   border-color: #c8c8c8;
 }
-:is(#sb-main, html) .swa-xlsx-sheet:not(#swa-xlsx-none) .swa-xlsx-sheet-letters th {
+.swa-xlsx-sheet:not(#swa-xlsx-none):not(#swa-xlsx-none) .swa-xlsx-sheet-letters th {
   position: sticky;
   top: 0;
   z-index: 4;
 }
-:is(#sb-main, html) .swa-xlsx-sheet:not(#swa-xlsx-none) .swa-xlsx-sheet-number {
+.swa-xlsx-sheet:not(#swa-xlsx-none):not(#swa-xlsx-none) .swa-xlsx-sheet-number {
   position: sticky;
   left: 0;
   z-index: 1;
 }
-:is(#sb-main, html) .swa-xlsx-sheet:not(#swa-xlsx-none) .swa-xlsx-sheet-corner {
+.swa-xlsx-sheet:not(#swa-xlsx-none):not(#swa-xlsx-none) .swa-xlsx-sheet-corner {
   left: 0;
   z-index: 5 !important;
 }

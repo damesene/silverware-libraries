@@ -998,9 +998,10 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
 /* What a cell draws of its markdown in the look the theme gives the page's: a table as a card, a picture's and a code
    block's corners, a quote's bar, by the theme's own variables (SilverBullet's after 2.12.1: its corners, its card's
    border and shadow, its code's ground), else plain (2.12.1 has none of them, nor its page). These rules alone set
-   it: the page's own drawing is SilverBullet's, untouched. Of more weight than a host's rules for a table in a block
-   of its (`:not(#swl-none)` twice: two ids more, matching every one) */
-.swl-grid-cell table:not(#swl-none):not(#swl-none) {
+   it: the page's own drawing is SilverBullet's, untouched. The cell's own blocks alone (its children): what a plugin
+   draws in a box of its own (a spreadsheet's preview) keeps its look. Of more weight than a host's rules for a table in a
+   block of its (`:not(#swl-none)` twice: two ids more, matching every one) */
+.swl-grid-cell > table:not(#swl-none):not(#swl-none) {
   border-collapse: separate;
   border-spacing: 0;
   border: 1px solid var(--ui-surface-border-color, transparent);
@@ -1009,35 +1010,37 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   background: var(--root-background-color);
 }
 /* (Its corner cells rounded as the card, inside its border: a cell's ground would show past a rounded corner) */
-.swl-grid-cell table > :first-child > tr:first-child > :first-child {
+.swl-grid-cell > table > :first-child > tr:first-child > :first-child {
   border-top-left-radius: max(0px, calc(var(--ui-radius-xl, 0px) - 1px));
 }
-.swl-grid-cell table > :first-child > tr:first-child > :last-child {
+.swl-grid-cell > table > :first-child > tr:first-child > :last-child {
   border-top-right-radius: max(0px, calc(var(--ui-radius-xl, 0px) - 1px));
 }
-.swl-grid-cell table > :last-child > tr:last-child > :first-child {
+.swl-grid-cell > table > :last-child > tr:last-child > :first-child {
   border-bottom-left-radius: max(0px, calc(var(--ui-radius-xl, 0px) - 1px));
 }
-.swl-grid-cell table > :last-child > tr:last-child > :last-child {
+.swl-grid-cell > table > :last-child > tr:last-child > :last-child {
   border-bottom-right-radius: max(0px, calc(var(--ui-radius-xl, 0px) - 1px));
 }
-.swl-grid-cell img:not(#swl-none) {
+/* (A picture of the cell's own markdown alone, in its paragraph or item: one a plugin draws, in a box of its own, is
+   that plugin's to look so) */
+.swl-grid-cell > :is(p, li) > img:not(#swl-none) {
   border-radius: var(--ui-radius-lg, 0);
   outline: 1px solid var(--ui-surface-border-color, transparent);
   outline-offset: -1px;
 }
-.swl-grid-cell pre:not(#swl-none) {
+.swl-grid-cell > pre:not(#swl-none) {
   padding: 12px 16px;
   overflow-x: auto;
   border-radius: var(--ui-radius-lg, 0);
   background-color: var(--editor-code-background-color, transparent);
 }
-.swl-grid-cell pre:not(#swl-none) code {
+.swl-grid-cell > pre:not(#swl-none) code {
   padding: 0;
   border-radius: 0;
   background: none;
 }
-.swl-grid-cell blockquote:not(#swl-none) {
+.swl-grid-cell > blockquote:not(#swl-none) {
   margin-left: 0;
   margin-right: 0;
   padding-left: 1em;

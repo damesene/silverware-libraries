@@ -129,6 +129,8 @@ const NATIVE_HIDDEN = "swa-native-hidden";
 // The host's medium of a file (its image, video, PDF's viewer), marked: what the style page zooms with the content's
 // scale, never a picture a type draws inside its own (a document's)
 const MEDIUM = "swa-medium";
+// A preview a type draws (its own element), shown as a picture is (the style page)
+const PREVIEW_FACE = "swa-preview-face";
 // What shows a document of its own, taking the clicks on it (a PDF's viewer)
 const DOCUMENT_VIEWERS = "object, iframe, embed";
 const LINK_ICON = "swa-link-icon";
@@ -1136,6 +1138,8 @@ export class AssetDecorator {
           return;
         }
         element.classList.add("swa-own");
+        // (A preview a type draws: its face, which the style page gives a picture's corners, as the host's own medium)
+        if (view === "preview") element.classList.add(PREVIEW_FACE);
         hideHost();
         frame.append(element);
         if (view === "preview") previewDone(element);
@@ -1198,6 +1202,20 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
  * content's scale of 1 (shared/contentscale.ts): a type draws its sizes as CSS following the scale (`scaledPx`), so
  * they change at once with it, as the host's media do, nothing drawn again
  */
+/**
+ * The width of the room an element is drawn in, where it has none of its own yet (a frame of ours round nothing drawn,
+ * in a field's line, inline and as wide as its label): its nearest ancestor laid out as a block, less its padding
+ */
+function roomOf(element: HTMLElement): number {
+  const win = element.ownerDocument.defaultView;
+  for (let at = element.parentElement; at; at = at.parentElement) {
+    const style = win?.getComputedStyle(at);
+    if (!style || style.display.startsWith("inline") || !at.clientWidth) continue;
+    return at.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0);
+  }
+  return 0;
+}
+
 function viewportOf(element: HTMLElement, embed: Embed, view: View, settings: AssetSettings, signal: AbortSignal, width?: number, ownHeight?: number): Viewport {
   // (A preview's: its type's own where it has one, as the frame's --swa-height says, else all files')
   const height = () => Number(embed.height) || ownHeight || (view === "card" ? 0 : settings[view].height);
@@ -1207,7 +1225,7 @@ function viewportOf(element: HTMLElement, embed: Embed, view: View, settings: As
     // own, as what is over the window has 1)
     get width() {
       if (width !== undefined) return width;
-      const shown = element.clientWidth || element.getBoundingClientRect().width;
+      const shown = element.clientWidth || element.getBoundingClientRect().width || roomOf(element);
       const scale = parseFloat(element.ownerDocument.defaultView?.getComputedStyle(element).getPropertyValue(CONTENT_SCALE) ?? "");
       return Number.isFinite(scale) && scale > 0 ? shown / scale : shown;
     },

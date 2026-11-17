@@ -148,9 +148,8 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
           // (Its content comes after the frame: looked at again as it does)
           if (!target) continue;
           const drawing = drawingIn(frame);
-          // (None found: SilverBullet's drawing of another shape, offered once as before)
-          if (!drawing && offeredWith.has(frame)) continue;
-          if (offeredWith.has(frame) && offeredWith.get(frame) === drawing) continue;
+          // (Offered again only with another drawing; none found, SilverBullet's of another shape, once as before)
+          if (offeredWith.has(frame) && (!drawing || offeredWith.get(frame) === drawing)) continue;
           offeredWith.set(frame, drawing);
           for (const bar of frame.parentElement?.querySelectorAll<HTMLElement>(BARS) ?? []) bar.style.setProperty("display", "none", "important");
           found.push({ frame, ...target });

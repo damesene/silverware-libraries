@@ -1007,6 +1007,18 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 [data-swa-type]::before {
   content: none !important;
 }
+/* A file's picture (the host's medium, an image or a video) and a preview a type draws (a document's first page) with
+   the corners and outline the theme gives a picture in the page, wherever the file is drawn (the page, a grid's cell,
+   a field): its variables (SilverBullet's after 2.12.1), else none (2.12.1). The preview's content cut to its corners */
+[data-swa-type] :is(img, video).swa-medium,
+[data-swa-type] .swa-preview-face {
+  border-radius: var(--ui-radius-lg, 0);
+  outline: 1px solid var(--ui-surface-border-color, transparent);
+  outline-offset: -1px;
+}
+[data-swa-type] .swa-preview-face {
+  overflow: hidden;
+}
 [data-swa-type]:has(object.swa-medium:not(.swa-native-hidden, .swa-native-hidden *), .swa-pdf) {
   display: block;
   width: auto;

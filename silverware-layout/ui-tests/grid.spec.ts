@@ -408,9 +408,10 @@ test("a click in a nested list's margin over its blank line puts the caret on th
   const cell = "- first\n\n  - b\n  - c";
   await space.open({ Page: `# Page\n\n<grid>\n<cell>\n\n${cell}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n` }, "Page");
   await gridsDrawn(page);
+  // (A theme's margin over a nested list: room between the item's text and the blank line under it; a style of the
+  // page's, so a grid drawn anew has it too)
+  await page.addStyleTag({ content: "#sb-main .swl-grid-cell li > ul { margin-top: 12px !important; }" });
   const first = page.locator("#sb-main .swl-grid-cell").first();
-  // (A theme's margin over a nested list: room between the item's text and the blank line under it)
-  await first.locator("li > ul").evaluate((list: HTMLElement) => list.style.setProperty("margin-top", "12px", "important"));
   const word = await boxOf(first.locator(".p").first());
   expect((await boxOf(first.locator("li > ul"))).y - (word.y + word.height)).toBeGreaterThan(8);
   await page.mouse.click(word.x + 10, word.y + word.height + 4);

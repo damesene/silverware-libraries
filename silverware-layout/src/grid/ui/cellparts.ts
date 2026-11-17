@@ -22,26 +22,28 @@ export const drawnBlocks = (cell: Element): Element[] => [...cell.children].filt
 
 /** The space drawn right before an element of a cell's rendering, and what is drawn before that */
 export type SpaceBefore = {
-  /** The host's line breaks */
-  readonly breaks: number;
+  /**
+   * The blank lines the host drew: its line breaks, the first of them only ending the line of what is inline before
+   * them (a paragraph, text), each a blank line after a block or where nothing is
+   */
+  readonly drawn: number;
   /** The blank lines put back */
   readonly blanks: number;
   /** What is drawn before them in what holds the element: an element, or text the host left unwrapped (an item's text); none where the element is the first there */
   readonly before: Element | Text | undefined;
-  /** Whether that is inline (a paragraph, text), its line ended by the first line break after it; not a block */
-  readonly afterInline: boolean;
 };
 
 /** The space drawn right before an element of a cell's rendering, and what is before it (text of white space alone, the HTML's own, none) */
 export function spaceBefore(element: Element): SpaceBefore {
   let breaks = 0;
   let blanks = 0;
+  const after = (before: Element | Text | undefined, inline: boolean): SpaceBefore => ({ drawn: inline ? Math.max(0, breaks - 1) : breaks, blanks, before });
   for (let node = element.previousSibling; node; node = node.previousSibling) {
     if (node instanceof Element) {
-      if (!node.matches(SPACERS)) return { breaks, blanks, before: node, afterInline: !BLOCKS.has(node.tagName.toUpperCase()) };
+      if (!node.matches(SPACERS)) return after(node, !BLOCKS.has(node.tagName.toUpperCase()));
       if (node.classList.contains(BLANK)) blanks++;
       else breaks++;
-    } else if (node.nodeType === node.TEXT_NODE && /[^ \t\r\n]/.test(node.textContent ?? "")) return { breaks, blanks, before: node as Text, afterInline: true };
+    } else if (node.nodeType === node.TEXT_NODE && /[^ \t\r\n]/.test(node.textContent ?? "")) return after(node as Text, true);
   }
-  return { breaks, blanks, before: undefined, afterInline: false };
+  return after(undefined, false);
 }

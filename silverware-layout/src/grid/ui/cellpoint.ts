@@ -77,6 +77,8 @@ function lineStartBelow(cellElement: HTMLElement, lines: readonly MarkedLine[], 
  */
 export function blankLineAt(content: string, cellElement: HTMLElement, y: number): number | undefined {
   const lines = cellLines(content);
+  // (A cell without a blank line has none to click: its rendering not measured)
+  if (!lines.some((line) => line.empty)) return undefined;
   const next = lineStartBelow(cellElement, lines, y);
   if (!next) return undefined;
   const { element, offset } = next;

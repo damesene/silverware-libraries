@@ -1,7 +1,7 @@
 // A grid drawn: its cells side by side as its column template says (a narrow pane stacks them: the style page's rule),
 // each cell's markdown as the host rendered it.
 import { el } from "../../../../shared/elements.ts";
-import { blankLinesAbove, blankLinesDrawn } from "../core/blanklines.ts";
+import { blankLinesAbove } from "../core/blanklines.ts";
 import type { BorderStyle } from "../model/border.ts";
 import { cellLines } from "./celllines.ts";
 import { BLANK, spaceBefore } from "./cellparts.ts";
@@ -64,11 +64,13 @@ export function plainCell(doc: Document, content: string): string {
  */
 export function keepBlankLines(doc: Document, cell: HTMLElement, content: string): void {
   const lines = cellLines(content);
+  // (A cell without a blank line has none to put back: its rendering not looked through)
+  if (!lines.some((line) => line.empty)) return;
   for (const { element, offset } of lineStarts(cell, lines)) {
     const wanted = blankLinesAbove(lines, offset).length;
     if (!wanted) continue;
     // (Those put back already counted: drawn again over the same, none more)
-    const { breaks, blanks, afterInline } = spaceBefore(element);
-    for (let missing = wanted - blanks - blankLinesDrawn(breaks, afterInline); missing > 0; missing--) element.before(el(doc, "div", { class: BLANK, attrs: { "aria-hidden": "true" } }));
+    const { drawn, blanks } = spaceBefore(element);
+    for (let missing = wanted - blanks - drawn; missing > 0; missing--) element.before(el(doc, "div", { class: BLANK, attrs: { "aria-hidden": "true" } }));
   }
 }

@@ -12,21 +12,27 @@ describe("the blocks a cell draws", () => {
 });
 
 describe("the space drawn before an element of a cell", () => {
-  it("is the host's line breaks and the blank lines put back right before it, by kind, and what is drawn before them", () => {
+  it("is the blank lines the host drew (the first line break only ending an inline line) and those put back, and what is drawn before them", () => {
     const cell = document.createElement("div");
     cell.innerHTML = '<span class="p">One</span><br><div class="swl-grid-blank"></div><br><ul data-pos="6"><li>a</li></ul><br><h1 data-pos="14">H</h1>';
-    const { breaks, blanks, before, afterInline } = spaceBefore(cell.querySelector("ul")!);
-    expect([breaks, blanks, before?.nodeName, afterInline]).toEqual([2, 1, "SPAN", true]);
-    expect(spaceBefore(cell.querySelector("span")!)).toEqual({ breaks: 0, blanks: 0, before: undefined, afterInline: false });
-    // After a block
+    const { drawn, blanks, before } = spaceBefore(cell.querySelector("ul")!);
+    expect([drawn, blanks, before?.nodeName]).toEqual([1, 1, "SPAN"]);
+    expect(spaceBefore(cell.querySelector("span")!)).toEqual({ drawn: 0, blanks: 0, before: undefined });
+    // After a block, each line break a blank line
     const heading = spaceBefore(cell.querySelector("h1")!);
-    expect([heading.breaks, heading.before?.nodeName, heading.afterInline]).toEqual([1, "UL", false]);
+    expect([heading.drawn, heading.before?.nodeName]).toEqual([1, "UL"]);
   });
 
   it("is text the host left unwrapped too, inline, not the HTML's own white space", () => {
     const item = document.createElement("li");
     item.innerHTML = 'first<br>\n <ul data-pos="9"><li>b</li></ul>';
-    const { breaks, before, afterInline } = spaceBefore(item.querySelector("ul")!);
-    expect([breaks, before?.nodeName, before?.textContent, afterInline]).toEqual([1, "#text", "first", true]);
+    const { drawn, before } = spaceBefore(item.querySelector("ul")!);
+    expect([drawn, before?.nodeName, before?.textContent]).toEqual([0, "#text", "first"]);
+  });
+
+  it("is each line break a blank line where nothing is before them", () => {
+    const cell = document.createElement("div");
+    cell.innerHTML = '<br><br><ul data-pos="2"><li>a</li></ul>';
+    expect(spaceBefore(cell.querySelector("ul")!)).toEqual({ drawn: 2, blanks: 0, before: undefined });
   });
 });

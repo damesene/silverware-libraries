@@ -2,9 +2,10 @@
 // editor shows each blank line of a page as a line of its own; the host's rendering of a cell (SilverBullet's
 // markdownToHtml, 2.12.1, probed 2026-11-14) keeps those between paragraphs (as line breaks) and drops those next to a
 // block (a list, a heading, a table, a code block) and between a loose list's items; in a quote alike, its blank lines
-// its marks alone (`>`: kept as line breaks but between a loose list's items, probed 2026-11-17). What a rendered
-// element misses of the blank lines before it in the markdown is counted here, its lines read once as markdown's parser
-// reads them (shared/markdown/parse.ts: a quote's marks, a list item's, none in a code block). Pure.
+// its marks alone (`>`: kept as line breaks but between a loose list's items, probed 2026-11-17). The blank lines
+// before a place in the markdown are found here, its lines read as markdown's parser reads them (shared/markdown/
+// parse.ts: a quote's marks, a list item's, none in a code block); what the host drew of them is the drawing's
+// (ui/cellparts.ts `spaceBefore`). Pure.
 import { lineIndexAt, type MarkedLine } from "../../../../shared/markdown/lines.ts";
 
 /**
@@ -34,9 +35,3 @@ export function blankLinesAbove(lines: readonly MarkedLine[], at: number): reado
  * typed a code block)
  */
 export const caretOn = (line: MarkedLine): number => (line.quotes.length ? line.quotes.at(-1)! + 1 : line.from);
-
-/**
- * How many blank lines the host drew right before an element of a cell: the line breaks before it, the first of them
- * only ending the line of what is inline before them (`afterInline`: a paragraph, text), none after a block
- */
-export const blankLinesDrawn = (breaks: number, afterInline: boolean): number => (afterInline ? Math.max(0, breaks - 1) : breaks);

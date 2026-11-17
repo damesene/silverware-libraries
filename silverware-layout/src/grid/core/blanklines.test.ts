@@ -2,7 +2,7 @@
 // those the host drew.
 import { describe, expect, it } from "vitest";
 import { markedLines } from "../../../../shared/markdown/parse.ts";
-import { blankLinesAbove, blankLinesDrawn, caretOn } from "./blanklines.ts";
+import { blankLinesAbove, caretOn } from "./blanklines.ts";
 
 // (Of a text read line by line first, as a cell's is)
 const countBefore = (text: string, at: number) => blankLinesAbove(markedLines(text), at).length;
@@ -57,15 +57,6 @@ describe("a cell's blank lines", () => {
   it("reads a mark after four spaces as a code block's line in a quote, no blank line", () => {
     expect(countBefore("> a\n>     >\n> b", 14)).toBe(0);
     expect(countBefore("> a\n>    >\n> b", 13)).toBe(1);
-  });
-
-  it("counts those drawn: the line breaks, the first only ending the line of what is inline before them", () => {
-    expect(blankLinesDrawn(2, true)).toBe(1);
-    expect(blankLinesDrawn(1, true)).toBe(0);
-    expect(blankLinesDrawn(0, true)).toBe(0);
-    // After a block, or nothing: each a blank line
-    expect(blankLinesDrawn(1, false)).toBe(1);
-    expect(blankLinesDrawn(0, false)).toBe(0);
   });
 });
 

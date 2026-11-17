@@ -1164,26 +1164,29 @@ test.describe("Pins on the sheet", () => {
       b.scrollTop = 400;
       b.scrollLeft = 150;
     });
-    // (Measured once what the scroll moves is placed: its frames, not a time)
-    await settled(page);
     const view = await board.evaluate((b) => {
       const r = b.getBoundingClientRect();
       const s = getComputedStyle(b);
       return { top: r.top + parseFloat(s.borderTopWidth), left: r.left + parseFloat(s.borderLeftWidth), bottom: r.top + parseFloat(s.borderTopWidth) + b.clientHeight };
     });
-    // The header (with the row pinned to the top) at the board's top, the Total row at its bottom, the pinned column at its left
-    expect((await drawn.locator("thead tr").first().boundingBox())!.y).toBeCloseTo(view.top, 0);
-    const total = (await drawn.locator("tr[data-swt-row='31'] > td").first().boundingBox())!;
-    expect(total.y + total.height).toBeCloseTo(view.bottom, 0);
-    expect((await drawn.locator("tr[data-swt-row='15'] > td").first().boundingBox())!.x).toBeCloseTo(view.left, 0);
+    // The header (with the row pinned to the top) at the board's top, the Total row at its bottom, the pinned column at
+    // its left: each as what the scroll moves is placed (frames after it, more under load)
+    await expect.poll(async () => (await drawn.locator("thead tr").first().boundingBox())?.y).toBeCloseTo(view.top, 0);
+    await expect.poll(async () => {
+      const total = await drawn.locator("tr[data-swt-row='31'] > td").first().boundingBox();
+      return total && total.y + total.height;
+    }).toBeCloseTo(view.bottom, 0);
+    await expect.poll(async () => (await drawn.locator("tr[data-swt-row='15'] > td").first().boundingBox())?.x).toBeCloseTo(view.left, 0);
     // Scrolled to the end: the header held goes no farther than its table
     await board.evaluate((b) => {
       b.scrollTop = b.scrollHeight;
     });
-    await settled(page);
-    const table = (await drawn.boundingBox())!;
-    const head = (await drawn.locator("thead").boundingBox())!;
-    expect(head.y + head.height).toBeLessThanOrEqual(table.y + table.height + 1);
+    await expect
+      .poll(async () => {
+        const [table, head] = [await drawn.boundingBox(), await drawn.locator("thead").boundingBox()];
+        return table && head ? head.y + head.height - (table.y + table.height) : undefined;
+      })
+      .toBeLessThanOrEqual(1);
   });
 
   test("a value under the row pinned to the bottom goes in a row above it, which stays last", async ({ page }) => {

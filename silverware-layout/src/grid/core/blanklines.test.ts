@@ -18,6 +18,9 @@ describe("a cell's blank lines", () => {
     expect(blankLinesBefore(TEXT, 25)).toBe(0);
     expect(blankLinesBefore(TEXT, 33)).toBe(1);
     expect(blankLinesBefore(TEXT, 0)).toBe(0);
+    // Blank lines of spaces too; a text starting with them
+    expect(blankLinesBefore("a\n  \n\t\nb", 7)).toBe(2);
+    expect(blankLinesBefore("\n\nb", 2)).toBe(2);
   });
 
   it("finds where the line a place is on starts", () => {
@@ -113,5 +116,8 @@ describe("a blank line clicked", () => {
     expect(blankLineStart(text, 4, 2)).toBe(2);
     expect(blankLineStart(text, 4, 3)).toBeUndefined();
     expect(blankLineStart(text, 0, 1)).toBeUndefined();
+    expect(blankLineStart(text, 4, 0)).toBeUndefined();
+    // A text starting with blank lines: the first at 0
+    expect(blankLineStart("\n\nb", 2, 2)).toBe(0);
   });
 });

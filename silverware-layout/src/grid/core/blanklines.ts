@@ -11,15 +11,24 @@ const BLOCKS = new Set(["UL", "OL", "LI", "H1", "H2", "H3", "H4", "H5", "H6", "P
 // (At 0 the first line, whatever it holds: `lastIndexOf` would read a from-index of -1 as 0 and find a line break there)
 export const lineStartOf = (text: string, at: number): number => (at <= 0 ? 0 : text.lastIndexOf("\n", at - 1) + 1);
 
-/** How many blank lines lie right before the line a place of a text is on */
-export function blankLinesBefore(text: string, at: number): number {
-  const lines = text.slice(0, Math.max(0, at)).split("\n");
-  // (The line the place is on, up to the place: not one of them)
-  lines.pop();
-  let blank = 0;
-  for (let i = lines.length - 1; i >= 0 && lines[i]!.trim() === ""; i--) blank++;
-  return blank;
+/**
+ * Where the blank lines right before the line a place of a text is on start, the nearest first. Read back from that
+ * line over them alone, not the text before: a cell's every line is asked for as it is drawn
+ */
+function blankLineStarts(text: string, at: number): readonly number[] {
+  const starts: number[] = [];
+  // (Each line before ends where the one after starts, its line break between)
+  for (let end = lineStartOf(text, at); end > 0; ) {
+    const start = lineStartOf(text, end - 1);
+    if (text.slice(start, end - 1).trim() !== "") break;
+    starts.push(start);
+    end = start;
+  }
+  return starts;
 }
+
+/** How many blank lines lie right before the line a place of a text is on */
+export const blankLinesBefore = (text: string, at: number): number => blankLineStarts(text, at).length;
 
 /**
  * How many blank lines the host drew right before an element of a cell: the line breaks before it, the first of them
@@ -32,8 +41,5 @@ export function blankLinesDrawn(breaks: number, before: { readonly tagName: stri
 
 /** Where the `nth` blank line above the line a place of a text is on starts (1: the nearest); none where there are not as many */
 export function blankLineStart(text: string, at: number, nth: number): number | undefined {
-  if (nth < 1 || nth > blankLinesBefore(text, at)) return undefined;
-  let start = lineStartOf(text, at);
-  for (let i = 0; i < nth; i++) start = text.lastIndexOf("\n", start - 2) + 1;
-  return start;
+  return nth < 1 ? undefined : blankLineStarts(text, at)[nth - 1];
 }

@@ -250,6 +250,17 @@ test("the toolbar stays on its chart as the text above it grows", async ({ page,
     .toBe(4);
 });
 
+/**
+ * A write of a chart's (`action`), and the chart drawn anew from it: its widget is rendered again as its block's text
+ * changes, and a menu opened on the one before closed with it
+ */
+async function chartRendersAnew(page: import("@playwright/test").Page, action: () => Promise<unknown>): Promise<void> {
+  await page.locator(".swc-chart").first().evaluate((chart) => chart.setAttribute("data-test-old", ""));
+  await action();
+  await expect(page.locator(".swc-chart[data-test-old]")).toHaveCount(0);
+  await expect(page.locator(".swc-chart canvas").first()).toBeVisible();
+}
+
 /** The chart's settings dialog opened from its menu */
 async function chartSettings(page: import("@playwright/test").Page): Promise<import("@playwright/test").Locator> {
   await chartMenu(page);
@@ -264,12 +275,13 @@ test("a type picked draws every series so; the settings draw one as a line over 
   await expect.poll(() => charts(page)).toHaveLength(1);
   await chartMenu(page);
   await page.locator(".swc-menu-item", { hasText: "Type" }).click();
-  await page.locator(".swc-menu-tile", { hasText: /^Line/ }).click();
+  // (Each write's chart drawn anew before its menu is opened again: one opened on the chart before closed with it)
+  await chartRendersAnew(page, () => page.locator(".swc-menu-tile", { hasText: /^Line/ }).click());
   await expect.poll(() => savedText(page)).toContain('  line "one" [1, 2]\n  line "two" [3, 4]\n```');
   let dialog = await chartSettings(page);
   await dialog.locator(".swc-settings-tab", { hasText: "Series" }).click();
   await dialog.locator(".swc-settings-item select").first().selectOption("bar");
-  await dialog.locator(".swc-settings-save").click();
+  await chartRendersAnew(page, () => dialog.locator(".swc-settings-save").click());
   await expect.poll(() => savedText(page)).toContain('  bar "one" [1, 2]\n  line "two" [3, 4]\n%% chart.type: line\n```');
   // Steps, which Mermaid has no word for: a line there, its kind said in chart.kinds; smooth lines on General
   dialog = await chartSettings(page);

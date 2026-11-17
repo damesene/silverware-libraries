@@ -83,7 +83,8 @@ function readAsParser(text: string, from = 0): { readonly read: string; readonly
  * A line of a text (`to` at its line break) with the marks the blocks holding it put on it, as markdown's parser reads
  * them: where each of its quotes' `>` is, whether a list's item starts on it (its marker), where its own text starts
  * past them and the indentation, and whether it holds nothing past them (a quote's empty line, `>`, a blank line). A
- * mark in a code block is its text: none. A CRLF is read as `parseBlocks` reads it, its `\r` in no line
+ * mark in a code block is its text: none. A CRLF is read as `parseBlocks` reads it, its `\r` in no line. The parser's
+ * own reading, none of SilverBullet's extensions: an HTML comment's body is no markdown here (`parseBlocks` reads it)
  */
 export type MarkedLine = Span & { readonly quotes: readonly number[]; readonly item: boolean; readonly content: number; readonly empty: boolean };
 

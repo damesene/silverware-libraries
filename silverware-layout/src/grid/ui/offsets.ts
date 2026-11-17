@@ -3,6 +3,8 @@
 import { lineIndexAt, type MarkedLine } from "../../../../shared/markdown/lines.ts";
 
 const POS = "data-pos";
+// A page the cell embeds, drawn in it (`GridHost.renderMarkdown`): its offset the embed's, nothing in it the cell's
+const EMBEDDED = "data-swl-embedded";
 
 /** An element of a cell's rendering that starts a line of its markdown, and its offset there */
 export type LineStart = { readonly element: HTMLElement; readonly offset: number };
@@ -26,6 +28,12 @@ export function* lineStarts(cell: HTMLElement, lines: readonly MarkedLine[]): Ge
     yield { element, offset };
   }
 }
+
+/** Whether an element of a cell's rendering is in a page the cell embeds: none of the cell's markdown */
+export const inEmbeddedPage = (element: Element): boolean => !!element.parentElement?.closest(`[${EMBEDDED}]`);
+
+/** Whether an element of a cell's rendering is a page the cell embeds, drawn as one: a point in it is at its offset */
+export const isEmbeddedPage = (element: Element): boolean => element.hasAttribute(EMBEDDED);
 
 /** The element marked with its offset that an element of a cell's rendering is in, itself or the nearest round it */
 export const markedFrom = (element: Element): Element | null => element.closest(`[${POS}]`);

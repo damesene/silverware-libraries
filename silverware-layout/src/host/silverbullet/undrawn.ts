@@ -9,8 +9,11 @@
 //
 // A page embedded (`![[Other page]]`) it expands in the line holding it (a paragraph, a heading, a task: probed
 // 2026-11-17), its elements marked with that page's offsets, not the cell's: read as the cell's, they would stand for
-// the cell's lines (its blank lines put back into the other page) and a click there would land elsewhere. Marked out by
-// an image before and after it, and what lies between them left unmarked: the page drawn is the line's, as its text.
+// the cell's lines (its blank lines put back into the other page), a click there would land elsewhere, a task's box
+// toggle the cell's. Marked out by an image before and after it, and what lies between them given as the grid takes a
+// page embedded (`GridHost.renderMarkdown`): in an element `data-swl-embedded` at the embed's offset, nothing in it
+// marked. One the text shows as it is (escaped, `\![[…]]`) is left so; a mark SilverBullet shows as text (in an
+// indented code block, in HTML) taken out.
 //
 // The offsets after what was put in set back by its length, so `data-pos` is the text's. Pure.
 import { type Embed, isFileTarget, readEmbeds } from "../../../../shared/markdown/embed.ts";
@@ -25,8 +28,8 @@ const PAGE_START = (n: number) => IMAGE(`swl-page-start-${n}`);
 const PAGE_END = (n: number) => IMAGE(`swl-page-end-${n}`);
 // A page embedded as drawn: the images round it, what lies between them
 const PAGE_DRAWN = /<img\b[^>]*?\balt="swl-page-start-(\d+)"[^>]*>([\s\S]*?)<img\b[^>]*?\balt="swl-page-end-\1"[^>]*>/gi;
-// An image of those left over (one drawn without the other): never shown
-const PAGE_MARK_DRAWN = /<img\b[^>]*?\balt="swl-page-(?:start|end)-\d+"[^>]*>/gi;
+// A mark left over (one drawn without the other), or shown as its text where SilverBullet draws no image: never shown
+const PAGE_MARK_DRAWN = /<img\b[^>]*?\balt="swl-page-(?:start|end)-\d+"[^>]*>|!\[swl-page-(?:start|end)-\d+\]\(data:,\.png\)/gi;
 const POSITION = /\bdata-pos="(\d+)"/g;
 const MARKED = /\sdata-pos="\d+"/g;
 
@@ -41,10 +44,17 @@ const escaped = (text: string) => text.replace(/&/g, "&amp;").replace(/"/g, "&qu
 
 /**
  * A text to render with each file SilverBullet draws none of stood in for and each page embedded marked out, and its
- * HTML given back with the files' places (a PDF's viewer, where its URL is given) and the pages unmarked
+ * HTML given back with the files' places (a PDF's viewer, where its URL is given) and each page in an element of its
+ * own, at the embed's offset, nothing in it marked
  */
 export function keepEmbeds(text: string, urlOf?: (embed: Embed) => string): { readonly text: string; readonly restore: (html: string) => string } {
-  const kept = readEmbeds(text).filter((embed) => !isFileTarget(embed.target) || !drawnInHtml(embed.target));
+  const kept = readEmbeds(text).filter((embed) =>
+    isFileTarget(embed.target)
+      ? !drawnInHtml(embed.target)
+      : // (A page, as a wiki embed or as an image of no file, which SilverBullet expands alike, probed 2026-11-17; one
+        // escaped its text)
+        text[embed.from - 1] !== "\\",
+  );
   if (!kept.length) return { text, restore: (html) => html };
   let shown = "";
   let at = 0;
@@ -57,18 +67,19 @@ export function keepEmbeds(text: string, urlOf?: (embed: Embed) => string): { re
     shift += replaced - added.length;
     placed.push({ from, to: shown.length, original, shift });
   };
-  // The files stood in for, by their stand-ins' numbers
+  // The files stood in for, the pages marked out, by their numbers
   const standIns: Embed[] = [];
-  let pages = 0;
+  const pages: Embed[] = [];
   for (const embed of kept) {
     shown += text.slice(at, embed.from);
     if (isFileTarget(embed.target)) {
       put(STAND_IN(standIns.length), embed.from, embed.to - embed.from);
       standIns.push(embed);
     } else {
-      put(PAGE_START(pages), embed.from, 0);
+      put(PAGE_START(pages.length), embed.from, 0);
       shown += text.slice(embed.from, embed.to);
-      put(PAGE_END(pages++), embed.to, 0);
+      put(PAGE_END(pages.length), embed.to, 0);
+      pages.push(embed);
     }
     at = embed.to;
   }
@@ -87,9 +98,13 @@ export function keepEmbeds(text: string, urlOf?: (embed: Embed) => string): { re
     text: shown,
     restore: (html) =>
       html
-        .replace(PAGE_DRAWN, (_all, _n: string, page: string) => page.replace(MARKED, ""))
-        .replace(PAGE_MARK_DRAWN, "")
         .replace(POSITION, (_all, offset: string) => `data-pos="${original(Number(offset))}"`)
+        .replace(PAGE_DRAWN, (all, n: string, page: string) => {
+          const embed = pages[Number(n)];
+          if (!embed) return all;
+          return `<span class="swl-embedded" data-swl-embedded="${escaped(embed.target)}" data-pos="${embed.from}">${page.replace(MARKED, "")}</span>`;
+        })
+        .replace(PAGE_MARK_DRAWN, "")
         .replace(STAND_IN_DRAWN, (all, n: string) => {
           const embed = standIns[Number(n)];
           if (!embed) return all;

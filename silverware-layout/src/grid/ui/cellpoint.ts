@@ -5,7 +5,7 @@ import { blankLinesAbove, caretOn } from "../core/blanklines.ts";
 import { positionInCell } from "../core/position.ts";
 import { cellLines } from "./celllines.ts";
 import { drawnBlocks, spaceBefore } from "./cellparts.ts";
-import { lineStarts, markedFrom, offsetOf } from "./offsets.ts";
+import { isEmbeddedPage, lineStarts, markedFrom, offsetOf } from "./offsets.ts";
 
 /** A caret's place in the rendering: a node and an offset in it */
 export type Caret = { readonly node: Node; readonly offset: number };
@@ -30,6 +30,8 @@ export function offsetInCell(content: string, cellElement: HTMLElement, target: 
   const marked = markedFrom(from);
   const element = marked && cellElement.contains(marked) ? marked : ([...cellElement.children].find((child) => child.contains(from)) ?? cellElement);
   const elementPos = element === marked ? offsetOf(marked) : 0;
+  // (A page embedded: at the embed, its text none of the cell's markdown to follow)
+  if (element === marked && isEmbeddedPage(element)) return elementPos;
   if (!caret || !element.contains(caret.node)) return positionInCell(content, elementPos, "", 0);
   // The element's text before the point
   const range = cellElement.ownerDocument.createRange();

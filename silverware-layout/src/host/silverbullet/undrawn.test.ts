@@ -22,7 +22,7 @@ describe("embeds SilverBullet's HTML draws none of", () => {
     expect(["a.png", "b.MP4", "c.mp3", "d.pdf", "e.zip", "f", "g.png#x"].map(drawnInHtml)).toEqual([true, true, true, false, false, false, true]);
   });
 
-  it("marks out an embedded page for SilverBullet's HTML to expand between, its own page's offsets taken off there", () => {
+  it("marks out an embedded page for SilverBullet's HTML to expand between, drawn in an element at the embed, nothing in it marked", () => {
     expect(["Notes", "Notes#Part", "Notes.md", "v1/Notes", "a.zip", "b.pdf"].map(isFileTarget)).toEqual([false, false, false, false, true, true]);
     const text = "![[Notes]]\n\n- a";
     const kept = keepEmbeds(text);
@@ -33,7 +33,7 @@ describe("embeds SilverBullet's HTML draws none of", () => {
       `<span class="p"><img alt="swl-page-start-0" title="swl-page-start-0" style="max-width: 100%;"><span class="p">Some text</span><br><ul data-pos="11"><li data-pos="11"><span class="p" data-pos="13">x</span></li></ul><img alt="swl-page-end-0" title="swl-page-end-0" style="max-width: 100%;" data-pos="41"></span><br><ul data-pos="${listAt}"><li data-pos="${listAt}"><span class="p" data-pos="${listAt + 2}">a</span></li></ul>`,
     );
     expect(html).toBe(
-      `<span class="p"><span class="p">Some text</span><br><ul><li><span class="p">x</span></li></ul></span><br><ul data-pos="12"><li data-pos="12"><span class="p" data-pos="14">a</span></li></ul>`,
+      `<span class="p"><span class="swl-embedded" data-swl-embedded="Notes" data-pos="0"><span class="p">Some text</span><br><ul><li><span class="p">x</span></li></ul></span></span><br><ul data-pos="12"><li data-pos="12"><span class="p" data-pos="14">a</span></li></ul>`,
     );
   });
 
@@ -43,12 +43,23 @@ describe("embeds SilverBullet's HTML draws none of", () => {
     expect(kept.text).toBe("# ![swl-page-start-0](data:,.png)![[A]]![swl-page-end-0](data:,.png) and ![swl-page-start-1](data:,.png)![[B]]![swl-page-end-1](data:,.png)\n\nEnd");
     const end = kept.text.indexOf("End");
     const html = kept.restore(`<h1><img alt="swl-page-start-0"><b data-pos="3">a</b><img alt="swl-page-end-0"> and <img alt="swl-page-start-1"><b data-pos="5">b</b><img alt="swl-page-end-1"></h1><span class="p" data-pos="${end}">End</span>`);
-    expect(html).toBe(`<h1><b>a</b> and <b>b</b></h1><span class="p" data-pos="${text.indexOf("End")}">End</span>`);
+    expect(html).toBe(
+      `<h1><span class="swl-embedded" data-swl-embedded="A" data-pos="2"><b>a</b></span> and <span class="swl-embedded" data-swl-embedded="B" data-pos="13"><b>b</b></span></h1><span class="p" data-pos="${text.indexOf("End")}">End</span>`,
+    );
   });
 
-  it("draws no image of a mark left over, where SilverBullet drew one without the other", () => {
+  it("draws no image of a mark left over, where SilverBullet drew one without the other, nor a mark it shows as text", () => {
     const kept = keepEmbeds("![[A]]");
     expect(kept.restore('<span class="p"><img alt="swl-page-start-0">a</span>')).toBe('<span class="p">a</span>');
+    // (An indented code block, HTML: SilverBullet expands no page there, the marks its text)
+    const code = keepEmbeds("    ![[A]]");
+    expect(code.restore(`<pre>${code.text.trim()}</pre>`)).toBe("<pre>![[A]]</pre>");
+  });
+
+  it("leaves a page embed as it is where the text shows it as text (escaped), and marks out an image of a page as one", () => {
+    expect(keepEmbeds("\\![[Notes]]").text).toBe("\\![[Notes]]");
+    // (SilverBullet expands an image of no file as the page, probed 2026-11-17)
+    expect(keepEmbeds("![logo](Notes)").text).toBe("![swl-page-start-0](data:,.png)![logo](Notes)![swl-page-end-0](data:,.png)");
   });
 
   it("leaves a text without them as it is", () => {

@@ -456,7 +456,9 @@ test("a page embedded in a cell keeps its own lines, the cell's blank line put b
   await expect(first.getByText("Some text")).toBeVisible();
   await expect(first.locator(".swl-grid-blank")).toHaveCount(1);
   await expect(first.locator(":scope > .swl-grid-blank + ul > li").filter({ hasText: /^a$/ })).toHaveCount(1);
-  await expect(first.locator("[data-pos] [data-pos]").filter({ hasText: /^x$/ })).toHaveCount(0);
+  // The page drawn in an element of its own, nothing in it marked
+  await expect(first.locator("[data-swl-embedded]")).toHaveCount(1);
+  await expect(first.locator("[data-swl-embedded] [data-pos]")).toHaveCount(0);
 });
 
 test("an empty cell is a line high, clicked into to write in it", async ({ page, space }) => {

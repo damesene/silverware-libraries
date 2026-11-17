@@ -184,6 +184,11 @@ describe("markedLines", () => {
     ]);
   });
 
+  it("reads a line of a non-breaking space as text, as the parser does, not empty", () => {
+    expect(marks("a\n \n- b")[1]).toEqual([2, [], false, 2, false]);
+    expect(marks("a\n \t\n- b")[1]).toEqual([2, [], false, 4, true]);
+  });
+
   it("reads a mark in a code block as its text", () => {
     expect(marks("> a\n>     >\n> b")[1]).toEqual([4, [4], false, 10, false]);
     expect(marks("- a\n\n  ```\n  >\n  ```")[3]).toEqual([11, [], false, 13, false]);

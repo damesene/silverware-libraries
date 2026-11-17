@@ -113,7 +113,8 @@ export function markedLines(text: string): MarkedLine[] {
     }
     let content = past;
     while (content < to && isSpace(read[content])) content++;
-    lines.push({ from: place(from), to: place(to), quotes, item, content: place(content), empty: read.slice(content, to).trim() === "" });
+    // (Empty past its marks as the parser reads it: spaces and tabs alone, a non-breaking space its text)
+    lines.push({ from: place(from), to: place(to), quotes, item, content: place(content), empty: content === to });
     if (end < 0) return lines;
     from = end + 1;
   }

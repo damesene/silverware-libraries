@@ -92,6 +92,8 @@ export type GridHost = {
   afterPress?(doc: Document): Promise<void>;
   /** The page's editor a cell is in given the focus back as the cell is left (none: nothing) */
   focusPage?(cell: HTMLElement): void;
+  /** Whether an Alt+press in the field of a cell edited is handed to the field as it comes, where the host would take it first (none: the field takes its own) */
+  readonly handsAltPressToField?: boolean;
   /** Whether a press is beside a grid on its line or in the margin at its height, where the host's editor would put its cursor into the grid's text (none: none is) */
   pressBesideGrid?(event: MouseEvent): boolean;
   /** Whether a node is in the page's own text (not a widget's): a drag begun there moves the page's selection (none: no drag of the page's moved) */
@@ -873,9 +875,17 @@ export class Grids {
     if (!event.altKey || event.button !== 0) return;
     const at = this.gridOf(event.target);
     if (!at) return;
-    // (In the field of the cell edited: the field's own, a file drawn there shows its markdown in it)
-    const field = this.editing?.session.editor?.element;
-    if (field && event.target instanceof Node && (field === event.target || field.contains(event.target))) return;
+    // (In the field of the cell edited: the field's own, a file drawn there shows its markdown in it; handed to it here
+    // where the host would take it before the field could)
+    const editor = this.editing?.session.editor;
+    const field = editor?.element;
+    if (field && event.target instanceof Node && (field === event.target || field.contains(event.target))) {
+      if (this.host.handsAltPressToField && editor?.altPress?.(event)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+      return;
+    }
     event.preventDefault();
     event.stopImmediatePropagation();
     const caret = caretWord(this.doc, event.clientX, event.clientY);

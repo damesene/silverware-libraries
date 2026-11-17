@@ -177,6 +177,20 @@ export function codeMirrorEditor(cm: CodeMirror, doc: Document, options: EditorO
     },
     focus: () => shown.focus(),
     hasFocus: () => shown.hasFocus,
+    altPress: (event) => {
+      // (Its real target, in the editor's shadow root: the event's own is the root's host where it was taken)
+      const target = event.composedPath()[0];
+      if (!(target instanceof Node) || !shown.contentDOM.contains(target)) return false;
+      try {
+        const embed = target instanceof Element ? target.closest(".swe-embed") : target.parentElement?.closest(".swe-embed");
+        const at = embed ? shown.posAtDOM(embed) : shown.posAtCoords({ x: event.clientX, y: event.clientY });
+        if (at !== null) shown.dispatch({ selection: { anchor: at } });
+        shown.focus();
+      } catch {
+        // (Gone from the editor meanwhile)
+      }
+      return true;
+    },
     destroy: () => {
       control.abort();
       host.gone(editor);

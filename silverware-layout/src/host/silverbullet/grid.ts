@@ -16,7 +16,7 @@ import type { PageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
 import { documentUrl } from "../../../../shared/silverbullet/platform.ts";
 import { withImages } from "../../../../shared/silverbullet/embedimage.ts";
-import { afterPress, SILVERBULLET_EDITORS, textForDrawing } from "./behaviour.ts";
+import { afterPress, HANDS_ALT_PRESS_TO_FIELD, SILVERBULLET_EDITORS, textForDrawing } from "./behaviour.ts";
 import { focusPage, isPageText, pressBesideGrid } from "./dom.ts";
 import { ownTasks } from "./tasks.ts";
 import { keepUndrawn } from "./undrawn.ts";
@@ -82,6 +82,7 @@ export function silverBulletGridHost(bridge: Bridge, writer: PageWriter, drawer:
     // How SilverBullet behaves, allowed for (./behaviour.ts)
     textForDrawing: (body: string): Promise<string> => textForDrawing(async () => String(await bridge.getText()), body),
     afterPress,
+    handsAltPressToField: HANDS_ALT_PRESS_TO_FIELD,
     focusPage,
     isPageText,
     pressBesideGrid,

@@ -88,3 +88,11 @@ export const SILVERBULLET_EDITORS: EditorHost = { historyAtWindow: true };
  * run where Silverware Layout takes two fingers for its pinch (the setting `fontZoom.pinch`) and they tapped
  */
 export const TWO_FINGER_TAP_COMMAND = "Navigate: Page Picker";
+
+/**
+ * An Alt+press in the field of a cell edited handed to the field by the grids as it comes: SilverBullet after 2.12.1
+ * takes an Alt+press anywhere in a widget at the widget's element (its capture, `widget_util.ts`), before what is in
+ * it, and puts its cursor at the widget's start (the grid's markdown shown, the cell left); 2.12.1 does not, and the
+ * field takes its own there all the same
+ */
+export const HANDS_ALT_PRESS_TO_FIELD = true;

@@ -133,6 +133,10 @@ export type TextEditor = EditingSurface & {
   // What it shows while it is empty
   setPlaceholder(text: string): void;
   hasFocus(): boolean;
+  // Optional: an Alt+press in it, handed over by a user that took it before the editor could (where its host would take
+  // it first): done as the editor does one, an embed's markdown shown (the caret at its start), else the caret put where
+  // it was; whether it was its
+  readonly altPress?: (event: MouseEvent) => boolean;
   // Taken out of its element's listeners and the editor's own; its element left to its user to take away
   destroy(): void;
 };

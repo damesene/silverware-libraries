@@ -339,7 +339,11 @@ export class Widgets {
   textMiddle(): number | undefined {
     if (!(this.content instanceof HTMLElement)) return undefined;
     const rect = this.content.getBoundingClientRect();
-    return rect.left + rect.width / 2;
+    // (Its padding left out each side: a host may pad it unevenly)
+    const style = this.content.ownerDocument.defaultView?.getComputedStyle(this.content);
+    const left = style ? parseFloat(style.paddingLeft) || 0 : 0;
+    const right = style ? parseFloat(style.paddingRight) || 0 : 0;
+    return rect.left + left + (rect.width - left - right) / 2;
   }
 
   /** The text's width now (the page's content less its padding): a widget without a width of its own is as wide */

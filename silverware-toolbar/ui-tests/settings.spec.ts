@@ -20,6 +20,30 @@ async function openSettings(page: Page): Promise<void> {
 }
 
 test.describe("The settings dialog", () => {
+  test("SilverBullet's own toolbar by a selection hidden; where it has one, the settings offer turning it off, and it stays off", async ({ page }) => {
+    test.skip(process.env.SW_TARGET !== "silverbullet", "SilverBullet's own toolbar: SilverBullet only");
+    // (SilverBullet after 2.12.1 marks its theme's scheme on the root, and has its toolbar by a selection, its markup bar's bubble)
+    const ownBar = await page.evaluate(() => document.documentElement.hasAttribute("data-sb-scheme"));
+    await select(page, "some text");
+    await expect(bar(page)).toBeVisible();
+    await expect(page.locator(".sb-selection-bubble")).toBeHidden();
+    await openSettings(page);
+    const advice = dialog(page).locator('[data-swb-advice="host-selection-bar"]');
+    if (!ownBar) {
+      await expect(advice).toHaveCount(0);
+      return;
+    }
+    await advice.locator(".swb-settings-advice-button").click();
+    await expect(advice).toHaveCount(0);
+    // (Its turning off loads SilverBullet's configuration again, the focus gone from the dialog: closed by Cancel)
+    await dialog(page).locator(".swb-settings-cancel").click();
+    await expect(dialog(page)).toHaveCount(0);
+    // Kept off: not offered again
+    await openSettings(page);
+    await expect(dialog(page)).toBeVisible();
+    await expect(advice).toHaveCount(0);
+  });
+
   test("opens from the gear by the popup's search (not listed; typed, found), its tabs General, Toolbars, Modules; Esc closes it unchanged", async ({ page }) => {
     await select(page, "some text");
     await barButton(page, "actions.more").click();

@@ -88,13 +88,18 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.12);
 }
 /* Room for the toolbar docked always or while writing (its height on html, set while it shows so): SilverBullet's
-   editor padded by it, so it covers no text and the editor keeps the cursor clear of it. The one place outside
-   src/dom.ts that assumes SilverBullet's DOM: its editor's id, and its height (100%) */
+   editor padded by it, so it covers no text and the editor keeps the cursor clear of it. With the rule after it, the
+   places outside src/dom.ts that assume SilverBullet's DOM: its editor's id and height (100%), its selection's bubble */
 #sb-editor {
   /* (Its height SilverBullet's 100%: the padding within it) */
   box-sizing: border-box;
   padding-top: var(--swb-docked-top, 0px);
   padding-bottom: var(--swb-docked-bottom, 0px);
+}
+/* SilverBullet's own toolbar by a selection (its markup bar's bubble, after 2.12.1) hidden: one toolbar by the
+   selection, this one. Its settings offer turning it off where SilverBullet draws it, so it is not drawn at all */
+.sb-selection-bubble {
+  display: none !important;
 }
 /* Docked at the top: under SilverBullet's top bar, its line and shadow below it */
 .swb-bar.swb-docked.swb-docked-top {

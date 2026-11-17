@@ -142,6 +142,16 @@ if js and js.window then
     startCompletion = editor.startCompletion,
     -- Whether SilverBullet's keyboard bar is on (the settings offer to turn it off on a phone)
     getUiOption = editor.getUiOption,
+    -- SilverBullet's own toolbar by a selection (its markup bar's bubble, after 2.12.1, a space's setting), which the
+    -- style page hides: the settings offer turning it off, so it is not drawn at all (config.persist came with it)
+    hostSelectionBar = config.persist and {
+      shown = function()
+        return config.get("markupBar.selectionBubble", true) ~= false
+      end,
+      turnOff = function()
+        config.persist("markupBar.selectionBubble", false)
+      end,
+    } or nil,
   })
   -- The toolbar this way of working (a mouse's, a finger's) shows, switched to another: the list of every action open at them
   command.define {

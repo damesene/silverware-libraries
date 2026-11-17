@@ -42,6 +42,9 @@ export type Bridge = {
   readonly startCompletion?: () => unknown;
   // Optional: one of SilverBullet's UI options (editor.getUiOption: `keyboardBar`, its bar over the on-screen keyboard)
   readonly getUiOption?: (key: string) => unknown;
+  // Optional: the host's own toolbar by a selection, where it has one that can be turned off for every device: whether
+  // it is on, and its turning off (none: the host has none, or none to turn off)
+  readonly hostSelectionBar?: { readonly shown: () => unknown; readonly turnOff: () => unknown };
 };
 
 export type Selection = { readonly from: number; readonly to: number; readonly text: string };

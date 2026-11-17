@@ -89,6 +89,8 @@ export class SettingsDialog {
   private naming: { readonly toolbar: number; readonly text: string; readonly problem: string } | undefined;
   // SilverBullet's keyboard bar on, on a touch screen: the docked toolbar goes over it, its turning off offered
   private keyboardBar = false;
+  // The host's own toolbar by a selection on (`bridge.hostSelectionBar`)
+  private hostBar = false;
 
   constructor(private readonly context: SettingsContext) {
     this.dialogs = new Dialogs(context.doc, { base: BASE, closeIcon: ICONS.close });
@@ -118,6 +120,7 @@ export class SettingsDialog {
     this.toolbarIndex = Math.max(0, settings.toolbars.indexOf(toolbarFor(settings.toolbars, inputOf(this.context.doc.defaultView))));
     this.naming = undefined;
     this.keyboardBar = await this.keyboardBarOn();
+    this.hostBar = await this.hostBarOn();
     this.values = { ...this.initial, toolbars: settings.toolbars.map((toolbar) => ({ ...toolbar, rows: toolbar.rows.map((row) => [...row]) })), modules: { ...modules } };
     this.render();
   }
@@ -188,6 +191,8 @@ export class SettingsDialog {
     card.append(keyRow, wordRow);
     // SilverBullet's keyboard bar on: said first, as it decides how the docked toolbar looks
     if (this.keyboardBar) general.append(this.keyboardBarNote());
+    // The host's own toolbar by a selection on: hidden by the style page, its turning off offered
+    if (this.hostBar) general.append(this.hostBarNote());
     general.append(card);
 
     this.toolbarsPanel = this.el("div");
@@ -241,6 +246,38 @@ export class SettingsDialog {
     } catch {
       return false;
     }
+  }
+
+  /** Whether the host's own toolbar by a selection is on (none to ask: off) */
+  private async hostBarOn(): Promise<boolean> {
+    const host = this.context.bridge.hostSelectionBar;
+    if (!host) return false;
+    try {
+      return (await host.shown()) === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** The host's own toolbar by a selection is on: hidden (one toolbar by the selection), its turning off offered, so it is not drawn at all */
+  private hostBarNote(): HTMLElement {
+    const { bridge, doc } = this.context;
+    const card = this.el("div", `${BASE}-card ${BASE}-advice`);
+    card.dataset.swbAdvice = "host-selection-bar";
+    const hint = "Silverware Toolbar hides it, so one toolbar shows by the text you select; turned off, SilverBullet does not draw it at all. For every device (SilverBullet's Configuration turns it on again).";
+    const control = this.button(`${BASE}-advice-button`, "Turn it off", () => {
+      void (async () => {
+        try {
+          await bridge.hostSelectionBar!.turnOff();
+          this.hostBar = false;
+          card.remove();
+        } catch (e) {
+          void bridge.flash(`Silverware Toolbar: SilverBullet's toolbar by the selection could not be turned off (${String(e)})`, "error");
+        }
+      })();
+    });
+    card.append(settingRow(doc, BASE, "SilverBullet's own toolbar by the selection is on", hint, control));
+    return card;
   }
 
   /** SilverBullet's keyboard bar is on: one bar over the keyboard is enough, its turning off offered (on this device, at once: its own command) */

@@ -236,6 +236,16 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
     ),
     var(--root-background-color, #fff);
 }
+/* And under their cells the page's color on the header and the bottom rows themselves, whatever paints the cells, held
+   or about to be (the browser holds a sticky one a frame before the script marks it): SilverBullet after 2.12.1 paints
+   a header's cells by a rule of more weight (its header's color, none in a theme without one: plain), and the rows
+   scrolled under the header showed through it */
+.sb-table-widget thead.swt-stuck,
+.sb-table-widget:is(.swt-sticky-native, .swt-sticky-inside, .swt-sticky-box) thead,
+.sb-table-widget tfoot.swt-stuck,
+.sb-table-widget:is(.swt-sticky-native, .swt-sticky-inside, .swt-sticky-box) tfoot {
+  background-color: var(--root-background-color, #fff);
+}
 
 /* Pinned rows and columns stay in view (moved there by script); they need an
    opaque background over the rows and columns scrolling under them.
@@ -4083,9 +4093,28 @@ html {
 :is(#sb-main, html) .sb-table-widget[data-swt-stripes="columns"] :is(tbody, tfoot) td:nth-child(even):not(.swt-pin-left):not(.swt-pin-right) {
   background-image: linear-gradient(var(--swt-stripe-color), var(--swt-stripe-color));
 }
-/* The row under the pointer: a tint over its striping (none if the theme sets none) */
-:is(#sb-main, html) .sb-table-widget[data-swt-theme] tbody tr:not(.swt-large-spacer):hover {
-  background-image: linear-gradient(var(--swt-hover), var(--swt-hover));
+/* The row under the pointer: a tint over a stripe's color (none if the theme sets none), on each of its cells, so it
+   reads apart from striped rows and plain ones alike. On the cells: SilverBullet after 2.12.1 paints its stripes on
+   them (its `background`, over a tint of the row's). A cell drawing a fill of its own keeps it (pinned: opaque, as
+   before; a conditional fill: over the tint, as its rule says); a data bar under the tint. One declaration each: a
+   theme without --swt-hover makes it invalid, the row then as it is. (Of more weight than SilverBullet's rule for a
+   striped row's cells, by the hover and the cells left out) */
+:is(#sb-main, html) .sb-table-widget[data-swt-theme] tbody tr:not(.swt-large-spacer):hover > td:not(.swt-pin-left, .swt-pin-right, .swt-cf-fill) {
+  background-image: linear-gradient(var(--swt-hover), var(--swt-hover)),
+    linear-gradient(var(--editor-table-even-background-color, transparent), var(--editor-table-even-background-color, transparent));
+}
+:is(#sb-main, html) .sb-table-widget[data-swt-stripes="columns"] tbody tr:not(.swt-large-spacer):hover > td:nth-child(even):not(.swt-pin-left, .swt-pin-right, .swt-cf-fill, .swt-cf-bar) {
+  background-image: linear-gradient(var(--swt-hover), var(--swt-hover)), linear-gradient(var(--swt-stripe-color), var(--swt-stripe-color));
+}
+:is(#sb-main, html) .sb-table-widget[data-swt-theme] tbody tr:not(.swt-large-spacer):hover > td.swt-cf-bar:not(.swt-pin-left, .swt-pin-right, .swt-cf-fill) {
+  background-image: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--swt-cf-bar-color-now) 45%, transparent) var(--swt-cf-bar),
+      transparent var(--swt-cf-bar)
+    ),
+    linear-gradient(var(--swt-hover), var(--swt-hover)),
+    linear-gradient(var(--editor-table-even-background-color, transparent), var(--editor-table-even-background-color, transparent));
+  background-repeat: no-repeat, repeat, repeat;
 }
 
 /* plain: no lines, fills nor bold header: text in rows and columns, as for a layout */

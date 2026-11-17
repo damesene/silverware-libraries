@@ -1070,19 +1070,34 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   width: calc(3 * var(--editor-column, 1ch));
   margin-left: calc(-3 * var(--editor-column, 1ch));
 }
-/* (A task's box in its room at its text's start, its text after the room, its next lines under its first) */
+/* (A task's box in its room at its text's start, as the page's: in the middle of the columns of its `[ ]`, the space's
+   after them, its text after the room, its next lines under its first; at its first line's middle. The column and the
+   line read where the text is, as lengths: the box's own font, an input's, is not the text's) */
+@property --swl-task-column {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --swl-task-line {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
 :is(.swl-grid-cell > :is(ul, ol), .swl-grid-cell > :is(ul, ol) :is(ul, ol)) > li > :has(> input[type="checkbox"]:first-child):not(#swl-none) {
+  --swl-task-column: var(--editor-column, 1ch);
+  --swl-task-line: 1lh;
   position: relative;
   display: inline-block;
-  padding-left: calc(4 * var(--editor-column, 1ch));
+  padding-left: calc(4 * var(--swl-task-column));
   text-indent: 0;
 }
 :is(.swl-grid-cell > :is(ul, ol), .swl-grid-cell > :is(ul, ol) :is(ul, ol)) > li > :has(> input[type="checkbox"]:first-child) > input[type="checkbox"]:first-child:not(#swl-none) {
   position: absolute;
-  left: 0;
-  top: 0.5lh;
+  left: calc(1.5 * var(--swl-task-column));
+  top: calc(0.5 * var(--swl-task-line));
   margin: 0;
-  transform: translateY(-50%);
+  /* (Its middle there, less half the page's gap after it: the page centres the box and its gap together) */
+  transform: translate(calc(-50% - 0.075em), -50%);
 }
 :is(.swl-grid-cell > :is(ul, ol), .swl-grid-cell > :is(ul, ol) :is(ul, ol)) > li > :has(> input[type="checkbox"]:first-child:checked):not(#swl-none) {
   text-decoration-line: line-through;

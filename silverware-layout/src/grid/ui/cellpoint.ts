@@ -2,6 +2,7 @@
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
 import { blankLinesBefore, blankLineStart } from "../core/blanklines.ts";
 import { lineStarts, offsetOf } from "./offsets.ts";
+import { SPACERS, spaceBefore } from "./view.ts";
 import { positionInCell } from "../core/position.ts";
 
 /** A caret's place in the rendering: a node and an offset in it */
@@ -40,8 +41,8 @@ export function offsetInCell(content: string, cellElement: HTMLElement, target: 
  * under its text: the caret after its last character); none where it is not
  */
 export function endAt(content: string, cellElement: HTMLElement, y: number): number | undefined {
-  // (The rendering's own elements: not the cell's "…", nor a blank line put back after its last block)
-  const drawn = [...cellElement.children].filter((child) => !child.matches("button, .swl-grid-blank"));
+  // (The rendering's own elements: not the cell's grip, nor space after its last block)
+  const drawn = [...cellElement.children].filter((child) => !child.matches(`button, ${SPACERS}`));
   const last = drawn.at(-1);
   if (last && y <= last.getBoundingClientRect().bottom) return undefined;
   return content.replace(/\s+$/, "").length;
@@ -62,8 +63,7 @@ export function blankLineAt(content: string, cellElement: HTMLElement, y: number
   // The bottom of what is drawn before it (a line break or a put-back blank line is space, not content); where nothing
   // is, the top of what it is in: the cell, or a list nested in an item (its blank lines inside the list, the item's
   // text above the list)
-  let before = element.previousElementSibling;
-  while (before && (before.tagName === "BR" || before.classList.contains("swl-grid-blank"))) before = before.previousElementSibling;
+  const { before } = spaceBefore(element);
   const top = element.getBoundingClientRect().top;
   const bottom = before ? before.getBoundingClientRect().bottom : (element.parentElement ?? cellElement).getBoundingClientRect().top;
   if (y < bottom || top <= bottom) return undefined;

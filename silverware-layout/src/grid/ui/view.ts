@@ -9,6 +9,21 @@ const COLUMNS = "--swl-grid-columns";
 // A blank line of a cell's markdown its rendering left out, put back
 const BLANK = "swl-grid-blank";
 
+/** What a cell's rendering draws as space, not content: the host's line breaks and the blank lines put back */
+export const SPACERS = `br, .${BLANK}`;
+
+/** The space drawn right before an element of a cell's rendering, by kind, and the element drawn before that (none: it is first) */
+export function spaceBefore(element: Element): { readonly breaks: number; readonly blanks: number; readonly before: Element | undefined } {
+  let breaks = 0;
+  let blanks = 0;
+  let before = element.previousElementSibling;
+  for (; before?.matches(SPACERS); before = before.previousElementSibling) {
+    if (before.tagName === "BR") breaks++;
+    else blanks++;
+  }
+  return { breaks, blanks, before: before ?? undefined };
+}
+
 /** A grid's element: a cell per rendered markdown (the host's HTML, its elements marked with their offsets in the cell's text) */
 export function drawGrid(doc: Document, template: string, cells: readonly string[]): HTMLElement {
   // (Focusable by a press, not by Tab: a press anywhere in it (a cell, the gap between two, a divider) focuses the grid,
@@ -67,14 +82,7 @@ export function keepBlankLines(doc: Document, cell: HTMLElement, content: string
     const wanted = blankLinesBefore(content, offset);
     if (!wanted) continue;
     // (Those put back already counted: drawn again over the same, none more)
-    let breaks = 0;
-    let kept = 0;
-    let before = element.previousElementSibling;
-    while (before?.tagName === "BR" || before?.classList.contains(BLANK)) {
-      if (before.tagName === "BR") breaks++;
-      else kept++;
-      before = before.previousElementSibling;
-    }
-    for (let missing = wanted - kept - blankLinesDrawn(breaks, before ?? undefined); missing > 0; missing--) element.before(el(doc, "div", { class: BLANK, attrs: { "aria-hidden": "true" } }));
+    const { breaks, blanks, before } = spaceBefore(element);
+    for (let missing = wanted - blanks - blankLinesDrawn(breaks, before); missing > 0; missing--) element.before(el(doc, "div", { class: BLANK, attrs: { "aria-hidden": "true" } }));
   }
 }

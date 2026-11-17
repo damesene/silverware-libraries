@@ -6,6 +6,7 @@
 // what it drew (`Drawn`: told as drawn, never taken again from what another may have decorated since).
 import type { Drawn } from "./drawn.ts";
 import { isMarked, offsetOf, shiftOffsets } from "./ui/offsets.ts";
+import { SPACERS } from "./ui/view.ts";
 
 /** A grid drawn: its element, its cells' markdown, what it drew in them */
 export type Drawing = { readonly element: HTMLElement; readonly contents: readonly string[]; readonly drawn: readonly Drawn[] };
@@ -20,14 +21,14 @@ const EDITING = "swl-grid-editing";
 /**
  * The blocks of a cell drawn, by the offsets marked on its children (a paragraph, a list, a heading; the first's 0 may
  * be unmarked): each its markdown, from its offset to the next one's (the cell's end for the last), its blank lines
- * round it left out. The host's line breaks between them (`<br>`) and ours (`.swl-grid-blank`, `keepBlankLines`) are
- * none, nor a control of the grid's (`controls`). None where another child is unmarked (another's drawing): the blocks
+ * round it left out. The space between them (`SPACERS`: the host's line breaks, the blank lines put back) is none,
+ * nor a control of the grid's (`controls`). None where another child is unmarked (another's drawing): the blocks
  * then unknown
  */
 export function blocksOf(cell: HTMLElement, content: string, controls: string): Block[] {
   const found: { readonly element: HTMLElement; readonly at: number }[] = [];
   for (const child of cell.children) {
-    if (!(child instanceof HTMLElement) || child.matches(`br, .swl-grid-blank, ${controls}`)) continue;
+    if (!(child instanceof HTMLElement) || child.matches(`${SPACERS}, ${controls}`)) continue;
     const at = isMarked(child) ? offsetOf(child) : found.length ? NaN : 0;
     if (!Number.isInteger(at) || at < 0 || at > content.length || at < (found.at(-1)?.at ?? 0)) return [];
     found.push({ element: child, at });

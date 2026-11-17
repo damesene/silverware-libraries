@@ -3,7 +3,7 @@
 // loose list's items) put back, those it kept (between paragraphs, as line breaks) left as they are.
 import { describe, expect, it } from "vitest";
 import { lineStarts } from "../ui/offsets.ts";
-import { keepBlankLines } from "../ui/view.ts";
+import { keepBlankLines, spaceBefore } from "../ui/view.ts";
 import { blankLinesBefore, blankLinesDrawn, blankLineStart, lineStartOf } from "./blanklines.ts";
 
 // SilverBullet 2.12.1's markdownToHtml of this text (probed 2026-11-14)
@@ -125,6 +125,16 @@ describe("a cell's blank lines", () => {
     keepBlankLines(document, cell, text);
     expect(cell.querySelectorAll(".swl-grid-blank")).toHaveLength(1);
     expect(cell.querySelector('li[data-pos="7"]')!.previousElementSibling?.className).toBe("swl-grid-blank");
+  });
+});
+
+describe("the space drawn before an element of a cell", () => {
+  it("is the host's line breaks and the blank lines put back right before it, by kind, and what is drawn before them", () => {
+    const cell = document.createElement("div");
+    cell.innerHTML = '<span class="p">One</span><br><div class="swl-grid-blank"></div><br><ul data-pos="6"><li>a</li></ul>';
+    const { breaks, blanks, before } = spaceBefore(cell.querySelector("ul")!);
+    expect([breaks, blanks, before?.tagName]).toEqual([2, 1, "SPAN"]);
+    expect(spaceBefore(cell.querySelector("span")!)).toEqual({ breaks: 0, blanks: 0, before: undefined });
   });
 });
 

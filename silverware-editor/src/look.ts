@@ -1,5 +1,5 @@
-// The page's look of what the live preview draws (shared/editor.ts `EditorLook`: a task's box, a done task's text,
-// its hanging indent, a hashtag, as the page's own rendering computes them), written as rules of the editor's shadow root over its own look.
+// The page's look of what the live preview draws (shared/editor.ts `EditorLook`: a task's box, a hashtag, a table's cells,
+// as the page's own rendering computes them), written as rules of the editor's shadow root over its own look.
 // Each value set through the CSSOM (`setProperty`): one it does not read is left out, none can end the rule, a value
 // with a `;` in it (a data URL's image) kept whole.
 import type { EditorLook, LookProperties } from "../../shared/editor.ts";
@@ -24,10 +24,8 @@ export function lookRules(doc: Document, look: EditorLook): string {
   rule(".swe-checkbox", look.checkbox);
   rule(".swe-checkbox:checked", look.checkboxChecked);
   rule(".swe-checkbox:checked::after", look.checkedMark);
-  rule(".swe-task-done", look.taskDone);
-  // (A task's hanging indent: how far its text's next lines begin after where its first begins, the box's room)
-  const hang = -parseFloat(look.task?.["text-indent"] ?? "");
-  if (hang > 0 && Number.isFinite(hang)) rule("", { "--swe-task-hang": `${hang}px` });
   rule(".swe-hashtag", look.hashtag);
+  rule(".swe-table thead th", look.tableHead);
+  rule(".swe-table tbody td", look.tableCell);
   return rules.join("\n");
 }

@@ -94,19 +94,19 @@ export type LookProperties = Readonly<Record<string, string>>;
 
 /**
  * The page's look of what an editor draws as rendered, read of the page's own rendering (the properties computed): a
- * task's box, checked too, a checked box's mark (its `::after`, where the page draws one of its own), a done task's
- * text, a hashtag
+ * task's box, checked too, a checked box's mark (its `::after`, where the page draws one of its own), a hashtag, a
+ * table's header cells and its other cells (their text, room, ground and lines; the card round it the editor's own, by
+ * the theme's variables). Where a
+ * list's marks and text stand and a done task's text are the editor's own rules, as the page draws them in its editor
+ * (its rendering strikes no done task through, nor hangs a task's text as its editor does)
  */
 export type EditorLook = {
   readonly checkbox?: LookProperties;
   readonly checkboxChecked?: LookProperties;
   readonly checkedMark?: LookProperties;
-  // A done task's text (struck through or not)
-  readonly taskDone?: LookProperties;
-  // What holds a task's box and its text: its hanging indent (`padding-left`, a negative `text-indent`: a task's text
-  // on its next lines where it begins after the box, or under the box)
-  readonly task?: LookProperties;
   readonly hashtag?: LookProperties;
+  readonly tableHead?: LookProperties;
+  readonly tableCell?: LookProperties;
 };
 
 /** What Silverware Toolbar acts on: an editor's text and selection, where the selection is, its element */

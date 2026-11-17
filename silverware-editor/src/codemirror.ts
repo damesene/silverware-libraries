@@ -10,6 +10,7 @@ import type { Extension } from "@codemirror/state";
 import type { EditorView as View, KeyBinding } from "@codemirror/view";
 import { companionBlur, type EditorOptions, type TextEditor } from "../../shared/editor.ts";
 import { livePreview, PREVIEW_THEME, wikiLinks } from "./livepreview.ts";
+import { listEnter } from "./listenter.ts";
 import { lookRules } from "./look.ts";
 
 /** The CodeMirror module beside the bundle (src/vendor.ts) */
@@ -109,10 +110,12 @@ export function codeMirrorEditor(cm: CodeMirror, doc: Document, options: EditorO
     cm.history(),
     cm.drawSelection(),
     // (GitHub's markdown, its tasks and strikethrough, as SilverBullet reads them; wiki links read too, for the preview)
-    cm.markdown({ base: cm.markdownLanguage, extensions: [wikiLinks] }),
+    // (Its keys ours below, Enter as listenter.ts has it: its own keymap, of a higher precedence, left out)
+    cm.markdown({ base: cm.markdownLanguage, extensions: [wikiLinks], addKeymap: false }),
     livePreview(cm, options.drawing, options.openLink),
     cm.closeBrackets(),
-    cm.keymap.of([...cm.closeBracketsKeymap, ...cm.markdownKeymap, ...cm.historyKeymap, ...cm.completionKeymap.filter(noEscape), cm.indentWithTab, ...usual]),
+    // (Enter continuing a list as SilverBullet's page does: no blank line put in a loose list, listenter.ts)
+    cm.keymap.of([...cm.closeBracketsKeymap, { key: "Enter", run: listEnter(cm) }, ...cm.markdownKeymap.filter((binding) => binding.key !== "Enter"), ...cm.historyKeymap, ...cm.completionKeymap.filter(noEscape), cm.indentWithTab, ...usual]),
     cm.EditorView.lineWrapping,
     theme(cm),
     highlight(cm),

@@ -158,7 +158,8 @@ describe("the CodeMirror editor's live preview", () => {
 
   it("draws a task's checkbox, toggling it, a done task struck through, a bullet for a list's mark", () => {
     const { editor, root, lines } = make("x\n- [ ] open\n- [x] done\n* item", 0);
-    expect(lines()).toEqual(["x", "•  open", "•  done", "• item"]);
+    // (A bullet and a box each with the space after it, in its room)
+    expect(lines()).toEqual(["x", "•open", "•done", "•item"]);
     const boxes = [...root.querySelectorAll<HTMLInputElement>("input.swe-checkbox")];
     expect(boxes.map((box) => box.checked)).toEqual([false, true]);
     expect(root.querySelector(".swe-task-done")?.textContent).toBe("done");
@@ -168,10 +169,10 @@ describe("the CodeMirror editor's live preview", () => {
     editor.destroy();
   });
 
-  it("hangs a task's next lines after what comes before its box: a nested one's indent, a numbered one's mark, a tab to its stop", () => {
-    const { editor, root } = make("x\n- [ ] top\n  - [ ] nested\n1. [ ] numbered\n\t- [ ] tabbed", 0);
-    const prefixes = [...root.querySelectorAll<HTMLElement>(".cm-line.swe-task-line")].map((line) => line.style.getPropertyValue("--swe-task-prefix"));
-    expect(prefixes).toEqual(["2ch", "4ch", "3ch", `${4 + 2}ch`]);
+  it("hangs a list's next lines after its marks' room: a bullet's, a number's, a task's box after either, after a nested one's indent, a tab to its stop", () => {
+    const { editor, root } = make("x\n- item\n1. first\n- [ ] top\n  - [ ] nested\n1. [ ] numbered\n\t- [ ] tabbed", 0);
+    const hangs = [...root.querySelectorAll<HTMLElement>(".cm-line.swe-list-line")].map((line) => line.style.getPropertyValue("--swe-list-hang"));
+    expect(hangs).toEqual(["calc(0ch + 1em)", "calc(0ch + 1.5em)", "calc(0ch + 3em)", "calc(2ch + 3em)", "calc(0ch + 3.5em)", "calc(4ch + 3em)"]);
     editor.destroy();
   });
 
@@ -341,7 +342,7 @@ describe("the CodeMirror editor's live preview", () => {
 
   it("shows no source in a read-only editor, its checkboxes not toggled", () => {
     const { editor, root, lines } = make("**bold** [ ]\n- [ ] task", 0, true);
-    expect(lines()).toEqual(["bold [ ]", "•  task"]);
+    expect(lines()).toEqual(["bold [ ]", "•task"]);
     root.querySelector<HTMLInputElement>("input.swe-checkbox")!.click();
     expect(editor.getText()).toBe("**bold** [ ]\n- [ ] task");
     editor.destroy();

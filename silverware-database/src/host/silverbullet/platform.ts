@@ -3,7 +3,8 @@
 // SilverBullet's API is called and what it answers. Everything else asks the
 // platform (shared/platform.ts).
 import { iconsOf } from "../../../../shared/icons.ts";
-import { editorsOf } from "../../../../shared/editor.ts";
+import { type EditorLook, editorsOf } from "../../../../shared/editor.ts";
+import { sampleLook } from "../../../../shared/editorlook.ts";
 import { saveConfigPage, withConfigSettings } from "../../../../shared/configpage.ts";
 import type { Choice, IndexChange, IndexedObject, Platform } from "../../../../shared/platform.ts";
 import { PAGE_KEYS, pageDates, referablePages, tasksOfPages, validatePageName } from "./pages.ts";
@@ -22,6 +23,8 @@ export type Bridge = {
   // Silverware Assets' API where it is installed (`silverware.assets.api`; shared/assets.ts `assetsOf` reads it): the
   // files an item's content embeds drawn in its field
   readonly assets?: unknown;
+  // Markdown rendered as the page renders it (a sample read for the look of what an item's content field draws)
+  renderMarkdown?(text: string): Promise<string>;
   getCurrentPage(): Promise<string>;
   getText(): Promise<string>;
   replaceRange(from: number, to: number, text: string): Promise<void>;
@@ -194,6 +197,15 @@ export function silverBulletPlatform(bridge: Bridge): {
 
 // SilverBullet's editor's area, where the peek goes (shared with Silverware Assets' side panel)
 export { editorArea, watchEditorArea } from "../../../../shared/silverbullet/editorarea.ts";
+
+/**
+ * The page's look of what an item's content field draws as rendered (shared/editorlook.ts): the sample rendered (`html`)
+ * read in SilverBullet's editor's content, where its rules for a task's box apply; none where the editor is not there
+ */
+export function fieldLook(doc: Document, html: string): EditorLook | undefined {
+  const content = doc.querySelector<HTMLElement>(".cm-content");
+  return content ? sampleLook(content, html) : undefined;
+}
 
 /**
  * How the page's text looks in SilverBullet's editor (its content, `.cm-content`: the theme's font, size, line height,

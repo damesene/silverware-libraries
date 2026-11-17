@@ -8,9 +8,4 @@ describe("the page's look of what the live preview draws", () => {
     expect(rules).toBe(".cm-editor .cm-content .swe-checkbox { width: 17px !important; border-top-left-radius: 50% !important; }");
     expect(lookRules(document, {})).toBe("");
   });
-
-  it("takes a task's hanging indent as how far its text's next lines begin after its first (none where it hangs none)", () => {
-    expect(lookRules(document, { task: { "padding-left": "27.2px", "text-indent": "-27.2px" } })).toBe(".cm-editor .cm-content { --swe-task-hang: 27.2px !important; }");
-    expect(lookRules(document, { task: { "padding-left": "0px", "text-indent": "0px" } })).toBe("");
-  });
 });

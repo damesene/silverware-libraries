@@ -43,6 +43,10 @@ if js and js.window then
     -- Silverware Assets, where it is installed: the files an item's content embeds drawn in the peek's field as the page
     -- draws them (else images alone)
     assets = silverware.assets and silverware.assets.api,
+    -- Markdown rendered as the page renders it: a sample read for the look of the peek's field (a task's box, a hashtag)
+    renderMarkdown = function(text)
+      return markdown.markdownToHtml(text)
+    end,
     getCurrentPage = editor.getCurrentPage,
     getText = editor.getText,
     replaceRange = editor.replaceRange,

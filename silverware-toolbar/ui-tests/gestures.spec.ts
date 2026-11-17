@@ -221,8 +221,12 @@ test.describe("The gesture button", () => {
     await dialog.locator('[data-swb-item="1:7"] .swb-settings-remove').click();
     await expect(dialog.locator(".swb-settings-warning")).toHaveCount(0);
     await dialog.locator(".swb-settings-save").click();
+    await expect(dialog).toHaveCount(0);
     await select(page, "some text");
-    await expect(barButton(page, "actions.more")).toHaveCount(0);
+    // (The toolbar started anew with the settings saved: one bar shown with the swipe and without the …; the … gone
+    // alone was also the bar of before gone and the new one not yet drawn, its swipe then the old bar's, taken away)
+    await expect(page.locator(".swb-bar.swb-visible").filter({ has: page.locator(".swb-gesture") }).filter({ hasNot: page.locator('[data-swb-action="actions.more"]') })).toHaveCount(1);
+    await expect(page.locator(".swb-bar.swb-visible")).toHaveCount(1);
     await dragUp(page, (await boxOf(gestureButton(page))).height);
     await expect(popup(page)).toBeVisible();
   });

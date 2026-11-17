@@ -76,6 +76,15 @@ test.describe("The held header", () => {
     expect(before.width).toBe("thin");
     expect(before.held).toBe(false);
     expect(before.color).not.toMatch(/^transparent transparent$|rgba\(0, 0, 0, 0\) rgba\(0, 0, 0, 0\)/);
+    // Its rows past the height scrolled to in the box (a host clipping its tables' box clipped them, no scrollbar)
+    const scrolls = await table(page).evaluate((w) => {
+      w.scrollTop = 100;
+      const scrolled = w.scrollTop;
+      w.scrollTop = 0;
+      return { overflow: getComputedStyle(w).overflowY, scrolled };
+    });
+    expect(scrolls.overflow).toBe("auto");
+    expect(scrolls.scrolled).toBe(100);
     // The page scrolled so the box's top is 100 px above the view's top: the header held by the page
     await page.evaluate(() => {
       const scroller = document.querySelector(".cm-scroller")!;

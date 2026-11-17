@@ -172,6 +172,25 @@ test("text selected in a cell's field dragged onto another cell: moved at once, 
   await expect(cellField(page)).toHaveCount(1);
 });
 
+test("Enter at a bullet item's end above a task list in a cell's field: the next item, no blank line before it (as the page)", async ({ page, space }) => {
+  const list = "* adasdadd\n\n* [ ] asdjl\n* [ ] b";
+  await space.open({ Page: `# Page\n\n<grid>\n<cell>\n\n${list}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n` }, "Page");
+  await gridsDrawn(page);
+  await page.locator("#sb-main .swl-grid-cell").first().getByText("adasdadd").click();
+  await expect(cellField(page)).toBeVisible();
+  // The caret at the item's end
+  await cellField(page).evaluate((root: HTMLElement) => {
+    type View = { state: { doc: { toString(): string } }; dispatch(spec: unknown): void; focus(): void };
+    const view = (root.shadowRoot?.querySelector(".cm-content") as (Element & { cmTile?: { view?: View } }) | null)?.cmTile?.view;
+    if (!view) throw new Error("the field is not Silverware Editor's");
+    const at = view.state.doc.toString().indexOf("adasdadd") + "adasdadd".length;
+    view.dispatch({ selection: { anchor: at } });
+    view.focus();
+  });
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await fieldState(page)).text).toBe("* adasdadd\n* \n\n* [ ] asdjl\n* [ ] b");
+});
+
 test("a drag moves text: the page's selection into a cell, a cell's (its markdown) into another, each one edit undone at once; a cell's into the page taken out of it", async ({ page, space }) => {
   const text = `# Page\n\n<grid>\n<cell>\n\nSome *italic* words\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n\nAfter\n`;
   await space.open({ Page: text }, "Page");
@@ -989,12 +1008,10 @@ test("a cell's field draws a task's box and a hashtag as the page renders them (
   expect(shown).toEqual(rendered);
 });
 
-test("a task's text wrapped in a cell's field as the page draws it: its next lines where the page's begin (a hanging indent of the page's read too)", async ({ page, space }) => {
+test("a task's text wrapped in a cell's field as the cell draws it: its next lines where the cell's begin, after its box", async ({ page, space }) => {
   const words = "first second third fourth fifth sixth seventh eighth";
   await space.open({ Page: `# Page\n\n<grid columns="1fr 3fr">\n<cell>\n\n- [ ] ${words}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n\nAfter\n` }, "Page");
   await gridsDrawn(page);
-  // (SilverBullet after 2.12.1 draws a task with a hanging indent, its text's next lines after the box: as its rule)
-  await page.addStyleTag({ content: ".swl-grid-cell li > .sb-task { display: inline-block; width: 100%; box-sizing: border-box; padding-left: 1.7em; text-indent: -1.7em; vertical-align: top; }" });
   // Where each of the task's text's lines begins (px from the cell's left), of its text nodes
   const lineStarts = (root: Node, cellLeft: number): number[] => {
     const starts: number[] = [];
@@ -1020,12 +1037,82 @@ test("a task's text wrapped in a cell's field as the page draws it: its next lin
   await page.keyboard.press("Enter");
   const edited = await cellField(page).evaluate((root: HTMLElement, source) => {
     const starts = new Function("root", "cellLeft", `return (${source})(root, cellLeft)`) as (root: Node, left: number) => number[];
-    const line = root.shadowRoot!.querySelector(".swe-task-line")!;
+    const line = root.shadowRoot!.querySelector(".swe-list-line")!;
     return starts(line, (root.closest(".swl-grid-cell") as HTMLElement).getBoundingClientRect().left);
   }, lineStarts.toString());
-  // The next lines begin where the page's do (the first may differ by the bullet's place); it wraps in the field too
+  // Each line begins where the cell's does, the next ones under the first (after the box); it wraps in the field too
   expect(edited.length).toBeGreaterThan(2);
-  expect(edited.slice(1).map((x) => Math.abs(x - rendered[1]!) <= 2)).toEqual(edited.slice(1).map(() => true));
+  expect(edited.map((x) => Math.abs(x - rendered[0]!) <= 2)).toEqual(edited.map(() => true));
+  expect(rendered.map((x) => Math.abs(x - rendered[0]!) <= 2)).toEqual(rendered.map(() => true));
+});
+
+test("a cell's lists drawn and in its field alike: each text after its mark's room, the marks in the bullets' colour, a done task struck through; a table a card in both", async ({ page, space }) => {
+  const cellText = "- one\n- two\n\n1. first\n2. second\n\n- [ ] open\n- [x] done\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\nEnd";
+  await space.open({ Page: `# Page\n\n<grid>\n<cell>\n\n${cellText}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n\nAfter\n` }, "Page");
+  await gridsDrawn(page);
+  // Where each word's text begins, px from the cell's left
+  const starts = (root: Node, cellLeft: number, words: string[]): number[] =>
+    words.map((word) => {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const at = node.textContent?.indexOf(word) ?? -1;
+        if (at < 0) continue;
+        const range = document.createRange();
+        range.setStart(node, at);
+        range.setEnd(node, at + 1);
+        return Math.round(range.getBoundingClientRect().left - cellLeft);
+      }
+      return -1;
+    });
+  const WORDS = ["one", "first", "open", "done"];
+  const cell = page.locator("#sb-main .swl-grid-cell").first();
+  const rendered = await cell.evaluate(
+    (element, [source, words]) => {
+      const read = new Function("root", "left", "words", `return (${source})(root, left, words)`) as (root: Node, left: number, words: string[]) => number[];
+      const marks = [...element.querySelectorAll(":scope > :is(ul, ol) > li")].map((li) => getComputedStyle(li, "::before").color);
+      const done = element.querySelector("input:checked")!.parentElement!;
+      return {
+        starts: read(element, element.getBoundingClientRect().left, words as string[]),
+        bullet: marks[0],
+        number: marks[2],
+        done: getComputedStyle(done).textDecorationLine,
+        table: getComputedStyle(element.querySelector(":scope > table")!).borderTopLeftRadius,
+        // (A header cell's text and the ground it is drawn on: its own, else its row's)
+        head: (() => {
+          const head = element.querySelector(":scope > table thead :is(th, td)")!;
+          const grounds = [head, head.parentElement!, head.parentElement!.parentElement!].map((one) => getComputedStyle(one).backgroundColor);
+          return [getComputedStyle(head).color, grounds.find((ground) => ground !== "rgba(0, 0, 0, 0)") ?? "rgba(0, 0, 0, 0)"];
+        })(),
+      };
+    },
+    [starts.toString(), WORDS] as const,
+  );
+  await cell.getByText("two").click();
+  await expect(cellField(page)).toBeVisible();
+  // (The caret on no list's line: their marks drawn)
+  await page.keyboard.press("Control+End");
+  const edited = await cellField(page).evaluate(
+    (root: HTMLElement, [source, words]) => {
+      const read = new Function("root", "left", "words", `return (${source})(root, left, words)`) as (root: Node, left: number, words: string[]) => number[];
+      const shadow = root.shadowRoot!;
+      const style = (selector: string) => getComputedStyle(shadow.querySelector(selector)!);
+      return {
+        starts: read(shadow, (root.closest(".swl-grid-cell") as HTMLElement).getBoundingClientRect().left, words as string[]),
+        bullet: style(".swe-bullet").color,
+        number: style(".swe-list-number").color,
+        done: style(".swe-task-done").textDecorationLine,
+        table: style(".swe-table").borderTopLeftRadius,
+        head: [style(".swe-table thead th").color, style(".swe-table thead th").backgroundColor],
+      };
+    },
+    [starts.toString(), WORDS] as const,
+  );
+  expect(rendered.starts.every((x) => x > 0)).toBe(true);
+  expect(edited.starts.map((x, i) => Math.abs(x - rendered.starts[i]!) <= 2)).toEqual(WORDS.map(() => true));
+  expect({ ...edited, starts: undefined }).toEqual({ ...rendered, starts: undefined });
+  expect(rendered.done).toBe("line-through");
+  const bullets = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--editor-list-bullet-color").trim());
+  if (bullets) expect(rendered.bullet).not.toBe(await cell.evaluate((element) => getComputedStyle(element).color));
 });
 
 test("a cell of a grid without borders edited: lines in the middle of its gaps, nothing moved (the cells' places, their text's)", async ({ page, space }) => {

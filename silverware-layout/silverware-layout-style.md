@@ -1040,6 +1040,48 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   border-radius: 0;
   background: none;
 }
+/* A cell's lists as the page draws them in its editor: each mark at the list's edge in its room, the text after it
+   (a bullet's 1em, a number's 1.5em, a task's box 2em after either: Silverware Editor's LIST_ROOM, its field's look of
+   the same cell), the marks in the theme's colour of the page's bullets, a done task's text struck through. The cell's
+   own lists and those in them alone */
+:is(.swl-grid-cell > :is(ul, ol), .swl-grid-cell > :is(ul, ol) :is(ul, ol)):not(#swl-none):not(#swl-none) {
+  padding-left: 1em;
+  list-style: none;
+}
+:is(.swl-grid-cell > ol, .swl-grid-cell > :is(ul, ol) ol):not(#swl-none):not(#swl-none) {
+  padding-left: 1.5em;
+}
+:is(.swl-grid-cell > :is(ul, ol), .swl-grid-cell > :is(ul, ol) :is(ul, ol)):not(#swl-none):not(#swl-none) > li::before {
+  content: "•";
+  display: inline-block;
+  width: 1em;
+  margin-left: -1em;
+  color: var(--editor-list-bullet-color, inherit);
+  text-decoration: none;
+}
+/* (A number as the list counts it, its own start too) */
+:is(.swl-grid-cell > ol, .swl-grid-cell > :is(ul, ol) ol):not(#swl-none):not(#swl-none) > li::before {
+  content: counter(list-item) ".";
+  width: 1.5em;
+  margin-left: -1.5em;
+}
+/* (A task's box in its room at its text's start, its text after the room, its next lines under its first) */
+:is(.swl-grid-cell > :is(ul, ol), .swl-grid-cell > :is(ul, ol) :is(ul, ol)) > li > :has(> input[type="checkbox"]:first-child):not(#swl-none) {
+  position: relative;
+  display: inline-block;
+  padding-left: 2em;
+  text-indent: 0;
+}
+:is(.swl-grid-cell > :is(ul, ol), .swl-grid-cell > :is(ul, ol) :is(ul, ol)) > li > :has(> input[type="checkbox"]:first-child) > input[type="checkbox"]:first-child:not(#swl-none) {
+  position: absolute;
+  left: 0;
+  top: 0.5lh;
+  margin: 0;
+  transform: translateY(-50%);
+}
+:is(.swl-grid-cell > :is(ul, ol), .swl-grid-cell > :is(ul, ol) :is(ul, ol)) > li > :has(> input[type="checkbox"]:first-child:checked):not(#swl-none) {
+  text-decoration-line: line-through;
+}
 .swl-grid-cell > blockquote:not(#swl-none) {
   margin-left: 0;
   margin-right: 0;

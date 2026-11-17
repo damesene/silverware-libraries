@@ -220,6 +220,11 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
 .sb-table-widget.swt-table table {
   overflow: clip !important;
 }
+/* A table wider than its box scrolls sideways in it (its widths dragged wider, many columns): SilverBullet after
+   2.12.1 clips its tables' box (overflow: clip, its card's corners), which would cut such a table off */
+.sb-table-widget.swt-table {
+  overflow-x: auto !important;
+}
 .sb-table-widget tfoot.swt-stuck {
   position: relative;
   z-index: 3;
@@ -366,11 +371,14 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
      padding: a border does not scroll away with the table. At the top the
      table's margin, as high as the header is held below the box's top
      (STICKY_GAP, swt-sticky-box); rows scrolled into it are covered by the
-     held header's shadow in the page's color. */
+     held header's shadow in the page's color. Important: SilverBullet after 2.12.1 draws its tables as a card
+     (a border, rounded corners, a shadow, its box clipped) by a rule of more weight */
   padding: 0;
-  border: 0;
-  border-left: 28px solid var(--root-background-color, #fff);
-  overflow: auto;
+  border: 0 !important;
+  border-left: 28px solid var(--root-background-color, #fff) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  overflow: auto !important;
   background: var(--root-background-color, #fff);
 }
 .sb-table-widget.swt-over-window > table {
@@ -414,7 +422,7 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
    window's edge, the + of a new column is pushed back over the toolbar and its
    line drawn on the edge (the sheet view shows its empty columns there) */
 .sb-table-widget.swt-over-window.swt-fullscreen {
-  border-right: 28px solid var(--root-background-color, #fff);
+  border-right: 28px solid var(--root-background-color, #fff) !important;
 }
 /* The columns' letters above the header and the rows' numbers left of the
    rows, in that room (as formulas count them). Shown over the window only. The

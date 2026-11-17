@@ -9,8 +9,12 @@ const COLUMNS = "--swl-grid-columns";
 // A blank line of a cell's markdown its rendering left out, put back
 const BLANK = "swl-grid-blank";
 
+/** The blank lines put back in a cell's rendering */
+export const BLANK_LINES = `.${BLANK}`;
+// The host's line breaks
+const BREAKS = "br";
 /** What a cell's rendering draws as space, not content: the host's line breaks and the blank lines put back */
-export const SPACERS = `br, .${BLANK}`;
+export const SPACERS = `${BREAKS}, ${BLANK_LINES}`;
 
 /** The space drawn right before an element of a cell's rendering, by kind, and the element drawn before that (none: it is first) */
 export function spaceBefore(element: Element): { readonly breaks: number; readonly blanks: number; readonly before: Element | undefined } {
@@ -18,7 +22,7 @@ export function spaceBefore(element: Element): { readonly breaks: number; readon
   let blanks = 0;
   let before = element.previousElementSibling;
   for (; before?.matches(SPACERS); before = before.previousElementSibling) {
-    if (before.tagName === "BR") breaks++;
+    if (before.matches(BREAKS)) breaks++;
     else blanks++;
   }
   return { breaks, blanks, before: before ?? undefined };

@@ -146,8 +146,9 @@ if js and js.window then
     -- style page hides: the settings offer turning it off, so it is not drawn at all (config.persist came with it).
     -- SB-2.12-COMPAT: `config.persist and` for 2.12.1, which has neither; once it is dropped, the table alone
     hostSelectionBar = config.persist and {
+      -- (Drawn where the space's setting and this device's markup bar are on, on a computer: the latter the JS asks)
       shown = function()
-        return config.get("markupBar.selectionBubble", true) ~= false
+        return config.get("markupBar.selectionBubble", true) ~= false and editor.getUiOption("markupBar") ~= false
       end,
       turnOff = function()
         config.persist("markupBar.selectionBubble", false)

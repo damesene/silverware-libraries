@@ -248,10 +248,10 @@ export class SettingsDialog {
     }
   }
 
-  /** Whether the host's own toolbar by a selection is on (none to ask: off) */
+  /** Whether the host's own toolbar by a selection is on, on a computer, where the host draws it (none to ask: off) */
   private async hostBarOn(): Promise<boolean> {
     const host = this.context.bridge.hostSelectionBar;
-    if (!host) return false;
+    if (!host || this.context.doc.defaultView?.matchMedia?.("(pointer: coarse)").matches) return false;
     try {
       return (await host.shown()) === true;
     } catch {

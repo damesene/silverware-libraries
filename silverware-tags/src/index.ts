@@ -39,15 +39,18 @@ export async function init(bridge: Bridge): Promise<void> {
     confirm: async (question) => (bridge.confirm ? !!(await bridge.confirm(question)) : globalThis.confirm(question)),
     flash: (message, type) => notifier.flash(message, type),
   };
-  await start(space, silverBulletPlatform(bridge), notifier, await readSettings(bridge), store);
+  await start(space, silverBulletPlatform(bridge), notifier, await readSettings(bridge), store, bridge.toolPagesByPlace === true);
 }
 
-/** The core and the modules on, over a space (SilverBullet's, or the playground's); the settings dialog where a store is given */
-export async function start(space: Space, platform: WritingPlatform, notifier: Notifier, settings: Settings, store?: SettingsStore): Promise<Controller> {
+/**
+ * The core and the modules on, over a space (SilverBullet's, or the playground's); the settings dialog where a store is
+ * given; `toolPagesByPlace`: SilverBullet's own pages told by their place, not by a meta tag (isSilverBulletPage)
+ */
+export async function start(space: Space, platform: WritingPlatform, notifier: Notifier, settings: Settings, store?: SettingsStore, toolPagesByPlace = false): Promise<Controller> {
   // The layers its style page lays its elements in (shared/layers.ts)
   applyLayers(document);
   const dialog = store ? new SettingsDialog(document, store) : undefined;
-  const controller = new Controller(document, space, platform, notifier, { protectMeta: settings.protectMeta, newTagsForm: settings.newTagsForm, settings: dialog ? () => dialog.open() : undefined });
+  const controller = new Controller(document, space, platform, notifier, { protectMeta: settings.protectMeta, newTagsForm: settings.newTagsForm, toolPagesByPlace, settings: dialog ? () => dialog.open() : undefined });
   setNewTagsForm(settings.newTagsForm);
   controller.setModules(createModules(settings, (name) => controller.hostFor(name)));
   slot[GLOBAL_KEY] = controller;

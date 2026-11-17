@@ -10,6 +10,8 @@ What starts [Silverware Database](silverware-database.md) in SilverBullet: its s
 -- SB-2.12-COMPAT: the configuration page, CONFIG in SilverBullet 2.12.1 and older, Library/Config from its 3.0 (edge),
 -- told by index.toolPages (tool pages under Library/ came with the move); once 2.12.1 is dropped, "Library/Config" alone
 local configPage = index.toolPages and "Library/Config" or "CONFIG"
+-- SB-2.12-COMPAT: whether SilverBullet tells its own pages by their place (after 2.12.1, the same release as its tool pages); once 2.12.1 is dropped, always
+local afterTwelve = index.toolPages ~= nil
 
 -- (After the API page, priority 50, and the user's scripts, priority 0: their views and types are defined by now)
 config.defineCategory {
@@ -105,6 +107,8 @@ if js and js.window then
     -- `set`: written and indexed, the configuration not loaded again (that runs Space Lua anew and starts Silverware Database
     -- anew: the item's panel closed as its width was saved), these values set in it as it is, by path (config.set)
     configPage = configPage,
+    -- SilverBullet's own pages told by their place (under Library/), else by an own meta tag: none offered as references
+    toolPagesByPlace = afterTwelve,
     saveConfigPage = function(text, set)
       space.writePage(configPage, text)
       local ok, err = pcall(function()

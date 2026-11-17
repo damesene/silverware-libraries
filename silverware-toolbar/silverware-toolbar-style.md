@@ -96,9 +96,10 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
   padding-top: var(--swb-docked-top, 0px);
   padding-bottom: var(--swb-docked-bottom, 0px);
 }
-/* SilverBullet's own toolbar by a selection (its markup bar's bubble, after 2.12.1) hidden: one toolbar by the
-   selection, this one. Its settings offer turning it off where SilverBullet draws it, so it is not drawn at all */
-.sb-selection-bubble {
+/* SilverBullet's own toolbar by a selection (its markup bar's bubble, after 2.12.1) hidden while this one runs (its
+   root mark): one toolbar by the selection, this one. Its settings offer turning it off where SilverBullet draws it, so
+   it is not drawn at all */
+html[data-swb-running] .sb-selection-bubble {
   display: none !important;
 }
 /* Docked at the top: under SilverBullet's top bar, its line and shadow below it */

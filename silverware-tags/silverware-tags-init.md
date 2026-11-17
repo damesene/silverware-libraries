@@ -9,6 +9,8 @@ What starts [Silverware Tags](silverware-tags.md) in SilverBullet: its settings 
 -- SB-2.12-COMPAT: the configuration page, CONFIG in SilverBullet 2.12.1 and older, Library/Config from its 3.0 (edge),
 -- told by index.toolPages (tool pages under Library/ came with the move); once 2.12.1 is dropped, "Library/Config" alone
 local configPage = index.toolPages and "Library/Config" or "CONFIG"
+-- SB-2.12-COMPAT: whether SilverBullet tells its own pages by their place (after 2.12.1, the same release as its tool pages); once 2.12.1 is dropped, always
+local afterTwelve = index.toolPages ~= nil
 
 -- Settings, shown in the Configuration Manager (Configuration: Open)
 config.defineCategory {
@@ -104,6 +106,8 @@ if js and js.window then
     -- The settings dialog: saved as SilverBullet's Configuration Manager saves
     -- (the configuration page, indexed, the configuration loaded again)
     configPage = configPage,
+    -- SilverBullet's own pages told by their place (under Library/), else by an own meta tag
+    toolPagesByPlace = afterTwelve,
     saveConfigPage = function(text)
       space.writePage(configPage, text)
       -- Written: the rest only loads it; a failure there says so, the page is saved

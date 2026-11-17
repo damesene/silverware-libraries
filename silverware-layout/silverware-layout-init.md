@@ -9,6 +9,8 @@ What starts [Silverware Layout](silverware-layout.md) in SilverBullet: its setti
 -- SB-2.12-COMPAT: the configuration page, CONFIG in SilverBullet 2.12.1 and older, Library/Config from its 3.0 (edge),
 -- told by index.toolPages (tool pages under Library/ came with the move); once 2.12.1 is dropped, "Library/Config" alone
 local configPage = index.toolPages and "Library/Config" or "CONFIG"
+-- SB-2.12-COMPAT: whether SilverBullet takes an Alt+press in a widget at the widget, before what is in it (after 2.12.1: its builds since 2026-11 do, as they have tool pages); once 2.12.1 is dropped, always
+local afterTwelve = index.toolPages ~= nil
 
 -- Settings, shown in the Configuration Manager (Configuration: Open)
 config.defineCategory({
@@ -146,6 +148,8 @@ if js and js.window then
     -- The dialog's default text width: saved as SilverBullet's Configuration Manager saves
     -- (the configuration page, indexed, the configuration loaded again)
     configPage = configPage,
+    -- SilverBullet takes an Alt+press in a widget before what is in it: a grid's cell edited hands it to its field
+    widgetTakesAltPress = afterTwelve,
     saveConfigPage = function(text)
       space.writePage(configPage, text)
       -- Written: the rest only loads it; a failure there says so, the page is saved

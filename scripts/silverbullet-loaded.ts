@@ -56,8 +56,13 @@ export async function loaded(page: Page): Promise<void> {
   await page.evaluate(async () => {
     const w = window as unknown as Loading;
     await w.client?.widgetsReady;
-    // (The first index complete, as the client tells it: after 2.12.1 the widgets are ready before it)
-    while (w.client?.fullIndexCompleted === false) await new Promise((resolve) => setTimeout(resolve, 20));
+    // (The first index complete, as the client tells it: after 2.12.1 the widgets are ready before it. Said so where it
+    // never is, before the test's own time runs out in whatever step waited)
+    const until = Date.now() + 30_000;
+    while (w.client?.fullIndexCompleted === false) {
+      if (Date.now() > until) throw new Error("SilverBullet's first index was not complete in 30 s");
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
     await Promise.all(w.silverwareTestReloads ?? []);
   });
 }

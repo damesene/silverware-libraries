@@ -38,8 +38,11 @@ export function validatePageName(name: string): string | undefined {
   return undefined;
 }
 
-/** The pages a reference may name, by name in order: the index's pages but SilverBullet's own (a library, the configuration: under Library/, or a tag `meta` or under it) */
-export function referablePages(objects: readonly IndexedObject[]): string[] {
-  const pages = objects.filter((page) => typeof page.name === "string" && !isSilverBulletPage(page.name, Array.isArray(page.tags) ? page.tags.filter((tag): tag is string => typeof tag === "string") : []));
+/**
+ * The pages a reference may name, by name in order: the index's pages but SilverBullet's own (a library, the
+ * configuration), told as the SilverBullet running tells them (`byPlace`: under Library/, else a tag `meta` or under it)
+ */
+export function referablePages(objects: readonly IndexedObject[], byPlace: boolean): string[] {
+  const pages = objects.filter((page) => typeof page.name === "string" && !isSilverBulletPage(page.name, Array.isArray(page.tags) ? page.tags.filter((tag): tag is string => typeof tag === "string") : [], byPlace));
   return pages.map((page) => page.name as string).sort((a, b) => a.localeCompare(b));
 }

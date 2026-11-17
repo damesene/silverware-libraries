@@ -14,16 +14,21 @@ export type TagInfo = {
 export type Catalog = {
   readonly tags: ReadonlyMap<string, TagInfo>;
   readonly pages: readonly string[];
+  // SilverBullet's own pages among those read (isSilverBulletPage), left out of the rest where hidden, told apart else
+  readonly silverBullet: ReadonlySet<string>;
 };
 
 export type CatalogOptions = {
   // SilverBullet's own pages (under Library/, or a page whose own tag is meta or under it) left out: their tags, the
   // pages themselves
   readonly hideMeta?: boolean;
+  // Whether the SilverBullet running tells its own pages by their place (isSilverBulletPage's `byPlace`)
+  readonly byPlace?: boolean;
 };
 
 export function catalogOf(records: readonly TagRecord[], pages: readonly string[], options: CatalogOptions = {}): Catalog {
-  const hidden = options.hideMeta ? silverBulletPages(records, pages) : new Set<string>();
+  const silverBullet = silverBulletPages(records, pages, options.byPlace ?? false);
+  const hidden = options.hideMeta ? silverBullet : new Set<string>();
   const tags = new Map<string, { name: string; pages: Set<string>; byContext: Map<string, Set<string>> }>();
   for (const { name, page, parent } of records) {
     if (hidden.has(page)) continue;
@@ -34,15 +39,20 @@ export function catalogOf(records: readonly TagRecord[], pages: readonly string[
     if (!context) info.byContext.set(parent, (context = new Set()));
     context.add(page);
   }
-  return { tags, pages: pages.filter((page) => !hidden.has(page)).sort((a, b) => a.localeCompare(b)) };
+  return { tags, pages: pages.filter((page) => !hidden.has(page)).sort((a, b) => a.localeCompare(b)), silverBullet };
 }
 
 /** SilverBullet's own pages among those the records and the list name (isSilverBulletPage: by place, or a meta tag) */
-function silverBulletPages(records: readonly TagRecord[], pages: Iterable<string>): Set<string> {
+function silverBulletPages(records: readonly TagRecord[], pages: Iterable<string>, byPlace: boolean): Set<string> {
   const own = new Map<string, string[]>();
-  for (const { name, page, parent } of records) if (parent === "page") own.set(page, [...(own.get(page) ?? []), name]);
+  for (const { name, page, parent } of records) {
+    if (parent !== "page") continue;
+    const tags = own.get(page);
+    if (tags) tags.push(name);
+    else own.set(page, [name]);
+  }
   const all = new Set([...pages, ...records.map((r) => r.page)]);
-  return new Set([...all].filter((page) => isSilverBulletPage(page, own.get(page) ?? [])));
+  return new Set([...all].filter((page) => isSilverBulletPage(page, own.get(page) ?? [], byPlace)));
 }
 
 export async function readCatalog(space: Space, options: CatalogOptions = {}): Promise<Catalog> {
@@ -97,15 +107,9 @@ export function pagesWith(catalog: Catalog, name: string, children: boolean): st
   return [...pages].sort((a, b) => a.localeCompare(b));
 }
 
-/** The meta pages: SilverBullet's own (libraries, templates, the configuration), under Library/ or with a meta tag of their own */
+/** The meta pages: SilverBullet's own (libraries, templates, the configuration), as the catalog read them */
 export function metaPages(catalog: Catalog): Set<string> {
-  const own = new Map<string, string[]>();
-  const all = new Set(catalog.pages);
-  for (const tag of catalog.tags.values()) {
-    for (const page of tag.pages) all.add(page);
-    for (const page of tag.byContext.get("page") ?? []) own.set(page, [...(own.get(page) ?? []), tag.name]);
-  }
-  return new Set([...all].filter((page) => isSilverBulletPage(page, own.get(page) ?? [])));
+  return new Set(catalog.silverBullet);
 }
 
 /** The tags under a tag (not itself) */

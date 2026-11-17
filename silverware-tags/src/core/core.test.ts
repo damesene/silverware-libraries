@@ -34,11 +34,13 @@ describe("meta", () => {
     const space = memorySpace({ Lib: "---\ntags: meta/library\n---\n", Mine: "#meta-notes\n\n#metal", Tpl: "#meta" });
     expect([...metaPages(await readCatalog(space))].sort()).toEqual(["Lib", "Tpl"]);
   });
-  it("tells them by their place too: a page under Library/ without a tag (SilverBullet's 3.0)", async () => {
-    const space = memorySpace({ "Library/Config": "Settings", "Library/Std/Thing": "#auto", Car: "#auto" });
-    expect([...metaPages(await readCatalog(space))].sort()).toEqual(["Library/Config", "Library/Std/Thing"]);
-    const catalog = await readCatalog(space, { hideMeta: true });
-    expect(catalog.pages).toEqual(["Car"]);
+  it("tells them by their place where SilverBullet does (after 2.12.1): a page under Library/ without a tag, not a template outside it", async () => {
+    const space = memorySpace({ "Library/Config": "Settings", "Library/Std/Thing": "#auto", Car: "#auto", "Templates/Note": "#meta/template" });
+    expect([...metaPages(await readCatalog(space, { byPlace: true }))].sort()).toEqual(["Library/Config", "Library/Std/Thing"]);
+    // SB-2.12-COMPAT: by a meta tag in 2.12.1, a page under Library/ without one content
+    expect([...metaPages(await readCatalog(space))].sort()).toEqual(["Templates/Note"]);
+    const catalog = await readCatalog(space, { hideMeta: true, byPlace: true });
+    expect(catalog.pages).toEqual(["Car", "Templates/Note"]);
     expect([...catalog.tags.get("auto")!.pages]).toEqual(["Car"]);
   });
 });

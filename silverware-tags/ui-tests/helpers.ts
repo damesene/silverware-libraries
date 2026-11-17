@@ -27,7 +27,9 @@ const server = () => silverbulletServer(test.info().parallelIndex, process.env.S
 // The sample's pages there: in a folder of their own, so a test's tree of pages is theirs
 const FOLDER = "UiTags";
 /** A sample page's name in the space the tests run against */
-export const pageName = (name: string): string => (onSilverBullet ? `${FOLDER}/${name}` : name);
+// (A page of SilverBullet's own, `Library/…`, under the real Library/: SilverBullet after 2.12.1 tells its pages by that
+// place, 2.12.1 by their meta tag, which they have too)
+export const pageName = (name: string): string => (!onSilverBullet ? name : name.startsWith("Library/") ? `Library/${FOLDER}/${name.slice("Library/".length)}` : `${FOLDER}/${name}`);
 
 type Window = { playgroundTags?: { runCommand(name: string): Promise<void>; space: { pages: Map<string, string> } }; client?: { runCommandByName(name: string): Promise<void> } };
 
@@ -45,6 +47,7 @@ export const test = base.extend({
     try {
       if (onSilverBullet) {
         await rm(join(server().space, FOLDER), { recursive: true, force: true });
+        await rm(join(server().space, "Library", FOLDER), { recursive: true, force: true });
         for (const [name, text] of Object.entries(SAMPLE_PAGES)) {
           const path = join(server().space, `${pageName(name)}.md`);
           await mkdir(dirname(path), { recursive: true });
@@ -65,6 +68,7 @@ export const test = base.extend({
       if (onSilverBullet) {
         await page.close();
         await rm(join(server().space, FOLDER), { recursive: true, force: true });
+        await rm(join(server().space, "Library", FOLDER), { recursive: true, force: true });
         // The settings a test saved go with it (CONFIG, written once the page is closed)
         await writeFile(configFile(server().space), "");
       }

@@ -33,6 +33,8 @@ export type ControllerOptions = {
   readonly settings?: () => Promise<void>;
   // How a page's tags are written where it has none yet (the setting)
   readonly newTagsForm?: FrontmatterForm;
+  // Whether SilverBullet tells its own pages by their place, not by a meta tag (isSilverBulletPage)
+  readonly toolPagesByPlace?: boolean;
 };
 
 export class Controller {
@@ -55,11 +57,12 @@ export class Controller {
     private readonly notifier: Notifier,
     private readonly options: ControllerOptions = {},
   ) {
-    const catalog = () => readCatalog(space, { hideMeta: this.options.protectMeta });
+    const byPlace = this.options.toolPagesByPlace ?? false;
+    const catalog = () => readCatalog(space, { hideMeta: this.options.protectMeta, byPlace });
     // A meta page as read now is never changed (the index may not have caught up with it); its tags as the
     // index has the page's (the catalog hides by them): the frontmatter's, tag lines', a paragraph's hashtags
     const meta: Guard = (page) =>
-      isSilverBulletPage(page.name, page.tagUses().filter((use) => use.context === "page" || use.context === "paragraph").map((use) => use.name))
+      isSilverBulletPage(page.name, page.tagUses().filter((use) => use.context === "page" || use.context === "paragraph").map((use) => use.name), byPlace)
         ? "a meta page: left alone (Hide and protect meta pages)"
         : undefined;
     this.guard = this.options.protectMeta ? meta : undefined;

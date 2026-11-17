@@ -70,7 +70,8 @@ export class Overlays {
       handle.classList.remove("swt-at-mid", "swt-at-top", "swt-at-bottom", "swt-at-left", "swt-at-right", "swt-under-head");
       handle.style.left = handle.style.top = handle.style.right = handle.style.bottom = "";
       this.handleOf.set(handle, { layer: name, key: info.key, className: place.className, row: place.row, column: place.column });
-      handle.classList.toggle("swt-under-head", place.row === underHead);
+      // (A whole column's in its middle: by the row it is put in, placeMid)
+      handle.classList.toggle("swt-under-head", place.mid !== "column" && place.row === underHead);
       // On a whole row (column) in its middle: inside the cell on the table's edges across that line too
       if (place.mid === "row") {
         handle.classList.toggle("swt-at-top", place.row === firstRow);
@@ -79,7 +80,8 @@ export class Overlays {
         handle.classList.toggle("swt-at-left", place.column === 0);
         handle.classList.toggle("swt-at-right", place.column === info.columns - 1);
       }
-      if (place.mid && this.placeMid(info, handle, place)) continue;
+      if (place.mid && this.placeMid(info, handle, place, underHead)) continue;
+      if (place.mid === "column") handle.classList.toggle("swt-under-head", place.row === underHead);
       const cell = this.rows.cellAt(info, place, true);
       if (!cell) {
         handle.remove();
@@ -104,7 +106,7 @@ export class Overlays {
    * table, at the cell of the line the middle is in: in reach however far the
    * page or the table scrolled. False when no cell of the line is in view there.
    */
-  private placeMid(info: WidgetInfo, handle: HTMLElement, place: HandlePlace): boolean {
+  private placeMid(info: WidgetInfo, handle: HTMLElement, place: HandlePlace, underHead: number | undefined): boolean {
     const widget = info.table.closest<HTMLElement>(WIDGET_SELECTOR);
     if (!widget) return false;
     const shown = intersect(shownRect(widget, info), viewBounds(widget));
@@ -122,6 +124,8 @@ export class Overlays {
       if (middle < from || middle >= to) continue;
       const half = handle.offsetWidth / 2 || 14;
       handle.classList.add("swt-at-mid");
+      // (On the first row under the header: over the header, as a handle in a cell of that row)
+      if (axis === "column") handle.classList.toggle("swt-under-head", underHead !== undefined && cell.parentElement instanceof HTMLTableRowElement && this.rows.rowOf(info, cell.parentElement) === underHead);
       if (axis === "row") {
         handle.style.left = `${middle - from - half}px`;
         handle.style.right = "auto";

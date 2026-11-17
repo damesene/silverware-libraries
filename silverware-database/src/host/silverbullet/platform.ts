@@ -60,6 +60,8 @@ export type Bridge = {
   listCommands?(): Promise<unknown>;
   // The configuration page's name (Library/Config, or CONFIG before SilverBullet's tool pages), told by the init page
   configPage?: string;
+  // Whether SilverBullet tells its own pages by their place (under Library/) rather than by a meta tag, told by the init page
+  toolPagesByPlace?: boolean;
   // The CONFIG page written as the Configuration Manager writes it (synced, indexed, the configuration loaded again)
   // `set`: written and indexed, the configuration not loaded again (which starts the plugin anew), these values set in it
   // as it is (config.set, by path), so SilverBullet's config and the plugin read them alike
@@ -139,7 +141,7 @@ export function silverBulletPlatform(bridge: Bridge): {
       reservedKeys: PAGE_KEYS,
       documentDates: pageDates,
       tasks: async (pages) => tasksOfPages(await index.objects("task"), pages),
-      referableDocuments: async () => referablePages(await index.objects("page")),
+      referableDocuments: async () => referablePages(await index.objects("page"), bridge.toolPagesByPlace === true),
       onChanged: (listener) => {
         listeners.add(listener);
         return () => void listeners.delete(listener);

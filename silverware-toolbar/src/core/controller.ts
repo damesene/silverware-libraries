@@ -76,6 +76,9 @@ export const SETTINGS_ACTION: Action = {
   listed: false,
 };
 
+// On the root while a toolbar runs (the style page hides the host's own toolbar by a selection then)
+const RUNNING_ATTRIBUTE = "data-swb-running";
+
 export class Controller {
   private readonly watcher: SelectionWatcher;
   private readonly bar: Bar;
@@ -160,6 +163,8 @@ export class Controller {
     this.doc.addEventListener("focusout", this.onBlur);
     this.docking.start();
     this.stopWatchingWindow = watchOverWindow(this.doc, this.windowChanged);
+    // Running: the style page hides the host's own toolbar by a selection meanwhile (one toolbar there, this one)
+    this.doc.documentElement.setAttribute(RUNNING_ATTRIBUTE, "");
     // Shown always: from the start
     void this.showStaying();
   }
@@ -177,6 +182,7 @@ export class Controller {
     this.docking.stop();
     this.stopWatchingWindow?.();
     this.stopWatchingWindow = undefined;
+    this.doc.documentElement.removeAttribute(RUNNING_ATTRIBUTE);
     this.bar.remove();
     this.popup.remove();
     this.panel.remove();

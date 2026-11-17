@@ -265,7 +265,7 @@ test("meta pages hidden and protected by default: their tags show nowhere, a ren
   // By page: SilverBullet's meta pages left out (against SilverBullet the sample is in a folder of its own: opened)
   await window.locator('[data-swg-view="pages"]').click();
   if (pageName("Garage") !== "Garage") await window.locator(`[data-swg-page="${pageName("Garage").split("/")[0]}"] > .swg-tree-row .swg-tree-toggle`).click();
-  await expect(window.locator(`[data-swg-page="${pageName("Library")}"]`)).toHaveCount(0);
+  await expect(window.locator(`[data-swg-page="${pageName("Library/Cars")}"]`)).toHaveCount(0);
   await expect(window.locator(`[data-swg-page="${pageName("Garage")}"]`)).toBeVisible();
 });
 

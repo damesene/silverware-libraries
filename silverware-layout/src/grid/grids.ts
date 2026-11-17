@@ -880,9 +880,11 @@ export class Grids {
     const editor = this.editing?.session.editor;
     const field = editor?.element;
     if (field && event.target instanceof Node && (field === event.target || field.contains(event.target))) {
-      if (this.host.handsAltPressToField && editor?.altPress?.(event)) {
+      if (this.host.handsAltPressToField) {
+        // (Taken whatever the field does with it: one past its text, in its padding, the host would take still)
         event.preventDefault();
         event.stopImmediatePropagation();
+        editor?.altPress?.(event);
       }
       return;
     }

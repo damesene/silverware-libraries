@@ -40,15 +40,16 @@ export function isToolPage(name: string): boolean {
 }
 
 /**
- * SilverBullet's own page (a library's, a template, the configuration): under
- * `Library/`, or with a meta tag of its own.
- * SB-2.12-COMPAT: the meta tag is what tells them in SilverBullet 2.12.1 and
- * older; from its 3.0 the place alone does (a page tagged `meta/template`
- * outside `Library/` is content there). Once 2.12.1 is dropped: `isToolPage`
- * alone, and this function goes.
+ * SilverBullet's own page (a library's, a template, the configuration), as the
+ * SilverBullet running tells it: by its place (`byPlace`: under `Library/`,
+ * from its 3.0; a page tagged `meta/template` outside `Library/` is content
+ * there), else by a meta tag of its own (2.12.1 and older, where a page under
+ * `Library/` without one is content). Which one, its init page tells.
+ * SB-2.12-COMPAT: the meta tag and `byPlace` for SilverBullet 2.12.1; once it
+ * is dropped, `isToolPage` alone, and this function goes.
  */
-export function isSilverBulletPage(name: string, ownTags: Iterable<string>): boolean {
-  if (isToolPage(name)) return true;
+export function isSilverBulletPage(name: string, ownTags: Iterable<string>, byPlace: boolean): boolean {
+  if (byPlace) return isToolPage(name);
   for (const tag of ownTags) if (isMetaTag(tag)) return true;
   return false;
 }

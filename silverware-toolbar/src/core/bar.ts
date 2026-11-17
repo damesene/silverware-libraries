@@ -11,6 +11,7 @@
 // of choices opens over it. A label of a fixed width keeps
 // it, cut with an ellipsis where longer, so what follows keeps its place.
 import { COMPANION_ATTRIBUTE } from "../../../shared/editor.ts";
+import { setRoom } from "../../../shared/room.ts";
 import { ICONS } from "../icons.ts";
 import type { Action } from "./action.ts";
 import type { Pin } from "./favorites.ts";
@@ -196,7 +197,8 @@ export class Bar {
    * Room kept for it docked, or none: its height as `--swb-docked-top` or
    * `--swb-docked-bottom` on html, by which the style page's CSS pads
    * SilverBullet's editor, so it covers no text and the editor keeps its
-   * cursor clear of it; off, it lies over the editor
+   * cursor clear of it; off, it lies over the editor. Told to the other
+   * plugins as well (shared/room.ts), what they lay at that edge clear of it
    */
   private keepRoom(on: boolean): void {
     // (None kept: nothing to give back; the variables may be another toolbar's, started after this one)
@@ -204,8 +206,10 @@ export class Bar {
     this.room = on;
     const style = this.doc.documentElement.style;
     for (const edge of ["top", "bottom"] as const) {
-      if (on && this.dockPlace?.edge === edge) style.setProperty(`--swb-docked-${edge}`, `${this.element.offsetHeight}px`);
+      const kept = on && this.dockPlace?.edge === edge;
+      if (kept) style.setProperty(`--swb-docked-${edge}`, `${this.element.offsetHeight}px`);
       else style.removeProperty(`--swb-docked-${edge}`);
+      setRoom(this.doc, edge, kept ? this.element.offsetHeight : undefined);
     }
   }
 

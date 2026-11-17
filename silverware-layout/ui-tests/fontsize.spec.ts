@@ -19,6 +19,17 @@ async function zoom(page: Page, notches: number): Promise<void> {
   await page.keyboard.up("Control");
 }
 
+test("the label above a bar another plugin docks at the window's bottom (the room it takes, shared/room.ts)", async ({ page, space }) => {
+  await space.open({ Page: PAGE }, "Page");
+  // A bar 80 px high docked at the bottom, as Silverware Toolbar tells its room
+  await page.evaluate(() => document.documentElement.style.setProperty("--sw-room-bottom", "80px"));
+  await zoom(page, 1);
+  await expect(label(page)).toBeVisible();
+  const box = await boxOf(label(page));
+  const view = page.viewportSize()!;
+  expect(box.y + box.height).toBeLessThanOrEqual(view.height - 80);
+});
+
 test("Ctrl + scroll over the page: a pixel a step, its label naming the size and the default; Ctrl+0 the default again", async ({ page, space }) => {
   await space.open({ Page: PAGE }, "Page");
   await runCommand(page, LAYOUT_SETTINGS);

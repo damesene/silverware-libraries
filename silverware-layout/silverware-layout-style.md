@@ -131,7 +131,8 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
 .swl-zoom-label {
   position: fixed;
   left: 12px;
-  bottom: 12px;
+  /* (Above a bar another plugin docks at the window's bottom: the room it takes, shared/room.ts) */
+  bottom: calc(12px + var(--sw-room-bottom, 0px));
   z-index: var(--sw-layer-dialog);
   padding: 6px 10px;
   font: 13px var(--ui-font, system-ui, sans-serif);

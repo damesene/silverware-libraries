@@ -404,6 +404,9 @@ test.describe("The settings dialog", () => {
     const height = (await bar(page).boundingBox())!.height;
     const room = await page.evaluate(() => document.documentElement.style.getPropertyValue("--swb-docked-bottom"));
     expect(Math.abs(parseFloat(room) - height)).toBeLessThan(1);
+    // Told to the other plugins too (shared/room.ts: what they lay at the bottom stands clear of it)
+    const shared = await page.evaluate(() => document.documentElement.style.getPropertyValue("--sw-room-bottom"));
+    expect(Math.abs(parseFloat(shared) - height)).toBeLessThan(1);
   });
 
   test("shown always, docked: none while another plugin shows something over the whole window (its room given back, a selection and the key show nothing); back once it ends", async ({ page }) => {
@@ -423,6 +426,7 @@ test.describe("The settings dialog", () => {
     await expect(bar(page)).toBeHidden();
     const room = await page.evaluate(() => document.documentElement.style.getPropertyValue("--swb-docked-bottom"));
     expect(parseFloat(room || "0")).toBe(0);
+    expect(await page.evaluate(() => document.documentElement.style.getPropertyValue("--sw-room-bottom"))).toBe("");
     await select(page, "some text");
     await page.keyboard.press("Control+Shift+Q");
     await page.waitForTimeout(200);

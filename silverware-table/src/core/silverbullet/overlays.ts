@@ -55,6 +55,8 @@ export class Overlays {
     const shown = this.rows.shownRows(info);
     const firstRow = shown[0] && this.rows.rowOf(info, shown[0]);
     const lastRow = shown.length ? this.rows.rowOf(info, shown[shown.length - 1]!) : undefined;
+    // The first row under the header: a handle on its top lies half over the header, which is held over the rows
+    const underHead = shown[1] && this.rows.rowOf(info, shown[1]);
     for (const place of places) {
       let handle = made.get(place.className);
       if (!handle) {
@@ -65,9 +67,18 @@ export class Overlays {
       placed.add(place.className);
       if (place.title !== undefined) handle.title = place.title;
       handle.classList.toggle("swt-active", !!place.active);
-      handle.classList.remove("swt-at-mid", "swt-at-top", "swt-at-bottom", "swt-at-left", "swt-at-right");
+      handle.classList.remove("swt-at-mid", "swt-at-top", "swt-at-bottom", "swt-at-left", "swt-at-right", "swt-under-head");
       handle.style.left = handle.style.top = handle.style.right = handle.style.bottom = "";
       this.handleOf.set(handle, { layer: name, key: info.key, className: place.className, row: place.row, column: place.column });
+      handle.classList.toggle("swt-under-head", place.row === underHead);
+      // On a whole row (column) in its middle: inside the cell on the table's edges across that line too
+      if (place.mid === "row") {
+        handle.classList.toggle("swt-at-top", place.row === firstRow);
+        handle.classList.toggle("swt-at-bottom", place.row === lastRow);
+      } else if (place.mid === "column") {
+        handle.classList.toggle("swt-at-left", place.column === 0);
+        handle.classList.toggle("swt-at-right", place.column === info.columns - 1);
+      }
       if (place.mid && this.placeMid(info, handle, place)) continue;
       const cell = this.rows.cellAt(info, place, true);
       if (!cell) {

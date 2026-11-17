@@ -3504,6 +3504,11 @@ html[data-swt-pointer="touch"] .swt-select-handle {
   height: 28px;
   touch-action: none;
 }
+/* On the first row under the header, over the header (held, z-index 3, opaque in a theme): else its upper half lay
+   under it, hard to take */
+html[data-swt-pointer="touch"] .swt-select-handle.swt-under-head {
+  z-index: 4;
+}
 html[data-swt-pointer="touch"] .swt-select-handle::after {
   content: "";
   position: absolute;

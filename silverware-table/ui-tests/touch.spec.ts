@@ -62,6 +62,29 @@ test.describe("Touch", () => {
   });
 });
 
+test.describe("Touch: the selection's handles", () => {
+  // What a finger takes at each handle's middle: the handle itself, not the header held over the rows nor nothing past
+  // the table's box (a theme's header opaque, a table's box clipped as a card)
+  const takenAtHandles = (page: Page) =>
+    page.evaluate(() =>
+      [...document.querySelectorAll(".swt-select-handle")].map((handle) => {
+        const r = handle.getBoundingClientRect();
+        return document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) === handle;
+      }),
+    );
+
+  test("on the first row under the header and on a whole row, each handle taken where it shows", startingOn("# Test\n\n| Header A | Header B |\n|---|---|\n| Cell A | Cell B |\n\nAfter\n"), async ({ page }) => {
+    await tap(page, cell(page, 1, 0));
+    await expect(page.locator(".swt-select-handle")).toHaveCount(2);
+    await expect.poll(() => takenAtHandles(page)).toEqual([true, true]);
+    // The whole row: its handles in its middle, inside the table at its bottom edge
+    await page.keyboard.press("Shift+ArrowRight");
+    await expect(page.locator(".swt-selected")).toHaveCount(2);
+    await expect(page.locator(".swt-select-handle.swt-at-mid")).toHaveCount(2);
+    await expect.poll(() => takenAtHandles(page)).toEqual([true, true]);
+  });
+});
+
 test.describe("Touch: moving a table on the sheet", () => {
   test("a tap on a table's cell shows its move handle; Move table… in the cell's menu, then a tap, moves it", startingOn("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| City |\n|---|\n| Brno |\n| <meta core.table core.name='b' sheet.name='Plan' sheet.at='D1'> |\n"), async ({ page }) => {
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);

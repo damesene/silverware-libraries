@@ -21,12 +21,14 @@ const EDITING = "swl-grid-editing";
 /**
  * The blocks of a cell drawn, by the offsets marked on its children (a paragraph, a list, a heading; the first's 0 may
  * be unmarked): each its markdown, from its offset to the next one's (the cell's end for the last), its blank lines
- * round it left out: those it draws (`drawnBlocks`: not the space between them, nor what the grid puts in the cell).
- * None where another is unmarked (another's drawing): the blocks then unknown
+ * round it left out: those it draws (`drawnBlocks`: not the space between them, nor what the grid puts in the cell),
+ * an element of HTML's (an SVG an HTML block holds is drawn in one, not a block of its own). None where another is
+ * unmarked (another's drawing): the blocks then unknown
  */
 export function blocksOf(cell: HTMLElement, content: string): Block[] {
   const found: { readonly element: Element; readonly at: number }[] = [];
   for (const child of drawnBlocks(cell)) {
+    if (!(child instanceof HTMLElement)) continue;
     const at = isMarked(child) ? offsetOf(child) : found.length ? NaN : 0;
     if (!Number.isInteger(at) || at < 0 || at > content.length || at < (found.at(-1)?.at ?? 0)) return [];
     found.push({ element: child, at });

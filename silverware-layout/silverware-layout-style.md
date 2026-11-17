@@ -995,6 +995,54 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
 .swl-grid-cell img {
   max-width: 100%;
 }
+/* What a cell draws of its markdown in the look the theme gives the page's: a table as a card, a picture's and a code
+   block's corners, a quote's bar, by the theme's own variables (SilverBullet's after 2.12.1: its corners, its card's
+   border and shadow, its code's ground), else plain (2.12.1 has none of them, nor its page). These rules alone set
+   it: the page's own drawing is SilverBullet's, untouched. Of more weight than a host's rules for a table in a block
+   of its (`:not(#swl-none)` twice: two ids more, matching every one) */
+.swl-grid-cell table:not(#swl-none):not(#swl-none) {
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--ui-surface-border-color, transparent);
+  border-radius: var(--ui-radius-xl, 0);
+  box-shadow: var(--ui-shadow-card, none);
+  background: var(--root-background-color);
+}
+/* (Its corner cells rounded as the card, inside its border: a cell's ground would show past a rounded corner) */
+.swl-grid-cell table > :first-child > tr:first-child > :first-child {
+  border-top-left-radius: max(0px, calc(var(--ui-radius-xl, 0px) - 1px));
+}
+.swl-grid-cell table > :first-child > tr:first-child > :last-child {
+  border-top-right-radius: max(0px, calc(var(--ui-radius-xl, 0px) - 1px));
+}
+.swl-grid-cell table > :last-child > tr:last-child > :first-child {
+  border-bottom-left-radius: max(0px, calc(var(--ui-radius-xl, 0px) - 1px));
+}
+.swl-grid-cell table > :last-child > tr:last-child > :last-child {
+  border-bottom-right-radius: max(0px, calc(var(--ui-radius-xl, 0px) - 1px));
+}
+.swl-grid-cell img:not(#swl-none) {
+  border-radius: var(--ui-radius-lg, 0);
+  outline: 1px solid var(--ui-surface-border-color, transparent);
+  outline-offset: -1px;
+}
+.swl-grid-cell pre:not(#swl-none) {
+  padding: 12px 16px;
+  overflow-x: auto;
+  border-radius: var(--ui-radius-lg, 0);
+  background-color: var(--editor-code-background-color, transparent);
+}
+.swl-grid-cell pre:not(#swl-none) code {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+}
+.swl-grid-cell blockquote:not(#swl-none) {
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 1em;
+  border-left: 2px solid var(--editor-blockquote-border-color, color-mix(in srgb, var(--root-color, #000) 25%, transparent));
+}
 /* A grid's borders (its `border` attribute): faint lines round it and between its cells, as a table's. The gap goes
    into each cell's padding, so a line between two columns lies where the gap's middle was, on its divider. All within
    the grid's box (it cuts off what lies outside, but above: `clip-path`): its ring on its own first and last

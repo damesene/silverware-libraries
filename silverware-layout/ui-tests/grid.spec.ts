@@ -734,6 +734,20 @@ test("a wide grid's divider snaps to the text's edge too: its first column lined
   await expect.poll(() => space.saved("Page")).toMatch(/<grid width="1100" columns="[^"]+">/);
 });
 
+test("what a cell draws in the theme's look: a table a card of its corners, a picture's and a code block's corners, a quote's bar", async ({ page, space }) => {
+  const cellText = "| A | B |\n|---|---|\n| 1 | 2 |\n\n```\nlet x = 1;\n```\n\n> A quote";
+  await space.open({ Page: `# Page\n\n<grid>\n<cell>\n\n${cellText}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n` }, "Page");
+  await gridsDrawn(page);
+  const cell = page.locator("#sb-main .swl-grid-cell").first();
+  // The theme's corners (none where it names none: SilverBullet 2.12.1, whose page has none either)
+  const radius = (name: string) => page.evaluate((name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "0px", name);
+  const looks = await cell.evaluate((cell) => {
+    const style = (selector: string) => getComputedStyle(cell.querySelector(selector)!);
+    return { table: style("table").borderTopLeftRadius, collapse: style("table").borderCollapse, code: style("pre").borderTopLeftRadius, quote: style("blockquote").borderLeftStyle };
+  });
+  expect(looks).toEqual({ table: await radius("--ui-radius-xl"), collapse: "separate", code: await radius("--ui-radius-lg"), quote: "solid" });
+});
+
 test("a grid in a page embedded in another: drawn with its own columns, not edited there", async ({ page, space }) => {
   await space.open(
     {

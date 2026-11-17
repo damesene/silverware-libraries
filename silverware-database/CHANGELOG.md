@@ -1,5 +1,15 @@
 # Silverware Database: changelog
 
+## 1.2.0 (2026-11-17)
+
+- Works with SilverBullet's next version (3.0) as well as 2.12.1: settings are saved in `Library/Config` there, SilverBullet's own pages (under `Library/`) are not offered as references, and your own views and types go in a `space-lua` block on a page under `Library/`.
+- The peek's content is edited in Silverware Editor where it is installed (markdown highlighted, tasks you tick, lists continued, links to pages completed), drawn in your page's look.
+- Images and other files in an item's content are drawn in the peek as in the page (by Silverware Assets where installed, else images alone); a link clicked there opens its page or file (Ctrl+click: a new tab).
+- With Silverware Toolbar, its toolbar shows for text selected in the peek.
+- A SilverBullet shortcut pressed in the peek (Ctrl+K, Ctrl+/, …) now says it does nothing there.
+- With Silverware Layout: a database placed at the left, in the middle or at the right of the text, from the menu of the bar beside it.
+- Fixed: a row's remove button kept its size at a smaller font; the peek's content is written when it closes after a file's view changed in it.
+
 ## 1.1.1 (2026-11-12)
 
 - Fixed: a database's menus, value editors and suggestions show over a table's header and over other plugins' controls (a table's tab, the width handle of Silverware Layout).

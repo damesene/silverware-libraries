@@ -1,11 +1,12 @@
 // Where a point of a cell's rendering is in the cell's markdown (a click, a drop, a selection): the element marked with
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
+import { readEmbeds } from "../../../../shared/markdown/embed.ts";
 import type { MarkedLine } from "../../../../shared/markdown/lines.ts";
-import { blankLinesAbove, caretOn } from "../core/blanklines.ts";
+import { blankLinesAbove, caretOn, holdsBlankLine } from "../core/blanklines.ts";
 import { positionInCell } from "../core/position.ts";
 import { cellLines } from "./celllines.ts";
 import { drawnBlocks, spaceBefore } from "./cellparts.ts";
-import { inEmbeddedPage, isEmbeddedPage, lineStarts, markedFrom, offsetOf } from "./offsets.ts";
+import { embeddedPagesIn, inEmbeddedPage, isEmbeddedPage, lineStarts, markedFrom, offsetOf } from "./offsets.ts";
 
 /** A caret's place in the rendering: a node and an offset in it */
 export type Caret = { readonly node: Node; readonly offset: number };
@@ -33,22 +34,27 @@ export function offsetInCell(content: string, cellElement: HTMLElement, target: 
   // (A page embedded: at the embed, its text none of the cell's markdown to follow)
   if (element === marked && isEmbeddedPage(element)) return elementPos;
   if (!caret || !element.contains(caret.node)) return positionInCell(content, elementPos, "", 0);
-  // The element's text, and how much of it is before the point: a page it embeds left out (none of the cell's
-  // markdown, its embed there passed over as marks are)
   const range = cellElement.ownerDocument.createRange();
   range.setStart(element, 0);
   range.setEnd(caret.node, caret.offset);
+  // A page the element embeds before the point (the last): followed from its embed's end in the markdown, as what
+  // the page draws is none of it (its embed's own text, `![[Notes]]`, not matched with the text after it)
+  const page = embeddedPagesIn(element)
+    .filter((one) => range.intersectsNode(one))
+    .at(-1);
+  const start = page ? (readEmbeds(content).find((embed) => embed.from === offsetOf(page))?.to ?? offsetOf(page)) : elementPos;
+  // The element's text from there, and how much of it is before the point: a page it embeds left out
   let text = "";
   let before = 0;
   const walker = cellElement.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    if (inEmbeddedPage(node)) continue;
+    if (inEmbeddedPage(node) || (page && !(page.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING))) continue;
     const own = node.textContent ?? "";
     text += own;
     // (A text in the range is whole in it, but the one the point is in)
     if (range.intersectsNode(node)) before += node === caret.node ? Math.min(caret.offset, own.length) : own.length;
   }
-  return positionInCell(content, elementPos, text, before);
+  return positionInCell(content, start, text, before);
 }
 
 /**
@@ -91,7 +97,7 @@ function lineStartBelow(cellElement: HTMLElement, lines: readonly MarkedLine[], 
 export function blankLineAt(content: string, cellElement: HTMLElement, y: number): number | undefined {
   const lines = cellLines(content);
   // (A cell without a blank line has none to click: its rendering not measured)
-  if (!lines.some((line) => line.empty)) return undefined;
+  if (!holdsBlankLine(lines)) return undefined;
   const next = lineStartBelow(cellElement, lines, y);
   if (!next) return undefined;
   const { element, offset } = next;

@@ -2,7 +2,7 @@
 // those the host drew.
 import { describe, expect, it } from "vitest";
 import { markedLines } from "../../../../shared/markdown/parse.ts";
-import { blankLinesAbove, caretOn } from "./blanklines.ts";
+import { blankLinesAbove, caretOn, holdsBlankLine } from "./blanklines.ts";
 
 // (Of a text read line by line first, as a cell's is)
 const countBefore = (text: string, at: number) => blankLinesAbove(markedLines(text), at).length;
@@ -66,5 +66,12 @@ describe("a blank line clicked", () => {
     expect(startsBefore("a\n\n\nb", 0)).toEqual([]);
     // A text starting with blank lines: the first at 0
     expect(startsBefore("\n\nb", 2)).toEqual([1, 0]);
+  });
+});
+
+describe("a text holding a blank line", () => {
+  it("holds one empty past its marks, an empty item's line none", () => {
+    const holds = (text: string) => holdsBlankLine(markedLines(text));
+    expect([holds("a\nb"), holds("a\n\nb"), holds("> a\n>\n> b"), holds("- a\n-\n- b")]).toEqual([false, true, true, false]);
   });
 });

@@ -1,7 +1,7 @@
 // A grid drawn: its cells side by side as its column template says (a narrow pane stacks them: the style page's rule),
 // each cell's markdown as the host rendered it.
 import { el } from "../../../../shared/elements.ts";
-import { blankLinesAbove } from "../core/blanklines.ts";
+import { blankLinesAbove, holdsBlankLine } from "../core/blanklines.ts";
 import type { BorderStyle } from "../model/border.ts";
 import { cellLines } from "./celllines.ts";
 import { BLANK, spaceBefore } from "./cellparts.ts";
@@ -65,7 +65,7 @@ export function plainCell(doc: Document, content: string): string {
 export function keepBlankLines(doc: Document, cell: HTMLElement, content: string): void {
   const lines = cellLines(content);
   // (A cell without a blank line has none to put back: its rendering not looked through)
-  if (!lines.some((line) => line.empty)) return;
+  if (!holdsBlankLine(lines)) return;
   for (const { element, offset } of lineStarts(cell, lines)) {
     const wanted = blankLinesAbove(lines, offset).length;
     if (!wanted) continue;

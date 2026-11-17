@@ -29,6 +29,9 @@ export function blankLinesAbove(lines: readonly MarkedLine[], at: number): reado
   return above;
 }
 
+/** Whether a text holds a blank line at all (an empty item's line none, as `blankLinesAbove` counts) */
+export const holdsBlankLine = (lines: readonly MarkedLine[]): boolean => lines.some((line) => line.empty && !line.item);
+
 /**
  * Where a caret put on a blank line goes: past its last quote's mark (a quote's empty line, `>`: what is typed there
  * stays in the quote), else at its start (the spaces a line of white space holds not taken: four would make what is

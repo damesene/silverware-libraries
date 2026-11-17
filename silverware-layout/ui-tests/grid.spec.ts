@@ -461,6 +461,24 @@ test("a page embedded in a cell keeps its own lines, the cell's blank line put b
   await expect(first.locator("[data-swl-embedded] [data-pos]")).toHaveCount(0);
 });
 
+test("a page embedded in a cell: its task's box toggles nothing in the cell, a click on its text puts the caret at the embed", async ({ page, space }) => {
+  const cell = `- [ ] mine\n\n![[${space.folder}/Todo]]`;
+  await space.open({ Page: `# Page\n\n<grid>\n<cell>\n\n${cell}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n`, Todo: "Buy bread\n\n- [ ] theirs\n" }, "Page");
+  await gridsDrawn(page);
+  const first = page.locator("#sb-main .swl-grid-cell").first();
+  const theirs = first.locator("[data-swl-embedded] input[type=checkbox]");
+  await expect(theirs).toHaveCount(1);
+  // The page's box clicked, then the cell's own: the cell's task toggled once, by its own box alone
+  await theirs.click();
+  await first.locator(":scope > ul input[type=checkbox]").first().click();
+  await expect.poll(async () => (await space.saved("Page")) ?? "").toContain("- [x] mine");
+  expect(await space.saved("Page")).toContain(`![[${space.folder}/Todo]]`);
+  // A click on the page's text: the cell's field, the caret at the embed
+  await first.getByText("Buy bread").click();
+  await expect(cellField(page)).toBeVisible();
+  await expect.poll(async () => (await fieldState(page)).from).toBe(cell.indexOf("![["));
+});
+
 test("an empty cell is a line high, clicked into to write in it", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n<grid>\n<cell>\n\nLeft\n\n</cell>\n<cell>\n\n\n</cell>\n</grid>\n" }, "Page");
   await gridsDrawn(page);

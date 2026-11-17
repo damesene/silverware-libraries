@@ -77,3 +77,17 @@ describe("a point after a page the cell embeds, in the same paragraph", () => {
     expect(offsetInCell(content, cell, after.parentElement!, { node: after, offset: " and mo".length })).toBe(content.indexOf("re"));
   });
 });
+
+describe("a point right after a page the cell embeds", () => {
+  it("is past its embed, never in the embed's own text", () => {
+    const content = "See ![[Meeting notes]] and more";
+    const cell = document.createElement("div");
+    cell.innerHTML = '<span class="p">See <span class="swl-embedded" data-swl-embedded="Meeting notes" data-pos="4"><span class="p">Notes</span></span> and more</span>';
+    const after = cell.querySelector(".p")!.lastChild!;
+    expect(offsetInCell(content, cell, after.parentElement!, { node: after, offset: 0 })).toBe(content.indexOf(" and"));
+    const tight = "![[Notes]]s more";
+    cell.innerHTML = '<span class="p"><span class="swl-embedded" data-swl-embedded="Notes" data-pos="0"><span class="p">x</span></span>s more</span>';
+    const s = cell.querySelector(".p")!.lastChild!;
+    expect(offsetInCell(tight, cell, s.parentElement!, { node: s, offset: 1 })).toBe(tight.indexOf("s more") + 1);
+  });
+});

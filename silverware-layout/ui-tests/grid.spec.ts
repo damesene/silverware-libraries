@@ -404,6 +404,21 @@ test("a click on an item's text over the list nested in it after a blank line pu
   await expect.poll(async () => inWord((await fieldState(page)).from)).toBe(true);
 });
 
+test("a quote's blank line between a loose list's items is a line, as in the editor, and a click there puts the caret on it", async ({ page, space }) => {
+  // (The quote's blank line its mark alone: SilverBullet's rendering leaves it out between the items)
+  const cell = "> - a\n>\n> - b";
+  await space.open({ Page: `# Page\n\n<grid>\n<cell>\n\n${cell}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n` }, "Page");
+  await gridsDrawn(page);
+  const first = page.locator("#sb-main .swl-grid-cell").first();
+  await expect(first.locator(".swl-grid-blank")).toHaveCount(1);
+  const a = await boxOf(first.locator("li .p").first());
+  const b = await boxOf(first.locator("li .p").nth(1));
+  expect(Math.round((b.y - a.y) / a.height)).toBe(2);
+  await page.mouse.click(b.x + 30, b.y - a.height / 2);
+  await expect(cellField(page)).toBeVisible();
+  await expect.poll(async () => (await fieldState(page)).from).toBe(cell.indexOf("\n>\n") + 1);
+});
+
 test("an empty cell is a line high, clicked into to write in it", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n<grid>\n<cell>\n\nLeft\n\n</cell>\n<cell>\n\n\n</cell>\n</grid>\n" }, "Page");
   await gridsDrawn(page);

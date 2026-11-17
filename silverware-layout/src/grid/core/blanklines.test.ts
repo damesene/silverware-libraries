@@ -23,6 +23,16 @@ describe("a cell's blank lines", () => {
     expect(blankLinesBefore("\n\nb", 2)).toBe(2);
   });
 
+  it("counts a quote's blank lines, its marks alone, for a place in the quote as deep or deeper, not outside it", () => {
+    expect(blankLinesBefore("> one\n>\n> two", 10)).toBe(1);
+    expect(blankLinesBefore("> one\n> >\n>\n> > two", 16)).toBe(2);
+    expect(blankLinesBefore("> one\n\n> two", 9)).toBe(1);
+    // (A quote's empty line is no blank line of the text after the quote, nor of a shallower quote)
+    expect(blankLinesBefore("> one\n>\ntwo", 8)).toBe(0);
+    expect(blankLinesBefore("> > one\n> >\n> two", 14)).toBe(0);
+    expect(blankLineStart("> one\n>\n> two", 10, 1)).toBe(6);
+  });
+
   it("finds where the line a place is on starts", () => {
     expect(lineStartOf("ab\ncd", 4)).toBe(3);
     expect(lineStartOf("ab\ncd", 3)).toBe(3);
@@ -86,6 +96,25 @@ describe("a cell's blank lines", () => {
     expect(cell.querySelector(`${before} .swl-grid-blank`)).toBeNull();
     keepBlankLines(document, cell, text);
     expect(cell.querySelectorAll(".swl-grid-blank")).toHaveLength(1);
+  });
+
+  it("puts back a quote's blank line between a loose list's items, and none the rendering keeps (between paragraphs, after a heading)", () => {
+    // SilverBullet 2.12.1's markdownToHtml (probed 2026-11-17): a quote at 0, unmarked
+    const cases = [
+      { text: "> - a\n>\n> - b", html: '<blockquote> <ul data-pos="2"><li data-pos="2"><span class="p" data-pos="4">a</span></li><li data-pos="10"><span class="p" data-pos="12">b</span></li></ul></blockquote>', blanks: 1 },
+      { text: "> one\n>\n> two", html: '<blockquote> <span class="p" data-pos="2">one</span><br><br> <span class="p" data-pos="10">two</span></blockquote>', blanks: 0 },
+      { text: "> # Head\n>\n> - a", html: '<blockquote> <h1 data-pos="2">Head</h1><br> <ul data-pos="13"><li data-pos="13"><span class="p" data-pos="15">a</span></li></ul></blockquote>', blanks: 0 },
+    ];
+    for (const { text, html, blanks } of cases) {
+      const cell = document.createElement("div");
+      cell.innerHTML = html;
+      keepBlankLines(document, cell, text);
+      expect(cell.querySelectorAll(".swl-grid-blank"), text).toHaveLength(blanks);
+    }
+    const cell = document.createElement("div");
+    cell.innerHTML = cases[0]!.html;
+    keepBlankLines(document, cell, cases[0]!.text);
+    expect(cell.querySelector('li[data-pos="10"]')!.previousElementSibling?.className).toBe("swl-grid-blank");
   });
 
   it("puts back a blank line before a list nested in an item inside that item's list, before its first item", () => {

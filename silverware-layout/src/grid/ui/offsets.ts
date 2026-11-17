@@ -8,15 +8,15 @@ const POS = "data-pos";
 export type LineStart = { readonly element: HTMLElement; readonly offset: number };
 
 /**
- * The elements of a cell's rendering that start a line of its markdown: its blocks and the items of its lists, in their
- * order, one per line. Where several start on one line (a list and its first item, a quote and the list in it), the
- * outermost stands for the line, the first in the document's order: what lies before that line (its blank lines) lies
- * before it, not inside it
+ * The elements of a cell's rendering that start a line of its markdown: its blocks, those of its quotes and the items of
+ * its lists, in their order, one per line. Where several start on one line (a list and its first item, a quote and the
+ * list in it), the outermost stands for the line, the first in the document's order: what lies before that line (its
+ * blank lines) lies before it, not inside it
  */
 export function lineStarts(cell: HTMLElement, content: string): readonly LineStart[] {
   const lines = new Set<number>();
   const starts: LineStart[] = [];
-  for (const element of cell.querySelectorAll<HTMLElement>(`:scope > [${POS}], :scope li[${POS}]`)) {
+  for (const element of cell.querySelectorAll<HTMLElement>(`:scope > [${POS}], :scope blockquote > [${POS}], :scope li[${POS}]`)) {
     const offset = offsetOf(element);
     const line = lineStartOf(content, offset);
     if (lines.has(line)) continue;

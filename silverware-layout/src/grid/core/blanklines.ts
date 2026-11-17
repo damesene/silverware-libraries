@@ -5,7 +5,7 @@
 // its marks alone (`>`: kept as line breaks but between a loose list's items, probed 2026-11-17). What a rendered
 // element misses of the blank lines before it in the markdown is counted here, its lines read once as markdown's parser
 // reads them (shared/markdown/parse.ts: a quote's marks, a list item's, none in a code block). Pure.
-import { lineIndexAt, type MarkedLine } from "../../../../shared/markdown/parse.ts";
+import { lineIndexAt, type MarkedLine } from "../../../../shared/markdown/lines.ts";
 
 /**
  * The blank lines right before the line a place is on, the nearest first (`caretOn`: where a caret goes on one). In a

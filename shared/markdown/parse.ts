@@ -14,6 +14,7 @@
 // (SilverBullet's own table keeps a wiki link's `|` in its cell); a footnote's
 // definition (`[^1]: …`) is a paragraph. Pure, synchronous.
 import { parser as commonMark, Table } from "@lezer/markdown";
+import { countBelow, type MarkedLine } from "./lines.ts";
 import { readTaskState } from "./task.ts";
 
 const parser = commonMark.configure([Table]);
@@ -77,19 +78,10 @@ function readAsParser(text: string, from = 0): { readonly read: string; readonly
     return "\n";
   });
   const breakAt = (i: number) => breaks[i]!;
-  return { read, place: (at) => from + at + below(breaks.length, breakAt, at) };
+  return { read, place: (at) => from + at + countBelow(breaks.length, breakAt, at) };
 }
 
-/**
- * A line of a text (`to` at its line break) with the marks the blocks holding it put on it, as markdown's parser reads
- * them: where each of its quotes' `>` is, whether a list's item starts on it (its marker), where its own text starts
- * past them and the indentation, and whether it holds nothing past them (a quote's empty line, `>`, a blank line). A
- * mark in a code block is its text: none. A CRLF is read as `parseBlocks` reads it, its `\r` in no line. The parser's
- * own reading, none of SilverBullet's extensions: an HTML comment's body is no markdown here (`parseBlocks` reads it)
- */
-export type MarkedLine = Span & { readonly quotes: readonly number[]; readonly item: boolean; readonly content: number; readonly empty: boolean };
-
-/** A text's lines, in order, with the marks of the blocks holding them */
+/** A text's lines, in order, with the marks of the blocks holding them (lines.ts `MarkedLine`), as the parser reads them */
 export function markedLines(text: string): MarkedLine[] {
   const { read, place } = readAsParser(text);
   const marks: { readonly from: number; readonly to: number; readonly quote: boolean }[] = [];
@@ -126,21 +118,6 @@ export function markedLines(text: string): MarkedLine[] {
 function readTree(text: string, place: (at: number) => number): MarkdownNode[] {
   return new Reader(text, place).children(parser.parse(text).topNode, []);
 }
-
-/** How many of `count` places in order (the `i`th `placeOf(i)`) are before `at` */
-function below(count: number, placeOf: (i: number) => number, at: number): number {
-  let low = 0;
-  let high = count;
-  while (low < high) {
-    const mid = (low + high) >> 1;
-    if (placeOf(mid) < at) low = mid + 1;
-    else high = mid;
-  }
-  return low;
-}
-
-/** Which of a text's lines (`markedLines`, in order) a place is on: its index (past the text's end, the last) */
-export const lineIndexAt = (lines: readonly MarkedLine[], at: number): number => Math.max(0, below(lines.length, (i) => lines[i]!.from, at + 1) - 1);
 
 /**
  * What a block holding others puts before each of their lines, outermost first: a quote's marker, a list item's

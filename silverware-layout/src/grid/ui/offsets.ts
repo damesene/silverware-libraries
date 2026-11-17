@@ -1,6 +1,6 @@
 // Where an element of a cell's rendering is in the cell's markdown: the host marks each element with its offset
 // (`data-pos`, `GridHost.renderMarkdown`), and may leave an offset of 0 unmarked (SilverBullet does): read here alone.
-import { lineIndexAt, type MarkedLine } from "../../../../shared/markdown/parse.ts";
+import { lineIndexAt, type MarkedLine } from "../../../../shared/markdown/lines.ts";
 import { inCellBlocks } from "./cellparts.ts";
 
 const POS = "data-pos";

@@ -1,6 +1,6 @@
 // Where a point of a cell's rendering is in the cell's markdown (a click, a drop, a selection): the element marked with
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
-import type { MarkedLine } from "../../../../shared/markdown/parse.ts";
+import type { MarkedLine } from "../../../../shared/markdown/lines.ts";
 import { blankLinesAbove, caretOn } from "../core/blanklines.ts";
 import { positionInCell } from "../core/position.ts";
 import { cellLines } from "./celllines.ts";

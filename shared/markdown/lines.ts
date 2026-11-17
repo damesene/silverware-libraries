@@ -1,6 +1,8 @@
 // Markdown's lines as a selection touches them, and its fenced code blocks
 // read line by line: what any plugin reading the text selected needs (Silverware
-// Toolbar's formats, Silverware Database's converters). Pure, on the text.
+// Toolbar's formats, Silverware Database's converters). Pure, on the text. Its
+// lines with the marks of the blocks holding them (`MarkedLine`, read by
+// parse.ts) and the line a place is on: what reads them needs no parser.
 
 /** A line of a text: where it is, its text without its line break */
 export type Line = { readonly from: number; readonly to: number; readonly text: string };
@@ -73,3 +75,28 @@ export function fenceOpenAt(text: string, at: number): string | undefined {
   for (const line of text.slice(0, at).split("\n")) open = nextFence(line, open);
   return open;
 }
+
+/**
+ * A line of a text (`to` at its line break) with the marks the blocks holding it put on it, as markdown's parser reads
+ * them (parse.ts `markedLines`, the one knowing the parser): where each of its quotes' `>` is, whether a list's item
+ * starts on it (its marker), where its own text starts past them and the indentation, and whether it holds nothing past
+ * them (a quote's empty line, `>`, a blank line). A mark in a code block is its text: none. A CRLF is read as
+ * `parseBlocks` reads it, its `\r` in no line. The parser's own reading, none of SilverBullet's extensions: an HTML
+ * comment's body is no markdown here (`parseBlocks` reads it)
+ */
+export type MarkedLine = { readonly from: number; readonly to: number; readonly quotes: readonly number[]; readonly item: boolean; readonly content: number; readonly empty: boolean };
+
+/** How many of `count` places in order (the `i`th `placeOf(i)`) are before `at` */
+export function countBelow(count: number, placeOf: (i: number) => number, at: number): number {
+  let low = 0;
+  let high = count;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (placeOf(mid) < at) low = mid + 1;
+    else high = mid;
+  }
+  return low;
+}
+
+/** Which of a text's marked lines (in order) a place is on: its index (past the text's end, the last) */
+export const lineIndexAt = (lines: readonly MarkedLine[], at: number): number => Math.max(0, countBelow(lines.length, (i) => lines[i]!.from, at + 1) - 1);

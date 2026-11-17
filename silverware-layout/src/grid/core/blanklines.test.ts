@@ -133,14 +133,28 @@ describe("a cell's blank lines", () => {
     expect(cell.querySelector('li[data-pos="10"]')!.previousElementSibling?.className).toBe("swl-grid-blank");
   });
 
-  it("puts back a blank line before a list nested in an item inside that item's list, before its first item", () => {
+  it.each([
+    // SilverBullet 2.12.1's markdownToHtml (probed 2026-11-17): a block after a blank line in a list's item, nothing drawn between
+    { what: "a code block", text: "- a\n\n  ```\n  code\n  ```", html: '<ul><li><span class="p" data-pos="2">a</span><pre data-pos="7">code</pre></li></ul>', block: "pre" },
+    { what: "a paragraph", text: "- a\n\n  para2", html: '<ul><li><span class="p" data-pos="2">a</span><span class="p" data-pos="7">para2</span></li></ul>', block: 'span[data-pos="7"]' },
+    { what: "a heading", text: "- a\n\n  # H", html: '<ul><li><span class="p" data-pos="2">a</span><h1 data-pos="7">H</h1></li></ul>', block: "h1" },
+    { what: "a quote", text: "- a\n\n  > q", html: '<ul><li><span class="p" data-pos="2">a</span><blockquote data-pos="7"> <span class="p" data-pos="9">q</span></blockquote></li></ul>', block: "blockquote" },
+  ])("puts back a blank line before $what in a list's item, before it", ({ text, html, block }) => {
+    const cell = document.createElement("div");
+    cell.innerHTML = html;
+    keepBlankLines(document, cell, text);
+    expect(cell.querySelectorAll(".swl-grid-blank")).toHaveLength(1);
+    expect(cell.querySelector(block)!.previousElementSibling?.className).toBe("swl-grid-blank");
+  });
+
+  it("puts back a blank line before a list nested in an item, before that list", () => {
     // (Probed alike: the outer list and its first item at 0, unmarked)
     const text = "- a\n\n  - b\n  - c";
     const cell = document.createElement("div");
     cell.innerHTML = '<ul><li><span class="p" data-pos="2">a</span><ul data-pos="7"><li data-pos="7"><span class="p" data-pos="9">b</span></li><li data-pos="13"><span class="p" data-pos="15">c</span></li></ul></li></ul>';
     keepBlankLines(document, cell, text);
     expect(cell.querySelectorAll(".swl-grid-blank")).toHaveLength(1);
-    expect(cell.querySelector('li[data-pos="7"]')!.previousElementSibling?.className).toBe("swl-grid-blank");
+    expect(cell.querySelector('ul[data-pos="7"]')!.previousElementSibling?.className).toBe("swl-grid-blank");
   });
 });
 
@@ -155,6 +169,13 @@ describe("the space drawn before an element of a cell", () => {
 });
 
 describe("the lines a cell's rendering starts", () => {
+  it("are the outermost of its marked elements on each line, a link starting a paragraph's later line too", () => {
+    const cell = document.createElement("div");
+    cell.innerHTML = '<span class="p">One<br><a class="wiki-link" data-pos="4">Probe</a> two</span><ul data-pos="18"><li data-pos="18"><span class="p" data-pos="20">a</span></li></ul>';
+    const starts = lineStarts(cell, "One\n[[Probe]] two\n- a");
+    expect(starts.map(({ element, offset }) => `${element.tagName}@${offset}`)).toEqual(["A@4", "UL@18"]);
+  });
+
   it("are its blocks and its lists' items, the outermost of those starting on one line standing for it", () => {
     const cell = document.createElement("div");
     cell.innerHTML =

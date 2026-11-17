@@ -433,6 +433,18 @@ test("a quote's blank line between a loose list's items is a line, as in the edi
   await expect.poll(async () => (await fieldState(page)).from).toBe(cell.indexOf("\n>\n") + 1);
 });
 
+test("a blank line before a block in a list's item is a line, as in the editor", async ({ page, space }) => {
+  // (SilverBullet's rendering draws the item's second paragraph right under its first)
+  const cell = "- a\n\n  para2";
+  await space.open({ Page: `# Page\n\n<grid>\n<cell>\n\n${cell}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n` }, "Page");
+  await gridsDrawn(page);
+  const first = page.locator("#sb-main .swl-grid-cell").first();
+  await expect(first.locator(".swl-grid-blank")).toHaveCount(1);
+  const a = await boxOf(first.locator("li .p").first());
+  const second = await boxOf(first.locator("li .p").nth(1));
+  expect(Math.round((second.y - a.y) / a.height)).toBe(2);
+});
+
 test("an empty cell is a line high, clicked into to write in it", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n<grid>\n<cell>\n\nLeft\n\n</cell>\n<cell>\n\n\n</cell>\n</grid>\n" }, "Page");
   await gridsDrawn(page);

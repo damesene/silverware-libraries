@@ -50,8 +50,9 @@ export function endAt(content: string, cellElement: HTMLElement, y: number): num
 
 /**
  * What is drawn right above an element of a cell's rendering, past the space between (line breaks, blank lines put
- * back): the element before it, or where it is the first in what holds it (a list nested in an item), the one before
- * that, up to the cell; none where nothing is. What lies between (a nested list's margin) is the blank lines' room
+ * back): the element before it, or where it is the first in what holds it (a quote's first block, after the quote's
+ * empty first line), the one before that, up to the cell; none where nothing is. What lies between (a margin) is the
+ * blank lines' room
  */
 function drawnAbove(element: Element, cellElement: Element): Element | undefined {
   for (let at: Element | null = element; at && at !== cellElement; at = at.parentElement) {

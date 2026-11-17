@@ -8,6 +8,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Page } from "@playwright/test";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
+import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 
 import { boxOf } from "../../scripts/ui-test-helpers.ts";
 
@@ -53,6 +54,7 @@ export const test = base.extend<{ space: Space }>({
     const path = (name: string) => join(server().space, folder, `${name}.md`);
     const configPath = join(server().space, "CONFIG.md");
     const configBefore = existsSync(configPath) ? await readFile(configPath, "utf8") : undefined;
+    let watching = false;
     await use({
       folder,
       open: async (pages, open, files = {}) => {
@@ -65,8 +67,13 @@ export const test = base.extend<{ space: Space }>({
           await mkdir(dirname(file), { recursive: true });
           await writeFile(file, content);
         }
+        // (SilverBullet's first index, complete, builds the editor's state anew: its view back at the cursor, its
+        // widgets drawn again; waited for, as what a test does before it would be undone: scripts/silverbullet-loaded.ts)
+        if (!watching) await watchReloads(page);
+        watching = true;
         await page.goto(`http://127.0.0.1:${server().port}/${folder}/${open}`);
         await page.waitForFunction(() => !!(window as unknown as { client?: { editorView?: unknown } }).client?.editorView);
+        await loaded(page);
         await commandDefined(page, LAYOUT_SETTINGS);
       },
       saved: async (name) => (existsSync(path(name)) ? (await readFile(path(name), "utf8")).replace(/\r\n/g, "\n") : undefined),

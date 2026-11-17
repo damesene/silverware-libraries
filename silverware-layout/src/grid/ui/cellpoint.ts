@@ -2,10 +2,10 @@
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
 import type { MarkedLine } from "../../../../shared/markdown/parse.ts";
 import { blankLinesAbove, caretOn } from "../core/blanklines.ts";
-import { cellLines } from "../core/celllines.ts";
+import { positionInCell } from "../core/position.ts";
+import { cellLines } from "./celllines.ts";
 import { drawnBlocks, spaceBefore } from "./cellparts.ts";
 import { lineStarts, markedFrom, offsetOf } from "./offsets.ts";
-import { positionInCell } from "../core/position.ts";
 
 /** A caret's place in the rendering: a node and an offset in it */
 export type Caret = { readonly node: Node; readonly offset: number };

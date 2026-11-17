@@ -1,6 +1,7 @@
 # Look compare tests: one markdown, every surface alike
 
-Status: planned (2026-11-17), nothing built. The user's question: screenshot tests, a few, that catch what was
+Status: steps 1 to 3 built (2026-11-17, `silverware-editor/ui-tests/look/surfaces.spec.ts`, see *What it found*); step 4
+and kind 2 not. The user's question: screenshot tests, a few, that catch what was
 found by hand again and again (a task's box in the peek, a number's colour and room in a grid's field, a table not a
 card while edited), without going red for what does not matter (the peek's padding moving it a few pixels) and without
 old screenshots to refresh all the time.
@@ -82,6 +83,24 @@ the peek share; the folder makes it a CI job of its own by `scripts/ui-test-grou
 (`look/helpers.ts`: the fixture, find a block on a surface, measure it, crop it). It needs Layout, Database and Assets
 in the space, as the test servers have (every plugin deployed). Mouse project only; a phone's layout is another
 question.
+
+### What it found (2026-11-17), and what was done
+
+Run first on edge and the release, the measurements told what the eye had missed:
+
+- **A task's text 4 px further than the page's, a nested item's 7 px nearer**: SilverBullet lays a list's marks out in
+  columns (`--editor-column`, set on its editor's content; a bullet's `- ` 2, a number's `1. ` 3, a task's `[ ] ` 4, an
+  indent its own), our rules in ems. Now both in its columns (Silverware Editor's `COLUMN`, `LIST_COLUMNS`; Silverware
+  Layout's style page), `1ch` where SilverBullet sets none (2.12.1); Silverware Database hands the page's
+  `--editor-column` to its peek, which hangs outside the editor.
+- **The peek's table in 18 px** where the page's is in 13.5 and 15.8 px: its look's sample read in the editor's content,
+  where SilverBullet's rules for a rendered block's table do not reach. Now read in a database's place in the page.
+- **A table's line on 2.12.1**, which draws no card: `--ui-surface-border-color` is set there for other things. The
+  card's line now only where the theme gives cards corners (`--ui-radius-xl`).
+- **A number's colour on 2.12.1** a step off (its markup's grey against its bullets'): colours read alike within two
+  steps of a channel.
+- The pixels: a grid's cell, read or edited, as the page's (0 to 5 % differing); the peek 2 to 12 %, from its ground a
+  shade off and its text half a pixel lower, which the eye does not see. Informative as planned.
 
 ### Steps
 

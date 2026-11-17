@@ -2,11 +2,12 @@
 // those the host drew.
 import { describe, expect, it } from "vitest";
 import { markedLines } from "../../../../shared/markdown/parse.ts";
-import { blankLinesBefore, blankLinesDrawn, blankLineStarts, cellLines } from "./blanklines.ts";
+import { blankLinesAbove, blankLinesBefore, blankLinesDrawn, cellLines } from "./blanklines.ts";
 
 // (Of a text read line by line first, as a cell's is)
 const countBefore = (text: string, at: number) => blankLinesBefore(markedLines(text), at);
-const startsBefore = (text: string, at: number) => blankLineStarts(markedLines(text), at);
+const startsBefore = (text: string, at: number) => blankLinesAbove(markedLines(text), at).map((line) => line.from);
+const caretsBefore = (text: string, at: number) => blankLinesAbove(markedLines(text), at).map((line) => line.content);
 
 // A cell's text: paragraphs a blank line or more apart, a loose list, a heading (drawn in ui/view.test.ts)
 const TEXT = "One\n\nTwo\n\n\nThree\n\n\n\nFour\n- item\n\n- item2\n\n# Head\n\nAfter";
@@ -26,6 +27,9 @@ describe("a cell's blank lines", () => {
   it("counts a quote's blank lines, its marks alone, for a place in a quote as deep or shallower", () => {
     expect(countBefore("> one\n>\n> two", 10)).toBe(1);
     expect(startsBefore("> one\n>\n> two", 10)).toEqual([6]);
+    // A caret put on it past its mark, in the quote; on a blank line out of a quote at its start
+    expect(caretsBefore("> one\n>\n> two", 10)).toEqual([7]);
+    expect(caretsBefore("a\n\nb", 3)).toEqual([2]);
     // A deeper quote's last empty lines, before a place out of that quote (the nested quote of the last at 14)
     expect(countBefore("> one\n>\ntwo", 8)).toBe(1);
     expect(countBefore("> > one\n> >\n> two", 14)).toBe(1);

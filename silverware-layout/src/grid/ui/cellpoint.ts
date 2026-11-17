@@ -1,6 +1,6 @@
 // Where a point of a cell's rendering is in the cell's markdown (a click, a drop, a selection): the element marked with
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
-import { blankLineStarts, cellLines } from "../core/blanklines.ts";
+import { blankLinesAbove, cellLines } from "../core/blanklines.ts";
 import { lineStarts, markedFrom, offsetOf } from "./offsets.ts";
 import { drawnBlocks, spaceBefore } from "./view.ts";
 import { positionInCell } from "../core/position.ts";
@@ -62,8 +62,9 @@ function blankRoomTop(element: Element, cellElement: Element): number {
 }
 
 /**
- * Where a click on a blank line of a cell's rendering is in its markdown: the start of that blank line (none where the
- * click is on no blank line). Blank lines are drawn as space, no element marked with its place in it: found by
+ * Where a click on a blank line of a cell's rendering is in its markdown: that blank line, past its marks (a quote's
+ * empty line: in the quote; none where the click is on no blank line). Blank lines are drawn as space, no element
+ * marked with its place in it: found by
  * height, between the element drawn before (its bottom) and the one after (its top, its `data-pos`), as many lines
  * there as its markdown has blank lines before it
  */
@@ -73,12 +74,12 @@ export function blankLineAt(content: string, cellElement: HTMLElement, y: number
   if (!next) return undefined;
   const { element, offset } = next;
   // (The nearest first)
-  const blanks = blankLineStarts(lines, offset);
+  const blanks = blankLinesAbove(lines, offset);
   if (!blanks.length) return undefined;
   const top = element.getBoundingClientRect().top;
   const bottom = blankRoomTop(element, cellElement);
   if (y < bottom || top <= bottom) return undefined;
   const line = (top - bottom) / blanks.length;
   const nth = Math.min(blanks.length, Math.max(1, Math.ceil((top - y) / line)));
-  return blanks[nth - 1];
+  return blanks[nth - 1]!.content;
 }

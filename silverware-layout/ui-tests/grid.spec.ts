@@ -419,7 +419,7 @@ test("a click in a nested list's margin over its blank line puts the caret on th
   await expect.poll(async () => (await fieldState(page)).from).toBe(cell.indexOf("\n\n") + 1);
 });
 
-test("a quote's blank line between a loose list's items is a line, as in the editor, and a click there puts the caret on it", async ({ page, space }) => {
+test("a quote's blank line between a loose list's items is a line, as in the editor, and a click there puts the caret on it, in the quote", async ({ page, space }) => {
   // (The quote's blank line its mark alone: SilverBullet's rendering leaves it out between the items)
   const cell = "> - a\n>\n> - b";
   await space.open({ Page: `# Page\n\n<grid>\n<cell>\n\n${cell}\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n` }, "Page");
@@ -431,7 +431,8 @@ test("a quote's blank line between a loose list's items is a line, as in the edi
   expect(Math.round((b.y - a.y) / a.height)).toBe(2);
   await page.mouse.click(b.x + 30, b.y - a.height / 2);
   await expect(cellField(page)).toBeVisible();
-  await expect.poll(async () => (await fieldState(page)).from).toBe(cell.indexOf("\n>\n") + 1);
+  // (Past its mark: what is typed there stays in the quote)
+  await expect.poll(async () => (await fieldState(page)).from).toBe(cell.indexOf("\n>\n") + 2);
 });
 
 test("a blank line before a block in a list's item is a line, as in the editor", async ({ page, space }) => {

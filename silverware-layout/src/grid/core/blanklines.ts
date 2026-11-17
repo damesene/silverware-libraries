@@ -33,27 +33,28 @@ export function cellLines(content: string): readonly MarkedLine[] {
 }
 
 /**
- * Where the blank lines right before the line a place is on start, the nearest first. In a quote a blank line is one of
- * its marks alone (`>`), the editor showing it as an empty line of the quote. One counts for a place in a quote as deep
- * or shallower (a deeper quote's last empty line, before the place, ends that quote), not for a place deeper: a blank
- * line shallower than the place's quote lies before that quote, its own. An empty item's line (its marker alone) is none.
+ * The blank lines right before the line a place is on, the nearest first; a caret put on one goes past its marks
+ * (`content`: a quote's empty line, `>`, kept in the quote). In a quote a blank line is one of its marks alone, the
+ * editor showing it as an empty line of the quote. One counts for a place in a quote as deep or shallower (a deeper
+ * quote's last empty line, before the place, ends that quote), not for a place deeper: a blank line shallower than the
+ * place's quote lies before that quote, its own. An empty item's line (its marker alone) is none.
  * Read back from that line over them alone, not the text before: a cell's every line is asked for as it is drawn
  */
-export function blankLineStarts(lines: readonly MarkedLine[], at: number): readonly number[] {
+export function blankLinesAbove(lines: readonly MarkedLine[], at: number): readonly MarkedLine[] {
   const index = lineIndexAt(lines, at);
   // (The quotes the place is in on its line: those whose marks are before it)
   const depth = lines[index]!.quotes.filter((quote) => quote < at).length;
-  const starts: number[] = [];
+  const above: MarkedLine[] = [];
   for (let i = index - 1; i >= 0; i--) {
     const line = lines[i]!;
     if (!line.empty || line.item || line.quotes.length < depth) break;
-    starts.push(line.from);
+    above.push(line);
   }
-  return starts;
+  return above;
 }
 
 /** How many blank lines lie right before the line a place is on */
-export const blankLinesBefore = (lines: readonly MarkedLine[], at: number): number => blankLineStarts(lines, at).length;
+export const blankLinesBefore = (lines: readonly MarkedLine[], at: number): number => blankLinesAbove(lines, at).length;
 
 /**
  * How many blank lines the host drew right before an element of a cell: the line breaks before it, the first of them

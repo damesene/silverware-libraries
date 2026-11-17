@@ -45,9 +45,10 @@ describe("a blank line clicked", () => {
     expect(cell.querySelectorAll(".swl-grid-blank")).toHaveLength(1);
     const quote = cell.querySelector("blockquote")!;
     laidOut(new Map<Element, readonly [number, number]>([[cell, [0, 120]], [cell.querySelector(".p")!, [0, 20]], [quote, [45, 120]], [quote.querySelector(".p")!, [95, 120]]]), [0, 0]);
-    // The quote's lines, 25 high each: its first empty line (6), its second (8); the blank line before it (5)
-    expect(blankLineAt(content, cell, 60)).toBe(6);
-    expect(blankLineAt(content, cell, 80)).toBe(8);
+    // The quote's lines, 25 high each: its first empty line (at 6, the caret past its mark), its second (at 8); the blank
+    // line before it (5)
+    expect(blankLineAt(content, cell, 60)).toBe(7);
+    expect(blankLineAt(content, cell, 80)).toBe(9);
     expect(blankLineAt(content, cell, 30)).toBe(5);
   });
 });

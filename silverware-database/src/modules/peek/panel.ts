@@ -725,7 +725,8 @@ export class PeekPanel {
           const schema = (await this.host.database(shown.database))?.value.properties.map((one) => one.key) ?? [];
           const key = target(schema);
           const to = key === undefined ? -1 : schema.indexOf(key);
-          if (to < 0 || to === schema.indexOf(property.key)) return void this.draw();
+          // (Nowhere to go: the list as it was, unless a row is being dragged meanwhile, which draws it as it ends)
+          if (to < 0 || to === schema.indexOf(property.key)) return void (this.dragging || this.draw());
           await this.host.core.moveProperty(shown.database, property.key, to);
           this.host.refreshPlaces();
           await this.follow();

@@ -12,7 +12,6 @@ function host(existing: string[] = [], more: Partial<InsertDialogHost> = {}): In
   return {
     folder: "Notes",
     maxBytes: 1000,
-    touch: false,
     now: () => new Date(2026, 10, 15, 13, 9, 48),
     existing: async () => new Set(existing.map((path) => path.toLowerCase())),
     typeOf: (file) =>
@@ -32,7 +31,7 @@ function host(existing: string[] = [], more: Partial<InsertDialogHost> = {}): In
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 const rows = () => [...document.querySelectorAll<HTMLElement>(".swa-insert-row")];
-const button = (text: string) => [...document.querySelectorAll<HTMLButtonElement>(".swa-dialog button")].find((one) => one.textContent === text)!;
+const button = (text: string) => [...document.querySelectorAll<HTMLButtonElement>(".swa-dialog button")].find((one) => one.textContent === text || (text === "Insert" && /^(Insert|Add)( |$)/.test(one.textContent ?? "")))!;
 const choice = (row: HTMLElement, text: string) => [...row.querySelectorAll<HTMLButtonElement>(".swa-insert-choice")].find((one) => one.textContent === text)!;
 
 function open(files: InsertFile[], given = host()): { result: Promise<readonly InsertChoice[] | undefined>; given: ReturnType<typeof host> } {
@@ -81,7 +80,7 @@ describe("the insert dialog", () => {
       ["Notes/photo.png", "preview"],
       ["Notes/Report.zip", "card"],
     ]);
-    button("Add 2").click();
+    button("Add 2 files").click();
     expect((await result)?.map((one) => one.path)).toEqual(["Notes/photo.png", "Notes/Report.zip"]);
   });
 
@@ -193,17 +192,21 @@ describe("the insert dialog", () => {
     ]);
     await settle();
     const kept = (row: HTMLElement) => row.querySelector(".swa-insert-kept [aria-checked=\"true\"]")?.textContent;
-    // (The first name to type focused: the file of no address's)
-    expect(document.activeElement).toBe(rows()[2]!.querySelector(".swa-insert-path"));
+    // (The first row's title focused: its main field)
+    expect(document.activeElement).toBe(rows()[0]!.querySelector(".swa-insert-title"));
     // (Linked by default, its address in place of its name; too large: its space's choice off; a file of no address: no choice)
-    expect(rows().map(kept)).toEqual(["Linked from the web", "Linked from the web", undefined]);
+    expect(rows().map(kept)).toEqual(["Link", "Link", undefined]);
+    expect(rows()[0]!.querySelector(".swa-insert-what")!.textContent).toBe("Link");
     expect(rows()[0]!.querySelector<HTMLInputElement>(".swa-insert-path")!.hidden).toBe(true);
-    expect(rows()[0]!.querySelector(".swa-insert-address")!.textContent).toBe(url);
+    expect(rows()[0]!.querySelector<HTMLElement>(".swa-insert-name")!.title).toBe(url);
     expect(rows()[1]!.hasAttribute("data-swa-left-out")).toBe(false);
     expect(rows()[1]!.querySelector(".swa-insert-row-note")!.textContent).toContain("Too large for the space");
-    expect(choice(rows()[1]!, "In the space").getAttribute("aria-disabled")).toBe("true");
-    // Kept in the space: its name to type again
-    choice(rows()[0]!, "In the space").click();
+    expect(choice(rows()[1]!, "Save a copy").getAttribute("aria-disabled")).toBe("true");
+    // A copy saved in the space: uploaded, its name shown, its field behind ✎
+    choice(rows()[0]!, "Save a copy").click();
+    expect(rows()[0]!.querySelector(".swa-insert-what")!.textContent).toBe("Upload");
+    expect(rows()[0]!.querySelector<HTMLInputElement>(".swa-insert-path")!.hidden).toBe(true);
+    rows()[0]!.querySelector<HTMLButtonElement>(".swa-insert-edit")!.click();
     expect(rows()[0]!.querySelector<HTMLInputElement>(".swa-insert-path")!.hidden).toBe(false);
     button("Insert").click();
     expect((await result)!.map((one) => [one.path, one.url])).toEqual([
@@ -213,7 +216,7 @@ describe("the insert dialog", () => {
     ]);
   });
 
-  it("shows the choice for all the rows share as it opens; focuses the first name to type, else a linked row's choice", async () => {
+  it("shows the choice for all the rows share as it opens; focuses the first row's title", async () => {
     open([
       { file: fileOf("huge.png", "image/png", 2000), source: "clipboard", url: "https://example.com/huge.png" },
       { file: fileOf("b.png", "image/png"), source: "drop" },
@@ -221,23 +224,30 @@ describe("the insert dialog", () => {
     ]);
     await settle();
     expect(document.querySelector('.swa-insert-all [aria-checked="true"]')?.textContent).toBe("Preview");
-    expect(document.activeElement).toBe(rows()[1]!.querySelector(".swa-insert-path"));
-    document.body.replaceChildren();
-    open([{ file: fileOf("image.png", "image/png"), source: "clipboard", url: "https://example.com/cat.png" }]);
-    await settle();
-    expect(document.activeElement?.textContent).toBe("Linked from the web");
+    expect(document.activeElement).toBe(rows()[0]!.querySelector(".swa-insert-title"));
   });
 
-  it("gives nothing as it is cancelled; opened empty to upload, files picked in it (Camera on a touch screen alone)", async () => {
+  it("takes files dropped anywhere on it as rows of their own", async () => {
+    open([]);
+    const dialog = document.querySelector<HTMLElement>(".swa-dialog")!;
+    const data = { files: [fileOf("dropped.png", "image/png")], types: ["Files"] };
+    const over = Object.assign(new Event("dragover", { bubbles: true, cancelable: true }), { dataTransfer: data });
+    dialog.dispatchEvent(over);
+    expect(over.defaultPrevented).toBe(true);
+    dialog.dispatchEvent(Object.assign(new Event("drop", { bubbles: true, cancelable: true }), { dataTransfer: data }));
+    await settle();
+    expect(rows().map((row) => row.querySelector<HTMLInputElement>(".swa-insert-path")!.value)).toEqual(["Notes/dropped.png"]);
+  });
+
+  it("gives nothing as it is cancelled; opened empty, its field focused and Browse… beside it", async () => {
     const cancelled = open([{ file: fileOf("a.png", "image/png"), source: "drop" }]);
     button("Cancel").click();
     expect(await cancelled.result).toBeUndefined();
-    open([], host([], { touch: true }));
-    expect(button("Files…")).toBeDefined();
-    expect(button("Camera…")).toBeDefined();
-    expect(button("Insert").disabled).toBe(true);
-    document.body.replaceChildren();
+    // (Browse… alone: a phone's picker offers its camera itself)
     open([], host());
+    expect(button("Browse…")).toBeDefined();
     expect(button("Camera…")).toBeUndefined();
+    expect(button("Insert").disabled).toBe(true);
+    expect(document.activeElement?.classList.contains("swa-insert-add-field")).toBe(true);
   });
 });

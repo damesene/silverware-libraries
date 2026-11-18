@@ -233,6 +233,20 @@ new tab, *Download*, *Remove* from the value; `Media.url`).
   a page's insert keeps its sample, which shows how the file will look there. `insertFiles` resolves `{ target, title }`
   (`AddedFile`). The space's files offered are those not `.md` nor under a folder starting with `_`.
 
+## The insert dialog made plainer (decided with the user 2026-11-18, built the same day)
+
+- **One field** in place of Link and Space: an address typed offers *Add link*, words find files of the space under it;
+  **Browse…** beside it picks the device's files (on a phone its picker offers the camera itself: no Camera button).
+  The whole dialog takes a drop; empty, it shows so (*Drop files here*).
+- **A row a card, its title first**: the title the main field (its placeholder the file's name: left empty, nothing
+  changes); a second line says what happens (*Upload* · its name with ✎, *Link* with *Link | Save a copy* for a file of
+  the web, *Already in your space*); the name's field and its folder (a tooltip) only on ✎ or where it has a problem,
+  said in the row with its way out (*Keep both* / *Replace*, *Use "…"*). A page's insert adds a compact *Link · Card ·
+  Preview · Full* to each row, and the choice for all above them.
+- **The foot says what happens**: `2 to upload · 1 link · 1 from your space`, the button a verb and a count (*Add 4
+  files* for another plugin, *Insert 4 files* in a page); Ctrl+Enter from anywhere, Enter in the field adds what it
+  offers first. On a phone the field at the top, the foot held at the bottom, the dialog of one height.
+
 ## Steps
 
 1. **Probe** (2.12.1): a file named by a wiki link in a frontmatter list; the file renamed, the database renamed: are the

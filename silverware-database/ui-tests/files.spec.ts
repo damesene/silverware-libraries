@@ -109,15 +109,14 @@ test("a value's files edited in its popup: one taken out, one dragged by its gri
   // Added through Silverware Assets' dialog: one found in the space by words of its path, one uploaded
   await popup.getByRole("button", { name: "+ Add files…" }).click();
   const dialog = page.locator(".swa-dialog.swa-insert-window");
-  await dialog.getByRole("button", { name: "Space" }).click();
-  await dialog.locator(".swa-insert-source-field").last().fill("elsewhere sunrise");
+  await dialog.locator(".swa-insert-add-field").fill("elsewhere sunrise");
   await dialog.locator(".swa-insert-found-item", { hasText: "sunrise.png" }).click();
   // Uploaded: Silverware Assets' dialog, its name alone asked, the file written into the database's folder of files
   const chooser = page.waitForEvent("filechooser");
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "Files…" }).click();
+  await dialog.getByRole("button", { name: "Browse…" }).click();
   await (await chooser).setFiles({ name: "beach.png", mimeType: "image/png", buffer: PNG });
-  await expect(dialog.locator(".swa-insert-path:visible")).toHaveValue(`${space.folder}/Page/db-files/files/beach.png`);
+  await expect(dialog.locator(".swa-insert-row").last().locator(".swa-insert-path")).toHaveValue(`${space.folder}/Page/db-files/files/beach.png`);
   await expect(dialog.locator(".swa-dialog-note")).toHaveText("1 to upload · 1 from your space");
   await expect(dialog.locator(".swa-insert-choices:visible")).toHaveCount(0);
   await dialog.getByRole("button", { name: /^(Add|Insert)/ }).click();
@@ -158,6 +157,8 @@ test("files dropped or pasted on a value of files: Silverware Assets' dialog of 
     // (Its name in the database's folder of files, nothing asked of how it is shown)
     await expect(dialog.locator(".swa-insert-path")).toHaveValue(new RegExp(`^${space.folder}/Page/db-files/files/.+\\.png$`));
     await expect(dialog.locator(".swa-insert-choices:visible")).toHaveCount(0);
+    // (Its name behind ✎)
+    await dialog.locator(".swa-insert-edit").click();
     await dialog.locator(".swa-insert-path").fill(`${space.folder}/Page/db-files/files/${name}`);
     await dialog.getByRole("button", { name: /^(Add|Insert)/ }).click();
     await expect(dialog).toHaveCount(0);

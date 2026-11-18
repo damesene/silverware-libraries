@@ -151,7 +151,6 @@ async function openDialog(
       existing: async () => new Set(bridge.listFiles ? pageNamesOf(await bridge.listFiles()).map((path) => path.toLowerCase()) : []),
       typeOf: (file, path) => drawing.insertTypeOf(file, path, settings),
       drawSample: (container, file, path, view, signal) => drawing.drawSample(container, file, path, view, signal),
-      touch: !!window.matchMedia?.("(pointer: coarse)").matches,
       companion: options.companion,
       ...(options.nameOnly ? { nameOnly: true } : {}),
       // (Space: the space's files, pages and the previews kept left out; drawn from SilverBullet's files)

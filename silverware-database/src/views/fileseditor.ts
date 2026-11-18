@@ -11,7 +11,7 @@ import { inCompanion } from "../../../shared/editor.ts";
 import { el } from "../../../shared/elements.ts";
 import type { Media } from "../core/media.ts";
 import { folderSearch, foundBy } from "../domain/folders.ts";
-import { type FileEntry, fileLabel, readFile, validateFileTarget, writeFile } from "../domain/types/files.ts";
+import { type FileEntry, fileLabel, fileName, readFile, validateFileTarget, writeFile } from "../domain/types/files.ts";
 import { takeFiles } from "./takefiles.ts";
 import type { GivenFiles } from "../core/media.ts";
 
@@ -115,7 +115,7 @@ export function filesEditor(cell: HTMLElement, editing: FilesEditing, float: (pa
           ...(url
             ? [
                 el(doc, "button", { text: "View original", attrs: { type: "button", role: "menuitem" }, run: () => void doc.defaultView?.open(url, "_blank", "noopener") }),
-                el(doc, "a", { text: "Download", attrs: { href: url, download: name, role: "menuitem" } }),
+                el(doc, "a", { text: "Download", attrs: { href: url, download: fileName(file), role: "menuitem" } }),
               ]
             : []),
           remove,
@@ -140,7 +140,7 @@ export function filesEditor(cell: HTMLElement, editing: FilesEditing, float: (pa
           drawList();
           drawFound();
           // (The focus on the row that took its place, else the search)
-          (list.querySelectorAll<HTMLElement>(".swd-files-more")[Math.min(at, files.length - 1)] ?? search).focus({ preventScroll: true });
+          (list.querySelectorAll<HTMLElement>(".swd-files-more")[Math.min(at, files.length - 1)] ?? (media?.upload ? upload : search)).focus({ preventScroll: true });
         });
         grip.addEventListener("keydown", (event) => {
           if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
@@ -259,7 +259,7 @@ export function filesEditor(cell: HTMLElement, editing: FilesEditing, float: (pa
   });
   takeFiles(panel, (given) => uploadGiven(given), { paste: true });
   panel.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" || event.target === search || (event.target as Element).closest("button")) return;
+    if (event.key !== "Enter" || event.target === search || (event.target as Element).closest("button, a")) return;
     event.preventDefault();
     finish();
   });
@@ -310,8 +310,9 @@ export function filesEditor(cell: HTMLElement, editing: FilesEditing, float: (pa
   float(panel);
   (media?.upload ? upload : search).focus({ preventScroll: true });
   panel.scrollIntoView?.({ block: "nearest" });
-  // (The space's files as they come: what was typed meanwhile searched among them)
-  void media?.files().then((paths) => {
+  // (The space's files as they come, where the field searches them (no dialog to add through): what was typed meanwhile
+  // searched among them)
+  if (!media?.upload) void media?.files().then((paths) => {
     known = paths;
     if (!finished) drawFound();
   });

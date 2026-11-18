@@ -141,6 +141,35 @@ describe("a value of files edited", () => {
     expect(writes[1]).toEqual([["[[a.png]]", "[[Databases/db-trips/files/b.png]]"], "photos", ["[[a.png]]", "[[Databases/db-trips/files/b.png]]", "[[Databases/db-trips/files/c.png|Sea]]"]]);
   });
 
+  it("a file's menu: downloaded by its file's name (not its title), Enter on Download its own; the last file taken out, the focus on + Add files…", async () => {
+    const { writes, edit, panel, key } = setup({ upload: async () => undefined });
+    edit(["[[Photos/beach.png|Beach]]"]);
+    panel().querySelector<HTMLButtonElement>(".swd-files-more")!.click();
+    const download = panel().querySelector<HTMLAnchorElement>('.swd-files-menu a[role="menuitem"]')!;
+    expect(download.getAttribute("download")).toBe("beach.png");
+    key(download, "Enter");
+    panel().querySelector<HTMLButtonElement>(".swd-files-remove")!.click();
+    // (The focus kept in the popup, which it leaves only with the focus: nothing written, still open)
+    expect(document.activeElement).toBe(panel().querySelector(".swd-files-upload"));
+    expect(writes).toEqual([]);
+  });
+
+  it("a link pasted on it, with no file: the host's dialog opened with that link", async () => {
+    const { edit, panel, uploads } = setup({ upload: async () => undefined });
+    edit([]);
+    const paste = (text: string) => {
+      const data = { files: [] as unknown as FileList, types: ["text/plain"], getData: (type: string) => (type === "text/plain" ? text : "") };
+      const event = Object.assign(new Event("paste", { bubbles: true, cancelable: true }), { clipboardData: data });
+      panel().dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    // (Words left to whatever takes them; an address: the dialog asked, for the item's database)
+    expect(paste("just words")).toBe(false);
+    expect(uploads).toEqual([]);
+    expect(paste(" https://example.com/cat.png ")).toBe(true);
+    expect(uploads).toEqual(["trips"]);
+  });
+
   it("without the host's files: an address still added, no search of the space, no upload (said why)", async () => {
     const { edit, panel, names, type, key, search } = setup({ media: false });
     edit([]);

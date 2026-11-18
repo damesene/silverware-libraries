@@ -410,7 +410,8 @@ For Silverware Database's property of files (docs/silverware-database-files.md),
   draws, its URL in a new tab.
 - `insertFiles(given, { folder })`: the insert dialog with its names alone (`nameOnly`: no *Inserted as*), its folder
   the caller's, always the caller's companion; the files written by `writeChosen` (the write half of `insertChosen`),
-  resolved with the targets a link names, undefined where cancelled; nothing put in a page.
+  resolved with each file added (`AddedFile`: the target a link names and its title where one was given), undefined
+  where cancelled; nothing put in a page. `given` may be a link alone (no file, its `uriList`): a row of it.
 - `deleteFiles(paths)`: each as *Delete file…* deletes one, its kept previews with it, nothing asked; those not deleted
   given back.
 

@@ -198,70 +198,100 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   gap: 6px;
   min-width: 0;
 }
-/* Its sources: Files…, Camera…, Link, Space in a row; a link's field and the space's search under them */
-.swa-insert-source {
+/* Its one field (a link, words of the space's files) and Browse… in a row; what the field offers under it, a line each */
+.swa-insert-pickers {
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
   align-items: center;
 }
-.swa-insert-source[hidden] {
-  display: none;
-}
-.swa-insert-source-field {
+.swa-insert-add-field {
   flex: 1;
-  min-width: 10em;
+  min-width: 0;
   font: inherit;
 }
 .swa-insert-found {
   display: flex;
-  flex-basis: 100%;
   flex-direction: column;
   max-height: 10em;
   overflow-y: auto;
 }
+.swa-insert-found[hidden] {
+  display: none;
+}
 .swa-insert-found-item {
+  display: grid;
+  justify-items: start;
+  min-width: 0;
   padding: 3px 6px;
-  overflow: hidden;
   border: 0;
   border-radius: 4px;
   background: none;
   color: inherit;
   font: inherit;
   text-align: left;
+  cursor: pointer;
+}
+.swa-insert-found-item > * {
+  max-width: 100%;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  cursor: pointer;
+}
+.swa-insert-found-detail {
+  opacity: 0.65;
+  font-size: 0.85em;
 }
 .swa-insert-found-item:hover,
 .swa-insert-found-item:focus-visible {
   background: color-mix(in srgb, currentColor 10%, transparent);
 }
-/* A title: behind + Title, its field under the name */
-.swa-insert-add-title {
+/* A row: its title first, under it what happens to the file (Upload, Link, Already in your space), its name and ✎ */
+.swa-insert-title {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+}
+.swa-insert-row-what {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  opacity: 0.75;
+  font-size: 0.85em;
+}
+.swa-insert-what {
   flex: none;
-  padding: 2px 6px;
+  font-weight: 600;
+}
+.swa-insert-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swa-insert-edit {
+  flex: none;
+  padding: 0 4px;
   border: 0;
   background: none;
-  color: var(--link-color, var(--ui-accent-color));
+  color: inherit;
   font: inherit;
-  font-size: 0.85em;
   cursor: pointer;
 }
-.swa-insert-title-row[hidden],
-.swa-insert-add-title[hidden] {
+.swa-insert-edit[hidden],
+.swa-insert-path[hidden] {
   display: none;
-}
-.swa-insert-title {
-  width: 100%;
-  box-sizing: border-box;
-  font: inherit;
 }
 .swa-insert-picture {
   display: block;
   max-width: 100%;
   max-height: 320px;
   object-fit: contain;
+}
+/* Files dragged over the dialog: it takes them */
+.swa-dialog.swa-insert-over {
+  outline: 2px dashed var(--ui-accent-color, #4a6cf7);
+  outline-offset: -4px;
 }
 /* Another plugin's upload: a row of two lines, its file a small picture at its left, larger on a press */
 [data-swa-compact] .swa-insert-row {

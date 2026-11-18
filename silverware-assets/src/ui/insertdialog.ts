@@ -1,9 +1,11 @@
-// The dialog files are inserted by (docs/silverware-assets-insert.md): a row each, its path (in the page's folder, the
-// name offered: SilverBullet's rules, taken apart from the batch's and the space's), how it is inserted (a link, a card,
-// a preview, the file in full), the file drawn as it will be; with several, a choice for all of them. Opened empty to
-// upload, with Files and (on a touch screen) Camera. An image of the web (copied from a page, dragged from one) may be
-// linked at its address instead of kept in the space (its row's *Kept*, linked by default; one too large for the space
-// linked alone).
+// The dialog files are inserted by (docs/silverware-assets-insert.md, docs/silverware-database-files.md *The insert dialog
+// made plainer*): over its rows one field (a link pasted, words of the space's files) and Browse… (the device's files; a
+// phone's picker offers its camera itself), a drop anywhere on it; a row each, its title first, under it what happens to
+// the file (Upload, Link, Already in your space) and its name (in the page's folder, the name offered: SilverBullet's
+// rules, taken apart from the batch's and the space's; its field behind ✎ or shown on a problem), how it is inserted (a
+// link, a card, a preview, the file in full: a page's alone), the file drawn as it will be; with several, a choice for all
+// of them. A file of the web may be linked at its address instead of kept in the space (*Link*, the default, or *Save a
+// copy*; one too large for the space linked alone).
 // Nothing is written here: the rows chosen are given back, the host writes them. The host gives what is known of a file's type and draws it (src/decorate.ts' `drawSample`).
 import type { Dialogs } from "../../../shared/dialog.ts";
 import { COMPANION_ATTRIBUTE } from "../../../shared/editor.ts";
@@ -61,8 +63,6 @@ export type InsertDialogHost = {
   typeOf(file: File, path: string): InsertType;
   // The file drawn as it will be (a view of its type, read-only), into `container`, until `signal` ends
   drawSample(container: HTMLElement, file: File, path: string, view: View, signal: AbortSignal): void;
-  // Whether this is a touch screen (Camera offered)
-  readonly touch: boolean;
   // Opened for a field of another plugin's (a grid's cell): the dialog acts on its editor, the focus going to it is not
   // the field left (shared/editor.ts `COMPANION_ATTRIBUTE`)
   readonly companion?: boolean;
@@ -130,6 +130,11 @@ type Row = {
   readonly existing?: string;
   readonly remote: boolean;
   title: string;
+  // Its name's field shown (✎ pressed); what happens to it, its name, as its second line says
+  editing: boolean;
+  readonly what: HTMLElement;
+  readonly name: HTMLElement;
+  readonly edit: HTMLElement;
   readonly file: File;
   readonly type: InsertType;
   // Its path as typed or offered
@@ -206,7 +211,12 @@ export function openInsertDialog(
     const limit = `${Math.floor(host.maxBytes / 1024 / 1024)} MiB`;
     rows.forEach((row, index) => {
       row.field.hidden = row.web || !!row.existing;
-      row.address.hidden = !row.web && !row.existing;
+      row.address.hidden = true;
+      row.edit.hidden = row.web || !!row.existing;
+      const shownPath = row.existing ?? (row.web && row.url ? webNameOf(row.url) : (now[index] ?? row.wanted));
+      row.name.textContent = shownPath.slice(shownPath.lastIndexOf("/") + 1);
+      row.name.title = row.existing ?? (row.web ? (row.url ?? "") : shownPath);
+      row.what.textContent = row.existing ? "Already in your space" : row.web ? "Link" : "Upload";
       if (row.existing) {
         row.note.replaceChildren("In your space already: nothing uploaded.");
         ready++;
@@ -258,6 +268,8 @@ export function openInsertDialog(
         row.note.append(el(doc, "span", { text: row.replace && path === row.wanted ? "A file of this name is in the space: replaced. " : `A file of this name is in the space: inserted as “${path}”. ` }), keep.element);
       } else if (path !== row.wanted) row.note.append(`Another file of this batch has this name: inserted as “${path}”.`);
       if (!problem && !row.tooLarge) ready++;
+      // (Its name's field where asked, or where its name needs a word: a problem, a name taken)
+      row.field.hidden = !row.editing && !problem && !taken;
       row.field.setAttribute("aria-invalid", String(!!problem && !row.tooLarge));
     });
     insert.disabled = looking || !ready || rows.some((row) => !row.web && !row.existing && !row.tooLarge && !!validateFilePath(row.wanted));
@@ -267,7 +279,8 @@ export function openInsertDialog(
     const said = [counts.upload && `${counts.upload} to upload`, counts.link && `${counts.link} ${counts.link === 1 ? "link" : "links"}`, counts.space && `${counts.space} from your space`].filter(Boolean).join(" · ");
     note.textContent = looking && rows.length ? "Looking for files of these names in the space…" : unknown ? "The space's files could not be listed: a file of a name taken is replaced." : said;
     const many = counts.upload + counts.link + counts.space;
-    insert.textContent = host.nameOnly ? (many > 1 ? `Add ${many}` : "Add") : "Insert";
+    // (A verb and a count: what pressing it does)
+    insert.textContent = `${host.nameOnly ? "Add" : "Insert"}${many ? ` ${many} ${many === 1 ? "file" : "files"}` : ""}`;
     allBox.hidden = !!host.nameOnly || rows.filter((row) => !leftOut(row)).length < 2;
     for (const row of rows) row.element.toggleAttribute("data-swa-left-out", leftOut(row));
     syncAll();
@@ -336,6 +349,10 @@ export function openInsertDialog(
       ...(one.existing ? { existing: one.existing } : {}),
       remote: !!one.remote,
       title: "",
+      editing: false,
+      what: el(doc, "span", `${BASE}-what`),
+      name: el(doc, "span", `${BASE}-name`),
+      edit: el(doc, "button", { class: `${BASE}-edit`, text: "✎", title: "Change its name in your space", attrs: { type: "button", "aria-label": `File ${rows.length + 1}: change its name in your space` } }),
       field,
       address: el(doc, "span", { class: `${BASE}-address`, text: one.existing ?? one.url ?? "", attrs: { title: one.existing ?? one.url ?? "" } }),
       note: rowNote,
@@ -368,8 +385,8 @@ export function openInsertDialog(
           doc,
           `File ${index + 1}: kept`,
           [
-            { value: "space", text: "In the space", ...(row.tooLarge ? { disabled: `Too large for the space` } : {}) },
-            { value: "web", text: "Linked from the web" },
+            { value: "web", text: "Link" },
+            { value: "space", text: "Save a copy", ...(row.tooLarge ? { disabled: `Too large for the space` } : {}) },
           ],
           row.web ? "web" : "space",
           (value) => {
@@ -381,23 +398,25 @@ export function openInsertDialog(
         ).element
       : undefined;
     choices.element.hidden = !!host.nameOnly || leftOut(row);
-    // Its title (an embed's alt text, a link's text): shown at once for a link of the web, whose address says little;
-    // else behind + Title
-    const titleField = el(doc, "input", { class: `${BASE}-title`, attrs: { type: "text", placeholder: "Title", "aria-label": `File ${index + 1}: its title` } });
+    // Its title first (an embed's alt text, a link's text; its placeholder the file's name: left empty, nothing changes);
+    // under it what happens to it (Upload, Link, Already in your space), its name and ✎ for its name's field
+    const titleField = el(doc, "input", { class: `${BASE}-title`, attrs: { type: "text", placeholder: name.slice(name.lastIndexOf("/") + 1), "aria-label": `File ${index + 1}: its title` } });
     titleField.addEventListener("input", () => (row.title = titleField.value));
-    const titleRow = el(doc, "div", `${BASE}-title-row`, titleField);
-    const addTitle = el(doc, "button", { class: `${BASE}-add-title`, text: "+ Title", attrs: { type: "button" }, run: () => ((titleRow.hidden = false), (addTitle.hidden = true), titleField.focus()) });
-    titleRow.hidden = !one.url;
-    addTitle.hidden = !!one.url;
+    row.edit.addEventListener("click", () => {
+      row.editing = !row.editing;
+      update();
+      if (row.editing) field.focus();
+    });
     row.element.append(
       sample,
       el(
         doc,
         "div",
         `${BASE}-row-body`,
-        el(doc, "div", `${BASE}-row-head`, el(doc, "span", { class: `${BASE}-icon`, html: type.icon }), field, row.address, addTitle),
-        titleRow,
-        ...(kept ? [el(doc, "div", `${BASE}-kept`, el(doc, "span", `${BASE}-kept-label`, "Kept"), kept)] : []),
+        el(doc, "div", `${BASE}-row-head`, el(doc, "span", { class: `${BASE}-icon`, html: type.icon }), titleField),
+        el(doc, "div", `${BASE}-row-what`, row.what, el(doc, "span", { class: `${BASE}-what-dot`, text: "·", attrs: { "aria-hidden": "true" } }), row.name, row.edit),
+        field,
+        ...(kept ? [el(doc, "div", `${BASE}-kept`, kept)] : []),
         rowNote,
         choices.element,
       ),
@@ -429,97 +448,67 @@ export function openInsertDialog(
   allBox.append(el(doc, "span", `${BASE}-all-label`, "All files"), all.element);
 
   // Files picked here (an upload): several, or a photo of the camera
-  const empty = el(doc, "p", `${BASE}-empty`, "Pick files, add a link, or find one in your space. Or drop files here.");
-  // A link typed (Link): added as a row, linked or kept in the space
-  const linkField = el(doc, "input", { class: `${BASE}-source-field`, attrs: { type: "url", placeholder: "https://…", "aria-label": "A link to a file" } });
-  const addLink = () => {
-    const url = linkField.value.trim();
-    if (!/^https?:\/\/\S+$/i.test(url)) return void linkField.focus();
-    addRow({ file: new File([], webNameOf(url)), source: "link", url, remote: true });
-    linkField.value = "";
-    update();
-  };
-  linkField.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter") return;
-    event.preventDefault();
-    event.stopPropagation();
-    addLink();
-  });
-  const linkRow = el(doc, "div", `${BASE}-source`, linkField, el(doc, "button", { text: "Add", attrs: { type: "button" }, run: addLink }));
-  linkRow.hidden = true;
-  // A file of the space (Space): found by words of its path, a few shown
+  const empty = el(doc, "p", `${BASE}-empty`, "Drop files here, browse your device's, paste a link, or find a file in your space.");
+  // One field: an address typed offers it as a link, words find files of the space (where the host lists them); Enter
+  // adds what it offers first. Browse… picks the device's files (a phone's picker offers its camera itself)
   let spaced: readonly string[] | undefined;
-  const spaceField = el(doc, "input", { class: `${BASE}-source-field`, attrs: { type: "text", placeholder: "Find a file in your space…", "aria-label": "Find a file in your space" } });
-  const spaceFound = el(doc, "div", `${BASE}-found`);
-  const drawSpace = () => {
-    const words = spaceField.value.toLowerCase().split(/\s+/).filter(Boolean);
-    const found = words.length ? (spaced ?? []).filter((path) => words.every((word) => path.toLowerCase().includes(word)) && !rows.some((row) => row.existing === path)).slice(0, 6) : [];
-    spaceFound.replaceChildren(
-      ...found.map((path) =>
-        el(doc, "button", {
-          class: `${BASE}-found-item`,
-          title: path,
-          attrs: { type: "button" },
-          run: () => {
-            addRow({ file: new File([], path.slice(path.lastIndexOf("/") + 1)), source: "space", existing: path });
-            spaceField.value = "";
-            drawSpace();
-            update();
-          },
-        }, path),
+  const addField = el(doc, "input", { class: `${BASE}-add-field`, attrs: { type: "text", placeholder: host.spaceFiles ? "Paste a link or search your files…" : "Paste a link…", "aria-label": "Add a file: a link, or words of its name in your space" } });
+  const offers = el(doc, "div", { class: `${BASE}-found`, attrs: { role: "group", "aria-label": "Files to add" } });
+  const offered = (): { readonly label: string; readonly detail?: string; readonly add: () => void }[] => {
+    const typed = addField.value.trim();
+    if (/^https?:\/\/\S+$/i.test(typed)) return [{ label: "Add link", detail: typed, add: () => addRow({ file: new File([], webNameOf(typed)), source: "link", url: typed, remote: true }) }];
+    const words = typed.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length || !spaced) return [];
+    return spaced
+      .filter((path) => words.every((word) => path.toLowerCase().includes(word)) && !rows.some((row) => row.existing === path))
+      .slice(0, 6)
+      .map((path) => ({ label: path.slice(path.lastIndexOf("/") + 1), detail: path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : undefined, add: () => addRow({ file: new File([], path.slice(path.lastIndexOf("/") + 1)), source: "space", existing: path }) }));
+  };
+  const take = (one: { readonly add: () => void }) => {
+    one.add();
+    addField.value = "";
+    drawOffers();
+    update();
+    addField.focus();
+  };
+  const drawOffers = () => {
+    offers.replaceChildren(
+      ...offered().map((one) =>
+        el(doc, "button", { class: `${BASE}-found-item`, title: one.detail ?? one.label, attrs: { type: "button" }, run: () => take(one) }, el(doc, "span", { class: `${BASE}-found-name`, text: one.label }), ...(one.detail ? [el(doc, "span", { class: `${BASE}-found-detail`, text: one.detail })] : [])),
       ),
     );
+    offers.hidden = !offers.childElementCount;
   };
-  spaceField.addEventListener("input", drawSpace);
-  spaceField.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter") return;
+  addField.addEventListener("focus", () => {
+    if (spaced || !host.spaceFiles) return;
+    spaced = [];
+    void host.spaceFiles().then((paths) => ((spaced = paths), drawOffers())).catch(() => undefined);
+  });
+  addField.addEventListener("input", drawOffers);
+  addField.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.ctrlKey || event.metaKey) return;
     event.preventDefault();
     event.stopPropagation();
-    spaceFound.querySelector<HTMLButtonElement>("button")?.click();
+    const first = offered()[0];
+    if (first) take(first);
   });
-  const spaceRow = el(doc, "div", `${BASE}-source ${BASE}-source-space`, spaceField, spaceFound);
-  spaceRow.hidden = true;
-  const toggle = (shown: HTMLElement, other: HTMLElement, field: HTMLInputElement) => {
-    other.hidden = true;
-    shown.hidden = !shown.hidden;
-    if (!shown.hidden) field.focus();
-  };
-  const picker = (camera: boolean) => {
-    const input = el(doc, "input", { attrs: { type: "file", ...(camera ? { accept: "image/*", capture: "environment" } : { multiple: "" }) } });
+  offers.hidden = true;
+  const picker = () => {
+    const input = el(doc, "input", { attrs: { type: "file", multiple: "" } });
     input.hidden = true;
     input.addEventListener("change", () => {
-      for (const file of input.files ?? []) addRow({ file, source: camera ? "camera" : "upload" });
+      for (const file of input.files ?? []) addRow({ file, source: "upload" });
       input.remove();
       update();
     });
     doc.body.append(input);
     input.click();
   };
-  const pickers = el(
-    doc,
-    "div",
-    `${BASE}-pickers`,
-    el(doc, "button", { text: "Files…", attrs: { type: "button" }, run: () => picker(false) }),
-    ...(host.touch ? [el(doc, "button", { text: "Camera…", attrs: { type: "button" }, run: () => picker(true) })] : []),
-    el(doc, "button", { text: "Link", attrs: { type: "button" }, run: () => toggle(linkRow, spaceRow, linkField) }),
-    ...(host.spaceFiles
-      ? [
-          el(doc, "button", {
-            text: "Space",
-            attrs: { type: "button" },
-            run: () => {
-              toggle(spaceRow, linkRow, spaceField);
-              spaced ??= [];
-              void host.spaceFiles!().then((paths) => ((spaced = paths), drawSpace())).catch(() => undefined);
-            },
-          }),
-        ]
-      : []),
-  );
+  const pickers = el(doc, "div", `${BASE}-pickers`, addField, el(doc, "button", { text: "Browse…", attrs: { type: "button" }, run: picker }));
 
   // (Its sources always over its rows: more files added to those a paste or a drop gave. For another plugin's upload its
   // rows compact, each file a small picture, larger on a press: nothing of how it shows in a page to see)
-  const content = el(doc, "div", BASE, pickers, linkRow, spaceRow, allBox, list, empty);
+  const content = el(doc, "div", BASE, pickers, offers, allBox, list, empty);
   content.toggleAttribute("data-swa-compact", !!host.nameOnly);
   // (Its rows there before it opens: the focus given to the first's name as it opens. For a field of another plugin's
   // the dialog is its companion before the focus comes to it: the field not taken for left as the dialog opens)
@@ -565,7 +554,8 @@ export function openInsertDialog(
     content,
     footer,
     // (The first name to type; a row linked on the web has none shown: its choice of where it is kept, else Insert)
-    focus: rows[0] ? (rows.find((row) => !row.web)?.field ?? rows[0].element.querySelector<HTMLElement>('.swa-insert-kept [aria-checked="true"]') ?? insert) : (pickers.querySelector("button") as HTMLElement),
+    // (The first row's title, its main field; none given: the field adding one)
+    focus: rows[0]?.element.querySelector<HTMLElement>(".swa-insert-title") ?? addField,
     closed: () => {
       for (const row of rows) {
         row.drawing?.abort();
@@ -578,11 +568,29 @@ export function openInsertDialog(
     },
   });
   if (host.companion) dialog.element.setAttribute(COMPANION_ATTRIBUTE, "");
+  dialog.element.addEventListener("dragover", (event) => {
+    if (!event.dataTransfer?.types.includes("Files")) return;
+    event.preventDefault();
+    dialog.element.classList.add(`${BASE}-over`);
+  });
+  dialog.element.addEventListener("dragleave", (event) => {
+    if (!dialog.element.contains(event.relatedTarget as Node | null)) dialog.element.classList.remove(`${BASE}-over`);
+  });
+  dialog.element.addEventListener("drop", (event) => {
+    dialog.element.classList.remove(`${BASE}-over`);
+    const dropped = [...(event.dataTransfer?.files ?? [])];
+    if (!dropped.length) return;
+    event.preventDefault();
+    event.stopPropagation();
+    for (const file of dropped) addRow({ file, source: "drop" });
+    update();
+  });
   // Enter inserts, where the focus is on no button nor choice (a field's Enter: the dialog's)
   dialog.element.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
     const target = event.target as HTMLElement;
-    if (target.closest("button, [role=radio], textarea")) return;
+    // (Ctrl+Enter from anywhere; Enter where no control takes it)
+    if (!(event.ctrlKey || event.metaKey) && target.closest("button, [role=radio], textarea")) return;
     event.preventDefault();
     finish(true);
   });

@@ -160,8 +160,8 @@ test("an image copied from a web page: linked at its address on the web instead 
   const path = await rows(page).first().locator(".swa-insert-path").inputValue();
   expect(path).toMatch(/\.png$/);
   // (Linked by default: its address in place of its name)
-  await expect(rows(page).first().locator('.swa-insert-kept [aria-checked="true"]')).toHaveText("Linked from the web");
-  await expect(rows(page).first().locator(".swa-insert-address")).toHaveText(url);
+  await expect(rows(page).first().locator('.swa-insert-kept [aria-checked="true"]')).toHaveText("Link");
+  await expect(rows(page).first().locator(".swa-insert-name")).toHaveAttribute("title", url);
   await dialog(page).getByRole("button", { name: "Insert" }).click();
   await expect.poll(() => space.saved("Page")).toContain(`![](${url})`);
   // (Nothing uploaded: no panel, no file of the space)
@@ -256,7 +256,7 @@ test("File: Upload opens the dialog empty, the files picked in it inserted at th
   await runCommand(page, "File: Upload");
   await expect(dialog(page)).toBeVisible();
   const chooser = page.waitForEvent("filechooser");
-  await dialog(page).getByRole("button", { name: "Files…" }).click();
+  await dialog(page).getByRole("button", { name: "Browse…" }).click();
   await (await chooser).setFiles([{ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hello") }]);
   await expect(rows(page)).toHaveCount(1);
   await expect(rows(page).first().locator(".swa-insert-path")).toHaveValue(`${space.folder}/notes.txt`);

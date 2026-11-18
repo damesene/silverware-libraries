@@ -2,7 +2,7 @@
 // whole screen, Files and Camera, the camera's picker asking a photo.
 import { expect, runCommand, test } from "./helpers.ts";
 
-test("File: Upload on a phone: the dialog over the screen, Files and Camera, the camera's picker for a photo", async ({ page, space }) => {
+test("File: Upload on a phone: the dialog over the screen, Browse… its picker (a phone's offers its camera itself)", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nHere\n" }, "Page");
   await page.locator("#sb-main .cm-line", { hasText: "Here" }).tap();
   // (Replaced once Silverware Assets' init page ran: before, SilverBullet's own)
@@ -18,14 +18,11 @@ test("File: Upload on a phone: the dialog over the screen, Files and Camera, the
   const box = (await dialog.boundingBox())!;
   const view = page.viewportSize()!;
   expect(Math.round(box.width)).toBe(view.width);
-  await expect(dialog.getByRole("button", { name: "Files…" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Camera…" })).toHaveCount(0);
   const chooser = page.waitForEvent("filechooser");
-  await dialog.getByRole("button", { name: "Camera…" }).tap();
+  await dialog.getByRole("button", { name: "Browse…" }).tap();
   const picked = await chooser;
-  expect(picked.isMultiple()).toBe(false);
-  expect(await picked.element().getAttribute("capture")).toBe("environment");
-  expect(await picked.element().getAttribute("accept")).toBe("image/*");
+  expect(picked.isMultiple()).toBe(true);
   await picked.setFiles([{ name: "image.jpg", mimeType: "image/jpeg", buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9]) }]);
-  // (A photo of the camera named by the time)
-  await expect(dialog.locator(".swa-insert-path")).toHaveValue(new RegExp(`^${space.folder}/\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}\\.jpg$`));
+  await expect(dialog.locator(".swa-insert-path")).toHaveValue(`${space.folder}/image.jpg`);
 });

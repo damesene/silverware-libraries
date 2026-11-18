@@ -6,6 +6,7 @@ import { iconsOf } from "../../../../shared/icons.ts";
 import { type EditorLook, editorsOf } from "../../../../shared/editor.ts";
 import { sampleLook } from "../../../../shared/editorlook.ts";
 import { editorSampleLook } from "../../../../shared/silverbullet/editorsample.ts";
+import { CONTENT_SCALE } from "../../../../shared/contentscale.ts";
 import { saveConfigPage, withConfigSettings } from "../../../../shared/configpage.ts";
 import type { Choice, IndexChange, IndexedObject, Platform } from "../../../../shared/platform.ts";
 import { PAGE_KEYS, pageDates, referablePages, tasksOfPages, validatePageName } from "./pages.ts";
@@ -222,5 +223,15 @@ export function editorLook(doc: Document): Readonly<Record<string, string>> | un
   const style = view.getComputedStyle(content);
   // (Its column too, where SilverBullet sets one: what a list's marks are laid out by, in the page and the peek's field)
   const column = style.getPropertyValue("--editor-column").trim();
-  return { "font-family": style.fontFamily, "font-size": style.fontSize, "line-height": style.lineHeight, color: style.color, ...(column ? { "--editor-column": column } : {}) };
+  // (And the content's scale, shared/contentscale.ts: what is over the window keeps 1, but the panel's text is the
+  // page's editor's size, so its files are zoomed as the page's are)
+  const scale = style.getPropertyValue(CONTENT_SCALE).trim();
+  return {
+    "font-family": style.fontFamily,
+    "font-size": style.fontSize,
+    "line-height": style.lineHeight,
+    color: style.color,
+    ...(column ? { "--editor-column": column } : {}),
+    ...(scale ? { [CONTENT_SCALE]: scale } : {}),
+  };
 }

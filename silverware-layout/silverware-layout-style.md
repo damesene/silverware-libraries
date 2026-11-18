@@ -1102,11 +1102,15 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
 :is(.swl-grid-cell > :is(ul, ol), .swl-grid-cell > :is(ul, ol) :is(ul, ol)) > li > :has(> input[type="checkbox"]:first-child:checked):not(#swl-none) {
   text-decoration-line: line-through;
 }
+/* A quote as the page's editor draws one: its theme's colours and ground, its text after two of the page's columns (as
+   the page's editor lays its `> ` out: --editor-column, set after 2.12.1, else a character's width), its bar within them */
 .swl-grid-cell > blockquote:not(#swl-none) {
   margin-left: 0;
   margin-right: 0;
-  padding-left: 1em;
+  padding-left: calc(2 * var(--editor-column, 1ch) - 2px);
   border-left: 2px solid var(--editor-blockquote-border-color, color-mix(in srgb, var(--root-color, #000) 25%, transparent));
+  color: var(--editor-blockquote-color, inherit);
+  background-color: var(--editor-blockquote-background-color, transparent);
 }
 /* A grid's borders (its `border` attribute): faint lines round it and between its cells, as a table's. The gap goes
    into each cell's padding, so a line between two columns lies where the gap's middle was, on its divider. All within

@@ -1108,6 +1108,24 @@ test("in the peek's editor a file's link has its icon and menu as in the page, a
   await expect(page).toHaveURL(/Write%20docs$|Write docs$/);
 });
 
+test("in the peek's editor a URL of its own is drawn as a link, a press opening it in a tab", async ({ page, space }) => {
+  // (The web answered from memory: no network)
+  await page.context().route("https://example.com/**", (route) => route.fulfill({ contentType: "text/html", body: "<p>ok</p>" }));
+  const content = `${item("Todo", "a0")}\nSee https://example.com/x here\n`;
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS, "Page/db-tasks/Fix login": content }, "Page");
+  const body = page.locator(".swd-peek .swd-peek-body");
+  await expect(async () => {
+    if (await page.locator(".swd-peek").count()) await page.keyboard.press("Escape");
+    await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
+    await expect(body.locator(".cm-content")).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+  await expect.poll(() => fieldReady(body)).toBe(true);
+  const tab = page.waitForEvent("popup");
+  await body.locator(".swe-link", { hasText: "https://example.com/x" }).click();
+  await (await tab).waitForURL("https://example.com/x");
+  expect(await space.saved("Page/db-tasks/Fix login")).toBe(content);
+});
+
 test("a shortcut of SilverBullet's pressed in the peek does nothing there and says so, the peek kept open", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS }, "Page");
   await page.locator(".swd-list-name", { hasText: "Fix login" }).click();

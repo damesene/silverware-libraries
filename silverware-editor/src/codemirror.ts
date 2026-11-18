@@ -9,7 +9,7 @@ import type { Completion, CompletionContext, CompletionResult } from "@codemirro
 import type { Extension } from "@codemirror/state";
 import type { EditorView as View, KeyBinding } from "@codemirror/view";
 import { companionBlur, type EditorOptions, type TextEditor } from "../../shared/editor.ts";
-import { livePreview, PREVIEW_THEME, wikiLinks } from "./livepreview.ts";
+import { highlights, livePreview, PREVIEW_THEME, wikiLinks } from "./livepreview.ts";
 import { listEnter } from "./listenter.ts";
 import { lookRules } from "./look.ts";
 
@@ -44,7 +44,7 @@ function theme(cm: CodeMirror): Extension {
   });
 }
 
-/** Markdown highlighted as SilverBullet's editor shows it, near enough: headings, emphasis, links, code, quotes */
+/** Markdown highlighted as SilverBullet's editor shows it, near enough: headings, emphasis, links, code (a quote's colours its line's, livepreview.ts) */
 function highlight(cm: CodeMirror): Extension {
   const t = cm.tags;
   return cm.syntaxHighlighting(
@@ -60,7 +60,6 @@ function highlight(cm: CodeMirror): Extension {
       { tag: t.strikethrough, textDecoration: "line-through" },
       { tag: [t.link, t.url], color: "var(--editor-link-color, var(--link-color, #0969da))" },
       { tag: t.monospace, fontFamily: "var(--editor-monospace-font, monospace)", backgroundColor: "color-mix(in srgb, currentColor 8%, transparent)" },
-      { tag: t.quote, color: "color-mix(in srgb, currentColor 70%, transparent)" },
       { tag: [t.processingInstruction, t.meta], color: "color-mix(in srgb, currentColor 50%, transparent)" },
       // (A code block's language's parts, in the theme's colours of code as SilverBullet's editor draws them)
       { tag: t.keyword, fontWeight: "bold" },
@@ -121,7 +120,7 @@ export function codeMirrorEditor(cm: CodeMirror, doc: Document, options: EditorO
     // (GitHub's markdown, its tasks and strikethrough, as SilverBullet reads them; wiki links read too, for the preview)
     // (Its keys ours below, Enter as listenter.ts has it: its own keymap, of a higher precedence, left out)
     // (A fenced code block highlighted in its language, by the names SilverBullet's editor knows, src/vendor.ts)
-    cm.markdown({ base: cm.markdownLanguage, codeLanguages: cm.codeLanguage, extensions: [wikiLinks], addKeymap: false }),
+    cm.markdown({ base: cm.markdownLanguage, codeLanguages: cm.codeLanguage, extensions: [wikiLinks, highlights], addKeymap: false }),
     livePreview(cm, options.drawing, options.openLink),
     cm.closeBrackets(),
     // (Enter continuing a list as SilverBullet's page does: no blank line put in a loose list, listenter.ts)

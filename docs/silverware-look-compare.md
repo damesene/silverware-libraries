@@ -1,6 +1,6 @@
 # Look compare tests: one markdown, every surface alike
 
-Status: steps 1 to 3 built (2026-11-17, `silverware-editor/ui-tests/look/surfaces.spec.ts`, see *What it found*); step 4
+Status: steps 1 to 3 built (2026-11-17, `silverware-editor/ui-tests/look/surfaces.spec.ts`, see *What it found*), more blocks 2026-11-18 (see *Known differences*); step 4
 and kind 2 not. The user's question: screenshot tests, a few, that catch what was
 found by hand again and again (a task's box in the peek, a number's colour and room in a grid's field, a table not a
 card while edited), without going red for what does not matter (the peek's padding moving it a few pixels) and without
@@ -113,6 +113,41 @@ Run first on edge and the release, the measurements told what the eye had missed
   3 px lower at the zoom: 12 %). Past 5 % a block is a **warning**: the test passes, the run tells it
   (`scripts/ui-tests-summary.ts`: GitHub's yellow warning on the run and the pull request, the job summary's
   *Warnings*; a yellow line in the console locally).
+
+### More blocks (decided with the user 2026-11-18)
+
+What Silverware Editor 1.1.0 draws as the page does (code blocks, rules, quotes, highlights) and what Silverware Assets
+draws on every surface had no comparison; added to the fixture, measured where a property tells it, cropped where the
+shape does:
+
+| Block | Measured (fails) | Cropped (warns) |
+| --- | --- | --- |
+| Headings 1 to 3 | font size, weight, colour; the space under each | no |
+| Inline: bold, italic, code, `==highlight==`, a link | each word's weight, style, font, colour, ground, line | no |
+| A quote (two lines) | where its text starts, its colour, its lines' spacing | yes (its bar) |
+| A fenced code block (`csharp`) | where its text starts, its font, its ground, a keyword's weight, a string's colour, its lines' spacing | yes (the card, the colours) |
+| `---` | the space between the lines above and under it | no (its line in no crop: one pixel) |
+| Files (Silverware Assets): an image's preview and card, a link to it | a preview's size, corners, shadow; a card's height, corners, line, its icon's size; a link's icon's size | yes, all three in one |
+
+A full image is left out (the image at the text's width, `assets.spec.ts` measures it); a PDF later, a test of its
+own (pdf.js draws late, its pixels would only tell noise), DOCX and XLSX in their own plugins' tests. A run: about 18 s
+per SilverBullet (9 s before), the window as tall as the markdown (the page's editor draws only the lines in view).
+
+### Known differences (2026-11-18), to mend
+
+Found by the blocks above on 2.12.1 and edge; each a measurement left out for its surfaces (`KNOWN` in the spec, its
+reason beside it), taken out as it is mended. Decided with the user: the test first, then the mending plugin by
+plugin; a grid's rendered cell stays SilverBullet's rendering (not Silverware Editor read-only: it would lose what only
+SilverBullet renders, `${…}`, queries, code widgets, and add an editor per cell).
+
+| Plugin | Surfaces | What differs |
+| --- | --- | --- |
+| Silverware Editor | grid edited, peek | a strong text's weight (700, the page's 900 on 2.12.1); code's font (the default monospace, the page's editor's font on 2.12.1); inline code's ground; a code block's inset (16 px, none on 2.12.1); headings' sizes (edge); the space round headings and a rule |
+| Silverware Assets | grid, grid edited, peek, peek edited | a preview 6 px higher; in a field a preview not zoomed with the text, a link's icon in the text's colour |
+| Silverware Layout | grid | headings' colour; a quote's colour, ground and indent; code's font and inset, no highlighting; bold; the space round headings and a rule |
+
+Silverware Editor's are read from the page as its look already is (`shared/editorlook.ts`, `EditorLook`): what differs
+between SilverBullet's versions is the page's to tell, not a number of ours.
 
 ### Steps
 

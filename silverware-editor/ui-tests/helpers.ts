@@ -21,8 +21,8 @@ const FOLDER = "UiEditor";
 export type Space = {
   /** The folder of this test's pages in the space (`UiEditor/<test>`) */
   readonly folder: string;
-  /** Pages written (by their names under the folder), the page `open` of them opened, the plugins started */
-  open(pages: Readonly<Record<string, string>>, open: string): Promise<void>;
+  /** Pages written (by their names under the folder), and files beside them (an image: its name with its extension), the page `open` of them opened, the plugins started */
+  open(pages: Readonly<Record<string, string>>, open: string, files?: Readonly<Record<string, Uint8Array | string>>): Promise<void>;
   /** Another of the pages written opened, the plugins started */
   goTo(name: string): Promise<void>;
 };
@@ -64,7 +64,13 @@ export const test = base.extend<{ space: Space }>({
     };
     await use({
       folder,
-      open: async (pages, open) => {
+      open: async (pages, open, files = {}) => {
+        // (The files first: a page indexed before what it embeds is there drew it missing)
+        for (const [name, content] of Object.entries(files)) {
+          const file = join(server().space, folder, name);
+          await mkdir(dirname(file), { recursive: true });
+          await writeFile(file, content);
+        }
         for (const [name, text] of Object.entries(pages)) {
           await mkdir(dirname(path(name)), { recursive: true });
           await writeFile(path(name), text);
@@ -76,6 +82,8 @@ export const test = base.extend<{ space: Space }>({
     // (The page closed first: an open client would take CONFIG written under it for a change of its own)
     await page.close();
     await rm(join(server().space, folder), { recursive: true, force: true });
+    // (Previews Silverware Assets kept of its files: silverware-assets/src/core/stored.ts)
+    await rm(join(server().space, "_silverware-assets-previews", folder), { recursive: true, force: true });
     if (configBefore === undefined) await rm(configPath, { force: true });
     else await writeFile(configPath, configBefore);
   },

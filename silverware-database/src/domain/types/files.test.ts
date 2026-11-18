@@ -7,7 +7,7 @@ describe("files as kept", () => {
     expect(readFile("[[Databases/db-ab12/files/sunset.jpg]]")).toEqual({ target: "Databases/db-ab12/files/sunset.jpg", web: false, written: "[[Databases/db-ab12/files/sunset.jpg]]" });
     expect(readFile(" https://example.com/cat.png ")).toEqual({ target: "https://example.com/cat.png", web: true, written: "https://example.com/cat.png" });
     // (A link's text after a bar kept as written; the file is what it names)
-    expect(readFile("[[Docs/report.pdf|The report]]")).toEqual({ target: "Docs/report.pdf", web: false, written: "[[Docs/report.pdf|The report]]" });
+    expect(readFile("[[Docs/report.pdf|The report]]")).toEqual({ target: "Docs/report.pdf", web: false, written: "[[Docs/report.pdf|The report]]", title: "The report" });
     for (const none of ["Docs/report.pdf", "example.com/cat.png", "[[]]", "https://a b"]) expect(readFile(none), none).toBeUndefined();
     expect(readFiles(["[[a.png]]", "https://example.com/b.png"])?.map((one) => one.target)).toEqual(["a.png", "https://example.com/b.png"]);
     expect(readFiles("[[a.png]]")?.map((one) => one.target)).toEqual(["a.png"]);

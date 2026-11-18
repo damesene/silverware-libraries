@@ -66,9 +66,9 @@ export function uploadInto(host: Pick<ViewHost, "database" | "media" | "update" 
     if (!targets?.length) return;
     const item = (await host.current(shown)) ?? shown;
     const kept = readFiles(item.values[key]);
-    if (!kept) return host.notify(`${label} of ${item.name}: its value is no list of files: the files uploaded are not added (${targets.join(", ")})`);
+    if (!kept) return host.notify(`${label} of ${item.name}: its value is no list of files: the files uploaded are not added (${targets.map((one) => one.target).join(", ")})`);
     const was = kept.map((one) => one.written);
-    const added = targets.map(writeFile).filter((one) => !was.includes(one));
+    const added = targets.filter((one) => !kept.some((file) => file.target === one.target)).map((one) => writeFile(one.target, one.title));
     if (added.length) void host.update(item, key, [...was, ...added]);
   });
 }

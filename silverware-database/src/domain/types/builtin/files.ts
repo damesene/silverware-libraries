@@ -3,7 +3,7 @@
 // they name, renamed with them. Shown as their previews, edited in a popup of its own; filtered and sorted by their
 // names, joined by ", "; never grouped by (a list of files is no group).
 import { isEmpty } from "../../../model/database.ts";
-import { fileName, readFiles, typedFiles } from "../files.ts";
+import { fileLabel, readFiles, typedFiles } from "../files.ts";
 import { keptText, type PropertyType } from "../type.ts";
 
 export const files: PropertyType = {
@@ -19,7 +19,7 @@ export const files: PropertyType = {
     if (!read) return "no list of files ([[folder/name.png]] or an address of the web)";
     return new Set(read.map((one) => one.target)).size === read.length ? undefined : "one named twice";
   },
-  text: (value) => readFiles(value)?.map(fileName).join(", ") ?? keptText(value),
+  text: (value) => readFiles(value)?.map(fileLabel).join(", ") ?? keptText(value),
   // (Its files of the space: an address of the web is no file kept)
   leaves: (value) => readFiles(value)?.flatMap((one) => (one.web ? [] : [one.target])) ?? [],
   parse: (typed) => {

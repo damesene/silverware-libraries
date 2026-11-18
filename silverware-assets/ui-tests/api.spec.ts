@@ -12,10 +12,10 @@ const dialog = (page: Page) => page.locator(".swa-dialog.swa-insert-window");
 async function upload(page: Page, folder: string, names: readonly string[]): Promise<void> {
   await page.evaluate(
     async ({ module, folder, names, png }) => {
-      type Api = { insertFiles(given: unknown, place: unknown): Promise<readonly string[] | undefined> };
+      type Api = { insertFiles(given: unknown, place: unknown): Promise<readonly unknown[] | undefined> };
       const { api } = (await import(module)) as { api: Api };
       const files = names.map((name) => new File([Uint8Array.from(atob(png), (c) => c.charCodeAt(0))], name, { type: "image/png" }));
-      const answer = window as unknown as { uploaded?: readonly string[] | null };
+      const answer = window as unknown as { uploaded?: readonly unknown[] | null };
       delete answer.uploaded;
       void api.insertFiles({ files, source: "drop" }, { folder }).then((paths) => (answer.uploaded = paths ?? null));
     },
@@ -23,7 +23,7 @@ async function upload(page: Page, folder: string, names: readonly string[]): Pro
   );
 }
 
-const uploaded = (page: Page) => page.evaluate(() => (window as unknown as { uploaded?: readonly string[] | null }).uploaded);
+const uploaded = (page: Page) => page.evaluate(() => (window as unknown as { uploaded?: readonly unknown[] | null }).uploaded);
 
 test("another plugin's upload: the dialog asks the names alone, as its companion; resolved with the paths once written, nothing put in the page", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nText\n" }, "Page");
@@ -34,8 +34,8 @@ test("another plugin's upload: the dialog asks the names alone, as its companion
   await expect(dialog(page).locator(".swa-insert-choices:visible")).toHaveCount(0);
   await expect(dialog(page)).not.toContainText("how it is put in the page");
   await expect(dialog(page).locator(".swa-insert-path")).toHaveValue(`${space.folder}/files/photo.png`);
-  await dialog(page).getByRole("button", { name: "Insert" }).click();
-  await expect.poll(() => uploaded(page)).toEqual([`${space.folder}/files/photo.png`]);
+  await dialog(page).getByRole("button", { name: "Add" }).click();
+  await expect.poll(() => uploaded(page)).toEqual([{ target: `${space.folder}/files/photo.png` }]);
   expect(space.hasFile("files/photo.png")).toBe(true);
   expect(await space.saved("Page")).toBe("# Page\n\nText\n");
   // Cancelled: nothing written, its answer none

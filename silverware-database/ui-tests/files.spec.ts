@@ -56,7 +56,7 @@ test("a value's files: a table's cell draws three and counts the rest, a press o
   // (Laid over the page, not cut by the properties' box: its Upload in view)
   await expect(page.locator(".swd-editor-files.swd-floated")).toHaveCount(1);
   await expect(page.locator(".swd-editor-files .swd-files-upload")).toBeInViewport({ ratio: 1 });
-  await row.locator(".swd-editor-files .swd-editor-search").press("Escape");
+  await page.locator(".swd-editor-files .swd-files-upload").press("Escape");
   await expect(row.locator(".swd-editor-files")).toHaveCount(0);
   await expect(row.locator(".swd-media-more")).toHaveText("+1");
 });
@@ -77,7 +77,7 @@ test("a value's files edited in its popup: one taken out, one dragged by its gri
   const rows = popup.locator(".swd-files-row");
   const shown = () => rows.evaluateAll((all) => all.map((one) => (one as HTMLElement).title));
   await expect.poll(shown).toEqual(["a.png", "b.png", "c.png"]);
-  await expect(popup.locator(".swd-editor-search")).toBeFocused();
+  await expect(popup.getByRole("button", { name: "+ Add files…" })).toBeFocused();
   // A file's menu: another's opened closes it; its ⋯ pressed again closes it alone, the popup kept
   await popup.getByRole("button", { name: "a.png: its menu" }).click();
   await popup.getByRole("button", { name: "c.png: its menu" }).click();
@@ -103,20 +103,21 @@ test("a value's files edited in its popup: one taken out, one dragged by its gri
   await page.mouse.move(grip.x + grip.width / 2, first.y + 4, { steps: 8 });
   await page.mouse.up();
   await expect.poll(shown).toEqual(["c.png", "a.png"]);
-  // Found in the space by words of its name
-  await popup.locator(".swd-editor-search").fill("elsewhere sunrise");
-  await popup.getByRole("button", { name: "Add sunrise.png" }).click();
-  await expect.poll(shown).toEqual(["c.png", "a.png", "sunrise.png"]);
+  // Added through Silverware Assets' dialog: one found in the space by words of its path, one uploaded
+  await popup.getByRole("button", { name: "+ Add files…" }).click();
+  const dialog = page.locator(".swa-dialog.swa-insert-window");
+  await dialog.getByRole("button", { name: "Space" }).click();
+  await dialog.locator(".swa-insert-source-field").last().fill("elsewhere sunrise");
+  await dialog.locator(".swa-insert-found-item", { hasText: "sunrise.png" }).click();
   // Uploaded: Silverware Assets' dialog, its name alone asked, the file written into the database's folder of files
   const chooser = page.waitForEvent("filechooser");
-  await popup.getByRole("button", { name: "Upload…" }).click();
-  const dialog = page.locator(".swa-dialog.swa-insert-window");
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Files…" }).click();
   await (await chooser).setFiles({ name: "beach.png", mimeType: "image/png", buffer: PNG });
-  await expect(dialog.locator(".swa-insert-path")).toHaveValue(`${space.folder}/Page/db-files/files/beach.png`);
+  await expect(dialog.locator(".swa-insert-path:visible")).toHaveValue(`${space.folder}/Page/db-files/files/beach.png`);
+  await expect(dialog.locator(".swa-dialog-note")).toHaveText("1 to upload · 1 from your space");
   await expect(dialog.locator(".swa-insert-choices:visible")).toHaveCount(0);
-  await dialog.getByRole("button", { name: "Insert" }).click();
+  await dialog.getByRole("button", { name: /^(Add|Insert)/ }).click();
   await expect.poll(shown).toEqual(["c.png", "a.png", "sunrise.png", "beach.png"]);
   // Left: written as listed, each a link
   await page.keyboard.press("Tab");
@@ -155,7 +156,7 @@ test("files dropped or pasted on a value of files: Silverware Assets' dialog of 
     await expect(dialog.locator(".swa-insert-path")).toHaveValue(new RegExp(`^${space.folder}/Page/db-files/files/.+\\.png$`));
     await expect(dialog.locator(".swa-insert-choices:visible")).toHaveCount(0);
     await dialog.locator(".swa-insert-path").fill(`${space.folder}/Page/db-files/files/${name}`);
-    await dialog.getByRole("button", { name: "Insert" }).click();
+    await dialog.getByRole("button", { name: /^(Add|Insert)/ }).click();
     await expect(dialog).toHaveCount(0);
   };
   const saved = (...names: string[]) => `photos:\n  - "[[${space.folder}/files/a.png]]"\n${names.map((one) => `  - "[[${space.folder}/Page/db-files/files/${one}]]"\n`).join("")}`;
@@ -197,7 +198,7 @@ test("files dropped on the files' popup: added to its list, written as it is lef
   await give(popup, ["dropped.png"], "drop");
   const dialog = page.locator(".swa-dialog.swa-insert-window");
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "Insert" }).click();
+  await dialog.getByRole("button", { name: /^(Add|Insert)/ }).click();
   // (The popup kept open under the dialog: its companion)
   await expect.poll(() => popup.locator(".swd-files-row").evaluateAll((all) => all.map((one) => (one as HTMLElement).title))).toEqual(["a.png", "dropped.png"]);
   await page.locator(".swd-table thead").click();
@@ -236,7 +237,7 @@ test("a board's Card preview: the first image of the property picked over each c
   await give(cover, ["beach.png"], "drop");
   const dialog = page.locator(".swa-dialog.swa-insert-window");
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "Insert" }).click();
+  await dialog.getByRole("button", { name: /^(Add|Insert)/ }).click();
   await expect.poll(() => space.saved("Page/db-files/Holiday")).toContain("beach.png");
   const saved = (await space.saved("Page/db-files/Holiday"))!;
   expect(saved).toContain(`docs: ["[[${space.folder}/files/a.png]]"]`);

@@ -11,7 +11,7 @@ import { inCompanion } from "../../../shared/editor.ts";
 import { el } from "../../../shared/elements.ts";
 import type { Media } from "../core/media.ts";
 import { folderSearch, foundBy } from "../domain/folders.ts";
-import { type FileEntry, fileName, readFile, validateFileTarget, writeFile } from "../domain/types/files.ts";
+import { type FileEntry, fileLabel, readFile, validateFileTarget, writeFile } from "../domain/types/files.ts";
 import { takeFiles } from "./takefiles.ts";
 import type { GivenFiles } from "../core/media.ts";
 
@@ -64,13 +64,11 @@ export function filesEditor(cell: HTMLElement, editing: FilesEditing, float: (pa
   const search = el(doc, "input", { class: "swd-editor-search", attrs: { type: "text", placeholder: media ? "Find a file, or type an address…" : "Type an address (https://…)", "aria-label": `Add to ${label}` } });
   const found = el(doc, "div", { class: "swd-editor-list swd-files-found", attrs: { role: "group", "aria-label": "Files found" } });
   const note = el(doc, "div", { class: "swd-editor-note", attrs: { role: "status" } });
-  const upload = el(doc, "button", { class: "swd-files-upload", text: "Upload…", attrs: { type: "button" } });
-  if (!media?.upload) {
-    upload.disabled = true;
-    upload.title = "Uploading needs Silverware Assets";
-  }
+  // Files added through the host's dialog (Silverware Assets': the device's, a link, the space's), one button; without it
+  // the field alone (a file of the space, an address)
+  const upload = el(doc, "button", { class: "swd-files-upload", text: "+ Add files…", attrs: { type: "button" } });
   // (The field and Upload side by side, those found and what is said under them)
-  const panel = el(doc, "div", { class: "swd-editor swd-editor-choices swd-editor-files", attrs: { tabindex: "-1" } }, list, el(doc, "div", "swd-files-add", search, upload), found, note);
+  const panel = el(doc, "div", { class: "swd-editor swd-editor-choices swd-editor-files", attrs: { tabindex: "-1" } }, list, ...(media?.upload ? [upload] : [search, found]), note);
   const written = () => files.map((one) => one.written);
   const finish = () => {
     if (finished) return;
@@ -83,12 +81,12 @@ export function filesEditor(cell: HTMLElement, editing: FilesEditing, float: (pa
     note.hidden = text === "";
   };
   // A file added (once: one there already is not), the focus kept where it was
-  const add = (target: string): boolean => {
+  const add = (target: string, title?: string): boolean => {
     const problem = validateFileTarget(target);
     if (problem) return say(problem), false;
-    const entry = readFile(writeFile(target));
+    const entry = readFile(writeFile(target, title));
     if (!entry) return false;
-    if (files.some((one) => one.target === entry.target)) return say(`${fileName(entry)} is there already`), false;
+    if (files.some((one) => one.target === entry.target)) return say(`${fileLabel(entry)} is there already`), false;
     files.push(entry);
     say("");
     return true;
@@ -105,7 +103,7 @@ export function filesEditor(cell: HTMLElement, editing: FilesEditing, float: (pa
   const drawList = () => {
     list.replaceChildren(
       ...files.map((file, at) => {
-        const name = fileName(file);
+        const name = fileLabel(file);
         const grip = el(doc, "button", { class: "swd-files-grip", html: GRIP, title: "Drag to move (Alt+↑ ↓)", attrs: { type: "button", "aria-label": `Move ${name} (Alt+↑ ↓)` } });
         // Its menu: the file opened in a tab, downloaded, or taken out of the value (the file stays in the space)
         const url = media?.url(file.target);
@@ -187,7 +185,7 @@ export function filesEditor(cell: HTMLElement, editing: FilesEditing, float: (pa
     found.replaceChildren(
       ...offered().map((target) => {
         const web = !!readFile(target)?.web;
-        const name = fileName({ target, web });
+        const name = fileLabel({ target, web });
         const folder = web ? undefined : target.slice(0, Math.max(0, target.lastIndexOf(SEPARATOR)));
         return el(
           doc,
@@ -240,17 +238,25 @@ export function filesEditor(cell: HTMLElement, editing: FilesEditing, float: (pa
       // (Left meanwhile: added to the value as it was written as the popup was left)
       if (finished) {
         const was = finished;
-        const now = [...was, ...targets.map(writeFile).filter((one) => !was.includes(one))];
+        const had = was.map((one) => readFile(one)?.target);
+        const now = [...was, ...targets.filter((one) => !had.includes(one.target)).map((one) => writeFile(one.target, one.title))];
         if (now.length !== was.length) editing.later(was, now);
         return;
       }
-      for (const target of targets) add(target);
+      for (const one of targets) add(one.target, one.title);
       drawList();
       drawFound();
       upload.focus({ preventScroll: true });
     });
   };
   upload.addEventListener("click", () => uploadGiven());
+  // (A link pasted on it, the field gone: the dialog with it)
+  panel.addEventListener("paste", (event) => {
+    const text = event.clipboardData?.getData("text/plain").trim() ?? "";
+    if (!media?.upload || event.clipboardData?.files.length || !/^https?:\/\/\S+$/i.test(text)) return;
+    event.preventDefault();
+    uploadGiven({ files: [], uriList: text, source: "clipboard" });
+  });
   takeFiles(panel, (given) => uploadGiven(given), { paste: true });
   panel.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" || event.target === search || (event.target as Element).closest("button")) return;
@@ -302,7 +308,7 @@ export function filesEditor(cell: HTMLElement, editing: FilesEditing, float: (pa
   say("");
   cell.replaceChildren(panel);
   float(panel);
-  search.focus({ preventScroll: true });
+  (media?.upload ? upload : search).focus({ preventScroll: true });
   panel.scrollIntoView?.({ block: "nearest" });
   // (The space's files as they come: what was typed meanwhile searched among them)
   void media?.files().then((paths) => {

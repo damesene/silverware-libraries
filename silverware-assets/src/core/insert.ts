@@ -42,7 +42,10 @@ export function extensionOf(mime: string): string {
 }
 
 /** Where a file comes from: the clipboard and the camera give no name of the user's (`image.png`) */
-export type FileSource = "clipboard" | "camera" | "drop" | "upload";
+export type FileSource = "clipboard" | "camera" | "drop" | "upload" | "link" | "space";
+
+/** A title as a link or an embed keeps it: what would end its segment taken out (none left: none) */
+export const cleanTitle = (title: string | undefined): string | undefined => title?.replace(/[[\]|]/g, "").trim() || undefined;
 
 /** A file's name as offered: its own, else (none, or of the clipboard or the camera) the date and time and the extension of its type */
 export function nameOf(file: { readonly name: string; readonly type: string }, source: FileSource, now: Date): string {
@@ -129,9 +132,11 @@ const encodedPath = (path: string): string => encodeURIComponent(path).replace(/
  * its view written in its metadata where it is not the one *Show as* gives its type (`configured`: the view
  * configured, not the one drawn)
  */
-export function markdownOf(path: string, as: Exclude<InsertAs, "shown">, configured: View, style: LinkStyle): string {
-  if (as === "link") return style === "wikilink" ? `[[${path}]]` : `[${path}](${encodedPath(path)})`;
-  return as === configured ? `![[${path}]]` : `![[${path}|||${writeMetadata({ view: as })}]]`;
+export function markdownOf(path: string, as: Exclude<InsertAs, "shown">, configured: View, style: LinkStyle, title?: string): string {
+  const shown = cleanTitle(title);
+  if (as === "link") return style === "wikilink" ? `[[${path}${shown ? `|${shown}` : ""}]]` : `[${shown ?? path}](${encodedPath(path)})`;
+  // (Its title the embed's alt text, its first segment)
+  return as === configured ? `![[${path}${shown ? `|${shown}` : ""}]]` : `![[${path}|${shown ?? ""}||${writeMetadata({ view: as })}]]`;
 }
 
 /**
@@ -210,9 +215,10 @@ const webUrl = (url: string): string => url.replace(/[\s()<>]/g, (char) => `%${c
  * (`![](url)`), its view in its metadata where it is not the one *Show as* gives its type (`![||{ view: card }](url)`:
  * SilverBullet reads the first two segments as the alt text and the size)
  */
-export function webMarkdownOf(url: string, name: string, as: Exclude<InsertAs, "shown">, configured: View): string {
-  if (as === "link") return `[${name.replace(/[[\]]/g, "")}](${webUrl(url)})`;
-  return as === configured ? `![](${webUrl(url)})` : `![||${writeMetadata({ view: as })}](${webUrl(url)})`;
+export function webMarkdownOf(url: string, name: string, as: Exclude<InsertAs, "shown">, configured: View, title?: string): string {
+  const shown = cleanTitle(title);
+  if (as === "link") return `[${shown ?? name.replace(/[[\]]/g, "")}](${webUrl(url)})`;
+  return as === configured ? `![${shown ?? ""}](${webUrl(url)})` : `![${shown ?? ""}||${writeMetadata({ view: as })}](${webUrl(url)})`;
 }
 
 /** A file's name in a URL of the web: its path's last part, decoded (none: `image`) */

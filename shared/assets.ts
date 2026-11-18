@@ -159,6 +159,9 @@ export type PreviewBox = { readonly width: number; readonly height: number };
  */
 export type GivenFiles = { readonly files: readonly File[]; readonly html?: string; readonly uriList?: string; readonly source: "clipboard" | "drop" };
 
+/** A file added through Silverware Assets' dialog: the target a link names, its title where one was given */
+export type AddedFile = { readonly target: string; readonly title?: string };
+
 /** Where files uploaded through Silverware Assets' dialog go: the folder their names are offered in (from the space's top) */
 export type FilesPlace = { readonly folder: string };
 
@@ -185,12 +188,13 @@ export type Assets = {
   /** Optional: a file shown in Silverware Assets' side panel, its target as a link names it (an address of the web: in a new tab where no panel takes it) */
   readonly showFile?: (target: string, page: string) => void;
   /**
-   * Optional: files uploaded through Silverware Assets' insert dialog, the files an event gave (none: opened empty, its
-   * files picked in it), their names offered in `place.folder`, nothing asked of how they are shown (a link is the
-   * caller's to write). Resolved once they are written: the targets a link names, in their order (paths of the space,
-   * an image of the web linked at its address); undefined where cancelled. A file not written is said, and left out
+   * Optional: files added through Silverware Assets' insert dialog: those an event gave (a link alone too: `uriList`),
+   * or picked in it (the device's files, a link, a file of the space), their names offered in `place.folder`, nothing
+   * asked of how they are shown (a link is the caller's to write). Resolved once they are written: each the target a
+   * link names (a path of the space, an address of the web linked) and its title where one was given, in their order;
+   * undefined where cancelled. A file not written is said, and left out
    */
-  readonly insertFiles?: (given: GivenFiles | undefined, place: FilesPlace) => Promise<readonly string[] | undefined>;
+  readonly insertFiles?: (given: GivenFiles | undefined, place: FilesPlace) => Promise<readonly AddedFile[] | undefined>;
   /**
    * Optional: files of the space deleted, as *Delete file…* deletes one, the previews kept of them with them; nothing
    * asked (the caller asks, naming them). Resolved with the paths not deleted, nothing said of them (the caller says)

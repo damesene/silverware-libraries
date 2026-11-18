@@ -10,7 +10,7 @@ import { wholePercent } from "../domain/types/builtin/progress.ts";
 import { fullAddress, isOpenable, prettyUrl, readLink } from "../domain/types/link.ts";
 import { pathOf } from "../domain/folders.ts";
 import { linkedDocument, type Reference, readReferences } from "../domain/types/reference.ts";
-import { type FileEntry, fileName, readFiles } from "../domain/types/files.ts";
+import { type FileEntry, fileLabel, readFiles } from "../domain/types/files.ts";
 import type { Media, MediaBox } from "../core/media.ts";
 import type { ViewHost } from "../core/view.ts";
 import { colorsOf, optionColor } from "../domain/types/options.ts";
@@ -255,7 +255,7 @@ function filesNode(doc: Document, media: Media, files: readonly FileEntry[], siz
   const shown = size === "small" ? files.slice(0, FILES_IN_LINE) : files;
   const rest = files.slice(shown.length);
   const buttons = shown.map((file) => {
-    const name = fileName(file);
+    const name = fileLabel(file);
     const button = el(doc, "button", { class: "swd-media-button", title: name, attrs: { type: "button", "aria-label": `Open ${name}` } }, media.draw(file.target, FILE_BOXES[size]));
     button.addEventListener("click", (event) => {
       event.preventDefault();
@@ -264,7 +264,7 @@ function filesNode(doc: Document, media: Media, files: readonly FileEntry[], siz
     });
     return button;
   });
-  const more = rest.length ? [el(doc, "span", { class: "swd-media-more", text: `+${rest.length}`, title: rest.map(fileName).join(", ") })] : [];
+  const more = rest.length ? [el(doc, "span", { class: "swd-media-more", text: `+${rest.length}`, title: rest.map(fileLabel).join(", ") })] : [];
   const strip = el(doc, "span", { class: `swd-media-strip swd-media-${size}` }, ...buttons, ...more);
   // (A small line as high as its files' box, zoomed with the content as they are)
   strip.style.setProperty("--swd-media-height", scaledPx(FILE_BOXES[size].height));

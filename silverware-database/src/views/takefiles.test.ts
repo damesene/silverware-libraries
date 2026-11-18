@@ -55,7 +55,7 @@ describe("files taken on a value of files", () => {
     const writes: unknown[][] = [];
     const told: string[] = [];
     let item: Item = { key: "a" as ItemKey, name: "Holiday", values: { photos: ["[[a.png]]"] }, rank: "a0", revision: "1" };
-    const host = (upload?: () => Promise<readonly string[] | undefined>) =>
+    const host = (upload?: () => Promise<readonly { target: string; title?: string }[] | undefined>) =>
       ({
         database: { id: "trips" },
         update: async (one: Item, key: string, value: unknown) => (writes.push([one.revision, key, value]), { problem: "", cause: "unchanged" }),
@@ -63,15 +63,15 @@ describe("files taken on a value of files", () => {
         current: async () => item,
         ...(upload ? { media: { upload: async (database: string) => (database === "trips" ? upload() : undefined) } } : {}),
       }) as unknown as ViewHost;
-    let answer!: (targets: readonly string[]) => void;
+    let answer!: (targets: readonly { target: string; title?: string }[]) => void;
     uploadInto(host(() => new Promise((resolve) => (answer = resolve))), item, "photos", "Photos");
     // (The item changed while the files were written, by another place: added to it as the store has it then)
     item = { ...item, revision: "2", values: { photos: ["[[a.png]]", "[[b.png]]"] } };
-    answer(["files/c.png", "b.png"]);
+    answer([{ target: "files/c.png" }, { target: "b.png" }]);
     await vi.waitFor(() => expect(writes).toEqual([["2", "photos", ["[[a.png]]", "[[b.png]]", "[[files/c.png]]"]]]));
     uploadInto(host(), item, "photos", "Photos");
     item = { ...item, values: { photos: "plain words" } };
-    uploadInto(host(async () => ["d.png"]), item, "photos", "Photos");
+    uploadInto(host(async () => [{ target: "d.png" }]), item, "photos", "Photos");
     await vi.waitFor(() => expect(told).toHaveLength(2));
     expect(told).toEqual(["Photos: uploading files needs Silverware Assets", "Photos of Holiday: its value is no list of files: the files uploaded are not added (d.png)"]);
     expect(writes).toHaveLength(1);

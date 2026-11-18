@@ -3357,7 +3357,8 @@ button.swd-editor-document-folder:hover,
   /* (Its height cut to the room it has: its list alone scrolls, the field always in view) */
   overflow: hidden;
   gap: 6px;
-  width: min(22em, 90vw);
+  /* (As wide as a file's picture, at most 150px, with its grip and its ⋯) */
+  width: min(250px, 90vw);
   font-size: 0.9em;
 }
 .swd-files-list {
@@ -3375,8 +3376,9 @@ button.swd-editor-document-folder:hover,
 }
 .swd-files-row {
   display: grid;
-  grid-template-columns: auto auto auto;
-  justify-content: start;
+  /* (Every ⋯ at the right, a few px from the edge: one place to press, whatever the picture's width) */
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding-right: 4px;
   gap: 6px;
   align-items: center;
   padding: 2px;

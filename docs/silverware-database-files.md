@@ -211,7 +211,7 @@ The peek's row draws files as a table's cell does (`small`: they took the whole 
 on their longer side, no name beside them (their title says it), and a ⋯ menu each in place of × (*View original* in a
 new tab, *Download*, *Remove* from the value; `Media.url`).
 
-## Next: sources in Silverware Assets' dialog, titles (decided with the user 2026-11-18, not built)
+## Sources in Silverware Assets' dialog, titles (decided with the user 2026-11-18, built the same day)
 
 - **The peek's popup out of the properties' flow**: laid over the page as a table's editors are (`floatPanel`), under
   the row or over it where there is no room (over the content, over the item's name), its height the window's, its list
@@ -229,6 +229,9 @@ new tab, *Download*, *Remove* from the value; `Media.url`).
   tooltip, its menu, the text sorted and filtered by).
 - **Database's popup**: its files and **+ Add files…** alone (the dialog); without Silverware Assets the field of today
   in its place (an address, a file of the space). A link pasted on the open popup opens the dialog with it.
+- Built: the dialog's rows compact (a 48 px picture, larger on a press) for another plugin's upload alone (`nameOnly`):
+  a page's insert keeps its sample, which shows how the file will look there. `insertFiles` resolves `{ target, title }`
+  (`AddedFile`). The space's files offered are those not `.md` nor under a folder starting with `_`.
 
 ## Steps
 

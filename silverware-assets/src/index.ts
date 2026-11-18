@@ -5,7 +5,7 @@
 // grids draw outside the editor (shared/rendered.ts).
 import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { layoutOf } from "../../shared/layout.ts";
-import type { Assets, FilesPlace, GivenFiles } from "../../shared/assets.ts";
+import type { AddedFile, Assets, FilesPlace, GivenFiles } from "../../shared/assets.ts";
 import { applyLayers } from "../../shared/layers.ts";
 import { pageWriter } from "../../shared/pages/writer.ts";
 import { renderedOf } from "../../shared/rendered.ts";
@@ -16,7 +16,7 @@ import { AssetRegistry } from "./core/registry.ts";
 import { type ListedFile, movedPreviews, orphanedPreviews } from "./core/stored.ts";
 import { AssetDecorator, type AssetHost } from "./decorate.ts";
 import { bytesOf, factsOf, silverBulletAssetHost } from "./host/silverbullet/assets.ts";
-import { pageNamesOf, silverBulletPlatform } from "../../shared/silverbullet/platform.ts";
+import { documentUrl, pageNamesOf, silverBulletPlatform } from "../../shared/silverbullet/platform.ts";
 import { ASSETS_PATH, type AssetSettings, readAssetSettings, readSyntaxModeSettings, storedAssetPaths, SYNTAX_PATHS, type SyntaxModeSettings, validatePreviewFolder } from "./model/settings.ts";
 import { SILVERBULLET_SYNTAX_PAGE, SYNTAX_OPTION } from "./host/silverbullet/syntaxmode.ts";
 import { assetProvider } from "./provider.ts";
@@ -24,7 +24,7 @@ import { mediaTabs } from "./ui/mediatab.ts";
 import { markdownTab, SettingsWindow } from "./ui/settingswindow.ts";
 import { Dialogs } from "../../shared/dialog.ts";
 import { type EditingSurface, editorsOf } from "../../shared/editor.ts";
-import { folderOf, webUrlOf } from "./core/insert.ts";
+import { folderOf, webNameOf, webUrlOf } from "./core/insert.ts";
 import { insertChosen, type InsertTarget, uploadBy, watchInserts, writeChosen } from "./host/silverbullet/insert.ts";
 import { DIALOG_LOOK } from "./ui/dialoglook.ts";
 import { type InsertChoice, type InsertFile, openInsertDialog } from "./ui/insertdialog.ts";
@@ -154,6 +154,8 @@ async function openDialog(
       touch: !!window.matchMedia?.("(pointer: coarse)").matches,
       companion: options.companion,
       ...(options.nameOnly ? { nameOnly: true } : {}),
+      // (Space: the space's files, pages and the previews kept left out; drawn from SilverBullet's files)
+      ...(bridge.listFiles ? { spaceFiles: async () => pageNamesOf(await bridge.listFiles!()).filter((path) => !path.endsWith(".md") && !path.startsWith("_")), urlOf: (path: string) => documentUrl(path) } : {}),
     },
     (chosen) => done(chosen, { bridge, drawing, settings }),
   );
@@ -177,13 +179,15 @@ async function openInsert(files: readonly InsertFile[], target: InsertTarget): P
  * web found in what came with them); resolved once written with the targets a link names, undefined where cancelled.
  * Not ruled by the setting of SilverBullet's own pasting (`insert.enabled`): asked for by the plugin
  */
-function uploadFiles(given: GivenFiles | undefined, place: FilesPlace): Promise<readonly string[] | undefined> {
+function uploadFiles(given: GivenFiles | undefined, place: FilesPlace): Promise<readonly AddedFile[] | undefined> {
   const url = given ? webUrlOf({ files: given.files.length, html: given.html ?? "", ...(given.uriList ? { uriList: given.uriList } : {}) }) : undefined;
-  const files: InsertFile[] = (given?.files ?? []).map((file) => ({ file, source: given!.source, ...(url ? { url } : {}) }));
+  // (A link alone, no file: a row of it, its data fetched where it is kept in the space)
+  const link = given && !given.files.length ? given.uriList?.split(/\r?\n/).find((one) => /^https?:\/\//i.test(one.trim()))?.trim() : undefined;
+  const files: InsertFile[] = link ? [{ file: new File([], webNameOf(link)), source: "link", url: link, remote: true }] : (given?.files ?? []).map((file) => ({ file, source: given!.source, ...(url ? { url } : {}) }));
   return new Promise((resolve, reject) => {
     openDialog(files, place.folder, { companion: true, nameOnly: true }, (chosen, { bridge, drawing, settings }) => {
       if (!chosen) return resolve(undefined);
-      writeWithProgress(bridge, drawing, settings, chosen).then((written) => resolve(written.map((one) => one.url ?? one.path)), reject);
+      writeWithProgress(bridge, drawing, settings, chosen).then((written) => resolve(written.map((one) => ({ target: one.url ?? one.path, ...(one.title ? { title: one.title } : {}) }))), reject);
     })
       .then((opened) => opened || resolve(undefined))
       .catch(reject);

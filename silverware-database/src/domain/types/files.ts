@@ -7,7 +7,7 @@
 import { readReference, writeReference } from "./reference.ts";
 
 /** A file of a value: what it names (a path of the space, an address of the web), which, and how it was written */
-export type FileEntry = { readonly target: string; readonly web: boolean; readonly written: string };
+export type FileEntry = { readonly target: string; readonly web: boolean; readonly written: string; readonly title?: string };
 
 // An address of the web: a scheme, `//`, nothing blank in it
 const WEB_RE = /^[a-z][a-z0-9+.-]*:\/\/\S+$/i;
@@ -28,10 +28,19 @@ export function isImageTarget(target: string): boolean {
 export function readFile(text: string): FileEntry | undefined {
   const written = text.trim();
   if (WEB_RE.test(written)) return { target: written, web: true, written };
+  // (An address with a title: `[Beach](https://…/beach.jpg)`)
+  const titled = TITLED_WEB_RE.exec(written);
+  if (titled && WEB_RE.test(titled[2]!)) return { target: titled[2]!, web: true, written, ...(titled[1]!.trim() ? { title: titled[1]!.trim() } : {}) };
   const link = readReference(written);
-  // (A link's text after a bar is kept as written; what it names is the file)
-  return link ? { target: link.target, web: false, written } : undefined;
+  // (A link's text after a bar its title; what it names is the file)
+  return link ? { target: link.target, web: false, written, ...(link.text ? { title: link.text } : {}) } : undefined;
 }
+
+// An address of the web with a title, a markdown link: `[title](address)`
+const TITLED_WEB_RE = /^\[([^\]]*)\]\((\S+)\)$/;
+
+/** What a file is shown as: its title, else its name */
+export const fileLabel = (entry: Pick<FileEntry, "target" | "web" | "title">): string => entry.title ?? fileName(entry);
 
 /**
  * A value's files, in their order (none: an empty list), or undefined where it is not a list of files (nor one alone):
@@ -45,10 +54,12 @@ export function readFiles(value: unknown): readonly FileEntry[] | undefined {
   return read.every((one): one is FileEntry => one !== undefined) ? read : undefined;
 }
 
-/** A file as kept: a wiki link to a path of the space, an address of the web as it is */
-export function writeFile(target: string): string {
+/** A file as kept: a wiki link to a path of the space, an address of the web as it is; with a title, `[[path|title]]`, `[title](address)` */
+export function writeFile(target: string, title?: string): string {
   const written = target.trim();
-  return WEB_RE.test(written) ? written : writeReference(written);
+  const shown = title?.replace(/[[\]|()]/g, "").trim();
+  if (WEB_RE.test(written)) return shown ? `[${shown}](${written})` : written;
+  return shown ? `[[${written}|${shown}]]` : writeReference(written);
 }
 
 /**
@@ -103,7 +114,7 @@ const decodeURIComponentSafe = (text: string): string => {
 };
 
 // A part of text typed: a wiki link whole, else what is between spaces and commas
-const TYPED_PART = /\[\[[^\]]*\]\]|[^\s,]+/g;
+const TYPED_PART = /\[\[[^\]]*\]\]|\[[^\]]*\]\([^)\s]+\)|[^\s,]+/g;
 
 /**
  * Text typed made files, in their order: each wiki link and address of the web in it as written, a file named twice

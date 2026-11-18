@@ -81,7 +81,7 @@ describe("the insert dialog", () => {
       ["Notes/photo.png", "preview"],
       ["Notes/Report.zip", "card"],
     ]);
-    button("Insert").click();
+    button("Add 2").click();
     expect((await result)?.map((one) => one.path)).toEqual(["Notes/photo.png", "Notes/Report.zip"]);
   });
 

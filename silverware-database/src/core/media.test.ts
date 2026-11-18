@@ -103,10 +103,10 @@ describe("a host's files", () => {
 
   it("upload into the database's folder of files the store gives; said and nothing uploaded where it gives none; no upload where the source has none", async () => {
     const given: [unknown, string][] = [];
-    const upload = async (files: unknown, folder: string) => (given.push([files, folder]), [`${folder}/a.png`]);
+    const upload = async (files: unknown, folder: string) => (given.push([files, folder]), [{ target: `${folder}/a.png` }]);
     const { media } = made({ upload }, "Databases/db-ab12/files");
     const drop = { files: [new File(["x"], "a.png")], source: "drop" as const };
-    expect(await media.upload!("ab12", drop)).toEqual(["Databases/db-ab12/files/a.png"]);
+    expect(await media.upload!("ab12", drop)).toEqual([{ target: "Databases/db-ab12/files/a.png" }]);
     expect(given).toEqual([[drop, "Databases/db-ab12/files"]]);
     const none = made({ upload });
     expect(await none.media.upload!("ab12")).toBeUndefined();

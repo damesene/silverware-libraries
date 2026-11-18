@@ -18,6 +18,9 @@ export type MediaBox = { readonly width: number; readonly height: number; readon
  * Files given by an event (a paste, a drop), read in it: the files, and the HTML and the address list beside them,
  * which may hold an image's address on the web; where they came from
  */
+/** A file added through the platform's dialog: the target a value names, its title where one was given */
+export type AddedFile = { readonly target: string; readonly title?: string };
+
 export type GivenFiles = { readonly files: readonly File[]; readonly html?: string; readonly uriList?: string; readonly source: "clipboard" | "drop" };
 
 /** What the host gives of files (each part optional: none, what needs it is not offered) */
@@ -29,7 +32,7 @@ export type MediaSource = {
   /** A file opened (a file of the space as the platform shows one, an address in a tab) */
   open?(target: string): void;
   /** Files uploaded into a folder (those an event gave, or picked: none given), resolved with their targets once written; undefined where cancelled */
-  upload?(given: GivenFiles | undefined, folder: string): Promise<readonly string[] | undefined>;
+  upload?(given: GivenFiles | undefined, folder: string): Promise<readonly AddedFile[] | undefined>;
   /** The space's files (paths), pages left out */
   files?(): Awaitable<readonly string[]>;
   /** Files deleted, nothing asked: those not deleted */
@@ -58,7 +61,7 @@ export type Media = {
    * none given), resolved with their targets once written; undefined where cancelled or not uploaded (said). None where
    * the platform uploads none
    */
-  upload?(database: string, given?: GivenFiles): Promise<readonly string[] | undefined>;
+  upload?(database: string, given?: GivenFiles): Promise<readonly AddedFile[] | undefined>;
   /** Files deleted, nothing asked (the caller asked): those not deleted. None where the platform deletes none */
   remove?(paths: readonly string[]): Promise<readonly string[]>;
 };

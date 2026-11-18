@@ -42,7 +42,7 @@ describe("files in SilverBullet", () => {
       actions: { register: () => () => undefined },
       drawPreview: async (...args: unknown[]) => (calls.push(["preview", ...args.slice(0, 3)]), null),
       showFile: (...args: unknown[]) => void calls.push(["show", ...args]),
-      insertFiles: async (...args: unknown[]) => (calls.push(["insert", ...args]), ["Databases/db-ab12/files/a.png"]),
+      insertFiles: async (...args: unknown[]) => (calls.push(["insert", ...args]), [{ target: "Databases/db-ab12/files/a.png" }]),
       deleteFiles: async (paths: readonly string[]) => (calls.push(["delete", paths]), []),
     });
     const navigated: string[] = [];
@@ -50,7 +50,7 @@ describe("files in SilverBullet", () => {
     expect(await media.preview!("Docs/report.pdf", { width: 84, height: 28, min: 14 }, new AbortController().signal)).toBeNull();
     media.open!("Docs/report.pdf");
     const drop = { files: [], source: "drop" as const };
-    expect(await media.upload!(drop, "Databases/db-ab12/files")).toEqual(["Databases/db-ab12/files/a.png"]);
+    expect(await media.upload!(drop, "Databases/db-ab12/files")).toEqual([{ target: "Databases/db-ab12/files/a.png" }]);
     expect(await media.remove!(["a.png"])).toEqual([]);
     expect(calls).toEqual([
       ["preview", "Docs/report.pdf", "", { width: 84, height: 28 }],

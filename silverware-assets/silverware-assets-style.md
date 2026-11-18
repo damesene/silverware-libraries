@@ -157,8 +157,11 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 /* The insert dialog (src/ui/insertdialog.ts): a row per file (its icon and path, its note, how it is inserted, the
    file as it will be, at most 320 px high); with several, a row for all of them above; picked in it to upload */
+/* (Of one height, as the settings window: a source opened, a row added or its note changed does not move it; its rows
+   scroll within) */
 .swa-dialog.swa-insert-window {
   min-height: 0;
+  height: min(560px, calc(var(--sw-view-height, 100dvh) - 32px));
 }
 .swa-insert {
   display: flex;
@@ -188,6 +191,112 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 .swa-insert-row[data-swa-left-out] {
   opacity: 0.6;
+}
+.swa-insert-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+/* Its sources: Files…, Camera…, Link, Space in a row; a link's field and the space's search under them */
+.swa-insert-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.swa-insert-source[hidden] {
+  display: none;
+}
+.swa-insert-source-field {
+  flex: 1;
+  min-width: 10em;
+  font: inherit;
+}
+.swa-insert-found {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  max-height: 10em;
+  overflow-y: auto;
+}
+.swa-insert-found-item {
+  padding: 3px 6px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.swa-insert-found-item:hover,
+.swa-insert-found-item:focus-visible {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+/* A title: behind + Title, its field under the name */
+.swa-insert-add-title {
+  flex: none;
+  padding: 2px 6px;
+  border: 0;
+  background: none;
+  color: var(--link-color, var(--ui-accent-color));
+  font: inherit;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+.swa-insert-title-row[hidden],
+.swa-insert-add-title[hidden] {
+  display: none;
+}
+.swa-insert-title {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+}
+.swa-insert-picture {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+}
+/* Another plugin's upload: a row of two lines, its file a small picture at its left, larger on a press */
+[data-swa-compact] .swa-insert-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 4px 10px;
+  align-items: start;
+}
+[data-swa-compact] .swa-insert-sample {
+  width: 56px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 4px;
+  cursor: zoom-in;
+}
+[data-swa-compact] .swa-insert-sample :is(img, video, canvas) {
+  max-width: 56px;
+  max-height: 48px;
+  object-fit: cover;
+}
+[data-swa-compact] .swa-insert-sample .swa-label-line {
+  display: none;
+}
+[data-swa-compact] .swa-insert-sample[data-swa-open] {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: auto;
+  height: auto;
+  max-height: 320px;
+  cursor: zoom-out;
+}
+[data-swa-compact] .swa-insert-sample[data-swa-open] :is(img, video, canvas) {
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
 }
 /* An image of the web: its address in place of its name in the space, where it is linked; where it is kept */
 .swa-insert-address {

@@ -167,6 +167,13 @@ async function placeNow(bridge: Bridge, target: InsertTarget): Promise<{ readonl
   }
 }
 
+/** A file of the web's data, fetched (a site that refuses another page's fetch: said why, nothing written) */
+async function fetchedData(url: string): Promise<Uint8Array> {
+  const response = await fetch(url).catch(() => undefined);
+  if (!response?.ok) throw new Error("the site did not give the file (it may refuse other sites; link it instead)");
+  return new Uint8Array(await response.arrayBuffer());
+}
+
 /** How a file's upload goes, by its index among those chosen */
 export type UploadState = (index: number, state: "uploading" | "done" | "failed") => void;
 
@@ -178,15 +185,17 @@ export async function writeChosen(bridge: Bridge, chosen: readonly InsertChoice[
   const written: InsertChoice[] = [];
   const failed: string[] = [];
   for (const [index, one] of chosen.entries()) {
-    // (A file of the web linked: nothing to write)
-    if (one.url) {
+    // (A file of the web linked, or one of the space already: nothing to write)
+    if (one.url || one.existing) {
       written.push(one);
       continue;
     }
     progress?.(index, "uploading");
     try {
       if (!bridge.writeDocument) throw new Error("this SilverBullet hands over no way to write a file");
-      await bridge.writeDocument(one.path, new Uint8Array(await one.file.arrayBuffer()));
+      // (A link typed kept in the space: fetched first, its data not in hand)
+      const data = one.fetch ? await fetchedData(one.fetch) : new Uint8Array(await one.file.arrayBuffer());
+      await bridge.writeDocument(one.path, data);
       written.push(one);
       progress?.(index, "done");
     } catch (error) {
@@ -215,7 +224,7 @@ export async function insertChosen(bridge: Bridge, target: InsertTarget, chosen:
   } catch {
     // (SilverBullet's own style then)
   }
-  const parts = written.map((one) => ({ text: one.url ? webMarkdownOf(one.url, webNameOf(one.url), one.as, one.configured) : markdownOf(one.path, one.as, one.configured, style), embed: one.as !== "link" }));
+  const parts = written.map((one) => ({ text: one.url ? webMarkdownOf(one.url, webNameOf(one.url), one.as, one.configured, one.title) : markdownOf(one.path, one.as, one.configured, style, one.title), embed: one.as !== "link" }));
   try {
     await putIn(bridge, target, parts, asPressed);
   } catch (error) {

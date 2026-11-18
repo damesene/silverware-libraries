@@ -12,7 +12,15 @@ import { cleanName, extensionOf, type FileSource, nameOf, pathIn, pathsApart, va
 import type { InsertAs, View } from "../model/settings.ts";
 
 /** A file to insert, where it comes from; its address on the web where the browser gave it (an image of a web page) */
-export type InsertFile = { readonly file: File; readonly source: FileSource; readonly url?: string };
+export type InsertFile = {
+  readonly file: File;
+  readonly source: FileSource;
+  readonly url?: string;
+  // A file of the space already (picked under Space): nothing uploaded, its path as it is
+  readonly existing?: string;
+  // A link typed (Link): its data not in hand, fetched where it is kept in the space
+  readonly remote?: boolean;
+};
 
 /** What the dialog is told of a file's type: its name, its icon, whether it can be drawn in a view, its views as set, whether it is costly to draw */
 export type InsertType = {
@@ -27,7 +35,19 @@ export type InsertType = {
 };
 
 /** A file as it is to be inserted: its path, how; `url`: linked at its address on the web, not kept in the space */
-export type InsertChoice = { readonly file: File; readonly path: string; readonly as: Exclude<InsertAs, "shown">; readonly configured: View; readonly url?: string };
+export type InsertChoice = {
+  readonly file: File;
+  readonly path: string;
+  readonly as: Exclude<InsertAs, "shown">;
+  readonly configured: View;
+  readonly url?: string;
+  // Its title (an embed's alt text, a link's text), where one was given
+  readonly title?: string;
+  // A file of the space already: nothing written
+  readonly existing?: boolean;
+  // A link typed kept in the space: its address, fetched as it is written
+  readonly fetch?: string;
+};
 
 export type InsertDialogHost = {
   // The folder of the page it goes into (from the space's top)
@@ -49,6 +69,10 @@ export type InsertDialogHost = {
   // Each file's name asked alone, nothing of how it is shown (another plugin's upload: it writes a link of its own,
   // shared/assets.ts `insertFiles`); a file drawn as the first view its type has
   readonly nameOnly?: boolean;
+  // The space's files (paths), a file of them picked under Space; none: no Space
+  spaceFiles?(): Promise<readonly string[]>;
+  // The address a file of the space is drawn from (a picture of one picked under Space)
+  urlOf?(path: string): string;
 };
 
 // What each choice is called
@@ -102,6 +126,10 @@ function choiceRow(doc: Document, label: string, options: readonly { readonly va
 
 /** A row's state */
 type Row = {
+  // A file of the space already; a link typed (its data not in hand); its title
+  readonly existing?: string;
+  readonly remote: boolean;
+  title: string;
   readonly file: File;
   readonly type: InsertType;
   // Its path as typed or offered
@@ -163,7 +191,7 @@ export function openInsertDialog(
   /** Each row's path now: cleaned where typed so, taken apart from the batch's, and from the space's where kept both (a row linked on the web: none of the space's) */
   const paths = (): string[] =>
     pathsApart(
-      rows.map((row, index) => (row.web ? `\u0000web-${index}` : row.wanted)),
+      rows.map((row, index) => (row.web || row.existing ? `\u0000web-${index}` : row.wanted)),
       (path) => existing.has(path.toLowerCase()),
       (index) => !rows[index]!.replace,
     );
@@ -177,8 +205,13 @@ export function openInsertDialog(
     let ready = 0;
     const limit = `${Math.floor(host.maxBytes / 1024 / 1024)} MiB`;
     rows.forEach((row, index) => {
-      row.field.hidden = row.web;
-      row.address.hidden = !row.web;
+      row.field.hidden = row.web || !!row.existing;
+      row.address.hidden = !row.web && !row.existing;
+      if (row.existing) {
+        row.note.replaceChildren("In your space already: nothing uploaded.");
+        ready++;
+        return;
+      }
       if (row.web) {
         row.note.replaceChildren(row.tooLarge ? `Too large for the space (it takes files up to ${limit}): linked at its address on the web.` : "Not kept in the space: linked at its address on the web, shown while the site keeps it there.");
         row.element.removeAttribute("data-swa-problem");
@@ -227,8 +260,14 @@ export function openInsertDialog(
       if (!problem && !row.tooLarge) ready++;
       row.field.setAttribute("aria-invalid", String(!!problem && !row.tooLarge));
     });
-    insert.disabled = looking || !ready || rows.some((row) => !row.web && !row.tooLarge && !!validateFilePath(row.wanted));
-    note.textContent = looking && rows.length ? "Looking for files of these names in the space…" : unknown ? "The space's files could not be listed: a file of a name taken is replaced." : "";
+    insert.disabled = looking || !ready || rows.some((row) => !row.web && !row.existing && !row.tooLarge && !!validateFilePath(row.wanted));
+    // (What Insert does, said: how many uploaded, linked, already in the space)
+    const counts = { upload: 0, link: 0, space: 0 };
+    for (const row of rows) if (!leftOut(row)) counts[row.existing ? "space" : row.web ? "link" : "upload"]++;
+    const said = [counts.upload && `${counts.upload} to upload`, counts.link && `${counts.link} ${counts.link === 1 ? "link" : "links"}`, counts.space && `${counts.space} from your space`].filter(Boolean).join(" · ");
+    note.textContent = looking && rows.length ? "Looking for files of these names in the space…" : unknown ? "The space's files could not be listed: a file of a name taken is replaced." : said;
+    const many = counts.upload + counts.link + counts.space;
+    insert.textContent = host.nameOnly ? (many > 1 ? `Add ${many}` : "Add") : "Insert";
     allBox.hidden = !!host.nameOnly || rows.filter((row) => !leftOut(row)).length < 2;
     for (const row of rows) row.element.toggleAttribute("data-swa-left-out", leftOut(row));
     syncAll();
@@ -248,6 +287,11 @@ export function openInsertDialog(
     row.drawing = control;
     row.sample.replaceChildren();
     const path = row.web && row.url ? webNameOf(row.url) : (paths()[rows.indexOf(row)] ?? row.wanted);
+    const at = row.existing ? host.urlOf?.(row.existing) : row.remote ? row.url : undefined;
+    if (at !== undefined || row.existing) {
+      row.sample.append(/\.(png|jpe?g|gif|webp|avif|svg|bmp)(\?|#|$)/i.test(row.existing ?? row.url ?? "") && at ? el(doc, "img", { class: `${BASE}-picture`, attrs: { src: at, alt: "" } }) : el(doc, "span", { class: `${BASE}-link-icon`, html: row.type.icon }));
+      return;
+    }
     if (row.as === "link") {
       const link = el(doc, "span", `${BASE}-link`, el(doc, "span", { class: `${BASE}-link-icon`, html: row.type.icon }), path);
       row.sample.append(link);
@@ -265,11 +309,11 @@ export function openInsertDialog(
   /** A row of a file */
   const addRow = (one: InsertFile) => {
     if (finished) return;
-    const offered = nameOf(one.file, one.source, host.now());
+    const offered = one.existing ?? (one.remote && one.url ? webNameOf(one.url) : nameOf(one.file, one.source, host.now()));
     const ext = /\.([a-z0-9]+)$/i.exec(offered)?.[1] ?? extensionOf(one.file.type);
     // (A name SilverBullet would refuse offered cleaned at once)
     const name = validateFilePath(offered) ? cleanName(offered, ext) : offered;
-    const wanted = pathIn(host.folder, name);
+    const wanted = one.existing ?? pathIn(host.folder, name);
     const type = host.typeOf(one.file, wanted);
     const index = rows.length;
     const field = el(doc, "input", { class: `${BASE}-path`, attrs: { type: "text", spellcheck: "false", "aria-label": `File ${index + 1}: its name in the space` } });
@@ -278,6 +322,7 @@ export function openInsertDialog(
     const rowNote = el(doc, "div", { class: `${BASE}-row-note`, attrs: { id: noteId, role: "status", "aria-live": "polite" } });
     field.setAttribute("aria-describedby", noteId);
     const sample = el(doc, "div", `${BASE}-sample`);
+    sample.addEventListener("click", () => host.nameOnly && sample.toggleAttribute("data-swa-open"));
     const as = host.nameOnly ? sampleView(type) : firstChoice(type);
     const row: Row = {
       file: one.file,
@@ -288,11 +333,14 @@ export function openInsertDialog(
       ...(one.url ? { url: one.url } : {}),
       // (Linked where it can be, the user's choice 2026-11-15: kept in the space where asked)
       web: !!one.url,
+      ...(one.existing ? { existing: one.existing } : {}),
+      remote: !!one.remote,
+      title: "",
       field,
-      address: el(doc, "span", { class: `${BASE}-address`, text: one.url ?? "", attrs: { title: one.url ?? "" } }),
+      address: el(doc, "span", { class: `${BASE}-address`, text: one.existing ?? one.url ?? "", attrs: { title: one.existing ?? one.url ?? "" } }),
       note: rowNote,
       sample,
-      tooLarge: one.file.size > host.maxBytes,
+      tooLarge: !one.remote && !one.existing && one.file.size > host.maxBytes,
       element: el(doc, "div", `${BASE}-row`),
       choices: { set: () => undefined },
     };
@@ -333,12 +381,26 @@ export function openInsertDialog(
         ).element
       : undefined;
     choices.element.hidden = !!host.nameOnly || leftOut(row);
+    // Its title (an embed's alt text, a link's text): shown at once for a link of the web, whose address says little;
+    // else behind + Title
+    const titleField = el(doc, "input", { class: `${BASE}-title`, attrs: { type: "text", placeholder: "Title", "aria-label": `File ${index + 1}: its title` } });
+    titleField.addEventListener("input", () => (row.title = titleField.value));
+    const titleRow = el(doc, "div", `${BASE}-title-row`, titleField);
+    const addTitle = el(doc, "button", { class: `${BASE}-add-title`, text: "+ Title", attrs: { type: "button" }, run: () => ((titleRow.hidden = false), (addTitle.hidden = true), titleField.focus()) });
+    titleRow.hidden = !one.url;
+    addTitle.hidden = !!one.url;
     row.element.append(
-      el(doc, "div", `${BASE}-row-head`, el(doc, "span", { class: `${BASE}-icon`, html: type.icon }), field, row.address),
-      ...(kept ? [el(doc, "div", `${BASE}-kept`, el(doc, "span", `${BASE}-kept-label`, "Kept"), kept)] : []),
-      rowNote,
-      choices.element,
       sample,
+      el(
+        doc,
+        "div",
+        `${BASE}-row-body`,
+        el(doc, "div", `${BASE}-row-head`, el(doc, "span", { class: `${BASE}-icon`, html: type.icon }), field, row.address, addTitle),
+        titleRow,
+        ...(kept ? [el(doc, "div", `${BASE}-kept`, el(doc, "span", `${BASE}-kept-label`, "Kept"), kept)] : []),
+        rowNote,
+        choices.element,
+      ),
     );
     rows.push(row);
     list.append(row.element);
@@ -367,7 +429,61 @@ export function openInsertDialog(
   allBox.append(el(doc, "span", `${BASE}-all-label`, "All files"), all.element);
 
   // Files picked here (an upload): several, or a photo of the camera
-  const empty = el(doc, "p", `${BASE}-empty`, "Pick the files to insert.");
+  const empty = el(doc, "p", `${BASE}-empty`, "Pick files, add a link, or find one in your space. Or drop files here.");
+  // A link typed (Link): added as a row, linked or kept in the space
+  const linkField = el(doc, "input", { class: `${BASE}-source-field`, attrs: { type: "url", placeholder: "https://…", "aria-label": "A link to a file" } });
+  const addLink = () => {
+    const url = linkField.value.trim();
+    if (!/^https?:\/\/\S+$/i.test(url)) return void linkField.focus();
+    addRow({ file: new File([], webNameOf(url)), source: "link", url, remote: true });
+    linkField.value = "";
+    update();
+  };
+  linkField.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    event.stopPropagation();
+    addLink();
+  });
+  const linkRow = el(doc, "div", `${BASE}-source`, linkField, el(doc, "button", { text: "Add", attrs: { type: "button" }, run: addLink }));
+  linkRow.hidden = true;
+  // A file of the space (Space): found by words of its path, a few shown
+  let spaced: readonly string[] | undefined;
+  const spaceField = el(doc, "input", { class: `${BASE}-source-field`, attrs: { type: "text", placeholder: "Find a file in your space…", "aria-label": "Find a file in your space" } });
+  const spaceFound = el(doc, "div", `${BASE}-found`);
+  const drawSpace = () => {
+    const words = spaceField.value.toLowerCase().split(/\s+/).filter(Boolean);
+    const found = words.length ? (spaced ?? []).filter((path) => words.every((word) => path.toLowerCase().includes(word)) && !rows.some((row) => row.existing === path)).slice(0, 6) : [];
+    spaceFound.replaceChildren(
+      ...found.map((path) =>
+        el(doc, "button", {
+          class: `${BASE}-found-item`,
+          title: path,
+          attrs: { type: "button" },
+          run: () => {
+            addRow({ file: new File([], path.slice(path.lastIndexOf("/") + 1)), source: "space", existing: path });
+            spaceField.value = "";
+            drawSpace();
+            update();
+          },
+        }, path),
+      ),
+    );
+  };
+  spaceField.addEventListener("input", drawSpace);
+  spaceField.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    event.stopPropagation();
+    spaceFound.querySelector<HTMLButtonElement>("button")?.click();
+  });
+  const spaceRow = el(doc, "div", `${BASE}-source ${BASE}-source-space`, spaceField, spaceFound);
+  spaceRow.hidden = true;
+  const toggle = (shown: HTMLElement, other: HTMLElement, field: HTMLInputElement) => {
+    other.hidden = true;
+    shown.hidden = !shown.hidden;
+    if (!shown.hidden) field.focus();
+  };
   const picker = (camera: boolean) => {
     const input = el(doc, "input", { attrs: { type: "file", ...(camera ? { accept: "image/*", capture: "environment" } : { multiple: "" }) } });
     input.hidden = true;
@@ -385,9 +501,26 @@ export function openInsertDialog(
     `${BASE}-pickers`,
     el(doc, "button", { text: "Files…", attrs: { type: "button" }, run: () => picker(false) }),
     ...(host.touch ? [el(doc, "button", { text: "Camera…", attrs: { type: "button" }, run: () => picker(true) })] : []),
+    el(doc, "button", { text: "Link", attrs: { type: "button" }, run: () => toggle(linkRow, spaceRow, linkField) }),
+    ...(host.spaceFiles
+      ? [
+          el(doc, "button", {
+            text: "Space",
+            attrs: { type: "button" },
+            run: () => {
+              toggle(spaceRow, linkRow, spaceField);
+              spaced ??= [];
+              void host.spaceFiles!().then((paths) => ((spaced = paths), drawSpace())).catch(() => undefined);
+            },
+          }),
+        ]
+      : []),
   );
 
-  const content = el(doc, "div", BASE, allBox, list, empty, ...(files.length ? [] : [pickers]));
+  // (Its sources always over its rows: more files added to those a paste or a drop gave. For another plugin's upload its
+  // rows compact, each file a small picture, larger on a press: nothing of how it shows in a page to see)
+  const content = el(doc, "div", BASE, pickers, linkRow, spaceRow, allBox, list, empty);
+  content.toggleAttribute("data-swa-compact", !!host.nameOnly);
   // (Its rows there before it opens: the focus given to the first's name as it opens. For a field of another plugin's
   // the dialog is its companion before the focus comes to it: the field not taken for left as the dialog opens)
   for (const one of files) addRow(one);
@@ -402,7 +535,20 @@ export function openInsertDialog(
     const now = paths();
     const chosen = inserting
       ? rows.flatMap((row, index): InsertChoice[] =>
-          leftOut(row) ? [] : row.web && row.url ? [{ file: row.file, path: webNameOf(row.url), as: row.as, configured: row.type.configured, url: row.url }] : [{ file: row.file, path: now[index]!, as: row.as, configured: row.type.configured }],
+          leftOut(row)
+            ? []
+            : [
+                {
+                  file: row.file,
+                  path: row.existing ?? (row.web && row.url ? webNameOf(row.url) : now[index]!),
+                  as: row.as,
+                  configured: row.type.configured,
+                  ...(row.web && row.url ? { url: row.url } : {}),
+                  ...(row.existing ? { existing: true } : {}),
+                  ...(!row.web && row.remote && row.url ? { fetch: row.url } : {}),
+                  ...(row.title.trim() ? { title: row.title.trim() } : {}),
+                },
+              ],
         )
       : undefined;
     for (const row of rows) {

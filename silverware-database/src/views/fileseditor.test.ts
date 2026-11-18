@@ -12,7 +12,7 @@ const DATABASE: Database = { id: "trips", name: "Trips", properties: [{ key: "ph
 const item = (photos?: unknown): Item => ({ key: "page-1" as ItemKey, name: "Holiday", values: photos === undefined ? {} : { photos: photos as string[] }, rank: "a0", revision: "1" });
 
 /** A host for one item, its files the space's given, recording what is written; `upload` the dialog's answer, as it comes */
-function setup(options: { readonly media?: boolean; readonly upload?: () => Promise<readonly string[] | undefined> } = {}) {
+function setup(options: { readonly media?: boolean; readonly upload?: () => Promise<readonly { target: string; title?: string }[] | undefined> } = {}) {
   const writes: unknown[][] = [];
   const uploads: string[] = [];
   const media: Media = {
@@ -53,12 +53,12 @@ describe("a value of files edited", () => {
   it("lists its files, takes one out by ×, moves one by Alt+↓, and writes the list as left, each as it was written", async () => {
     const { writes, edit, panel, names, key, leave } = setup();
     edit(["[[Photos/a.png]]", "[[Photos/b.png|B]]", "https://example.com/c.jpg"]);
-    expect(names()).toEqual(["a.png", "b.png", "c.jpg"]);
+    expect(names()).toEqual(["a.png", "B", "c.jpg"]);
     expect(document.activeElement).toBe(panel().querySelector(".swd-editor-search"));
     panel().querySelectorAll<HTMLButtonElement>(".swd-files-remove")[0]!.click();
-    expect(names()).toEqual(["b.png", "c.jpg"]);
+    expect(names()).toEqual(["B", "c.jpg"]);
     key(panel().querySelectorAll(".swd-files-grip")[0]!, "ArrowDown", { altKey: true });
-    expect(names()).toEqual(["c.jpg", "b.png"]);
+    expect(names()).toEqual(["c.jpg", "B"]);
     // (The moved one's grip focused again)
     expect(document.activeElement).toBe(panel().querySelectorAll(".swd-files-grip")[1]);
     leave();
@@ -116,7 +116,7 @@ describe("a value of files edited", () => {
   });
 
   it("uploads into the item's database, the dialog its companion: the files added once written; those written after it was left added to the value as written then", async () => {
-    let answer!: (targets: readonly string[] | undefined) => void;
+    let answer!: (targets: readonly { target: string; title?: string }[] | undefined) => void;
     const { writes, uploads, edit, panel, names, leave } = setup({ upload: () => new Promise((resolve) => (answer = resolve)) });
     edit(["[[a.png]]"]);
     const upload = panel().querySelector<HTMLButtonElement>(".swd-files-upload")!;
@@ -129,24 +129,24 @@ describe("a value of files edited", () => {
     document.body.append(dialog);
     dialog.focus();
     expect(panel()).not.toBeNull();
-    answer(["Databases/db-trips/files/b.png"]);
+    answer([{ target: "Databases/db-trips/files/b.png" }]);
     await vi.waitFor(() => expect(names()).toEqual(["a.png", "b.png"]));
     expect(document.activeElement).toBe(upload);
     // Again, the popup left before the files are written: added to what it wrote
     upload.click();
     leave();
     await vi.waitFor(() => expect(writes).toHaveLength(1));
-    answer(["Databases/db-trips/files/c.png"]);
+    answer([{ target: "Databases/db-trips/files/c.png", title: "Sea" }]);
     await vi.waitFor(() => expect(writes).toHaveLength(2));
-    expect(writes[1]).toEqual([["[[a.png]]", "[[Databases/db-trips/files/b.png]]"], "photos", ["[[a.png]]", "[[Databases/db-trips/files/b.png]]", "[[Databases/db-trips/files/c.png]]"]]);
+    expect(writes[1]).toEqual([["[[a.png]]", "[[Databases/db-trips/files/b.png]]"], "photos", ["[[a.png]]", "[[Databases/db-trips/files/b.png]]", "[[Databases/db-trips/files/c.png|Sea]]"]]);
   });
 
   it("without the host's files: an address still added, no search of the space, no upload (said why)", async () => {
     const { edit, panel, names, type, key, search } = setup({ media: false });
     edit([]);
     expect(search().placeholder).toBe("Type an address (https://…)");
-    const upload = panel().querySelector<HTMLButtonElement>(".swd-files-upload")!;
-    expect([upload.disabled, upload.title]).toEqual([true, "Uploading needs Silverware Assets"]);
+    // (No button: the field adds what it can)
+    expect(panel().querySelector(".swd-files-upload")).toBeNull();
     await type("https://example.com/a.png");
     key(search(), "Enter");
     expect(names()).toEqual(["a.png"]);

@@ -340,6 +340,43 @@ describe("the CodeMirror editor's live preview", () => {
     editor.destroy();
   });
 
+  it("draws a fenced code block as one card, its fences' marks where the selection touches it, else its language alone", () => {
+    const text = "x\n```csharp\nreturn 1;\n```\nz";
+    const { editor, root } = make(text, 0);
+    const card = () => [...root.querySelectorAll(".cm-line")].map((line) => [...line.classList].filter((one) => one.startsWith("swe-code")).join(" "));
+    expect(card()).toEqual(["", "swe-code-line swe-code-first swe-code-fence", "swe-code-line", "swe-code-line swe-code-last swe-code-fence", ""]);
+    expect(root.querySelector(".swe-code-fence .swe-code-info")?.textContent).toBe("csharp");
+    editor.setSelection(text.indexOf("1;"));
+    expect(card()).toEqual(["", "swe-code-line swe-code-first", "swe-code-line", "swe-code-line swe-code-last", ""]);
+    expect(root.querySelector(".swe-code-info")).toBeNull();
+    editor.destroy();
+  });
+
+  it("highlights a fenced code block in its language, by the names SilverBullet's editor knows", async () => {
+    const { editor, root } = make("```cs\nreturn \"text\";\n```\n```unknown\nreturn \"text\";\n```\n```#tag\nkey: 1\n```", 0);
+    const view = cm.EditorView.findFromDOM(root.querySelector<HTMLElement>(".cm-editor")!)!;
+    // (Its language loaded as the block is first parsed, the block parsed again then)
+    const token = (line: number, text: string) => [...root.querySelectorAll(".cm-line")[line]!.querySelectorAll("span")].some((span) => span.textContent === text);
+    await vi.waitFor(
+      () => {
+        forceParsing(view, view.state.doc.length, 60_000);
+        expect(token(1, "return")).toBe(true);
+      },
+      { timeout: 5_000 },
+    );
+    expect(token(1, '"text"')).toBe(true);
+    expect(token(4, "return")).toBe(false);
+    // (A tag's data block YAML)
+    await vi.waitFor(
+      () => {
+        forceParsing(view, view.state.doc.length, 60_000);
+        expect(token(7, "key")).toBe(true);
+      },
+      { timeout: 5_000 },
+    );
+    editor.destroy();
+  });
+
   it("shows no source in a read-only editor, its checkboxes not toggled", () => {
     const { editor, root, lines } = make("**bold** [ ]\n- [ ] task", 0, true);
     expect(lines()).toEqual(["bold [ ]", "•task"]);

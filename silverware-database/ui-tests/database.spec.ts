@@ -1195,6 +1195,38 @@ test("in the peek's editor a file's view picked in its menu, the editor never fo
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain(`![||{ view: card }](${url})`);
 });
 
+test("in the peek's editor a fenced code block is a card highlighted in its language, its fences shown as the caret is in it", async ({ page, space }) => {
+  const content = "Start\n\n```csharp\nreturn \"text\";\n```\n\nEnd\n";
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS, "Page/db-tasks/Fix login": `${item("Todo", "a0")}\n${content}` }, "Page");
+  const body = page.locator(".swd-peek .swd-peek-body");
+  await expect(async () => {
+    if (await page.locator(".swd-peek").count()) await page.keyboard.press("Escape");
+    await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
+    await expect(body.locator(".cm-content")).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+  await expect.poll(() => fieldReady(body)).toBe(true);
+  const lines = body.locator(".cm-line");
+  // (The fences' marks unseen, the language at the line's end; the code highlighted once its language is loaded)
+  const fence = body.locator(".cm-line.swe-code-fence").first();
+  await expect(fence.locator(".swe-code-info")).toHaveText("csharp");
+  const colors = () =>
+    fence.evaluate((line) => {
+      const info = line.querySelector(".swe-code-info")!;
+      return { line: getComputedStyle(line).color, info: getComputedStyle(info).color };
+    });
+  expect((await colors()).line).toBe("rgba(0, 0, 0, 0)");
+  expect((await colors()).info).not.toBe("rgba(0, 0, 0, 0)");
+  const code = body.locator(".cm-line.swe-code-line", { hasText: "return" });
+  await expect(code.locator("span", { hasText: /^return$/ })).toHaveCount(1);
+  await expect(code.locator("span", { hasText: /^"text"$/ })).toHaveCount(1);
+  expect(await code.locator("span", { hasText: /^return$/ }).evaluate((span) => getComputedStyle(span).fontWeight)).toBe("700");
+  expect(await code.evaluate((line) => getComputedStyle(line).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
+  // (The caret in the block: its fences as written)
+  await code.locator("span", { hasText: /^return$/ }).click();
+  await expect(body.locator(".cm-line.swe-code-fence")).toHaveCount(0);
+  await expect(lines.filter({ hasText: "```csharp" })).toHaveCount(1);
+});
+
 test("in the peek's editor a task's box looks as the page's, though the peek hangs outside the page", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n- [ ] in the page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS, "Page/db-tasks/Fix login": `${item("Todo", "a0")}\n- [ ] in the item\n` }, "Page");
   const body = page.locator(".swd-peek .swd-peek-body");

@@ -1,6 +1,7 @@
 // Markdown shown as SilverBullet's editor shows it (its behaviour, written here: docs/silverware-editor.md): a task's
 // `[ ]` a checkbox toggling it, a done task struck through, a bullet list's `-` a bullet, the marks of emphasis, code,
-// headings, links and `[[wiki links]]` hidden, an escape's backslash hidden, an embed drawn and a link's icon before it
+// headings, links and `[[wiki links]]` hidden, a fenced code block a card (its fences hidden, its language at its
+// end), an escape's backslash hidden, an embed drawn and a link's icon before it
 // (by its plugin, as it says: `drawing`), a link followed as it is pressed (by its plugin: `openLink`, docs/silverware-
 // editor-links.md), a table drawn as one (read-only: its cells edited in its markdown), each shown again as its
 // markdown where the selection touches it. A read-only editor shows none: nothing to edit there. Built over the
@@ -385,6 +386,17 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
   const link = cm.Decoration.mark({ class: "swe-link" });
   const wikiLink = cm.Decoration.mark({ class: "swe-wiki-link" });
   const hashtag = cm.Decoration.mark({ class: "swe-hashtag" });
+  // A fenced code block's lines as the page draws them: one card, its first and last line its corners; its fences'
+  // lines (their backticks, its language) shown as written only where the selection touches the block, else its
+  // language alone, at the line's end
+  const codeLines = new Map<string, ReturnType<typeof cm.Decoration.line>>();
+  const codeLine = (first: boolean, last: boolean, fence: boolean) => {
+    const className = ["swe-code-line", first && "swe-code-first", last && "swe-code-last", fence && "swe-code-fence"].filter(Boolean).join(" ");
+    let line = codeLines.get(className);
+    if (!line) codeLines.set(className, (line = cm.Decoration.line({ class: className })));
+    return line;
+  };
+  const codeInfo = cm.Decoration.mark({ class: "swe-code-info" });
   // What holds no hashtag: code (fenced, indented), HTML
   const NO_TAGS = new Set(["FencedCode", "CodeBlock", "HTMLBlock", "CommentBlock"]);
 
@@ -440,6 +452,16 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
             while (start < task.to && /[ \t]/.test(state.sliceDoc(start, start + 1))) start++;
             if (start < task.to) out.push(done.range(start, task.to));
           }
+        } else if (name === "FencedCode") {
+          // (Its fences' lines: those its marks are on, the closing one missing where the block runs to the text's end)
+          const fences = new Set(children(node).flatMap((child) => (child.name === "CodeMark" ? [state.doc.lineAt(child.from).number] : [])));
+          const covered = !shown(from, to);
+          const first = state.doc.lineAt(from).number;
+          const last = state.doc.lineAt(to).number;
+          for (let n = first; n <= last; n++) out.push(codeLine(n === first, n === last, covered && fences.has(n)).range(state.doc.line(n).from));
+          if (covered) for (const child of children(node)) if (child.name === "CodeInfo") out.push(codeInfo.range(child.from, child.to));
+          // (Its language's nodes not read as markdown's)
+          return false;
         } else if (name === "Table") {
           // A table drawn, its whole lines replaced (one indented in a list from its line's start), unless the selection
           // touches it; its inline nodes not decorated again within it
@@ -565,6 +587,21 @@ export const PREVIEW_THEME = {
   ".swe-task-box, .swe-task-mark": { display: "inline-block", minWidth: `calc(${LIST_COLUMNS.task} * ${COLUMN})`, textIndent: "0", whiteSpace: "pre" },
   // (The box in the middle of the columns of its `[ ]`, the space's after them, on a line of its own height, as the page's)
   ".swe-task-box": { boxSizing: "content-box", minWidth: `calc(${LIST_COLUMNS.task - 1} * ${COLUMN})`, paddingRight: COLUMN, textAlign: "center", lineHeight: "1" },
+  // (A fenced code block as the page's: one card of the code's background, its text inset, in the code's font; its
+  // fences' backticks unseen and its language at the line's end, where the selection is not in it)
+  "& .cm-line.swe-code-line": {
+    fontFamily: "var(--editor-monospace-font, monospace)",
+    fontSizeAdjust: "var(--editor-font-x-height, none)",
+    backgroundColor: "var(--editor-code-background-color, color-mix(in srgb, currentColor 6%, transparent))",
+    paddingLeft: "16px",
+    paddingRight: "16px",
+  },
+  // (Its code's own background none: the card's alone)
+  "& .cm-line.swe-code-line *": { backgroundColor: "transparent" },
+  "& .cm-line.swe-code-first": { borderTopLeftRadius: "var(--ui-radius-lg, 6px)", borderTopRightRadius: "var(--ui-radius-lg, 6px)" },
+  "& .cm-line.swe-code-last": { borderBottomLeftRadius: "var(--ui-radius-lg, 6px)", borderBottomRightRadius: "var(--ui-radius-lg, 6px)" },
+  "& .cm-line.swe-code-fence, & .cm-line.swe-code-fence *": { color: "transparent" },
+  "& .cm-line.swe-code-fence .swe-code-info, & .cm-line.swe-code-fence .swe-code-info *": { color: "var(--editor-code-info-color, color-mix(in srgb, currentColor 55%, transparent))", float: "right", fontSize: "90%" },
   ".swe-link": { color: "var(--editor-link-color, var(--link-color, #0969da))", textDecoration: "underline" },
   ".swe-wiki-link": { color: "var(--editor-wiki-link-page-color, var(--link-color, #0969da))" },
   // (A hashtag as SilverBullet 2.12.1 draws one rendered, a grid's cell's too: its theme's colours and corners, the

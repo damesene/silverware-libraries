@@ -367,6 +367,8 @@ test.describe("Sheet view", () => {
       input.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
     });
     await expect.poll(() => markdown(page)).toMatch(/\| Column 1 +\| Column 2 +\|\n\|[- |]+\|\n\| a +\| b +\|\n\| <meta core.table core.name='table2' sheet.name='Sheet1' sheet.at='A(\d+)'> \|/);
+    // (Both tables drawn anew after the write before the first's rows are counted: a stand-in counts none)
+    await expect(page.locator(".sb-table-widget.swt-drawn.swt-sheet-table:not(.swt-stand-in)")).toHaveCount(2);
     // The first table takes the sheet's rows 1 to N (its header and body), the cell pasted into is row N + 4 (three
     // empty rows under it): the new table starts on the row above, so its value is in that cell
     const first = await sheetTable(page).first().locator("tr[data-swt-row], thead tr").count();

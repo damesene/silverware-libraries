@@ -172,11 +172,20 @@ export function reorder(e: PointerEvent, options: Reorder): void {
     win.addEventListener("click", swallow, true);
     win.setTimeout(() => win.removeEventListener("click", swallow, true), 0);
   };
-  const finish = (dropped: boolean) => {
+  // `held`: ended while the pointer is still down (Esc): the click its going up sends taken too
+  const finish = (dropped: boolean, held = false) => {
     leave();
     const moved = !!ghost;
     ghost?.remove();
     element.classList.remove(`${base}-placeholder`);
+    if (moved && held) {
+      const upped = (u: PointerEvent) => {
+        if (u.pointerId !== e.pointerId) return;
+        win.removeEventListener("pointerup", upped, true);
+        noClick();
+      };
+      win.addEventListener("pointerup", upped, true);
+    }
     if (!dropped || !moved) {
       options.done(undefined);
       if (dropped) options.clicked?.();
@@ -202,7 +211,7 @@ export function reorder(e: PointerEvent, options: Reorder): void {
     if (k.key !== "Escape" || !ghost) return;
     k.preventDefault();
     k.stopPropagation();
-    finish(false);
+    finish(false, true);
   };
   win.addEventListener("pointermove", move, true);
   win.addEventListener("pointerup", up, true);

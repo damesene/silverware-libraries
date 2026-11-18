@@ -220,7 +220,7 @@ new tab, *Download*, *Remove* from the value; `Media.url`).
   off, over it where there is no room under it.
 - **Sources in Assets' insert dialog** (for a page too): one bar always shown, *Files…*, *Camera…* (touch), *Link*
   (a field under the bar: an address added as a row), *Space* (a search of the space's files, a few found under it);
-  rows of two lines with a small picture (about 48 px, larger on a press): a file of the device its name, a web
+  rows of two lines with a small picture (about 48 px): a file of the device its name, a web
   address *Kept* (Link / Save to space), a file of the space nothing to set; the foot says what happens
   (`1 to upload · 1 link · 1 from your space`, *Add 3*). A page's insert keeps *Inserted as*.
 - **Titles**: every row may have one (a file of the device's behind *+ Title*); a web address's shown first. In a page
@@ -229,9 +229,10 @@ new tab, *Download*, *Remove* from the value; `Media.url`).
   tooltip, its menu, the text sorted and filtered by).
 - **Database's popup**: its files and **+ Add files…** alone (the dialog); without Silverware Assets the field of today
   in its place (an address, a file of the space). A link pasted on the open popup opens the dialog with it.
-- Built: the dialog's rows compact (a 48 px picture, larger on a press) for another plugin's upload alone (`nameOnly`):
-  a page's insert keeps its sample, which shows how the file will look there. `insertFiles` resolves `{ target, title }`
-  (`AddedFile`). The space's files offered are those not `.md` nor under a folder starting with `_`.
+- Built: the dialog's rows compact (a 48 px picture) for another plugin's upload alone (`nameOnly`): a page's insert
+  keeps its sample, which shows how the file will look there. Its picture larger on a press was taken out 2026-11-18
+  (the user's wish): the picture took the row's second line and pushed the rest into its narrow column. `insertFiles`
+  resolves `{ target, title }` (`AddedFile`). The space's files offered are those not `.md` nor under a folder starting with `_`.
 
 ## The insert dialog made plainer (decided with the user 2026-11-18, built the same day)
 

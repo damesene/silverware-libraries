@@ -293,7 +293,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   outline: 2px dashed var(--ui-accent-color, #4a6cf7);
   outline-offset: -4px;
 }
-/* Another plugin's upload: a row of two lines, its file a small picture at its left, larger on a press */
+/* Another plugin's upload: a row of two lines, its file a small picture at its left */
 [data-swa-compact] .swa-insert-row {
   display: grid;
   grid-template-columns: 56px minmax(0, 1fr);
@@ -305,7 +305,6 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   height: 48px;
   overflow: hidden;
   border-radius: 4px;
-  cursor: zoom-in;
 }
 [data-swa-compact] .swa-insert-sample :is(img, video, canvas) {
   max-width: 56px;
@@ -314,19 +313,6 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 [data-swa-compact] .swa-insert-sample .swa-label-line {
   display: none;
-}
-[data-swa-compact] .swa-insert-sample[data-swa-open] {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  width: auto;
-  height: auto;
-  max-height: 320px;
-  cursor: zoom-out;
-}
-[data-swa-compact] .swa-insert-sample[data-swa-open] :is(img, video, canvas) {
-  max-width: 100%;
-  max-height: 320px;
-  object-fit: contain;
 }
 /* An image of the web: its address in place of its name in the space, where it is linked; where it is kept */
 .swa-insert-address {

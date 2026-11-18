@@ -335,7 +335,6 @@ export function openInsertDialog(
     const rowNote = el(doc, "div", { class: `${BASE}-row-note`, attrs: { id: noteId, role: "status", "aria-live": "polite" } });
     field.setAttribute("aria-describedby", noteId);
     const sample = el(doc, "div", `${BASE}-sample`);
-    sample.addEventListener("click", () => host.nameOnly && sample.toggleAttribute("data-swa-open"));
     const as = host.nameOnly ? sampleView(type) : firstChoice(type);
     const row: Row = {
       file: one.file,
@@ -507,7 +506,7 @@ export function openInsertDialog(
   const pickers = el(doc, "div", `${BASE}-pickers`, addField, el(doc, "button", { text: "Browse…", attrs: { type: "button" }, run: picker }));
 
   // (Its sources always over its rows: more files added to those a paste or a drop gave. For another plugin's upload its
-  // rows compact, each file a small picture, larger on a press: nothing of how it shows in a page to see)
+  // rows compact, each file a small picture: nothing of how it shows in a page to see)
   const content = el(doc, "div", BASE, pickers, offers, allBox, list, empty);
   content.toggleAttribute("data-swa-compact", !!host.nameOnly);
   // (Its rows there before it opens: the focus given to the first's name as it opens. For a field of another plugin's

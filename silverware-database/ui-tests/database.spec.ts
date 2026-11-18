@@ -1,4 +1,4 @@
-import { boxOf, editorText, expect, fieldReady, fieldText, item, root, runCommand, test, waitForIndex } from "./helpers.ts";
+import { boxOf, caretAtEnd, editorText, expect, fieldReady, fieldText, item, root, runCommand, test, waitForIndex } from "./helpers.ts";
 
 // (The test's own view named: the built-in ones come first in the switcher)
 const BLOCK = "```silverware-database\nid: tasks\nview: names\n```\n";
@@ -242,26 +242,58 @@ ${BLOCK}`, ...TASKS }, "Page");
 test("a press beside the block, on its lines, does not show its markdown", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${BLOCK}\nAfter\n`, ...TASKS }, "Page");
   await expect(page.locator(".test-item")).toHaveCount(2);
+  // (The caret out of the block, at the page's end, before each press: SilverBullet after 2.12.1 puts it at the block's
+  // start as the focus goes into the block (a press in its margin), its markdown then shown once the editor has the focus
+  // again, whatever a press beside did; each press is told by what it does alone)
   type Box = { x: number; y: number; width: number; height: number };
+  const box = (selector: string) => () => boxOf(page.locator(selector).first());
+  const [widget, place, closing, content] = [box(".swd-widget"), box(".swd-place"), box(".cm-line.sb-fenced-code-hide"), box(".cm-content")];
+  // A point of the content's padding right of the block where the press lands in the editor: not on what another
+  // plugin lays beside the block there (Silverware Layout's handle of its width), whose press is that plugin's
+  const besideRight = async (from: Box, to: Box, y: number): Promise<readonly [number, number]> => {
+    const x = await page.evaluate(
+      ([left, right, y]) => {
+        for (let x = right; x > left; x--) {
+          const hit = document.elementFromPoint(x, y);
+          if (hit && hit.closest(".cm-editor") && !hit.closest(".swd-widget")) return x;
+        }
+        return undefined;
+      },
+      [from.x + from.width + 1, to.x + to.width - 2, y] as const,
+    );
+    if (x === undefined) throw new Error("no point right of the block is the editor's");
+    return [x, y];
+  };
   // In the widget's margin above the place, on the closing fence hidden under it, and left and right of the block in the
   // editor, on none of its lines (the content's padding, the room beside it), which CodeMirror puts on the block's line.
-  // Each measured as it is pressed: a press before may have the block drawn anew, or laid out again (its width)
-  const points: readonly (readonly [string, (b: { widget: Box; place: Box; closing: Box; content: Box }) => readonly [number, number]])[] = [
-    ["the widget's margin", ({ widget, place }) => [widget.x + 40, (widget.y + place.y) / 2]],
-    ["the closing fence", ({ closing }) => [closing.x + 40, closing.y + closing.height / 2]],
-    ["the content's padding, left", ({ widget, content }) => [Math.max(content.x + 2, widget.x - 8), widget.y + widget.height / 2]],
-    ["the content's padding, right", ({ widget, content }) => [Math.min(content.x + content.width - 2, widget.x + widget.width + 8), widget.y + widget.height / 2]],
-    ["right of the content", ({ widget, content }) => [content.x + content.width + 20, widget.y + widget.height / 2]],
+  // Each measured as it is pressed, what it needs alone: a press before may have the block drawn anew (as a line, or a
+  // block of its own: no closing fence's line then), or laid out again (its width)
+  const points: readonly (readonly [string, () => Promise<readonly [number, number]>])[] = [
+    ["the widget's margin", async () => {
+      const [w, p] = [await widget(), await place()];
+      return [w.x + 40, (w.y + p.y) / 2];
+    }],
+    ["the closing fence", async () => {
+      const c = await closing();
+      return [c.x + 40, c.y + c.height / 2];
+    }],
+    ["the content's padding, left", async () => {
+      const [w, c] = [await widget(), await content()];
+      return [Math.max(c.x + 2, w.x - 8), w.y + w.height / 2];
+    }],
+    ["the content's padding, right", async () => {
+      const [w, c] = [await widget(), await content()];
+      return besideRight(w, c, w.y + w.height / 2);
+    }],
+    ["right of the content", async () => {
+      const [w, c] = [await widget(), await content()];
+      return [c.x + c.width + 20, w.y + w.height / 2];
+    }],
   ];
   for (const [where, at] of points) {
     await test.step(where, async () => {
-      const boxes = {
-        widget: await boxOf(page.locator(".swd-widget")),
-        place: await boxOf(page.locator(".swd-place")),
-        closing: await boxOf(page.locator(".cm-line.sb-fenced-code-hide").first()),
-        content: await boxOf(page.locator(".cm-content")),
-      };
-      const [x, y] = at(boxes);
+      await caretAtEnd(page);
+      const [x, y] = await at();
       await page.mouse.click(x, y);
       await expect(page.locator(".swd-place")).toBeVisible();
       await expect(page.locator(".cm-line", { hasText: "```silverware-database" })).toHaveCount(0);
@@ -558,10 +590,7 @@ test("the command New database makes its root page beside the page open and its 
   await space.open({ Page: "# Page\n\ntext\n" }, "Page");
   // (The page's text loaded first: loading it puts the cursor at its start)
   await expect.poll(() => editorText(page)).toBe("# Page\n\ntext\n");
-  await page.evaluate(() => {
-    const view = (window as unknown as { client: { editorView: { state: { doc: { length: number } }; dispatch(spec: unknown): void } } }).client.editorView;
-    view.dispatch({ selection: { anchor: view.state.doc.length } });
-  });
+  await caretAtEnd(page);
   await runCommand(page, "Silverware Database: New database");
   const field = page.locator(".sb-modal-box input").first();
   await field.fill("Ideas");
@@ -1015,6 +1044,8 @@ test("an item's icon picked in the peek, an icon of Silverware Icons then an emo
   await page.locator(".swd-peek-color").click();
   await page.locator('.swd-peek-pop-color[aria-label="Green"]').click();
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("color: green");
+  // (The colors' choice gone first: open, Esc would close it, not the peek)
+  await expect(page.locator(".swd-peek-pop-color")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.locator(".swd-peek")).toHaveCount(0);
   const card = page.locator(".swd-board-card", { hasText: "Fix login" });
@@ -1288,8 +1319,9 @@ test("the peek's properties scroll in their own box past a height, the content u
   await box.evaluate((one) => (one.scrollTop = 0));
   const first = peek.locator('.swd-peek-row[data-property="p0"]');
   await first.hover();
-  const grip = (await first.locator(".swd-peek-grip").boundingBox())!;
-  const edges = (await box.boundingBox())!;
+  // (The grip shown as its row is hovered: its box once it is)
+  const grip = await boxOf(first.locator(".swd-peek-grip"));
+  const edges = await boxOf(box);
   await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
   await page.mouse.down();
   await page.mouse.move(grip.x + grip.width / 2, edges.y + edges.height - 6, { steps: 8 });

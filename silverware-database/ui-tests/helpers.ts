@@ -194,3 +194,11 @@ export function fieldText(field: Locator): Promise<string> {
 export async function fieldReady(field: Locator): Promise<boolean> {
   return field.evaluate((root: HTMLElement) => root.dataset.reading === undefined && !(root instanceof HTMLTextAreaElement && root.readOnly));
 }
+
+/** The editor's caret put at the page's end */
+export async function caretAtEnd(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const view = (window as unknown as { client: { editorView: { state: { doc: { length: number } }; dispatch(spec: unknown): void } } }).client.editorView;
+    view.dispatch({ selection: { anchor: view.state.doc.length } });
+  });
+}

@@ -142,7 +142,7 @@ SilverBullet renders, `${…}`, queries, code widgets, and add an editor per cel
 
 | Plugin | Surfaces | What differs |
 | --- | --- | --- |
-| Silverware Editor | grid edited, peek | a strong text's weight (700, the page's 900 on 2.12.1); code's font (the default monospace, the page's editor's font on 2.12.1); inline code's ground; a code block's inset (16 px, none on 2.12.1); headings' sizes (edge); the space round headings and a rule |
+| Silverware Editor | grid edited, peek | ~~a strong text's weight, code's font, inline code's ground, a code block's inset, headings' sizes, the space round headings~~ (read from the page, docs/silverware-look-fixes.md, 2026-11-18); a rule's line 1 px on edge (its editor's, not its rules': the field keeps 2.12.1's) |
 | Silverware Assets | grid, grid edited, peek, peek edited | a preview 6 px higher; in a field a preview not zoomed with the text, a link's icon in the text's colour |
 | Silverware Layout | grid | headings' colour; a quote's colour, ground and indent; code's font and inset, no highlighting; bold; the space round headings and a rule |
 

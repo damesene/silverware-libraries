@@ -379,13 +379,9 @@ test("the same, the text zoomed on this device (Silverware Layout's font zoom): 
 const FIELDS = ["grid edited", "peek", "peek edited"];
 type Part = "font" | "color" | "ground" | "decoration";
 const KNOWN: readonly { readonly surfaces: readonly string[]; readonly keys: readonly string[]; readonly parts?: readonly Part[]; readonly why: string }[] = [
-  // Silverware Editor's field: its own look where the page's is not read yet
-  { surfaces: FIELDS, keys: ["bold"], parts: ["font"], why: "a strong text's weight its own (700), the page's 900 on 2.12.1" },
-  { surfaces: FIELDS, keys: ["inline code"], parts: ["font", "ground"], why: "code's font the default monospace where the page has none of its own for it (2.12.1: the editor's font); its ground its own" },
-  { surfaces: FIELDS, keys: ["code"], parts: ["font"], why: "code's font the default monospace where the page has none of its own for it (2.12.1: the editor's font)" },
-  { surfaces: FIELDS, keys: ["return"], why: "a code block's text inset 16 px, as edge's; 2.12.1 insets none" },
-  { surfaces: FIELDS, keys: ["heading 1", "heading 2", "heading 3"], parts: ["font"], why: "headings' sizes the rendering's (1.5, 1.2, 1.1 em), edge's editor's otherwise" },
-  { surfaces: FIELDS, keys: ["Second level under First level", "Third level under Second level", "Some under Third level", "Below rule under Above rule"], why: "the space round headings and a rule its own" },
+  // Silverware Editor's field: a rule's line a line's height, as 2.12.1 draws it; edge's editor draws it 1 px (its
+  // CodeMirror, not its rules: nothing to read)
+  { surfaces: FIELDS, keys: ["Below rule under Above rule"], why: "a rule's line a line high, as on 2.12.1; 1 px on edge" },
   // Silverware Assets in every surface but the page
   { surfaces: [...FIELDS, "grid"], keys: ["a file's preview"], why: "a preview 6 px higher than the page's (its label's room), not zoomed with the text in a field" },
   { surfaces: FIELDS, keys: ["a link's icon"], why: "a link's icon in the text's colour, the page's in the link's" },

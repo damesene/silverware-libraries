@@ -49,17 +49,12 @@ function highlight(cm: CodeMirror): Extension {
   const t = cm.tags;
   return cm.syntaxHighlighting(
     cm.HighlightStyle.define([
-      { tag: t.heading, fontWeight: "bold", color: "var(--editor-heading-color, inherit)" },
-      // (The sizes of SilverBullet's rendered headings: a grid's cell shows them so as it is not edited. Each level bold
-      // itself: a level's rule takes the place of the heading's, the two are not merged)
-      { tag: t.heading1, fontWeight: "bold", fontSize: "1.5em", color: "var(--editor-heading-color, inherit)" },
-      { tag: t.heading2, fontWeight: "bold", fontSize: "1.2em", color: "var(--editor-heading-color, inherit)" },
-      { tag: t.heading3, fontWeight: "bold", fontSize: "1.1em", color: "var(--editor-heading-color, inherit)" },
-      { tag: t.strong, fontWeight: "bold" },
+      // (A heading's look on its line, a strong text's on its mark, src/livepreview.ts: the page's look of them written
+      // there, src/look.ts, which a span's own would outweigh)
       { tag: t.emphasis, fontStyle: "italic" },
       { tag: t.strikethrough, textDecoration: "line-through" },
       { tag: [t.link, t.url], color: "var(--editor-link-color, var(--link-color, #0969da))" },
-      { tag: t.monospace, fontFamily: "var(--editor-monospace-font, monospace)", backgroundColor: "color-mix(in srgb, currentColor 8%, transparent)" },
+      // (Inline code's font and ground on its mark, src/livepreview.ts)
       { tag: [t.processingInstruction, t.meta], color: "color-mix(in srgb, currentColor 50%, transparent)" },
       // (A code block's language's parts, in the theme's colours of code as SilverBullet's editor draws them)
       { tag: t.keyword, fontWeight: "bold" },

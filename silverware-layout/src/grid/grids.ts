@@ -69,6 +69,8 @@ export type GridHost = {
   ask?(question: string, value: string): Promise<string | undefined>;
   /** A cell's markdown rendered as the host renders a page (its elements marked with `data-pos`, their offsets in it; an offset of 0 may be left unmarked) */
   renderMarkdown(text: string): Promise<string>;
+  /** The look of what the host's editor draws of its own (headings, code, a rule; none: the rendering's alone) */
+  pageEditorLook?(): EditorLook;
   /** The page's text now */
   pageText(): Promise<string>;
   /** A cell's markdown written into the page (one edit); why not, as text */
@@ -513,7 +515,11 @@ export class Grids {
     const html = await rendering;
     // (Not rendered: rendered again next time)
     if (html === undefined && this.lookSample === rendering) this.lookSample = undefined;
-    return html !== undefined && cell.isConnected ? sampleLook(cell, html) : undefined;
+    if (!cell.isConnected) return undefined;
+    // (The page's editor's own look too, where the host reads it: read as the field opens, nothing drawn between)
+    const own = this.host.pageEditorLook?.() ?? {};
+    const look = html === undefined ? own : { ...sampleLook(cell, html), ...own };
+    return Object.keys(look).length ? look : undefined;
   }
 
   /** A grid drawn remembered where it starts (the last few places alone: grids moved down the page leave old ones) */

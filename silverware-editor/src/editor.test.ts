@@ -330,6 +330,13 @@ describe("the CodeMirror editor's live preview", () => {
     editor.destroy();
   });
 
+  it("marks a heading's line by its level (an ATX heading's, as the page's editor sizes), a strong text and inline code, for the page's look of them", () => {
+    const { editor, root } = make("x\n# One\n## Two\nThree\n===\n**b** `c`", 0);
+    expect([...root.querySelectorAll(".cm-line")].map((line) => [...line.classList].filter((one) => /^swe-h\d$/.test(one)).join(""))).toEqual(["", "swe-h1", "swe-h2", "", "", ""]);
+    expect([".swe-strong", ".swe-inline-code"].map((one) => root.querySelector(one)?.textContent)).toEqual(["b", "c"]);
+    editor.destroy();
+  });
+
   it("draws a quote with its bar, its `>` in its room shown where the selection touches it", () => {
     const { editor, root, lines } = make("x\n> quoted\n> more", 0);
     expect(lines()).toEqual(["x", "quoted", "more"]);

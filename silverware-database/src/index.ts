@@ -212,7 +212,7 @@ export function init(bridge: Bridge): void {
       // (a theme or zoom changed since read as it is then)
       fieldLook: async () => {
         const html = await (sampled ??= bridge.renderMarkdown?.(LOOK_SAMPLE).catch(() => undefined) ?? Promise.resolve(undefined));
-        return html === undefined ? undefined : fieldLook(document, html);
+        return fieldLook(document, html);
       },
       // SilverBullet's shortcuts a panel keeps from it, told in its notification (shared/silverbullet/keptkeys.ts)
       keyKept: keptKeys(bridge.listCommands, (message) => bridge.flash(message, "info")),

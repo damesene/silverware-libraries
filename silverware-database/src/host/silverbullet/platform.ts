@@ -5,6 +5,7 @@
 import { iconsOf } from "../../../../shared/icons.ts";
 import { type EditorLook, editorsOf } from "../../../../shared/editor.ts";
 import { sampleLook } from "../../../../shared/editorlook.ts";
+import { editorSampleLook } from "../../../../shared/silverbullet/editorsample.ts";
 import { saveConfigPage, withConfigSettings } from "../../../../shared/configpage.ts";
 import type { Choice, IndexChange, IndexedObject, Platform } from "../../../../shared/platform.ts";
 import { PAGE_KEYS, pageDates, referablePages, tasksOfPages, validatePageName } from "./pages.ts";
@@ -199,13 +200,14 @@ export function silverBulletPlatform(bridge: Bridge): {
 export { editorArea, watchEditorArea } from "../../../../shared/silverbullet/editorarea.ts";
 
 /**
- * The page's look of what an item's content field draws as rendered (shared/editorlook.ts): the sample rendered (`html`)
- * read where a database's place is drawn in the page (SilverBullet's rules for what a block renders reach it there: a
- * table's cells, a task's box), else in its editor's content; none where the editor is not there
+ * The page's look of what an item's content field draws as rendered (shared/editorlook.ts): the sample rendered (`html`,
+ * none where it could not be) and the page's editor's (shared/silverbullet/editorsample.ts: headings, code, a rule) read
+ * where a database's place is drawn in the page (SilverBullet's rules for what a block renders reach it there: a table's
+ * cells, a task's box), else in its editor's content; none where the editor is not there
  */
-export function fieldLook(doc: Document, html: string): EditorLook | undefined {
+export function fieldLook(doc: Document, html: string | undefined): EditorLook | undefined {
   const place = doc.querySelector<HTMLElement>(".cm-content .swd-place") ?? doc.querySelector<HTMLElement>(".cm-content");
-  return place ? sampleLook(place, html) : undefined;
+  return place ? { ...(html === undefined ? {} : sampleLook(place, html)), ...editorSampleLook(doc) } : undefined;
 }
 
 /**

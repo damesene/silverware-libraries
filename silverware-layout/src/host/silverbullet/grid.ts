@@ -16,6 +16,7 @@ import type { PageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
 import { documentUrl } from "../../../../shared/silverbullet/platform.ts";
 import { withImages } from "../../../../shared/silverbullet/embedimage.ts";
+import { editorSampleLook } from "../../../../shared/silverbullet/editorsample.ts";
 import { afterPress, handsAltPressToField, SILVERBULLET_EDITORS, textForDrawing } from "./behaviour.ts";
 import { focusPage, isPageText, pressBesideGrid } from "./dom.ts";
 import { ownTasks } from "./tasks.ts";
@@ -70,6 +71,8 @@ export function silverBulletGridHost(bridge: Bridge, writer: PageWriter, drawer:
     // A cell edited in Silverware Editor's editor where the init page hands its API over, else a `<textarea>`
     editors: editorsOf(bridge.editor, SILVERBULLET_EDITORS),
     ...(keyKept ? { keyKept } : {}),
+    // (The page's editor's look of headings, code, a rule: shared/silverbullet/editorsample.ts)
+    pageEditorLook: () => editorSampleLook(document),
     renderMarkdown: async (text: string): Promise<string> => {
       if (!bridge.renderMarkdown) throw new Error("the init page hands over no renderMarkdown");
       // (An embed SilverBullet's HTML draws none of, a PDF, a zip, kept as a place: the page's widget draws it)

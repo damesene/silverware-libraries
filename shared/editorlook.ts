@@ -53,35 +53,52 @@ function grounded(win: Window, cell: Element, look: LookProperties): LookPropert
   return look;
 }
 
-const read = (style: CSSStyleDeclaration, names: readonly string[]): LookProperties => Object.fromEntries(names.map((name) => [name, style.getPropertyValue(name)]));
+/** Properties of a computed style by their names, as computed */
+export const readProperties = (style: CSSStyleDeclaration, names: readonly string[]): LookProperties => Object.fromEntries(names.map((name) => [name, style.getPropertyValue(name)]));
+const read = readProperties;
 
-/** The look of the sample rendered (`html`) where an editor will be (`place`), as computed there; none of what it does not have */
-export function sampleLook(place: HTMLElement, html: string): EditorLook {
+/**
+ * A sample's look read: an element of `html` put in `place` (made as `made` says, its classes and style before it is
+ * hidden), out of sight, `reading` it as computed, taken out at once (nothing drawn between); none where the document
+ * has no window
+ */
+export function readSample<Look>(place: HTMLElement, html: string, reading: (sample: HTMLElement, win: Window) => Look, made?: (sample: HTMLElement) => void): Look | undefined {
   const win = place.ownerDocument.defaultView;
-  if (!win) return {};
+  if (!win) return undefined;
   const sample = place.ownerDocument.createElement("div");
+  made?.(sample);
   sample.setAttribute("aria-hidden", "true");
-  sample.style.cssText = "position: absolute; visibility: hidden; pointer-events: none; left: 0; top: 0; width: 100%;";
+  sample.style.cssText += "; position: absolute; visibility: hidden; pointer-events: none; left: 0; top: 0; width: 100%;";
   sample.innerHTML = html;
   place.append(sample);
   try {
-    const boxes = [...sample.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
-    const open = boxes.find((box) => !box.checked);
-    const done = boxes.find((box) => box.checked);
-    const tag = [...sample.querySelectorAll<HTMLElement>("*")].reverse().find((one) => one.textContent?.trim() === HASHTAG);
-    const mark = done ? win.getComputedStyle(done, "::after") : undefined;
-    const table = sample.querySelector("table");
-    const head = table?.querySelector("thead :is(th, td)");
-    const cell = table?.querySelector("tbody td");
-    return {
-      ...(open ? { checkbox: read(win.getComputedStyle(open), BOX) } : {}),
-      ...(done ? { checkboxChecked: read(win.getComputedStyle(done), BOX) } : {}),
-      ...(mark && mark.getPropertyValue("content") !== "none" ? { checkedMark: read(mark, MARK) } : {}),
-      ...(tag ? { hashtag: read(win.getComputedStyle(tag), TAG) } : {}),
-      ...(head ? { tableHead: grounded(win, head, read(win.getComputedStyle(head), TABLE_CELL)) } : {}),
-      ...(cell ? { tableCell: read(win.getComputedStyle(cell), TABLE_CELL) } : {}),
-    };
+    return reading(sample, win);
   } finally {
     sample.remove();
   }
+}
+
+/** The look of the sample rendered (`html`) where an editor will be (`place`), as computed there; none of what it does not have */
+export function sampleLook(place: HTMLElement, html: string): EditorLook {
+  return readSample(place, html, (sample, win) => renderedLook(sample, win)) ?? {};
+}
+
+/** The look of a rendered sample, its parts found by what they are (a box, a hashtag's text, a table) */
+function renderedLook(sample: HTMLElement, win: Window): EditorLook {
+  const boxes = [...sample.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+  const open = boxes.find((box) => !box.checked);
+  const done = boxes.find((box) => box.checked);
+  const tag = [...sample.querySelectorAll<HTMLElement>("*")].reverse().find((one) => one.textContent?.trim() === HASHTAG);
+  const mark = done ? win.getComputedStyle(done, "::after") : undefined;
+  const table = sample.querySelector("table");
+  const head = table?.querySelector("thead :is(th, td)");
+  const cell = table?.querySelector("tbody td");
+  return {
+    ...(open ? { checkbox: read(win.getComputedStyle(open), BOX) } : {}),
+    ...(done ? { checkboxChecked: read(win.getComputedStyle(done), BOX) } : {}),
+    ...(mark && mark.getPropertyValue("content") !== "none" ? { checkedMark: read(mark, MARK) } : {}),
+    ...(tag ? { hashtag: read(win.getComputedStyle(tag), TAG) } : {}),
+    ...(head ? { tableHead: grounded(win, head, read(win.getComputedStyle(head), TABLE_CELL)) } : {}),
+    ...(cell ? { tableCell: read(win.getComputedStyle(cell), TABLE_CELL) } : {}),
+  };
 }

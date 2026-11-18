@@ -1,7 +1,8 @@
 # The surfaces' look mended to the page's
 
 Status: planned 2026-11-18; Silverware Editor's part built the same day (branch `fix/editor-page-look`: all its
-entries out but a rule's spaces on edge, below), Silverware Assets' and Layout's to come. What `silverware-editor/ui-tests/look/surfaces.spec.ts`
+entries out but a rule's spaces on edge, below); the files' part the same day (`fix/assets-surfaces-look`, below);
+Silverware Layout's to come. What `silverware-editor/ui-tests/look/surfaces.spec.ts`
 found when its blocks grew (docs/silverware-look-compare.md, *Known differences*), mended plugin by plugin, each a
 branch and a pull request of its own taking its entries out of the test's `KNOWN`.
 
@@ -50,7 +51,7 @@ no language (SilverBullet's `--editor-code-color`) is not read: its language's p
 | Plugin | What | How | `KNOWN` entries it takes out |
 | --- | --- | --- | --- |
 | Silverware Editor | bold, code's font and inset, inline code's ground, headings' sizes, the space round headings and a rule | A, above | the fields' bold, inline code, code, return, headings, spaces |
-| Silverware Assets | a preview 6 px higher; in a field not zoomed with the text; a link's icon in the text's colour | its own rules in a field (`pagestyles.ts` puts them in the field's root: what does not reach it found there) | a file's preview, a link's icon |
+| Silverware Assets | a preview 6 px higher; in a field not zoomed with the text; a link's icon in the text's colour | built 2026-11-18, each where it was: Silverware Assets' frame of its own drew its medium inline (a line's descent under it: now a block, as the page's frame has it); the peek is over the window, whose content's scale Silverware Layout keeps 1, while its text is the page's editor's size (Silverware Database's binding now hands the page's scale to its field with the font); the icon before a link's text was Silverware Editor's wrapper outside the link's colour (now its link's, a wiki link's or a markdown link's) | a file's preview, a link's icon |
 | Silverware Layout | a rendered cell's headings, bold, code, quote, the spaces round headings and a rule | its style page's rules for a cell, by the theme's variables where they are, else A's sample | the grid's entries |
 
 Each part: its test entries taken out, `npm run test:ui:sb` and `:edge` for the look folder and the plugin's own, a

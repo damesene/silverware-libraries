@@ -382,9 +382,6 @@ const KNOWN: readonly { readonly surfaces: readonly string[]; readonly keys: rea
   // Silverware Editor's field: a rule's line a line's height, as 2.12.1 draws it; edge's editor draws it 1 px (its
   // CodeMirror, not its rules: nothing to read)
   { surfaces: FIELDS, keys: ["Below rule under Above rule"], why: "a rule's line a line high, as on 2.12.1; 1 px on edge" },
-  // Silverware Assets in every surface but the page
-  { surfaces: [...FIELDS, "grid"], keys: ["a file's preview"], why: "a preview 6 px higher than the page's (its label's room), not zoomed with the text in a field" },
-  { surfaces: FIELDS, keys: ["a link's icon"], why: "a link's icon in the text's colour, the page's in the link's" },
   // A grid's cell rendered: SilverBullet's rendering, Silverware Layout's rules on it
   { surfaces: ["grid"], keys: ["heading 1", "heading 2", "heading 3"], parts: ["font", "color"], why: "headings' colour (2.12.1) and size (edge) not yet the page's" },
   { surfaces: ["grid"], keys: ["bold", "inline code"], parts: ["font"], why: "a strong text's weight and code's font not yet the page's" },

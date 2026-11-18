@@ -204,45 +204,58 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   gap: 6px;
   align-items: center;
 }
+/* The field adding a file, its offers (a link, files of the space: shared/suggest.ts) in a popup under it, over the rows */
+.swa-insert-add {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
 .swa-insert-add-field {
   flex: 1;
   min-width: 0;
   font: inherit;
 }
-.swa-insert-found {
-  display: flex;
-  flex-direction: column;
-  max-height: 10em;
+.swa-insert-suggest {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: min(16em, 50vh);
+  margin: 0;
+  padding: 4px;
   overflow-y: auto;
+  list-style: none;
+  background: var(--root-background-color);
+  border: 1px solid var(--swa-dialog-line);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
 }
-.swa-insert-found[hidden] {
+.swa-insert-suggest[hidden] {
   display: none;
 }
-.swa-insert-found-item {
+.swa-insert-suggest-item {
   display: grid;
   justify-items: start;
   min-width: 0;
-  padding: 3px 6px;
-  border: 0;
+  padding: 4px 8px;
   border-radius: 4px;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
   cursor: pointer;
 }
-.swa-insert-found-item > * {
+.swa-insert-suggest-item > *,
+.swa-insert-suggest-item:not(:has(> *)) {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.swa-insert-found-detail {
+.swa-insert-suggest-detail {
   opacity: 0.65;
   font-size: 0.85em;
 }
-.swa-insert-found-item:hover,
-.swa-insert-found-item:focus-visible {
+.swa-insert-suggest-item:hover,
+.swa-insert-suggest-item[aria-selected="true"] {
   background: color-mix(in srgb, currentColor 10%, transparent);
 }
 /* A row: its title first, under it what happens to the file (Upload, Link, Already in your space), its name and ✎ */
@@ -2202,7 +2215,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
    thumb quiet in the text's color and its track clear, the same in every plugin (Silverware Table's first). The page's
    own scrollbar is SilverBullet's, left as it is. Of no weight of its own (`:where`): a rule of the plugin's for one of
    them (a strip whose scrollbar is hidden) still holds. A theme sets another thumb by `--sw-scrollbar-thumb` */
-:where(.swa-panel-body, .swa-dialog-body, .swa-insert-found, .swa-upload-progress-rows, .swa-menu) {
+:where(.swa-panel-body, .swa-dialog-body, .swa-insert-suggest, .swa-upload-progress-rows, .swa-menu) {
   scrollbar-width: thin;
   scrollbar-color: var(--sw-scrollbar-thumb, color-mix(in srgb, var(--root-color, #333) 30%, transparent)) transparent;
 }

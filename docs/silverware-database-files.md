@@ -239,6 +239,9 @@ new tab, *Download*, *Remove* from the value; `Media.url`).
 - **One field** in place of Link and Space: an address typed offers *Add link*, words find files of the space under it;
   **Browse…** beside it picks the device's files (on a phone its picker offers the camera itself: no Camera button).
   The whole dialog takes a drop; empty, it shows so (*Drop files here*).
+- **What the field offers in a popup** under it, over the rows (2026-11-18, the user's wish: found under the field it
+  pushed the rows down): `shared/suggest.ts`, given a `detail` (a file's folder, a link's address as a second line);
+  ↑ ↓ pick, Enter takes the one picked or the first, Esc closes the popup alone, leaving the field closes it.
 - **A row a card, its title first**: the title the main field (its placeholder the file's name: left empty, nothing
   changes); a second line says what happens (*Upload* · its name with ✎, *Link* with *Link | Save a copy* for a file of
   the web, *Already in your space*); the name's field and its folder (a tooltip) only on ✎ or where it has a problem,

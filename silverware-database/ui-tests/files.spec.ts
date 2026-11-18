@@ -110,7 +110,7 @@ test("a value's files edited in its popup: one taken out, one dragged by its gri
   await popup.getByRole("button", { name: "+ Add files…" }).click();
   const dialog = page.locator(".swa-dialog.swa-insert-window");
   await dialog.locator(".swa-insert-add-field").fill("elsewhere sunrise");
-  await dialog.locator(".swa-insert-found-item", { hasText: "sunrise.png" }).click();
+  await dialog.locator(".swa-insert-suggest-item", { hasText: "sunrise.png" }).click();
   // Uploaded: Silverware Assets' dialog, its name alone asked, the file written into the database's folder of files
   const chooser = page.waitForEvent("filechooser");
   await expect(dialog).toBeVisible();

@@ -26,6 +26,19 @@ function setup(whenEmpty?: boolean) {
 afterEach(() => document.body.replaceChildren());
 
 describe("a list of names offered under a field", () => {
+  it("shows a name's detail as a second line where one is given, the label alone where not", () => {
+    const input = document.createElement("input");
+    document.body.append(input);
+    const list = suggestionList(document, input, { base: "x", suggest: () => ["Photos/a.png", "b.png"], take: () => undefined, label: (name) => name.slice(name.lastIndexOf("/") + 1), detail: (name) => (name.includes("/") ? name.slice(0, name.lastIndexOf("/")) : undefined) });
+    type(input, "png");
+    const items = [...list.querySelectorAll("li")];
+    expect(items.map((one) => [one.querySelector(".x-suggest-name")?.textContent, one.querySelector(".x-suggest-detail")?.textContent, one.textContent])).toEqual([
+      ["a.png", "Photos", "a.pngPhotos"],
+      [undefined, undefined, "b.png"],
+    ]);
+    expect(items[0]!.title).toBe("Photos");
+  });
+
   it("offers once something is typed, by its labels, nothing picked until an arrow picks: Enter then takes it, Tab the first", () => {
     const { input, taken, shown } = setup();
     input.focus();

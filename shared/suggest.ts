@@ -18,6 +18,8 @@ export type SuggestOptions = {
   readonly take: (name: string) => void;
   /** How a name shows in the list (none: as it is) */
   readonly label?: (name: string) => string;
+  /** A second, quieter line under a name's label (a file's folder; none: the label alone) */
+  readonly detail?: (name: string) => string | undefined;
   /** Offered with nothing typed too, and as the field is focused (none: only once something is typed) */
   readonly whenEmpty?: boolean;
 };
@@ -35,11 +37,15 @@ export function suggestionList(doc: Document, input: HTMLInputElement, options: 
     typed = search.trim() !== "";
     offered = options.whenEmpty || typed ? options.suggest(search) : [];
     at = -1;
+    const shownAs = (name: string) => (options.label ? options.label(name) : name);
     list.replaceChildren(
-      ...offered.map((name, i) =>
-        el(doc, "li", {
+      ...offered.map((name, i) => {
+        const detail = options.detail?.(name);
+        // (With a detail: the label and it, each a line of its own; else the label as the item's text)
+        const lines = detail ? [el(doc, "span", { class: `${base}-suggest-name`, text: shownAs(name) }), el(doc, "span", { class: `${base}-suggest-detail`, text: detail })] : [];
+        return el(doc, "li", {
           class: `${base}-suggest-item`,
-          text: options.label ? options.label(name) : name,
+          ...(detail ? { title: detail } : { text: shownAs(name) }),
           attrs: { role: "option", "aria-selected": String(i === at), [`data-${base}-name`]: name },
           // A press keeps the field's focus (a click then takes the name); it is the list's, going no further: what holds the
           // field would take it as its own (a table's cell, its editor closed by the name taken, opened anew by the click)
@@ -53,8 +59,8 @@ export function suggestionList(doc: Document, input: HTMLInputElement, options: 
               pick(i);
             },
           },
-        }),
-      ),
+        }, ...lines);
+      }),
     );
     list.hidden = !offered.length;
   };

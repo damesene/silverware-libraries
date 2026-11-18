@@ -10,6 +10,7 @@
 import type { Dialogs } from "../../../shared/dialog.ts";
 import { COMPANION_ATTRIBUTE } from "../../../shared/editor.ts";
 import { el } from "../../../shared/elements.ts";
+import { suggestionList } from "../../../shared/suggest.ts";
 import { cleanName, extensionOf, type FileSource, nameOf, pathIn, pathsApart, validateFilePath, webNameOf } from "../core/insert.ts";
 import type { InsertAs, View } from "../model/settings.ts";
 
@@ -452,46 +453,47 @@ export function openInsertDialog(
   // adds what it offers first. Browse… picks the device's files (a phone's picker offers its camera itself)
   let spaced: readonly string[] | undefined;
   const addField = el(doc, "input", { class: `${BASE}-add-field`, attrs: { type: "text", placeholder: host.spaceFiles ? "Paste a link or search your files…" : "Paste a link…", "aria-label": "Add a file: a link, or words of its name in your space" } });
-  const offers = el(doc, "div", { class: `${BASE}-found`, attrs: { role: "group", "aria-label": "Files to add" } });
-  const offered = (): { readonly label: string; readonly detail?: string; readonly add: () => void }[] => {
-    const typed = addField.value.trim();
-    if (/^https?:\/\/\S+$/i.test(typed)) return [{ label: "Add link", detail: typed, add: () => addRow({ file: new File([], webNameOf(typed)), source: "link", url: typed, remote: true }) }];
-    const words = typed.toLowerCase().split(/\s+/).filter(Boolean);
-    if (!words.length || !spaced) return [];
-    return spaced
-      .filter((path) => words.every((word) => path.toLowerCase().includes(word)) && !rows.some((row) => row.existing === path))
-      .slice(0, 6)
-      .map((path) => ({ label: path.slice(path.lastIndexOf("/") + 1), detail: path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : undefined, add: () => addRow({ file: new File([], path.slice(path.lastIndexOf("/") + 1)), source: "space", existing: path }) }));
-  };
-  const take = (one: { readonly add: () => void }) => {
-    one.add();
-    addField.value = "";
-    drawOffers();
-    update();
-    addField.focus();
-  };
-  const drawOffers = () => {
-    offers.replaceChildren(
-      ...offered().map((one) =>
-        el(doc, "button", { class: `${BASE}-found-item`, title: one.detail ?? one.label, attrs: { type: "button" }, run: () => take(one) }, el(doc, "span", { class: `${BASE}-found-name`, text: one.label }), ...(one.detail ? [el(doc, "span", { class: `${BASE}-found-detail`, text: one.detail })] : [])),
-      ),
-    );
-    offers.hidden = !offers.childElementCount;
-  };
+  // (Offered in a popup under the field, over the rows: an address the link to add, words the space's files holding them)
+  const isAddress = (typed: string) => /^https?:\/\/\S+$/i.test(typed);
+  const offers = suggestionList(doc, addField, {
+    base: BASE,
+    suggest: (typed) => {
+      const trimmed = typed.trim();
+      if (isAddress(trimmed)) return [trimmed];
+      const words = trimmed.toLowerCase().split(/\s+/).filter(Boolean);
+      if (!words.length || !spaced) return [];
+      return spaced.filter((path) => words.every((word) => path.toLowerCase().includes(word)) && !rows.some((row) => row.existing === path)).slice(0, 6);
+    },
+    label: (name) => (isAddress(name) ? "Add link" : name.slice(name.lastIndexOf("/") + 1)),
+    detail: (name) => (isAddress(name) ? name : name.includes("/") ? name.slice(0, name.lastIndexOf("/")) : undefined),
+    take: (name) => {
+      if (isAddress(name)) addRow({ file: new File([], webNameOf(name)), source: "link", url: name, remote: true });
+      else addRow({ file: new File([], name.slice(name.lastIndexOf("/") + 1)), source: "space", existing: name });
+      addField.value = "";
+      update();
+    },
+  });
+  offers.setAttribute("aria-label", "Files to add");
   addField.addEventListener("focus", () => {
     if (spaced || !host.spaceFiles) return;
     spaced = [];
-    void host.spaceFiles().then((paths) => ((spaced = paths), drawOffers())).catch(() => undefined);
+    // (Listed late: what was typed meanwhile offered again, as a key typed would)
+    void host
+      .spaceFiles()
+      .then((paths) => {
+        spaced = paths;
+        if (addField.value.trim() && doc.activeElement === addField) addField.dispatchEvent(new Event("input"));
+      })
+      .catch(() => undefined);
   });
-  addField.addEventListener("input", drawOffers);
+  // Enter with nothing picked in the popup: what it offers first (an arrow picks another, Enter then takes it there)
   addField.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" || event.ctrlKey || event.metaKey) return;
+    if (event.key !== "Enter" || event.ctrlKey || event.metaKey || event.defaultPrevented) return;
     event.preventDefault();
     event.stopPropagation();
-    const first = offered()[0];
-    if (first) take(first);
+    if (offers.hidden) return;
+    offers.querySelector<HTMLElement>(`.${BASE}-suggest-item`)?.click();
   });
-  offers.hidden = true;
   const picker = () => {
     const input = el(doc, "input", { attrs: { type: "file", multiple: "" } });
     input.hidden = true;
@@ -503,11 +505,11 @@ export function openInsertDialog(
     doc.body.append(input);
     input.click();
   };
-  const pickers = el(doc, "div", `${BASE}-pickers`, addField, el(doc, "button", { text: "Browse…", attrs: { type: "button" }, run: picker }));
+  const pickers = el(doc, "div", `${BASE}-pickers`, el(doc, "div", `${BASE}-add`, addField, offers), el(doc, "button", { text: "Browse…", attrs: { type: "button" }, run: picker }));
 
   // (Its sources always over its rows: more files added to those a paste or a drop gave. For another plugin's upload its
   // rows compact, each file a small picture: nothing of how it shows in a page to see)
-  const content = el(doc, "div", BASE, pickers, offers, allBox, list, empty);
+  const content = el(doc, "div", BASE, pickers, allBox, list, empty);
   content.toggleAttribute("data-swa-compact", !!host.nameOnly);
   // (Its rows there before it opens: the focus given to the first's name as it opens. For a field of another plugin's
   // the dialog is its companion before the focus comes to it: the field not taken for left as the dialog opens)

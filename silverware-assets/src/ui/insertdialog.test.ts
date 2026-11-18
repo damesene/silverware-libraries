@@ -239,6 +239,45 @@ describe("the insert dialog", () => {
     expect(rows().map((row) => row.querySelector<HTMLInputElement>(".swa-insert-path")!.value)).toEqual(["Notes/dropped.png"]);
   });
 
+  it("offers in a popup under its field: the space's files by words (Enter the first, ↓ another), an address as a link; Esc closes the popup alone", async () => {
+    open([], host([], { spaceFiles: async () => ["Photos/sunset.jpg", "Photos/sunrise.jpg", "Docs/report.pdf"] }));
+    const field = document.querySelector<HTMLInputElement>(".swa-insert-add-field")!;
+    const popup = () => document.querySelector<HTMLElement>(".swa-insert-add > .swa-insert-suggest")!;
+    const shown = () => (popup().hidden ? [] : [...popup().querySelectorAll("li")].map((one) => one.textContent));
+    const type = (text: string) => {
+      field.value = text;
+      field.dispatchEvent(new Event("input"));
+    };
+    const key = (name: string) => field.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }));
+    field.focus();
+    await settle();
+    type("photos sun");
+    // (Each its name, its folder a line under it)
+    expect(shown()).toEqual(["sunset.jpgPhotos", "sunrise.jpgPhotos"]);
+    key("Enter");
+    expect(rows().map((row) => row.querySelector(".swa-insert-what")!.textContent)).toEqual(["Already in your space"]);
+    expect(field.value).toBe("");
+    // (One added is not offered again; ↓ picks the next, Enter takes it)
+    type("sun");
+    expect(shown()).toEqual(["sunrise.jpgPhotos"]);
+    type("o");
+    key("ArrowDown");
+    key("ArrowDown");
+    key("Enter");
+    expect(rows().map((row) => row.querySelector<HTMLInputElement>(".swa-insert-path")!.value)).toEqual(["Photos/sunset.jpg", "Docs/report.pdf"]);
+    type("https://example.com/cat.png");
+    expect(shown()).toEqual(["Add linkhttps://example.com/cat.png"]);
+    // Esc: the popup closed, the dialog still open
+    key("Escape");
+    expect(popup().hidden).toBe(true);
+    expect(document.querySelector(".swa-insert-window")).not.toBeNull();
+    // (The field left: the popup closed)
+    type("sunrise");
+    expect(popup().hidden).toBe(false);
+    field.blur();
+    expect(popup().hidden).toBe(true);
+  });
+
   it("gives nothing as it is cancelled; opened empty, its field focused and Browse… beside it", async () => {
     const cancelled = open([{ file: fileOf("a.png", "image/png"), source: "drop" }]);
     button("Cancel").click();

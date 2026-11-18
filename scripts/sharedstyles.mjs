@@ -13,7 +13,7 @@ export const SHARED_STYLES = [
     pages: [
       { page: "silverware-table/silverware-table-style.md", base: "swt", scrolls: ".sb-table-widget.swt-table, .swt-view-scroll, .swt-sheet-board, .swt-dialog-body, .swt-settings-body, .swt-choices, .swt-choices-preview-values, .swt-filter-values, .swt-functions-list, .swt-functions-detail, .swt-formula-choices, .swt-formulafield-choices, .swt-result-box, .swt-excel-skipped, .swt-cell-popup .swt-cell-popup-field, .swt-menu" },
       { page: "silverware-database/silverware-database-style.md", base: "swd", scrolls: ".swd-peek, .swd-peek-props-box, .swd-place-body, .swd-place.swd-over-window, .swd-table-box, .swd-board, .swd-tl-box, .swd-cal-undated-items, .swd-files-list, .swd-editor-list, .swd-floated, .swd-suggest, .swd-menu, .swd-settings-body, .swd-conflict-body" },
-      { page: "silverware-assets/silverware-assets-style.md", base: "swa", scrolls: ".swa-panel-body, .swa-dialog-body, .swa-insert-found, .swa-upload-progress-rows, .swa-menu" },
+      { page: "silverware-assets/silverware-assets-style.md", base: "swa", scrolls: ".swa-panel-body, .swa-dialog-body, .swa-insert-suggest, .swa-upload-progress-rows, .swa-menu" },
       { page: "silverware-toolbar/silverware-toolbar-style.md", base: "swb", scrolls: ".swb-list, .swb-settings-body, .swb-settings-pick-list" },
       { page: "silverware-tags/silverware-tags-style.md", base: "swg", scrolls: ".swg-detail, .swg-dialog-body, .swg-review, .swg-settings-body, .swg-tags, .swg-tree-box-list, .swg-views" },
       { page: "silverware-chart/silverware-chart-style.md", base: "swc", scrolls: ".swc-settings-body, .swc-menu" },

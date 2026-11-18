@@ -540,8 +540,10 @@ test("a table grouped under Group by is one table, a part per group with its own
 
 test("long text wraps: a table's cell at most its maximum width, a board's columns each as wide as the others", async ({ page, space }) => {
   const long = "a long note that goes on ".repeat(12) + "Pneumonoultramicroscopicsilicovolcanoconiosis".repeat(3);
-  const root = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n    notes: { type: text, label: Notes }\n---\n";
-  const longItem = `---\ntags: [db]\nstatus: Todo\nnotes: ${long}\n_database:\n  rank: a2\n---\n`;
+  const root = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n    notes: { type: text, label: Notes }\n    more: { type: text, label: More }\n---\n";
+  // (Two long values: the table's width all taken by its columns, none left over to share out among them, which a table
+  // does past a cell's max-width)
+  const longItem = `---\ntags: [db]\nstatus: Todo\nnotes: ${long}\nmore: ${long}\n_database:\n  rank: a2\n---\n`;
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS, "Page/db-tasks": root, "Page/db-tasks/Long one": longItem }, "Page");
   const cell = page.locator('td[data-key="notes"]').filter({ hasText: "a long note" });
   await expect(cell).toBeVisible();

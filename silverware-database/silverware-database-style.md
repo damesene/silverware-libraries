@@ -1228,19 +1228,8 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   padding-top: var(--swd-cell-pad-y);
   padding-bottom: var(--swd-cell-pad-y);
 }
-/* The grip's own cell no higher than the others' (their first line and its room), the grip in the middle of that: a
-   row as high as its text makes it, as a table's of Silverware Table whose handle adds nothing, however small the font
-   (a block, not on the line's baseline, which put it lower in a large font) */
-:is(#sb-main, html) .swd-place .swd-table td.swd-table-grip {
-  --swd-grip-pad-y: max(0px, (1lh + 2 * var(--swd-cell-pad-y) - 22px) / 2);
-  padding-top: var(--swd-grip-pad-y);
-  padding-bottom: var(--swd-grip-pad-y);
-}
-.swd-table td.swd-table-grip .swd-row-grip {
-  display: flex;
-}
-.swd-table th:not(.swd-table-gripcol):not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]),
-.swd-table td:not(.swd-table-grip):not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]) {
+.swd-table th:not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]),
+.swd-table td:not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]) {
   min-width: 6em;
   max-width: var(--swd-cell-max-width, 24em);
   overflow-wrap: anywhere;
@@ -1362,12 +1351,20 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 .swd-table td[data-key="name"] {
   min-width: 8em;
 }
-/* A row's grip: dragged to its place by hand (the table's first column, a list's line's start); shown as its row is hovered or
-   it has the focus, always on a touch screen; none to press while the view is sorted */
-.swd-table th.swd-table-gripcol,
-.swd-table td.swd-table-grip {
-  width: 18px;
-  padding: 4px 0 4px 2px;
+/* A row's grip: dragged to its place by hand (a table's at the left edge of its name's cell, as Silverware Table's grip lies
+   at a table's edge, no column of its own; a list's line's start); shown as its row is hovered or it has the focus, always
+   on a touch screen; none to press while the view is sorted. The name's cell and its header as far in, whatever room
+   SilverBullet gives a cell (8px in 2.12.1, 16px since): :is() weighs as an id */
+:is(#sb-main, html) .swd-place .swd-table :is(td[data-key="name"], .swd-table-headrow > th:first-child) {
+  padding-left: 20px;
+}
+/* (Its cell's, not its content's: kept so where the content is held under an editor, adding no width) */
+.swd-table td[data-key="name"] .swd-row-grip {
+  position: absolute;
+  left: 2px;
+  /* (By the name's first line, in its middle) */
+  top: calc(var(--swd-cell-pad-y) + (1lh - 22px) / 2);
+  width: 16px;
 }
 /* (Its size whatever the font's, as Silverware Table's handle) */
 .swd-row-grip {

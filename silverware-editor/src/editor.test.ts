@@ -377,6 +377,16 @@ describe("the CodeMirror editor's live preview", () => {
     editor.destroy();
   });
 
+  it("draws a horizontal rule as a line, its `---` where the selection touches it", () => {
+    const { editor, root, lines } = make("x\n\n---\n\nz", 0);
+    expect(lines()).toEqual(["x", "", "", "", "z"]);
+    expect(root.querySelectorAll(".cm-line")[2]!.classList.contains("swe-hr")).toBe(true);
+    editor.setSelection(4);
+    expect(lines()[2]).toBe("---");
+    expect(root.querySelector(".swe-hr")).toBeNull();
+    editor.destroy();
+  });
+
   it("shows no source in a read-only editor, its checkboxes not toggled", () => {
     const { editor, root, lines } = make("**bold** [ ]\n- [ ] task", 0, true);
     expect(lines()).toEqual(["bold [ ]", "•task"]);

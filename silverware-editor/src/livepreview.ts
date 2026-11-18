@@ -1,7 +1,7 @@
 // Markdown shown as SilverBullet's editor shows it (its behaviour, written here: docs/silverware-editor.md): a task's
 // `[ ]` a checkbox toggling it, a done task struck through, a bullet list's `-` a bullet, the marks of emphasis, code,
 // headings, links and `[[wiki links]]` hidden, a fenced code block a card (its fences hidden, its language at its
-// end), an escape's backslash hidden, an embed drawn and a link's icon before it
+// end), a horizontal rule a line, an escape's backslash hidden, an embed drawn and a link's icon before it
 // (by its plugin, as it says: `drawing`), a link followed as it is pressed (by its plugin: `openLink`, docs/silverware-
 // editor-links.md), a table drawn as one (read-only: its cells edited in its markdown), each shown again as its
 // markdown where the selection touches it. A read-only editor shows none: nothing to edit there. Built over the
@@ -397,6 +397,8 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
     return line;
   };
   const codeInfo = cm.Decoration.mark({ class: "swe-code-info" });
+  // A horizontal rule's line: a line across it, its `---` hidden
+  const ruleLine = cm.Decoration.line({ class: "swe-hr" });
   // What holds no hashtag: code (fenced, indented), HTML
   const NO_TAGS = new Set(["FencedCode", "CodeBlock", "HTMLBlock", "CommentBlock"]);
 
@@ -462,6 +464,10 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
           if (covered) for (const child of children(node)) if (child.name === "CodeInfo") out.push(codeInfo.range(child.from, child.to));
           // (Its language's nodes not read as markdown's)
           return false;
+        } else if (name === "HorizontalRule") {
+          if (shown(from, to)) return;
+          hide(from, to);
+          out.push(ruleLine.range(state.doc.lineAt(from).from));
         } else if (name === "Table") {
           // A table drawn, its whole lines replaced (one indented in a list from its line's start), unless the selection
           // touches it; its inline nodes not decorated again within it
@@ -602,6 +608,13 @@ export const PREVIEW_THEME = {
   "& .cm-line.swe-code-last": { borderBottomLeftRadius: "var(--ui-radius-lg, 6px)", borderBottomRightRadius: "var(--ui-radius-lg, 6px)" },
   "& .cm-line.swe-code-fence, & .cm-line.swe-code-fence *": { color: "transparent" },
   "& .cm-line.swe-code-fence .swe-code-info, & .cm-line.swe-code-fence .swe-code-info *": { color: "var(--editor-code-info-color, color-mix(in srgb, currentColor 55%, transparent))", float: "right", fontSize: "90%" },
+  // (A horizontal rule as the page's: a line across the middle of its own)
+  "& .cm-line.swe-hr": {
+    backgroundImage: "linear-gradient(var(--editor-ruler-color, var(--ui-surface-border-color, color-mix(in srgb, currentColor 25%, transparent))), var(--editor-ruler-color, var(--ui-surface-border-color, color-mix(in srgb, currentColor 25%, transparent))))",
+    backgroundSize: "100% 1px",
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
+  },
   ".swe-link": { color: "var(--editor-link-color, var(--link-color, #0969da))", textDecoration: "underline" },
   ".swe-wiki-link": { color: "var(--editor-wiki-link-page-color, var(--link-color, #0969da))" },
   // (A hashtag as SilverBullet 2.12.1 draws one rendered, a grid's cell's too: its theme's colours and corners, the

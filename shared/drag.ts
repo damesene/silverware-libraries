@@ -161,6 +161,17 @@ export function reorder(e: PointerEvent, options: Reorder): void {
     win.removeEventListener("contextmenu", noMenu, true);
     win.cancelAnimationFrame(scrolling);
   };
+  // A drag is no click: the one the browser sends as the pointer goes up (to what holds both the press and where it was let
+  // go: a table's cell, which a click edits) taken before anyone has it; none sent, the catch gone with this turn
+  const noClick = () => {
+    const swallow = (c: MouseEvent) => {
+      c.preventDefault();
+      c.stopPropagation();
+      win.removeEventListener("click", swallow, true);
+    };
+    win.addEventListener("click", swallow, true);
+    win.setTimeout(() => win.removeEventListener("click", swallow, true), 0);
+  };
   const finish = (dropped: boolean) => {
     leave();
     const moved = !!ghost;
@@ -171,6 +182,7 @@ export function reorder(e: PointerEvent, options: Reorder): void {
       if (dropped) options.clicked?.();
       return;
     }
+    noClick();
     const containers = options.containers();
     const container = containers.findIndex((c) => c.contains(element));
     const index = container < 0 ? -1 : options.items(containers[container]!).indexOf(element);

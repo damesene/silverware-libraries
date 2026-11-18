@@ -286,6 +286,67 @@ describe("the CodeMirror editor's live preview", () => {
     editor.destroy();
   });
 
+  it("draws a URL of its own as a link, an autolink's brackets hidden, followed as the markdown link it stands for", () => {
+    const opened: string[] = [];
+    const editor = parsedEditor(cm, document, { text: "x\nsee https://a.b/c and <https://x.y>", selection: 0, openLink: (markdown) => opened.push(markdown) }, { made: () => undefined, gone: () => undefined });
+    const root = editor.element.shadowRoot!;
+    expect([...root.querySelectorAll(".cm-line")].map((line) => line.textContent)).toEqual(["x", "see https://a.b/c and https://x.y"]);
+    const links = [...root.querySelectorAll(".swe-link")];
+    expect(links.map((one) => one.textContent)).toEqual(["https://a.b/c", "https://x.y"]);
+    for (const one of links) one.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
+    expect(opened).toEqual(["[https://a.b/c](https://a.b/c)", "[https://x.y](https://x.y)"]);
+    editor.destroy();
+  });
+
+  it("takes no address without its scheme for a link, nor a URL in a link's text for one of its own", () => {
+    const opened: string[] = [];
+    const editor = parsedEditor(cm, document, { text: "x\nsee www.a.b, bob@a.b and [see *https://a.b*](Other)", selection: 0, openLink: (markdown) => opened.push(markdown) }, { made: () => undefined, gone: () => undefined });
+    const root = editor.element.shadowRoot!;
+    const links = [...root.querySelectorAll(".swe-link")];
+    expect(links.map((one) => one.textContent)).toEqual(["see https://a.b"]);
+    // (The URL's own element in the link's text)
+    const url = [...links[0]!.querySelectorAll("*")].find((one) => one.textContent === "https://a.b")!;
+    url.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
+    expect(opened).toEqual(["[see *https://a.b*](Other)"]);
+    editor.destroy();
+  });
+
+  it("picks a code block's language by its info's first word exactly, a tag's data block YAML", () => {
+    expect(["cs", "C#", "python title=x", "text", "jsonc", "context", "#task"].map((info) => cm.codeLanguage(info)?.name ?? null)).toEqual(["csharp", "csharp", "python", null, null, null, "yaml"]);
+  });
+
+  it("hides a quote's `>` on the lines of a code block in it", () => {
+    const { editor, lines } = make("x\n> ```js\n> let a = 1;\n> ```\n> after", 0);
+    expect(lines()).toEqual(["x", "```js", "let a = 1;", "```", "after"]);
+    editor.destroy();
+  });
+
+  it("draws a highlight, a superscript and a subscript in their looks, their marks where the selection touches them", () => {
+    const { editor, root, lines } = make("x\na ==marked== x^2^ H~2~O", 0);
+    expect(lines()[1]).toBe("a marked x2 H2O");
+    expect(["swe-highlight", "swe-sup", "swe-sub"].map((one) => root.querySelector(`.${one}`)?.textContent)).toEqual(["marked", "2", "2"]);
+    editor.setSelection(6);
+    expect(lines()[1]).toBe("a ==marked== x2 H2O");
+    editor.destroy();
+  });
+
+  it("draws a quote with its bar, its `>` in its room shown where the selection touches it", () => {
+    const { editor, root, lines } = make("x\n> quoted\n> more", 0);
+    expect(lines()).toEqual(["x", "quoted", "more"]);
+    expect([...root.querySelectorAll(".cm-line")].map((line) => line.classList.contains("swe-quote"))).toEqual([false, true, true]);
+    editor.setSelection(2);
+    expect(lines()[1]).toBe("> quoted");
+    editor.destroy();
+  });
+
+  it("draws an indented code block as a card, a URL in a table's cell as a link", () => {
+    const { editor, root } = make("x\n\n    code\n    more\n\n| a |\n|---|\n| https://a.b |", 0);
+    const card = [...root.querySelectorAll(".cm-line")].map((line) => [...line.classList].filter((one) => one.startsWith("swe-code")).join(" "));
+    expect(card.slice(2, 4)).toEqual(["swe-code-line swe-code-first", "swe-code-line swe-code-last"]);
+    expect(root.querySelector(".swe-table td .swe-link")?.textContent).toBe("https://a.b");
+    editor.destroy();
+  });
+
   it("hides an escape's backslash where the caret is not on it, as the page draws it", () => {
     const editor = parsedEditor(cm, document, { text: "x\nA \\[estimate: 5] b", selection: 0 }, { made: () => undefined, gone: () => undefined });
     const line = () => editor.element.shadowRoot!.querySelectorAll(".cm-line")[1]!.textContent;
@@ -337,6 +398,53 @@ describe("the CodeMirror editor's live preview", () => {
     const { editor, root } = make(text, 0);
     root.querySelectorAll(".swe-table td")[1]!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
     expect(editor.getSelection().from).toBe(text.lastIndexOf("2"));
+    editor.destroy();
+  });
+
+  it("draws a fenced code block as one card, its fences' marks where the selection touches it, else its language alone", () => {
+    const text = "x\n```csharp\nreturn 1;\n```\nz";
+    const { editor, root } = make(text, 0);
+    const card = () => [...root.querySelectorAll(".cm-line")].map((line) => [...line.classList].filter((one) => one.startsWith("swe-code")).join(" "));
+    expect(card()).toEqual(["", "swe-code-line swe-code-first swe-code-fence", "swe-code-line", "swe-code-line swe-code-last swe-code-fence", ""]);
+    expect(root.querySelector(".swe-code-fence .swe-code-info")?.textContent).toBe("csharp");
+    editor.setSelection(text.indexOf("1;"));
+    expect(card()).toEqual(["", "swe-code-line swe-code-first", "swe-code-line", "swe-code-line swe-code-last", ""]);
+    expect(root.querySelector(".swe-code-info")).toBeNull();
+    editor.destroy();
+  });
+
+  it("highlights a fenced code block in its language, by the names SilverBullet's editor knows", async () => {
+    const { editor, root } = make("```cs\nreturn \"text\";\n```\n```unknown\nreturn \"text\";\n```\n```#tag\nkey: 1\n```", 0);
+    const view = cm.EditorView.findFromDOM(root.querySelector<HTMLElement>(".cm-editor")!)!;
+    // (Its language loaded as the block is first parsed, the block parsed again then)
+    const token = (line: number, text: string) => [...root.querySelectorAll(".cm-line")[line]!.querySelectorAll("span")].some((span) => span.textContent === text);
+    await vi.waitFor(
+      () => {
+        forceParsing(view, view.state.doc.length, 60_000);
+        expect(token(1, "return")).toBe(true);
+      },
+      { timeout: 5_000 },
+    );
+    expect(token(1, '"text"')).toBe(true);
+    expect(token(4, "return")).toBe(false);
+    // (A tag's data block YAML)
+    await vi.waitFor(
+      () => {
+        forceParsing(view, view.state.doc.length, 60_000);
+        expect(token(7, "key")).toBe(true);
+      },
+      { timeout: 5_000 },
+    );
+    editor.destroy();
+  });
+
+  it("draws a horizontal rule as a line, its `---` where the selection touches it", () => {
+    const { editor, root, lines } = make("x\n\n---\n\nz", 0);
+    expect(lines()).toEqual(["x", "", "", "", "z"]);
+    expect(root.querySelectorAll(".cm-line")[2]!.classList.contains("swe-hr")).toBe(true);
+    editor.setSelection(4);
+    expect(lines()[2]).toBe("---");
+    expect(root.querySelector(".swe-hr")).toBeNull();
     editor.destroy();
   });
 

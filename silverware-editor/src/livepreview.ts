@@ -1,6 +1,8 @@
 // Markdown shown as SilverBullet's editor shows it (its behaviour, written here: docs/silverware-editor.md): a task's
 // `[ ]` a checkbox toggling it, a done task struck through, a bullet list's `-` a bullet, the marks of emphasis, code,
-// headings, links and `[[wiki links]]` hidden, an escape's backslash hidden, an embed drawn and a link's icon before it
+// headings, highlights (`==`), super- and subscripts, links and `[[wiki links]]` hidden, a URL of its own a link, a
+// quote's `>` hidden and a bar beside it, an indented code block a card, a fenced code block a card (its fences hidden, its language at its
+// end), a horizontal rule a line, an escape's backslash hidden, an embed drawn and a link's icon before it
 // (by its plugin, as it says: `drawing`), a link followed as it is pressed (by its plugin: `openLink`, docs/silverware-
 // editor-links.md), a table drawn as one (read-only: its cells edited in its markdown), each shown again as its
 // markdown where the selection touches it. A read-only editor shows none: nothing to edit there. Built over the
@@ -33,9 +35,41 @@ export const wikiLinks: MarkdownConfig = {
   ],
 };
 
+// (One delimiter's type for both ends: lezer pairs them by it)
+const HIGHLIGHT = { resolve: "Highlight", mark: "HighlightMark" };
+
+/** `==text==` read as SilverBullet reads it (lezer's markdown knows none): a `Highlight`, its marks */
+export const highlights: MarkdownConfig = {
+  defineNodes: ["Highlight", "HighlightMark"],
+  parseInline: [
+    {
+      name: "Highlight",
+      after: "Emphasis",
+      parse(cx, next, pos) {
+        if (next !== 61 || cx.char(pos + 1) !== 61) return -1;
+        return cx.addDelimiter(HIGHLIGHT, pos, pos + 2, true, true);
+      },
+    },
+  ],
+};
+
 // The marks hidden in what they mark, by the node marked
-const MARKED = new Set(["Emphasis", "StrongEmphasis", "Strikethrough", "InlineCode"]);
-const MARKS = new Set(["EmphasisMark", "StrikethroughMark", "CodeMark"]);
+const MARKED = new Set(["Emphasis", "StrongEmphasis", "Strikethrough", "InlineCode", "Highlight", "Superscript", "Subscript"]);
+const MARKS = new Set(["EmphasisMark", "StrikethroughMark", "CodeMark", "HighlightMark", "SuperscriptMark", "SubscriptMark"]);
+// What is drawn in a look of its own, its marks hidden or not: a highlight, a superscript, a subscript
+const LOOKS: Readonly<Record<string, string>> = { Highlight: "swe-highlight", Superscript: "swe-sup", Subscript: "swe-sub" };
+// What a URL of its own (`https://…`, `<https://…>`) is not in: a link, an image or a link's reference
+const URL_OWNERS = new Set(["Link", "Image", "LinkReference"]);
+// A URL with its scheme (`www.…` and an e-mail address, which GitHub's markdown links too, have none: a link would
+// take them for a page of the space)
+const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
+/** Whether a node is a URL of its own: one with its scheme, in no link, image or link's reference */
+function ownUrl(state: EditorState, node: SyntaxNode): boolean {
+  if (node.name !== "URL" || !SCHEME.test(state.sliceDoc(node.from, node.to))) return false;
+  for (let up = node.parent; up; up = up.parent) if (URL_OWNERS.has(up.name)) return false;
+  return true;
+}
 
 /** A table's cell's content as drawn: its text, and its inline parts in elements of their own */
 export type Inline = string | { readonly tag: string; readonly class?: string; readonly parts: readonly Inline[] };
@@ -52,8 +86,11 @@ const INLINE_TAGS: Readonly<Record<string, { tag: string; class?: string }>> = {
   Strikethrough: { tag: "s" },
   InlineCode: { tag: "code" },
   Link: { tag: "span", class: "swe-link" },
+  Highlight: { tag: "span", class: "swe-highlight" },
+  Superscript: { tag: "span", class: "swe-sup" },
+  Subscript: { tag: "span", class: "swe-sub" },
 };
-const LEFT_OUT = new Set(["EmphasisMark", "StrikethroughMark", "CodeMark", "LinkMark", "URL", "LinkTitle", "LinkLabel"]);
+const LEFT_OUT = new Set(["EmphasisMark", "StrikethroughMark", "CodeMark", "HighlightMark", "SuperscriptMark", "SubscriptMark", "LinkMark", "URL", "LinkTitle", "LinkLabel"]);
 
 /** A node's content as drawn, from `from` to `to` of it: the text between its children, its children drawn */
 function inlineOf(state: EditorState, node: SyntaxNode, from: number, to: number): Inline[] {
@@ -64,6 +101,11 @@ function inlineOf(state: EditorState, node: SyntaxNode, from: number, to: number
     if (child.to <= from || child.from >= to) continue;
     text(child.from);
     at = child.to;
+    // (A URL of its own a link: a link's or an image's left out)
+    if (ownUrl(state, child)) {
+      parts.push({ tag: "span", class: "swe-link", parts: [state.sliceDoc(child.from, child.to)] });
+      continue;
+    }
     if (LEFT_OUT.has(child.name)) continue;
     if (child.name === "Escape") parts.push(state.sliceDoc(child.from + 1, child.to));
     else if (child.name === "WikiLink") {
@@ -137,6 +179,11 @@ const LINK_TEXT = ".swe-link, .swe-wiki-link";
 export function linkAt(state: EditorState, tree: { resolveInner(at: number, side: -1 | 0 | 1): SyntaxNode }, at: number): string | undefined {
   for (let node: SyntaxNode | null = tree.resolveInner(at, 1); node; node = node.parent) {
     if (node.name === "WikiLink" || node.name === "Link") return state.sliceDoc(node.from, node.to);
+    // (A URL of its own as the markdown link it stands for: what its user follows a link's markdown by)
+    if (ownUrl(state, node)) {
+      const url = state.sliceDoc(node.from, node.to);
+      return `[${url}](${url})`;
+    }
   }
   return undefined;
 }
@@ -198,6 +245,26 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
       bullet.className = "swe-bullet";
       bullet.textContent = "•";
       return bullet;
+    }
+  }
+
+  // A quote's mark not shown: its room kept, the text not moving as the caret comes to it
+  class Spacer extends cm.WidgetType {
+    constructor(readonly columns: number) {
+      super();
+    }
+    override eq(other: Spacer): boolean {
+      return other.columns === this.columns;
+    }
+    toDOM(view: EditorView): HTMLElement {
+      const spacer = view.dom.ownerDocument.createElement("span");
+      spacer.className = "swe-quote-mark";
+      spacer.style.minWidth = `calc(${this.columns} * ${COLUMN})`;
+      return spacer;
+    }
+    // (A press on it the editor's: the caret put beside it)
+    override ignoreEvent(): boolean {
+      return false;
     }
   }
 
@@ -385,6 +452,23 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
   const link = cm.Decoration.mark({ class: "swe-link" });
   const wikiLink = cm.Decoration.mark({ class: "swe-wiki-link" });
   const hashtag = cm.Decoration.mark({ class: "swe-hashtag" });
+  // A fenced code block's lines as the page draws them: one card, its first and last line its corners; its fences'
+  // lines (their backticks, its language) shown as written only where the selection touches the block, else its
+  // language alone, at the line's end
+  const codeLines = new Map<string, ReturnType<typeof cm.Decoration.line>>();
+  const codeLine = (first: boolean, last: boolean, fence: boolean) => {
+    const className = ["swe-code-line", first && "swe-code-first", last && "swe-code-last", fence && "swe-code-fence"].filter(Boolean).join(" ");
+    let line = codeLines.get(className);
+    if (!line) codeLines.set(className, (line = cm.Decoration.line({ class: className })));
+    return line;
+  };
+  const codeInfo = cm.Decoration.mark({ class: "swe-code-info" });
+  // A quote's lines: its bar, its colours
+  const quoteLine = cm.Decoration.line({ class: "swe-quote" });
+  // What is drawn in a look of its own (`LOOKS`) and a URL of its own drawn as a link
+  const looks = new Map(Object.entries(LOOKS).map(([name, className]) => [name, cm.Decoration.mark({ class: className })]));
+  // A horizontal rule's line: a line across it, its `---` hidden
+  const ruleLine = cm.Decoration.line({ class: "swe-hr" });
   // What holds no hashtag: code (fenced, indented), HTML
   const NO_TAGS = new Set(["FencedCode", "CodeBlock", "HTMLBlock", "CommentBlock"]);
 
@@ -407,10 +491,37 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
       for (let child = node.firstChild; child; child = child.nextSibling) all.push(child);
       return all;
     };
+    // A code block entered: in it only a quote's marks are read (a block in a quote), its language's nodes not as
+    // markdown's
+    let code: SyntaxNode | undefined;
     cm.syntaxTree(state).iterate({
       enter: ({ name, from, to, node }) => {
+        if (code && from >= code.from && to <= code.to && node !== code) {
+          if (name !== "QuoteMark") return false;
+        } else code = undefined;
         if (MARKED.has(name)) {
+          const look = looks.get(name);
+          if (look) out.push(look.range(from, to));
           if (!shown(from, to)) for (const child of children(node)) if (MARKS.has(child.name)) hide(child.from, child.to);
+        } else if (ownUrl(state, node)) {
+          // `https://…` and `<https://…>`: a link, its `<` `>` hidden
+          out.push(link.range(from, to));
+          const auto = node.parent?.name === "Autolink" ? node.parent : undefined;
+          if (auto && !shown(auto.from, auto.to)) for (const child of children(auto)) if (child.name === "LinkMark") hide(child.from, child.to);
+        } else if (name === "Blockquote") {
+          // Its lines a quote's (a nested one's the same)
+          const last = state.doc.lineAt(to).number;
+          for (let n = state.doc.lineAt(from).number; n <= last; n++) out.push(quoteLine.range(state.doc.line(n).from));
+        } else if (name === "QuoteMark") {
+          // (`> ` in its room, shown as written or not: the text does not move as the caret comes to it)
+          const end = state.sliceDoc(to, to + 1) === " " ? to + 1 : to;
+          out.push((shown(from, to) ? slot("swe-quote-mark", end - from) : cm.Decoration.replace({ widget: new Spacer(end - from) })).range(from, end));
+        } else if (name === "CodeBlock") {
+          // An indented code block: a card, as a fenced one
+          const first = state.doc.lineAt(from).number;
+          const last = state.doc.lineAt(to).number;
+          for (let n = first; n <= last; n++) out.push(codeLine(n === first, n === last, false).range(state.doc.line(n).from));
+          code = node;
         } else if (/^ATXHeading\d$/.test(name)) {
           const mark = node.firstChild;
           // (The `#`s and the space after them; a heading of no text keeps them, else nothing is left of it)
@@ -440,6 +551,19 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
             while (start < task.to && /[ \t]/.test(state.sliceDoc(start, start + 1))) start++;
             if (start < task.to) out.push(done.range(start, task.to));
           }
+        } else if (name === "FencedCode") {
+          // (Its fences' lines: those its marks are on, the closing one missing where the block runs to the text's end)
+          const fences = new Set(children(node).flatMap((child) => (child.name === "CodeMark" ? [state.doc.lineAt(child.from).number] : [])));
+          const covered = !shown(from, to);
+          const first = state.doc.lineAt(from).number;
+          const last = state.doc.lineAt(to).number;
+          for (let n = first; n <= last; n++) out.push(codeLine(n === first, n === last, covered && fences.has(n)).range(state.doc.line(n).from));
+          if (covered) for (const child of children(node)) if (child.name === "CodeInfo") out.push(codeInfo.range(child.from, child.to));
+          code = node;
+        } else if (name === "HorizontalRule") {
+          if (shown(from, to)) return;
+          hide(from, to);
+          out.push(ruleLine.range(state.doc.lineAt(from).from));
         } else if (name === "Table") {
           // A table drawn, its whole lines replaced (one indented in a list from its line's start), unless the selection
           // touches it; its inline nodes not decorated again within it
@@ -565,6 +689,39 @@ export const PREVIEW_THEME = {
   ".swe-task-box, .swe-task-mark": { display: "inline-block", minWidth: `calc(${LIST_COLUMNS.task} * ${COLUMN})`, textIndent: "0", whiteSpace: "pre" },
   // (The box in the middle of the columns of its `[ ]`, the space's after them, on a line of its own height, as the page's)
   ".swe-task-box": { boxSizing: "content-box", minWidth: `calc(${LIST_COLUMNS.task - 1} * ${COLUMN})`, paddingRight: COLUMN, textAlign: "center", lineHeight: "1" },
+  // (A fenced code block as the page's: one card of the code's background, its text inset, in the code's font; its
+  // fences' backticks unseen and its language at the line's end, where the selection is not in it)
+  "& .cm-line.swe-code-line": {
+    fontFamily: "var(--editor-monospace-font, monospace)",
+    fontSizeAdjust: "var(--editor-font-x-height, none)",
+    backgroundColor: "var(--editor-code-background-color, color-mix(in srgb, currentColor 6%, transparent))",
+    paddingLeft: "16px",
+    paddingRight: "16px",
+  },
+  // (Its code's own background none: the card's alone)
+  "& .cm-line.swe-code-line *": { backgroundColor: "transparent" },
+  "& .cm-line.swe-code-first": { borderTopLeftRadius: "var(--ui-radius-lg, 6px)", borderTopRightRadius: "var(--ui-radius-lg, 6px)" },
+  "& .cm-line.swe-code-last": { borderBottomLeftRadius: "var(--ui-radius-lg, 6px)", borderBottomRightRadius: "var(--ui-radius-lg, 6px)" },
+  "& .cm-line.swe-code-fence, & .cm-line.swe-code-fence *": { color: "transparent" },
+  "& .cm-line.swe-code-fence .swe-code-info, & .cm-line.swe-code-fence .swe-code-info *": { color: "var(--editor-code-info-color, color-mix(in srgb, currentColor 55%, transparent))", float: "right", fontSize: "90%" },
+  // (A horizontal rule as the page's: a line across the middle of its own)
+  "& .cm-line.swe-hr": {
+    backgroundImage: "linear-gradient(var(--editor-ruler-color, var(--ui-surface-border-color, color-mix(in srgb, currentColor 25%, transparent))), var(--editor-ruler-color, var(--ui-surface-border-color, color-mix(in srgb, currentColor 25%, transparent))))",
+    backgroundSize: "100% 1px",
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
+  },
+  // (A quote as the page's: a bar at its left, its colours)
+  "& .cm-line.swe-quote": {
+    color: "var(--editor-blockquote-color, color-mix(in srgb, currentColor 70%, transparent))",
+    backgroundColor: "var(--editor-blockquote-background-color, transparent)",
+    backgroundImage: "linear-gradient(to right, var(--editor-blockquote-border-color, color-mix(in srgb, currentColor 30%, transparent)) 0 3px, transparent 3px)",
+    backgroundRepeat: "no-repeat",
+  },
+  ".swe-quote-mark": { display: "inline-block", textIndent: "0", whiteSpace: "pre" },
+  ".swe-highlight": { backgroundColor: "var(--editor-highlight-background-color, var(--highlight-color, #fff3a3))", borderRadius: "3px", padding: "0 2px" },
+  ".swe-sup": { verticalAlign: "super", fontSize: "smaller" },
+  ".swe-sub": { verticalAlign: "sub", fontSize: "smaller" },
   ".swe-link": { color: "var(--editor-link-color, var(--link-color, #0969da))", textDecoration: "underline" },
   ".swe-wiki-link": { color: "var(--editor-wiki-link-page-color, var(--link-color, #0969da))" },
   // (A hashtag as SilverBullet 2.12.1 draws one rendered, a grid's cell's too: its theme's colours and corners, the

@@ -1,5 +1,12 @@
 # Silverware Editor: changelog
 
+## 1.1.0 (2026-11-18)
+
+- Code blocks drawn as blocks and highlighted in their language (the languages SilverBullet highlights: C#, Python, JavaScript, SQL, YAML and more); their backticks shown only where your cursor is in them.
+- `---` drawn as a line.
+- `==highlights==`, superscripts (`x^2^`) and subscripts (`H~2~O`) drawn as such; quotes with their bar, the `>` hidden; indented code as a block.
+- Web addresses drawn as links you click to open; one in a table no longer disappears.
+
 ## 1.0.1 (2026-11-17)
 
 - Enter in a list with blank lines between its items continues it without adding a blank line, as SilverBullet's page does.

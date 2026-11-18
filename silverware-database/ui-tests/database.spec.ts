@@ -1326,10 +1326,16 @@ test("the peek's properties scroll in their own box past a height, the content u
   });
   await peek.locator(`.swd-peek-row[data-property="${lowest}"]`).hover();
   await peek.locator(`.swd-peek-row[data-property="${lowest}"] .swd-peek-grip`).focus();
+  // (The properties' order as the root page keeps it)
+  const savedOrder = async () => [...((await space.saved("Page/db-tasks")) ?? "").matchAll(/^ {4}(p\d+):/gm)].map((one) => one[1]);
+  const moved = (await savedOrder()).filter((key) => key !== lowest);
+  moved.splice((await savedOrder()).indexOf(lowest) + 3, 0, lowest);
   for (let n = 0; n < 3; n++) {
     await page.keyboard.press("Alt+ArrowDown");
     await expect.poll(() => shownInBox(lowest)).toBe(true);
   }
+  // (Each move written, one after another, before a row is dragged)
+  await expect.poll(savedOrder).toEqual(moved);
   // A row dragged by its grip to the box's bottom edge: the box scrolls on (the rows past it reachable)
   await box.evaluate((one) => (one.scrollTop = 0));
   const first = peek.locator('.swd-peek-row[data-property="p0"]');

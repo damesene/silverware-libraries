@@ -225,7 +225,10 @@ export class AssetDecorator {
         link.element.getAttribute("data-swa-link") === type?.name &&
         (!settings.link.fields.includes("icon") || !!link.element.querySelector(`:scope > .${LINK_ICON}`));
       if (type && was && live && whole && was.asset === assetKey && was.type === type && was.settings === settingsKey) continue;
-      link.element.querySelectorAll(`:scope > :is(.${LINK_ICON}, .swa-menu-marker)`).forEach((one) => one.remove());
+      // (Its arrow kept, its menu bound to it anew: one taken out between a press's mousedown and its click made the
+      // click the link's, which followed it)
+      const keptMarker = type ? link.element.querySelector<HTMLElement>(":scope > .swa-menu-marker") : null;
+      link.element.querySelectorAll(`:scope > :is(.${LINK_ICON}, .swa-menu-marker)`).forEach((one) => one !== keptMarker && one.remove());
       this.linkMenus.get(link.element)?.abort();
       this.linkDecorated.delete(link.element);
       link.element.removeAttribute("data-swa-link");
@@ -234,8 +237,8 @@ export class AssetDecorator {
       // Its type's icon before it (where the user shows it), a picture alone; its menu's way in a small arrow after it,
       // always (an icon that opened the menu was found by nobody new: docs/silverware-assets-menu.md, *The arrow*)
       if (settings.link.fields.includes("icon")) link.element.prepend(this.linkIcon(type));
-      const marker = this.linkMarker(asset);
-      link.element.append(marker);
+      const marker = this.linkMarker(asset, keptMarker ?? undefined);
+      if (marker !== link.element.lastElementChild) link.element.append(marker);
       link.element.setAttribute("data-swa-link", type.name);
       // Its menu: what can be done with the file (a press on the arrow the menu's, the link's text still the host's),
       // what it changes written into the page, the link found there as it is now
@@ -265,8 +268,8 @@ export class AssetDecorator {
   }
 
   /** A link's way into its file's menu: a small arrow, drawn after its text */
-  private linkMarker(asset: Asset): HTMLElement {
-    const marker = menuMarker(this.doc, "link");
+  private linkMarker(asset: Asset, kept?: HTMLElement): HTMLElement {
+    const marker = kept ?? menuMarker(this.doc, "link");
     marker.setAttribute("aria-label", `${assetName(asset)}: its menu`);
     marker.title = "Show…";
     marker.setAttribute("role", "button");

@@ -604,6 +604,25 @@ describe("a link's menu", () => {
     expect(document.querySelector(".swa-popup")).not.toBeNull();
   });
 
+  it("keeps its arrow as a type registered replaces the link's own, its menu opened by it as of that type", async () => {
+    const { registry, decorator } = setUp("See [[report.pdf]] here.\n");
+    const element = Object.assign(document.createElement("a"), { textContent: "report.pdf", href: "report.pdf" });
+    let followed = 0;
+    element.addEventListener("click", () => followed++);
+    document.body.append(element);
+    await decorator.decorateLinks([{ element, target: "report.pdf", style: "wiki" }]);
+    const arrow = element.querySelector<HTMLElement>(".swa-link-marker")!;
+    registry.types.register({ name: "pdf", match: { kind: ["file"], ext: ["pdf"] }, icon: "<svg class='own-pdf'/>" } as AssetType);
+    await decorator.redecorateAll();
+    // (The same element: a press on it as it is decorated again stays its own)
+    expect(element.querySelectorAll(".swa-link-marker")).toHaveLength(1);
+    expect(element.querySelector(".swa-link-marker")).toBe(arrow);
+    expect(element.querySelector(".own-pdf")).not.toBeNull();
+    arrow.click();
+    expect(document.querySelector(".swa-popup")).not.toBeNull();
+    expect(followed).toBe(0);
+  });
+
   it("offers an image's preview, as an embed of it has one (the browser's drawing, smaller), and writes the embed shown so", async () => {
     const { state, decorator } = setUp("See [[cat.png]] here.\n");
     const element = Object.assign(document.createElement("a"), { textContent: "cat.png", href: "cat.png" });

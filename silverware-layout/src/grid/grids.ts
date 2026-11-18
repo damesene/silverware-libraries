@@ -61,6 +61,21 @@ export type IntoGridWrite = {
   readonly place: GridPlace;
 };
 
+/**
+ * What a cell's rendering takes of the host's editor's look where no theme's variable tells it, by the variable the
+ * style page reads it by: a code block's inset (16 px after SilverBullet 2.12.1, none on it), a strong text's weight
+ * (900), headings' sizes (edge's 1.4 and 1.15 em) and the room above and under them
+ */
+const PAGE_LOOK: readonly (readonly [part: keyof EditorLook, property: string, variable: string])[] = [
+  ["codeBlock", "padding-left", "--swl-code-inset"],
+  ["strong", "font-weight", "--swl-strong-weight"],
+  ...([1, 2, 3] as const).flatMap((level) => [
+    [`heading${level}`, "font-size", `--swl-h${level}-size`] as const,
+    [`heading${level}`, "padding-top", `--swl-h${level}-above`] as const,
+    [`heading${level}`, "padding-bottom", `--swl-h${level}-under`] as const,
+  ]),
+];
+
 /** What the grids ask of the host whose page they are in */
 export type GridHost = {
   /** Whether the user means what cannot be undone but by the page's undo (a cell deleted, its content with it), asked in the host's dialog (none: the browser's) */
@@ -457,14 +472,16 @@ export class Grids {
   }
 
   /**
-   * A grid drawn given what its cells' rendering takes of the host's editor's look where no theme's variable tells it,
-   * as variables of its own the style page reads: a code block's inset (`--swl-code-inset`: 16 px after SilverBullet
-   * 2.12.1, none on it); none where the host reads none (the style page's own)
+   * A grid drawn given what its cells' rendering takes of the host's editor's look where no theme's variable tells it
+   * (`PAGE_LOOK`), as variables of its own the style page reads; none where the host reads none (the style page's own)
    */
   private showPageLook(element: HTMLElement): void {
-    const inset = this.host.pageEditorLook?.().codeBlock?.["padding-left"];
-    if (inset) element.style.setProperty("--swl-code-inset", inset);
-    else element.style.removeProperty("--swl-code-inset");
+    const look = this.host.pageEditorLook?.() ?? {};
+    for (const [part, property, variable] of PAGE_LOOK) {
+      const value = look[part]?.[property];
+      if (value) element.style.setProperty(variable, value);
+      else element.style.removeProperty(variable);
+    }
   }
 
   /** Each cell of a grid drawn given the blank lines of its markdown the host's rendering left out */

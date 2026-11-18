@@ -1030,6 +1030,42 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   outline: 1px solid var(--ui-surface-border-color, transparent);
   outline-offset: -1px;
 }
+/* Headings, a strong text and code as the page's editor draws them: the theme's heading colour and code font (2.12.1's
+   code in its editor's font: the cell's); what no variable of the theme tells read of the page's editor, the grid's
+   --swl-… (src/grid/grids.ts `PAGE_LOOK`), else the rendering's own */
+.swl-grid-cell > :is(h1, h2, h3, h4, h5, h6):not(#swl-none) {
+  color: var(--editor-heading-color, inherit);
+}
+.swl-grid-cell > h1:not(#swl-none) {
+  font-size: var(--swl-h1-size, 1.5em);
+  padding-top: var(--swl-h1-above, 0);
+  padding-bottom: var(--swl-h1-under, 0);
+}
+.swl-grid-cell > h2:not(#swl-none) {
+  font-size: var(--swl-h2-size, 1.2em);
+  padding-top: var(--swl-h2-above, 0);
+  padding-bottom: var(--swl-h2-under, 0);
+}
+.swl-grid-cell > h3:not(#swl-none) {
+  font-size: var(--swl-h3-size, 1.1em);
+  padding-top: var(--swl-h3-above, 0);
+  padding-bottom: var(--swl-h3-under, 0);
+}
+.swl-grid-cell strong:not(#swl-none) {
+  font-weight: var(--swl-strong-weight, bold);
+}
+.swl-grid-cell code:not(#swl-none) {
+  font-family: var(--editor-monospace-font, inherit);
+}
+/* A rule as the page's editor draws one on 2.12.1: a line's room (and its line's pixel), its line 1em down it, in the
+   theme's ruler colour (edge's editor draws its line of no text 1 px high: its CodeMirror's, no rule of its to follow) */
+.swl-grid-cell > hr:not(#swl-none) {
+  box-sizing: content-box;
+  height: calc(1lh + 1px);
+  margin: 0;
+  border: none;
+  background: linear-gradient(var(--editor-ruler-color, currentColor), var(--editor-ruler-color, currentColor)) 0 1em / 100% 1px no-repeat;
+}
 /* A code block in the page's code font (the theme's, after 2.12.1; 2.12.1 draws code in its editor's font: the cell's),
    its parts highlighted as the page's editor does where Silverware Editor is there (host/silverbullet/codeblocks.ts) */
 .swl-grid-cell > pre:not(#swl-none) {

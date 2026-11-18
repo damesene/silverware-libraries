@@ -379,13 +379,10 @@ test("the same, the text zoomed on this device (Silverware Layout's font zoom): 
 const FIELDS = ["grid edited", "peek", "peek edited"];
 type Part = "font" | "color" | "ground" | "decoration";
 const KNOWN: readonly { readonly surfaces: readonly string[]; readonly keys: readonly string[]; readonly parts?: readonly Part[]; readonly why: string }[] = [
-  // Silverware Editor's field: a rule's line a line's height, as 2.12.1 draws it; edge's editor draws it 1 px (its
-  // CodeMirror, not its rules: nothing to read)
-  { surfaces: FIELDS, keys: ["Below rule under Above rule"], why: "a rule's line a line high, as on 2.12.1; 1 px on edge" },
+  // A field and a grid's rendered cell: a rule's line a line's height, as 2.12.1 draws it; edge's editor draws it 1 px
+  // (its CodeMirror, not its rules: nothing to read)
+  { surfaces: [...FIELDS, "grid"], keys: ["Below rule under Above rule"], why: "a rule's line a line high, as on 2.12.1; 1 px on edge" },
   // A grid's cell rendered: SilverBullet's rendering, Silverware Layout's rules on it
-  { surfaces: ["grid"], keys: ["heading 1", "heading 2", "heading 3"], parts: ["font", "color"], why: "headings' colour (2.12.1) and size (edge) not yet the page's" },
-  { surfaces: ["grid"], keys: ["bold", "inline code"], parts: ["font"], why: "a strong text's weight and code's font not yet the page's" },
-  { surfaces: ["grid"], keys: ["Second level under First level", "Third level under Second level", "Below rule under Above rule"], why: "the space round headings and a rule not yet the page's" },
 ];
 
 /** The fixture opened on every surface, read, its pixels attached, each surface's measurements compared with the page's */

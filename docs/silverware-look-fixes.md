@@ -2,7 +2,7 @@
 
 Status: planned 2026-11-18; Silverware Editor's part built the same day (branch `fix/editor-page-look`: all its
 entries out but a rule's spaces on edge, below); the files' part the same day (`fix/assets-surfaces-look`, below);
-Silverware Layout's to come. What `silverware-editor/ui-tests/look/surfaces.spec.ts`
+Silverware Layout's the same day (`fix/layout-cell-look`, below). Left known: a rule's line on edge, on every surface. What `silverware-editor/ui-tests/look/surfaces.spec.ts`
 found when its blocks grew (docs/silverware-look-compare.md, *Known differences*), mended plugin by plugin, each a
 branch and a pull request of its own taking its entries out of the test's `KNOWN`.
 
@@ -76,5 +76,10 @@ release proposed once done.
     (`data-swl-highlighted`), its text read with its `<br>`s, its parts drawn as spans of their look between the same
     `<br>`s (the text's offsets as they were: a press in it still finds its markdown). A cell taken over unchanged
     keeps its highlighting.
-- **Code's font and the rest** (headings' colour and size, bold, the space round headings and a rule, a code block's
-  inset): by the theme's variables where they are; what is not, measured against the page as each is built.
+- **Code's font and the rest** (built): by the theme's variables where they are (a heading's colour,
+  `--editor-heading-color`; code's font, `--editor-monospace-font`, else the cell's: 2.12.1's code is in its editor's
+  font). What no variable tells, read of the page's editor (A's sample, through the host's `pageEditorLook`) and set
+  on the grid as it is drawn as variables of its own (`src/grid/grids.ts` `PAGE_LOOK`): a code block's inset
+  (`--swl-code-inset`), a strong text's weight (`--swl-strong-weight`, 900 on both), headings' sizes and the room above
+  and under them (`--swl-h1-size`, `-above`, `-under`, to h3). A rule a line's room, its line 1em down it, as 2.12.1's
+  editor draws it (its margins 1em and -1em on its line); edge's 1 px line left known, as in the fields.

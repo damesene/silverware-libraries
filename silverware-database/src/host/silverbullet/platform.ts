@@ -5,6 +5,8 @@
 import { iconsOf } from "../../../../shared/icons.ts";
 import { type EditorLook, editorsOf } from "../../../../shared/editor.ts";
 import { sampleLook } from "../../../../shared/editorlook.ts";
+import { editorSampleLook } from "../../../../shared/silverbullet/editorsample.ts";
+import { CONTENT_SCALE } from "../../../../shared/contentscale.ts";
 import { saveConfigPage, withConfigSettings } from "../../../../shared/configpage.ts";
 import type { Choice, IndexChange, IndexedObject, Platform } from "../../../../shared/platform.ts";
 import { PAGE_KEYS, pageDates, referablePages, tasksOfPages, validatePageName } from "./pages.ts";
@@ -199,13 +201,14 @@ export function silverBulletPlatform(bridge: Bridge): {
 export { editorArea, watchEditorArea } from "../../../../shared/silverbullet/editorarea.ts";
 
 /**
- * The page's look of what an item's content field draws as rendered (shared/editorlook.ts): the sample rendered (`html`)
- * read where a database's place is drawn in the page (SilverBullet's rules for what a block renders reach it there: a
- * table's cells, a task's box), else in its editor's content; none where the editor is not there
+ * The page's look of what an item's content field draws as rendered (shared/editorlook.ts): the sample rendered (`html`,
+ * none where it could not be) and the page's editor's (shared/silverbullet/editorsample.ts: headings, code, a rule) read
+ * where a database's place is drawn in the page (SilverBullet's rules for what a block renders reach it there: a table's
+ * cells, a task's box), else in its editor's content; none where the editor is not there
  */
-export function fieldLook(doc: Document, html: string): EditorLook | undefined {
+export function fieldLook(doc: Document, html: string | undefined): EditorLook | undefined {
   const place = doc.querySelector<HTMLElement>(".cm-content .swd-place") ?? doc.querySelector<HTMLElement>(".cm-content");
-  return place ? sampleLook(place, html) : undefined;
+  return place ? { ...(html === undefined ? {} : sampleLook(place, html)), ...editorSampleLook(doc) } : undefined;
 }
 
 /**
@@ -220,5 +223,15 @@ export function editorLook(doc: Document): Readonly<Record<string, string>> | un
   const style = view.getComputedStyle(content);
   // (Its column too, where SilverBullet sets one: what a list's marks are laid out by, in the page and the peek's field)
   const column = style.getPropertyValue("--editor-column").trim();
-  return { "font-family": style.fontFamily, "font-size": style.fontSize, "line-height": style.lineHeight, color: style.color, ...(column ? { "--editor-column": column } : {}) };
+  // (And the content's scale, shared/contentscale.ts: what is over the window keeps 1, but the panel's text is the
+  // page's editor's size, so its files are zoomed as the page's are)
+  const scale = style.getPropertyValue(CONTENT_SCALE).trim();
+  return {
+    "font-family": style.fontFamily,
+    "font-size": style.fontSize,
+    "line-height": style.lineHeight,
+    color: style.color,
+    ...(column ? { "--editor-column": column } : {}),
+    ...(scale ? { [CONTENT_SCALE]: scale } : {}),
+  };
 }

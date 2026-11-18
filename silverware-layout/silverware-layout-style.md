@@ -1030,8 +1030,48 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   outline: 1px solid var(--ui-surface-border-color, transparent);
   outline-offset: -1px;
 }
+/* Headings, a strong text and code as the page's editor draws them: the theme's heading colour and code font (2.12.1's
+   code in its editor's font: the cell's); what no variable of the theme tells read of the page's editor, the grid's
+   --swl-… (src/grid/grids.ts `PAGE_LOOK`), else the rendering's own */
+.swl-grid-cell > :is(h1, h2, h3, h4, h5, h6):not(#swl-none) {
+  color: var(--editor-heading-color, inherit);
+}
+.swl-grid-cell > h1:not(#swl-none) {
+  font-size: var(--swl-h1-size, 1.5em);
+  padding-top: var(--swl-h1-above, 0);
+  padding-bottom: var(--swl-h1-under, 0);
+}
+.swl-grid-cell > h2:not(#swl-none) {
+  font-size: var(--swl-h2-size, 1.2em);
+  padding-top: var(--swl-h2-above, 0);
+  padding-bottom: var(--swl-h2-under, 0);
+}
+.swl-grid-cell > h3:not(#swl-none) {
+  font-size: var(--swl-h3-size, 1.1em);
+  padding-top: var(--swl-h3-above, 0);
+  padding-bottom: var(--swl-h3-under, 0);
+}
+.swl-grid-cell strong:not(#swl-none) {
+  font-weight: var(--swl-strong-weight, bold);
+}
+.swl-grid-cell code:not(#swl-none) {
+  font-family: var(--editor-monospace-font, inherit);
+}
+/* A rule as the page's editor draws one on 2.12.1: a line's room (and its line's pixel), its line 1em down it, in the
+   theme's ruler colour (edge's editor draws its line of no text 1 px high: its CodeMirror's, no rule of its to follow) */
+.swl-grid-cell > hr:not(#swl-none) {
+  box-sizing: content-box;
+  height: calc(1lh + 1px);
+  margin: 0;
+  border: none;
+  background: linear-gradient(var(--editor-ruler-color, currentColor), var(--editor-ruler-color, currentColor)) 0 1em / 100% 1px no-repeat;
+}
+/* A code block in the page's code font (the theme's, after 2.12.1; 2.12.1 draws code in its editor's font: the cell's),
+   its parts highlighted as the page's editor does where Silverware Editor is there (host/silverbullet/codeblocks.ts) */
 .swl-grid-cell > pre:not(#swl-none) {
-  padding: 12px 16px;
+  font-family: var(--editor-monospace-font, inherit);
+  /* (Its text inset as the page's editor's code block: read of it, --swl-code-inset on the grid, src/grid/grids.ts) */
+  padding: 12px var(--swl-code-inset, 16px);
   overflow-x: auto;
   border-radius: var(--ui-radius-lg, 0);
   background-color: var(--editor-code-background-color, transparent);
@@ -1102,11 +1142,15 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
 :is(.swl-grid-cell > :is(ul, ol), .swl-grid-cell > :is(ul, ol) :is(ul, ol)) > li > :has(> input[type="checkbox"]:first-child:checked):not(#swl-none) {
   text-decoration-line: line-through;
 }
+/* A quote as the page's editor draws one: its theme's colours and ground, its text after two of the page's columns (as
+   the page's editor lays its `> ` out: --editor-column, set after 2.12.1, else a character's width), its bar within them */
 .swl-grid-cell > blockquote:not(#swl-none) {
   margin-left: 0;
   margin-right: 0;
-  padding-left: 1em;
+  padding-left: calc(2 * var(--editor-column, 1ch) - 2px);
   border-left: 2px solid var(--editor-blockquote-border-color, color-mix(in srgb, var(--root-color, #000) 25%, transparent));
+  color: var(--editor-blockquote-color, inherit);
+  background-color: var(--editor-blockquote-background-color, transparent);
 }
 /* A grid's borders (its `border` attribute): faint lines round it and between its cells, as a table's. The gap goes
    into each cell's padding, so a line between two columns lies where the gap's middle was, on its divider. All within

@@ -1064,6 +1064,11 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   max-width: 100%;
   vertical-align: top;
 }
+/* Its medium a block in it, as in the page's frame (a block of its own there): inline, the room of a line's descent
+   showed under it (6 px, 2026-11-18) */
+.swa-frame > :is(img, video).swa-medium {
+  display: block;
+}
 /* Laid out by the handle (its width on the frame, data-swl-width): the host's medium fills the frame, its height by
    its ratio, so a drag shows at once what the width written will draw (its medium alone: a document's pictures, a
    type's own drawing, keep theirs) */

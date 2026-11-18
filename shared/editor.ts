@@ -98,7 +98,9 @@ export type LookProperties = Readonly<Record<string, string>>;
  * table's header cells and its other cells (their text, room, ground and lines; the card round it the editor's own, by
  * the theme's variables). Where a
  * list's marks and text stand and a done task's text are the editor's own rules, as the page draws them in its editor
- * (its rendering strikes no done task through, nor hangs a task's text as its editor does)
+ * (its rendering strikes no done task through, nor hangs a task's text as its editor does). What the page's editor draws
+ * of its own (its rendering differs: shared/silverbullet/editorsample.ts): headings (a line's size, weight, spaces, its
+ * text's colour), a strong text, inline code, a code block's line (its font, ground, inset), a rule's line
  */
 export type EditorLook = {
   readonly checkbox?: LookProperties;
@@ -107,6 +109,13 @@ export type EditorLook = {
   readonly hashtag?: LookProperties;
   readonly tableHead?: LookProperties;
   readonly tableCell?: LookProperties;
+  readonly heading1?: LookProperties;
+  readonly heading2?: LookProperties;
+  readonly heading3?: LookProperties;
+  readonly strong?: LookProperties;
+  readonly inlineCode?: LookProperties;
+  readonly codeBlock?: LookProperties;
+  readonly rule?: LookProperties;
 };
 
 /** What Silverware Toolbar acts on: an editor's text and selection, where the selection is, its element */
@@ -147,7 +156,13 @@ export type Editors = {
   create(doc: Document, options: EditorOptions): TextEditor;
   // The editing surface a node is in (an editor focused, for Silverware Toolbar), none where it is in none
   surfaceOf(node: Node): EditingSurface | undefined;
+  // A code's text highlighted in its language (a code block's info, `csharp`), as the editor highlights a code block:
+  // its parts in order, none where the language is not known. Optional: an editor that highlights none has none
+  highlightCode?(code: string, language: string): Promise<readonly CodePart[] | undefined>;
 };
+
+/** A part of a code's text as it is highlighted: its text, the look it is drawn in (CSS properties; none: the text's own) */
+export type CodePart = { readonly text: string; readonly look?: LookProperties };
 
 /**
  * Marks an element that acts on an editor from outside it (Silverware Toolbar's bar, its popup, its panel): the focus

@@ -61,6 +61,21 @@ export type IntoGridWrite = {
   readonly place: GridPlace;
 };
 
+/**
+ * What a cell's rendering takes of the host's editor's look where no theme's variable tells it, by the variable the
+ * style page reads it by: a code block's inset (16 px after SilverBullet 2.12.1, none on it), a strong text's weight
+ * (900), headings' sizes (edge's 1.4 and 1.15 em) and the room above and under them
+ */
+const PAGE_LOOK: readonly (readonly [part: keyof EditorLook, property: string, variable: string])[] = [
+  ["codeBlock", "padding-left", "--swl-code-inset"],
+  ["strong", "font-weight", "--swl-strong-weight"],
+  ...([1, 2, 3] as const).flatMap((level) => [
+    [`heading${level}`, "font-size", `--swl-h${level}-size`] as const,
+    [`heading${level}`, "padding-top", `--swl-h${level}-above`] as const,
+    [`heading${level}`, "padding-bottom", `--swl-h${level}-under`] as const,
+  ]),
+];
+
 /** What the grids ask of the host whose page they are in */
 export type GridHost = {
   /** Whether the user means what cannot be undone but by the page's undo (a cell deleted, its content with it), asked in the host's dialog (none: the browser's) */
@@ -69,6 +84,10 @@ export type GridHost = {
   ask?(question: string, value: string): Promise<string | undefined>;
   /** A cell's markdown rendered as the host renders a page (its elements marked with `data-pos`, their offsets in it; an offset of 0 may be left unmarked) */
   renderMarkdown(text: string): Promise<string>;
+  /** A grid drawn's code blocks highlighted as the host's editor highlights them (none: as rendered) */
+  highlightCode?(grid: HTMLElement): void;
+  /** The look of what the host's editor draws of its own (headings, code, a rule; none: the rendering's alone) */
+  pageEditorLook?(): EditorLook;
   /** The page's text now */
   pageText(): Promise<string>;
   /** A cell's markdown written into the page (one edit); why not, as text */
@@ -326,6 +345,9 @@ export class Grids {
     this.drawnIn.set(element, text);
     this.bodies.set(element, body);
     this.attributes.set(element, attributes);
+    // (After the cells taken over: theirs are highlighted already)
+    this.host.highlightCode?.(element);
+    this.showPageLook(element);
     this.changedSinceTold = true;
     // Where its cells are in the page (the first grid of its body; set again as it is found among its alike)
     if (first) {
@@ -396,6 +418,8 @@ export class Grids {
     showFit(element, fitsColumns(grid.attributes.columns));
     showBorder(element, borderOf(grid.attributes));
     this.keepBlankLines(element, cells.map((cell) => cell.content));
+    this.host.highlightCode?.(element);
+    this.showPageLook(element);
     element.classList.add("swl-grid-shown");
     return element;
   }
@@ -444,6 +468,19 @@ export class Grids {
       } catch (error) {
         console.error("Silverware Layout: a listener of what grids draw failed", error);
       }
+    }
+  }
+
+  /**
+   * A grid drawn given what its cells' rendering takes of the host's editor's look where no theme's variable tells it
+   * (`PAGE_LOOK`), as variables of its own the style page reads; none where the host reads none (the style page's own)
+   */
+  private showPageLook(element: HTMLElement): void {
+    const look = this.host.pageEditorLook?.() ?? {};
+    for (const [part, property, variable] of PAGE_LOOK) {
+      const value = look[part]?.[property];
+      if (value) element.style.setProperty(variable, value);
+      else element.style.removeProperty(variable);
     }
   }
 
@@ -513,7 +550,11 @@ export class Grids {
     const html = await rendering;
     // (Not rendered: rendered again next time)
     if (html === undefined && this.lookSample === rendering) this.lookSample = undefined;
-    return html !== undefined && cell.isConnected ? sampleLook(cell, html) : undefined;
+    if (!cell.isConnected) return undefined;
+    // (The page's editor's own look too, where the host reads it: read as the field opens, nothing drawn between)
+    const own = this.host.pageEditorLook?.() ?? {};
+    const look = html === undefined ? own : { ...sampleLook(cell, html), ...own };
+    return Object.keys(look).length ? look : undefined;
   }
 
   /** A grid drawn remembered where it starts (the last few places alone: grids moved down the page leave old ones) */

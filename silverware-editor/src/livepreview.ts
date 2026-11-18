@@ -56,8 +56,9 @@ export const highlights: MarkdownConfig = {
 // The marks hidden in what they mark, by the node marked
 const MARKED = new Set(["Emphasis", "StrongEmphasis", "Strikethrough", "InlineCode", "Highlight", "Superscript", "Subscript"]);
 const MARKS = new Set(["EmphasisMark", "StrikethroughMark", "CodeMark", "HighlightMark", "SuperscriptMark", "SubscriptMark"]);
-// What is drawn in a look of its own, its marks hidden or not: a highlight, a superscript, a subscript
-const LOOKS: Readonly<Record<string, string>> = { Highlight: "swe-highlight", Superscript: "swe-sup", Subscript: "swe-sub" };
+// What is drawn in a look of its own, its marks hidden or not: a highlight, a superscript, a subscript, a strong text and
+// inline code (the page's editor's look of them written on these: src/look.ts)
+const LOOKS: Readonly<Record<string, string>> = { Highlight: "swe-highlight", Superscript: "swe-sup", Subscript: "swe-sub", StrongEmphasis: "swe-strong", InlineCode: "swe-inline-code" };
 // What a URL of its own (`https://…`, `<https://…>`) is not in: a link, an image or a link's reference
 const URL_OWNERS = new Set(["Link", "Image", "LinkReference"]);
 // A URL with its scheme (`www.…` and an e-mail address, which GitHub's markdown links too, have none: a link would
@@ -288,7 +289,8 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
     }
     toDOM(view: EditorView): HTMLElement {
       const container = view.dom.ownerDocument.createElement("span");
-      container.className = this.lead ? "swe-embed swe-link-lead" : "swe-embed";
+      // (One before a link's text in its link's colour, a wiki link's or a markdown link's, as the page draws it)
+      container.className = this.lead ? `swe-embed swe-link-lead${this.markdown.startsWith("[[") ? " swe-link-lead-wiki" : ""}` : "swe-embed";
       const control = new AbortController();
       Embed.ends.set(container, control);
       // (Its height known as it is drawn, perhaps later: the editor measures its lines again)
@@ -465,6 +467,9 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
   const codeInfo = cm.Decoration.mark({ class: "swe-code-info" });
   // A quote's lines: its bar, its colours
   const quoteLine = cm.Decoration.line({ class: "swe-quote" });
+  // A heading's line by its level (its weight and colour; the first three's size and spaces the page's editor's,
+  // src/look.ts)
+  const headingLines = [1, 2, 3, 4, 5, 6].map((level) => cm.Decoration.line({ class: `swe-h${level}` }));
   // What is drawn in a look of its own (`LOOKS`) and a URL of its own drawn as a link
   const looks = new Map(Object.entries(LOOKS).map(([name, className]) => [name, cm.Decoration.mark({ class: className })]));
   // A horizontal rule's line: a line across it, its `---` hidden
@@ -523,6 +528,9 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
           for (let n = first; n <= last; n++) out.push(codeLine(n === first, n === last, false).range(state.doc.line(n).from));
           code = node;
         } else if (/^ATXHeading\d$/.test(name)) {
+          // (Its line a heading's, as SilverBullet's editor sizes an ATX heading's line alone, not an underlined one's)
+          const line = headingLines[Number(name.slice(-1)) - 1];
+          if (line) out.push(line.range(state.doc.lineAt(from).from));
           const mark = node.firstChild;
           // (The `#`s and the space after them; a heading of no text keeps them, else nothing is left of it)
           if (mark?.name === "HeaderMark" && mark.to < to && !shown(from, to)) hide(mark.from, Math.min(to, mark.to + 1));
@@ -719,11 +727,21 @@ export const PREVIEW_THEME = {
     backgroundRepeat: "no-repeat",
   },
   ".swe-quote-mark": { display: "inline-block", textIndent: "0", whiteSpace: "pre" },
+  // (A heading's size on its line, the rendering's sizes: SilverBullet's rendered headings; the page's editor's where its
+  // look is given, src/look.ts)
+  "& .cm-line:is(.swe-h1, .swe-h2, .swe-h3, .swe-h4, .swe-h5, .swe-h6)": { fontWeight: "bold", color: "var(--editor-heading-color, inherit)" },
+  "& .cm-line.swe-h1": { fontSize: "1.5em" },
+  "& .cm-line.swe-h2": { fontSize: "1.2em" },
+  "& .cm-line.swe-h3": { fontSize: "1.1em" },
+  ".swe-strong": { fontWeight: "bold" },
+  ".swe-inline-code": { fontFamily: "var(--editor-monospace-font, monospace)", backgroundColor: "color-mix(in srgb, currentColor 8%, transparent)" },
   ".swe-highlight": { backgroundColor: "var(--editor-highlight-background-color, var(--highlight-color, #fff3a3))", borderRadius: "3px", padding: "0 2px" },
   ".swe-sup": { verticalAlign: "super", fontSize: "smaller" },
   ".swe-sub": { verticalAlign: "sub", fontSize: "smaller" },
   ".swe-link": { color: "var(--editor-link-color, var(--link-color, #0969da))", textDecoration: "underline" },
   ".swe-wiki-link": { color: "var(--editor-wiki-link-page-color, var(--link-color, #0969da))" },
+  ".swe-link-lead": { color: "var(--editor-link-color, var(--link-color, #0969da))" },
+  ".swe-link-lead-wiki": { color: "var(--editor-wiki-link-page-color, var(--link-color, #0969da))" },
   // (A hashtag as SilverBullet 2.12.1 draws one rendered, a grid's cell's too: its theme's colours and corners, the
   // text's place as there, so it does not move as the cell is edited)
   ".swe-hashtag": {

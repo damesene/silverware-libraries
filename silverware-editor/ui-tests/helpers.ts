@@ -65,14 +65,15 @@ export const test = base.extend<{ space: Space }>({
     await use({
       folder,
       open: async (pages, open, files = {}) => {
-        for (const [name, text] of Object.entries(pages)) {
-          await mkdir(dirname(path(name)), { recursive: true });
-          await writeFile(path(name), text);
-        }
+        // (The files first: a page indexed before what it embeds is there drew it missing)
         for (const [name, content] of Object.entries(files)) {
           const file = join(server().space, folder, name);
           await mkdir(dirname(file), { recursive: true });
           await writeFile(file, content);
+        }
+        for (const [name, text] of Object.entries(pages)) {
+          await mkdir(dirname(path(name)), { recursive: true });
+          await writeFile(path(name), text);
         }
         await goTo(open);
       },

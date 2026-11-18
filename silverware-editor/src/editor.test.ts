@@ -4,7 +4,7 @@
 // bundle, loaded when idle).
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { COMPANION_ATTRIBUTE, COMPANION_LOOK_MS, EDITOR_VERSION, editorsOf, textareaEditor, type TextEditor } from "../../shared/editor.ts";
-import { codeMirrorEditor } from "./codemirror.ts";
+import { codeMirrorEditor, highlightCode } from "./codemirror.ts";
 import * as cm from "./vendor.ts";
 import { forceParsing } from "@codemirror/language";
 
@@ -224,6 +224,8 @@ describe("the CodeMirror editor's live preview", () => {
     const root = editor.element.shadowRoot!;
     expect(drawn).toEqual(["[[a.pdf]]", "[doc](b.pdf)"]);
     expect(root.querySelectorAll(".swe-embed .test-icon")).toHaveLength(2);
+    // (Each in its link's colour: a wiki link's, a markdown link's)
+    expect([...root.querySelectorAll(".swe-link-lead")].map((lead) => lead.classList.contains("swe-link-lead-wiki"))).toEqual([true, false]);
     // (The link's text still shown after its icon)
     expect(root.querySelectorAll(".cm-line")[1]!.textContent).toBe("a.pdf and Page and doc");
     root.querySelector<HTMLElement>(".test-icon")!.click();
@@ -315,6 +317,14 @@ describe("the CodeMirror editor's live preview", () => {
     expect(["cs", "C#", "python title=x", "text", "jsonc", "context", "#task"].map((info) => cm.codeLanguage(info)?.name ?? null)).toEqual(["csharp", "csharp", "python", null, null, null, "yaml"]);
   });
 
+  it("highlights a code's text for another plugin as its code blocks are: its parts in order, each in its token's look; none of a language it does not know", async () => {
+    const parts = (await highlightCode(cm, 'return "x";', "cs"))!;
+    expect(parts.map((part) => part.text).join("")).toBe('return "x";');
+    expect(parts.find((part) => part.text === "return")?.look).toEqual({ "font-weight": "bold" });
+    expect(parts.find((part) => part.text === '"x"')?.look?.color).toContain("--editor-code-string-color");
+    expect(await highlightCode(cm, "x", "nope")).toBeUndefined();
+  });
+
   it("hides a quote's `>` on the lines of a code block in it", () => {
     const { editor, lines } = make("x\n> ```js\n> let a = 1;\n> ```\n> after", 0);
     expect(lines()).toEqual(["x", "```js", "let a = 1;", "```", "after"]);
@@ -327,6 +337,13 @@ describe("the CodeMirror editor's live preview", () => {
     expect(["swe-highlight", "swe-sup", "swe-sub"].map((one) => root.querySelector(`.${one}`)?.textContent)).toEqual(["marked", "2", "2"]);
     editor.setSelection(6);
     expect(lines()[1]).toBe("a ==marked== x2 H2O");
+    editor.destroy();
+  });
+
+  it("marks a heading's line by its level (an ATX heading's, as the page's editor sizes), a strong text and inline code, for the page's look of them", () => {
+    const { editor, root } = make("x\n# One\n## Two\nThree\n===\n**b** `c`", 0);
+    expect([...root.querySelectorAll(".cm-line")].map((line) => [...line.classList].filter((one) => /^swe-h\d$/.test(one)).join(""))).toEqual(["", "swe-h1", "swe-h2", "", "", ""]);
+    expect([".swe-strong", ".swe-inline-code"].map((one) => root.querySelector(one)?.textContent)).toEqual(["b", "c"]);
     editor.destroy();
   });
 

@@ -138,10 +138,11 @@ function readLook(element: HTMLElement, shadow: boolean): Look {
   })();
   // A word's text: its font, its colour, its ground (the first of it and the boxes round it within its line drawing one)
   // and a line drawn through or under it (its own or a box's round it)
-  const LINE = "li, td, th, p, h1, h2, h3, blockquote, pre, .cm-line";
+  // (A word's line: an editor's, a rendering's block round it before a paragraph, a quote's `<p>` in its `<blockquote>`)
+  const LINE = "li, td, th, h1, h2, h3, blockquote, pre, .cm-line";
   const textOf = (word: string) => {
     const own = exact(word).parentElement!;
-    const line = own.closest(LINE);
+    const line = own.closest(LINE) ?? own.closest("p");
     const boxes: Element[] = [];
     for (let at: Element | null = own; at; at = at.parentElement) {
       boxes.push(at);
@@ -259,7 +260,7 @@ function blockClip(element: HTMLElement, [shadow, first, last]: readonly [boolea
   })();
   const top = box(first).top;
   const bottom = Math.max(box(last).bottom, box(first).bottom);
-  return { x: Math.max(0, Math.floor(origin - 4)), y: Math.max(0, Math.floor(top - 4)), width: 300, height: Math.ceil(bottom - top + 8) };
+  return { x: Math.max(0, Math.floor(origin - 4)), y: Math.max(0, Math.floor(top - 4)), width: 460, height: Math.ceil(bottom - top + 8) };
 }
 
 /**
@@ -328,6 +329,12 @@ function differing([a, b]: readonly [string, string]): Promise<number> {
  */
 function alike(a: unknown, b: unknown): boolean {
   if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((one, i) => alike(one, b[i]));
+  // (An object's parts alike part by part: a colour in it as near as one alone)
+  if (a && b && typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b)) {
+    const [x, y] = [a as Record<string, unknown>, b as Record<string, unknown>];
+    const keys = Object.keys(x);
+    return keys.length === Object.keys(y).length && keys.every((key) => key in y && alike(x[key], y[key]));
+  }
   const rgb = (value: unknown) => (typeof value === "string" ? /^rgba?\(([\d.]+), ([\d.]+), ([\d.]+)(?:, ([\d.]+))?\)$/.exec(value)?.slice(1).map((n) => Number(n ?? 1)) : undefined);
   const [x, y] = [rgb(a), rgb(b)];
   if (x && y) return x.every((n, i) => Math.abs(n - y[i]!) <= (i === 3 ? 0.01 : 2));
@@ -341,9 +348,9 @@ async function read(page: Page, surface: Surface): Promise<{ look: Look; crops: 
   await page.mouse.move(1, 1);
   // (Its files drawn by Silverware Assets, as it does a moment after the text: a preview, a card, a link's icon)
   for (const selector of ['[data-swa-view="preview"]', ".swa-card", ".swa-link-icon"]) await expect(surface.target.locator(selector).first()).toBeVisible();
-  // (The code block highlighted in its language, which an editor (the page's, a field's) loads as the block is first
-  // drawn: its string a node of its own. Not by SilverBullet's rendering of a grid's cell, which highlights none)
-  if (surface.name !== "grid") await expect(surface.target.locator(".cm-line span", { hasText: /^"text"$/ })).toHaveCount(1);
+  // (The code block highlighted in its language, which an editor (the page's, a field's, the one a grid's rendered cell
+  // asks) loads as the block is first drawn: its string a node of its own)
+  await expect(surface.target.locator("span", { hasText: /^"text"$/ }).first()).toBeVisible();
   const look = await surface.target.evaluate(readLook, surface.shadow);
   const crops: Record<string, Buffer> = {};
   for (const [block, [first, last]] of Object.entries(BLOCKS)) {
@@ -372,22 +379,10 @@ test("the same, the text zoomed on this device (Silverware Layout's font zoom): 
 const FIELDS = ["grid edited", "peek", "peek edited"];
 type Part = "font" | "color" | "ground" | "decoration";
 const KNOWN: readonly { readonly surfaces: readonly string[]; readonly keys: readonly string[]; readonly parts?: readonly Part[]; readonly why: string }[] = [
-  // Silverware Editor's field: its own look where the page's is not read yet
-  { surfaces: FIELDS, keys: ["bold"], parts: ["font"], why: "a strong text's weight its own (700), the page's 900 on 2.12.1" },
-  { surfaces: FIELDS, keys: ["inline code"], parts: ["font", "ground"], why: "code's font the default monospace where the page has none of its own for it (2.12.1: the editor's font); its ground its own" },
-  { surfaces: FIELDS, keys: ["code"], parts: ["font"], why: "code's font the default monospace where the page has none of its own for it (2.12.1: the editor's font)" },
-  { surfaces: FIELDS, keys: ["return"], why: "a code block's text inset 16 px, as edge's; 2.12.1 insets none" },
-  { surfaces: FIELDS, keys: ["heading 1", "heading 2", "heading 3"], parts: ["font"], why: "headings' sizes the rendering's (1.5, 1.2, 1.1 em), edge's editor's otherwise" },
-  { surfaces: FIELDS, keys: ["Second level under First level", "Third level under Second level", "Some under Third level", "Below rule under Above rule"], why: "the space round headings and a rule its own" },
-  // Silverware Assets in every surface but the page
-  { surfaces: [...FIELDS, "grid"], keys: ["a file's preview"], why: "a preview 6 px higher than the page's (its label's room), not zoomed with the text in a field" },
-  { surfaces: FIELDS, keys: ["a link's icon"], why: "a link's icon in the text's colour, the page's in the link's" },
+  // A field and a grid's rendered cell: a rule's line a line's height, as 2.12.1 draws it; edge's editor draws it 1 px
+  // (its CodeMirror, not its rules: nothing to read)
+  { surfaces: [...FIELDS, "grid"], keys: ["Below rule under Above rule"], why: "a rule's line a line high, as on 2.12.1; 1 px on edge" },
   // A grid's cell rendered: SilverBullet's rendering, Silverware Layout's rules on it
-  { surfaces: ["grid"], keys: ["heading 1", "heading 2", "heading 3"], parts: ["font", "color"], why: "headings' colour (2.12.1) and size (edge) not yet the page's" },
-  { surfaces: ["grid"], keys: ["bold", "inline code"], parts: ["font"], why: "a strong text's weight and code's font not yet the page's" },
-  { surfaces: ["grid"], keys: ["quote"], parts: ["color", "ground"], why: "a quote's colour and ground not yet the page's" },
-  { surfaces: ["grid"], keys: ["code", "code's string"], why: "a code block not highlighted (SilverBullet's rendering), its font not the page's" },
-  { surfaces: ["grid"], keys: ["Quoted one", "return", "Second level under First level", "Third level under Second level", "Below rule under Above rule"], why: "a quote's and a code block's indent, the space round headings and a rule not yet the page's" },
 ];
 
 /** The fixture opened on every surface, read, its pixels attached, each surface's measurements compared with the page's */
@@ -463,8 +458,9 @@ async function compareSurfaces(page: Page, space: Space): Promise<void> {
       const within = key.endsWith("box down") ? 3 : 2;
       const onPage = reference!.look.places[key]!;
       const differs = Math.abs(value - onPage) > within;
-      const known = knownOf(surface.name, key)[0];
-      if (known) tell(differs ? "known difference" : "known difference not shown", surface.name, key, `${value} px, the page ${onPage} px (${known.why})`);
+      // (A place is no part of a look: entries of a part do not hold it)
+      const known = knownOf(surface.name, key).filter((entry) => !entry.parts);
+      if (known.length) tell(differs ? "known difference" : "known difference not shown", surface.name, key, `${value} px, the page ${onPage} px (${known.map((entry) => entry.why).join("; ")})`);
       else expect.soft(Math.abs(value - onPage), `${surface.name}: where "${key}" starts (${value} px, the page ${onPage} px)`).toBeLessThanOrEqual(within);
     }
     for (const [key, value] of Object.entries(surface.look.looks)) {
@@ -473,8 +469,11 @@ async function compareSurfaces(page: Page, space: Space): Promise<void> {
       // (Known of a part alone: the other parts compared still)
       const whole = known.find((entry) => !entry.parts);
       const parts = new Set(known.flatMap((entry) => entry.parts ?? []));
-      const without = (look: unknown) => (parts.size && look && typeof look === "object" && !Array.isArray(look) ? Object.fromEntries(Object.entries(look).filter(([part]) => !parts.has(part as Part))) : look);
-      if (known.length) tell(alike(value, onPage) ? "known difference not shown" : "known difference", surface.name, key, `${JSON.stringify(value)}, the page ${JSON.stringify(onPage)} (${known.map((entry) => entry.why).join("; ")})`);
+      const split = (look: unknown, keep: boolean) => (parts.size && look && typeof look === "object" && !Array.isArray(look) ? Object.fromEntries(Object.entries(look).filter(([part]) => parts.has(part as Part) === keep)) : look);
+      const without = (look: unknown) => split(look, false);
+      // (Shown or not by what is known of it alone: its known parts, or all of it)
+      const shown = whole ? !alike(value, onPage) : !alike(split(value, true), split(onPage, true));
+      if (known.length) tell(shown ? "known difference" : "known difference not shown", surface.name, key, `${JSON.stringify(value)}, the page ${JSON.stringify(onPage)} (${known.map((entry) => entry.why).join("; ")})`);
       if (whole) continue;
       if (!alike(without(value), without(onPage))) expect.soft(without(value), `${surface.name}: ${key}`).toEqual(without(onPage));
     }

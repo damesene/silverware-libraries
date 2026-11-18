@@ -16,6 +16,8 @@ import type { PageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
 import { documentUrl } from "../../../../shared/silverbullet/platform.ts";
 import { withImages } from "../../../../shared/silverbullet/embedimage.ts";
+import { editorSampleLook } from "../../../../shared/silverbullet/editorsample.ts";
+import { highlightCodeIn } from "./codeblocks.ts";
 import { afterPress, handsAltPressToField, SILVERBULLET_EDITORS, textForDrawing } from "./behaviour.ts";
 import { focusPage, isPageText, pressBesideGrid } from "./dom.ts";
 import { ownTasks } from "./tasks.ts";
@@ -66,10 +68,15 @@ type IntoGridWrite = {
 export function silverBulletGridHost(bridge: Bridge, writer: PageWriter, drawer: () => FieldDrawer | undefined = () => undefined) {
   // SilverBullet's shortcuts a cell's field keeps from it, told in its notification (shared/silverbullet/keptkeys.ts)
   const keyKept = keptKeys(bridge.listCommands, (message) => void bridge.flash(message, "info"));
+  // A cell edited in Silverware Editor's editor where the init page hands its API over, else a `<textarea>`
+  const editors = editorsOf(bridge.editor, SILVERBULLET_EDITORS);
   return {
-    // A cell edited in Silverware Editor's editor where the init page hands its API over, else a `<textarea>`
-    editors: editorsOf(bridge.editor, SILVERBULLET_EDITORS),
+    editors,
+    // (A cell's code blocks highlighted by it too, where it highlights: SilverBullet's rendering highlights none)
+    highlightCode: (grid: HTMLElement) => highlightCodeIn(grid, editors),
     ...(keyKept ? { keyKept } : {}),
+    // (The page's editor's look of headings, code, a rule: shared/silverbullet/editorsample.ts)
+    pageEditorLook: () => editorSampleLook(document),
     renderMarkdown: async (text: string): Promise<string> => {
       if (!bridge.renderMarkdown) throw new Error("the init page hands over no renderMarkdown");
       // (An embed SilverBullet's HTML draws none of, a PDF, a zip, kept as a place: the page's widget draws it)

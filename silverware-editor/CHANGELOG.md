@@ -1,5 +1,11 @@
 # Silverware Editor: changelog
 
+## 1.2.0 (2026-11-18)
+
+- Headings, bold text, inline code, code blocks and `---` drawn as in the page's editor, on every SilverBullet version (their sizes, weight, font, spacing and the code block's inset read from the page).
+- A link's file icon in the link's colour.
+- Other Silverware plugins can highlight code in the editor's languages (Silverware Layout's grid cells do).
+
 ## 1.1.0 (2026-11-18)
 
 - Code blocks drawn as blocks and highlighted in their language (the languages SilverBullet highlights: C#, Python, JavaScript, SQL, YAML and more); their backticks shown only where your cursor is in them.

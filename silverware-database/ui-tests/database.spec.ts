@@ -1204,15 +1204,25 @@ test("in the peek's editor a task's box looks as the page's, though the peek han
     await expect(body.locator(".cm-content")).toBeVisible({ timeout: 1000 });
   }).toPass({ timeout: 20_000 });
   await expect.poll(() => fieldReady(body)).toBe(true);
+  // (None where the box found was gone as it was measured: the editor draws its line anew)
   const look = (box: import("@playwright/test").Locator) =>
     box.evaluate((one) => {
+      if (!one.isConnected) return undefined;
       const style = getComputedStyle(one);
       return [Math.round(parseFloat(style.width)), Math.round(parseFloat(style.height)), style.borderTopLeftRadius, style.borderTopColor, style.backgroundColor];
     });
-  const inPage = page.locator("#sb-main .cm-content input[type=checkbox]").first();
+  // (The page's own, out of the database's place: the sample of the page's look the peek reads is put there a moment)
+  const inPage = page.locator("#sb-main .cm-content input[type=checkbox]:not(.swd-place *)").first();
   const inPeek = body.locator("input[type=checkbox]").first();
   await expect(inPeek).toBeVisible();
-  expect(await look(inPeek)).toEqual(await look(inPage));
+  // (Both measured as they are in the page: the two looks, or which one was not)
+  await expect
+    .poll(async () => {
+      const [peek, own] = [await look(inPeek), await look(inPage)];
+      if (!peek || !own) return "measuring";
+      return JSON.stringify(peek) === JSON.stringify(own) ? "the same" : { peek, own };
+    })
+    .toBe("the same");
 });
 
 test("Delete database… in ⋯ deletes its pages and its blocks on every page once its name is typed; Undo brings them back", async ({ page, space }) => {

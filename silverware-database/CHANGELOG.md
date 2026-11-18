@@ -1,5 +1,10 @@
 # Silverware Database: changelog
 
+## 1.2.2 (2026-11-18)
+
+- In an item's peek, files zoom with the text, as in the page.
+- Headings, bold text, code and `---` in an item's content drawn as in the page.
+
 ## 1.2.1 (2026-11-18)
 
 - Fixes: a database block shows its database once SilverBullet has indexed it (opened before that, it stayed "not found" until reloaded); moving properties quickly in the peek with Alt+↑/↓ no longer fails with "changed elsewhere"; the full screen icon works when pressed right after Esc.

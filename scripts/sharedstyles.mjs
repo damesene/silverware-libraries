@@ -7,6 +7,23 @@ import { readFile, writeFile } from "node:fs/promises";
 /** Each shared style: its template, its marks' name, the pages it goes into with their base */
 export const SHARED_STYLES = [
   {
+    // (Each page's own boxes that scroll, `__scrolls__`: the plugin's, never SilverBullet's page)
+    template: "shared/scrollbar.css",
+    mark: "shared-scrollbar",
+    pages: [
+      { page: "silverware-table/silverware-table-style.md", base: "swt", scrolls: ".sb-table-widget.swt-table, .swt-view-scroll, .swt-sheet-board, .swt-dialog-body, .swt-settings-body, .swt-choices, .swt-choices-preview-values, .swt-filter-values, .swt-functions-list, .swt-functions-detail, .swt-formula-choices, .swt-formulafield-choices, .swt-result-box, .swt-excel-skipped, .swt-cell-popup .swt-cell-popup-field, .swt-menu" },
+      { page: "silverware-database/silverware-database-style.md", base: "swd", scrolls: ".swd-peek, .swd-peek-props-box, .swd-place-body, .swd-place.swd-over-window, .swd-table-box, .swd-board, .swd-tl-box, .swd-cal-undated-items, .swd-files-list, .swd-editor-list, .swd-floated, .swd-suggest, .swd-menu, .swd-settings-body, .swd-conflict-body" },
+      { page: "silverware-assets/silverware-assets-style.md", base: "swa", scrolls: ".swa-panel-body, .swa-dialog-body, .swa-insert-found, .swa-upload-progress-rows, .swa-menu" },
+      { page: "silverware-toolbar/silverware-toolbar-style.md", base: "swb", scrolls: ".swb-list, .swb-settings-body, .swb-settings-pick-list" },
+      { page: "silverware-tags/silverware-tags-style.md", base: "swg", scrolls: ".swg-detail, .swg-dialog-body, .swg-review, .swg-settings-body, .swg-tags, .swg-tree-box-list, .swg-views" },
+      { page: "silverware-chart/silverware-chart-style.md", base: "swc", scrolls: ".swc-settings-body, .swc-menu" },
+      { page: "silverware-layout/silverware-layout-style.md", base: "swl", scrolls: ".swl-dialog-body, .swl-menu" },
+      { page: "silverware-icons/silverware-icons-style.md", base: "swi", scrolls: ".swi-picker .swi-groups, .swi-picker .swi-list" },
+      { page: "silverware-assets-docx/silverware-assets-docx-style.md", base: "swa-docx", scrolls: ".swa-docx-reader-scroll" },
+      { page: "silverware-assets-xlsx/silverware-assets-xlsx-style.md", base: "swa-xlsx", scrolls: ".swa-xlsx-reader-scroll" },
+    ],
+  },
+  {
     template: "shared/menu.css",
     mark: "shared-menu",
     pages: [
@@ -61,8 +78,8 @@ const begin = (mark) => `/* <${mark}> generated from its template by scripts/sha
 const end = (mark) => `/* </${mark}> */`;
 
 /** The block a page holds for a style, made from its template */
-export function sharedBlock(template, mark, base) {
-  return `${begin(mark)}\n${template.replaceAll("__base__", base).trim()}\n${end(mark)}`;
+export function sharedBlock(template, mark, base, scrolls = "") {
+  return `${begin(mark)}\n${template.replaceAll("__base__", base).replaceAll("__scrolls__", scrolls).trim()}\n${end(mark)}`;
 }
 
 /** A page's text with its block of a style made anew, or why it cannot be (its marks missing) */
@@ -78,9 +95,9 @@ export async function sharedStyles(check) {
   let wrong = 0;
   for (const { template, mark, pages } of SHARED_STYLES) {
     const css = (await readFile(template, "utf8")).replaceAll("\r\n", "\n");
-    for (const { page, base } of pages) {
+    for (const { page, base, scrolls } of pages) {
       const text = (await readFile(page, "utf8")).replaceAll("\r\n", "\n");
-      const made = withSharedBlock(text, mark, sharedBlock(css, mark, base));
+      const made = withSharedBlock(text, mark, sharedBlock(css, mark, base, scrolls));
       if ("problem" in made) {
         console.error(`${page}: ${made.problem}`);
         wrong++;

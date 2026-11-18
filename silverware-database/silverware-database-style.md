@@ -4446,4 +4446,14 @@ button.swd-peek-label:hover {
 .swd-peek-body:is(:focus, :focus-within) {
   background: var(--swd-surface);
 }
+/* <shared-scrollbar> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* The boxes of the plugin's own that scroll (a view, a list, a panel, a dialog's body, a menu): a thin scrollbar, its
+   thumb quiet in the text's color and its track clear, the same in every plugin (Silverware Table's first). The page's
+   own scrollbar is SilverBullet's, left as it is. Of no weight of its own (`:where`): a rule of the plugin's for one of
+   them (a strip whose scrollbar is hidden) still holds. A theme sets another thumb by `--sw-scrollbar-thumb` */
+:where(.swd-peek, .swd-peek-props-box, .swd-place-body, .swd-place.swd-over-window, .swd-table-box, .swd-board, .swd-tl-box, .swd-cal-undated-items, .swd-files-list, .swd-editor-list, .swd-floated, .swd-suggest, .swd-menu, .swd-settings-body, .swd-conflict-body) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sw-scrollbar-thumb, color-mix(in srgb, var(--root-color, #333) 30%, transparent)) transparent;
+}
+/* </shared-scrollbar> */
 ```

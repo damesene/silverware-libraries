@@ -40,6 +40,9 @@ test("a value's files: a table's cell draws three and counts the rest, a press o
   await expect(row.locator(".swd-media-button")).toHaveCount(3);
   await expect(row.locator(".swd-media-more")).toHaveText("+1");
   await expect(row.locator(".swd-peek-edit")).toHaveCount(1);
+  // (The panel and its properties' box with the plugins' thin scrollbar: shared/scrollbar.css)
+  await expect(page.locator(".swd-peek-props-box")).toHaveCSS("scrollbar-width", "thin");
+  await expect(page.locator(".swd-peek")).toHaveCSS("scrollbar-width", "thin");
   const small = row.locator(".swd-media-button").first().locator("img");
   await expect.poll(() => small.evaluate((img: HTMLImageElement) => img.complete && !!img.style.height)).toBe(true);
   expect(Math.round((await small.boundingBox())!.height)).toBe(28);

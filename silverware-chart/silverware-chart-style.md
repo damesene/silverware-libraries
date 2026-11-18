@@ -1049,4 +1049,14 @@ The look of [Silverware Chart](silverware-chart.md): a chart's box, its toolbar,
   margin: 0;
   white-space: pre-wrap;
 }
+/* <shared-scrollbar> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* The boxes of the plugin's own that scroll (a view, a list, a panel, a dialog's body, a menu): a thin scrollbar, its
+   thumb quiet in the text's color and its track clear, the same in every plugin (Silverware Table's first). The page's
+   own scrollbar is SilverBullet's, left as it is. Of no weight of its own (`:where`): a rule of the plugin's for one of
+   them (a strip whose scrollbar is hidden) still holds. A theme sets another thumb by `--sw-scrollbar-thumb` */
+:where(.swc-settings-body, .swc-menu) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sw-scrollbar-thumb, color-mix(in srgb, var(--root-color, #333) 30%, transparent)) transparent;
+}
+/* </shared-scrollbar> */
 ```

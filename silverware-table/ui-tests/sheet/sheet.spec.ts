@@ -1160,10 +1160,16 @@ test.describe("Pins on the sheet", () => {
   test("pinned rows and columns are held at the board's edges while their table is in view, never past it", async ({ page }) => {
     const drawn = await open(page, PINNED, 31);
     const board = page.locator(".swt-sheet-board");
+    // (Scrolled once the board's grid reaches that far: scrolled before, the browser held it at less)
+    await expect.poll(() => board.evaluate((b) => [b.scrollHeight - b.clientHeight >= 400, b.scrollWidth - b.clientWidth >= 150])).toEqual([true, true]);
     await board.evaluate((b) => {
       b.scrollTop = 400;
       b.scrollLeft = 150;
     });
+    // (Within a pixel: at a device pixel ratio not whole the browser scrolls by its pixels)
+    const [top, left] = await board.evaluate((b) => [b.scrollTop, b.scrollLeft]);
+    expect(Math.abs(top - 400)).toBeLessThan(1);
+    expect(Math.abs(left - 150)).toBeLessThan(1);
     const view = await board.evaluate((b) => {
       const r = b.getBoundingClientRect();
       const s = getComputedStyle(b);
@@ -1191,7 +1197,10 @@ test.describe("Pins on the sheet", () => {
 
   test("a value under the row pinned to the bottom goes in a row above it, which stays last", async ({ page }) => {
     const drawn = await open(page, PINNED, 31);
-    await page.locator(".swt-sheet-board").evaluate((b) => {
+    const board = page.locator(".swt-sheet-board");
+    // (Scrolled once the board's grid reaches that far: scrolled before, the browser held it at less)
+    await expect.poll(() => board.evaluate((b) => b.scrollHeight - b.clientHeight >= 700)).toBe(true);
+    await board.evaluate((b) => {
       b.scrollTop = 700;
     });
     const total = drawn.locator("tr[data-swt-row='31'] > td").nth(1);

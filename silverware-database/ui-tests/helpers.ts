@@ -80,8 +80,8 @@ export const item = (status: string, rank: string) => `---\ntags: [db]\nstatus: 
 export type Space = {
   /** The folder of this test's pages in the space (`UiDatabase/<test>`) */
   readonly folder: string;
-  /** Pages written (by their names under the folder) and the page `open` of them opened, the test's views defined */
-  open(pages: Readonly<Record<string, string>>, open: string): Promise<void>;
+  /** Pages written (by their names under the folder), and files beside them (a name with its extension), the page `open` of them opened, the test's views defined */
+  open(pages: Readonly<Record<string, string>>, open: string, files?: Readonly<Record<string, Uint8Array | string>>): Promise<void>;
   /** A page's text as saved (its name under the folder); undefined where there is none */
   saved(name: string): Promise<string | undefined>;
   /** The space's CONFIG page as saved (the settings dialog writes it; put back as it was after the test) */
@@ -117,7 +117,7 @@ export const test = base.extend<{ space: Space }>({
     const configBefore = existsSync(configPath) ? await readFile(configPath, "utf8") : undefined;
     await use({
       folder,
-      open: async (pages, open) => {
+      open: async (pages, open, files = {}) => {
         const views = join(server().space, folder, "views.js");
         await mkdir(dirname(views), { recursive: true });
         await writeFile(views, VIEWS);
@@ -129,6 +129,11 @@ export const test = base.extend<{ space: Space }>({
         for (const [name, text] of Object.entries(pages)) {
           await mkdir(dirname(path(name)), { recursive: true });
           await writeFile(path(name), text);
+        }
+        for (const [name, content] of Object.entries(files)) {
+          const file = join(server().space, folder, name);
+          await mkdir(dirname(file), { recursive: true });
+          await writeFile(file, content);
         }
         await watchReloads(page);
         await page.goto(`http://127.0.0.1:${server().port}/${folder}/${open}`);

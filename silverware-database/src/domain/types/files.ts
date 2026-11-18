@@ -12,6 +12,18 @@ export type FileEntry = { readonly target: string; readonly web: boolean; readon
 // An address of the web: a scheme, `//`, nothing blank in it
 const WEB_RE = /^[a-z][a-z0-9+.-]*:\/\/\S+$/i;
 
+/** Whether a file's target is an address of the web, not a path of the space */
+export const isWebTarget = (target: string): boolean => WEB_RE.test(target.trim());
+
+// The extensions of the images a browser draws itself
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "avif", "svg", "bmp", "ico"]);
+
+/** Whether a file is an image the browser draws (by its name's extension; an address's path's) */
+export function isImageTarget(target: string): boolean {
+  const path = target.trim().split(/[?#]/, 1)[0]!;
+  return IMAGE_EXTENSIONS.has(/\.([a-z0-9]+)$/i.exec(path)?.[1]?.toLowerCase() ?? "");
+}
+
 /** A text read as one file (a wiki link, an address of the web), or undefined where it is none */
 export function readFile(text: string): FileEntry | undefined {
   const written = text.trim();

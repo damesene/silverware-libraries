@@ -482,6 +482,7 @@ export class PeekPanel {
       ...(this.host.folderSeparator ? { folderSeparator: this.host.folderSeparator } : {}),
       openByName: (name) => this.host.openByName(name),
       ...(this.host.openMention ? { openMention: this.host.openMention } : {}),
+      ...(this.host.media ? { media: this.host.media } : {}),
     };
   }
 
@@ -669,11 +670,11 @@ export class PeekPanel {
     const show = () => {
       const now = shown.item;
       if (editor.type(property).look === "check") return void value.replaceChildren(el(doc, "span", { class: `swd-peek-check${now.values[property.key] === true ? " swd-on" : ""}`, html: now.values[property.key] === true ? typeIcon("checkbox") : "", attrs: { "aria-label": now.values[property.key] === true ? "Yes" : "No" } }));
-      const shownNodes = valueNodes(editor, now, property);
+      const shownNodes = valueNodes(editor, now, property, { files: "large" });
       const lacking = missing(editor, now, property);
-      // A value drawn as a link takes its press, so a pencil after it edits it whatever room is left beside it: only a
-      // pointer's way, the value itself being the button the keys edit (Enter, F2), its press reaching it
-      const pencil = !property.readonly && shownNodes.some((node) => node instanceof Element && node.matches("a")) ? [el(doc, "span", { class: "swd-peek-edit", html: VIEW_ICONS.edit, title: `Edit ${property.label}`, attrs: { "aria-hidden": "true" } })] : [];
+      // A value drawn as a link or as files takes its press, so a pencil after it edits it whatever room is left beside it:
+      // only a pointer's way, the value itself being the button the keys edit (Enter, F2), its press reaching it
+      const pencil = !property.readonly && shownNodes.some((node) => node instanceof Element && node.matches("a, .swd-media-strip")) ? [el(doc, "span", { class: "swd-peek-edit", html: VIEW_ICONS.edit, title: `Edit ${property.label}`, attrs: { "aria-hidden": "true" } })] : [];
       value.replaceChildren(...(shownNodes.length ? shownNodes : [el(doc, "span", { class: `swd-peek-empty${lacking ? " swd-peek-missing" : ""}`, text: lacking ? "Required" : "Empty" })]), ...pencil);
     };
     show();

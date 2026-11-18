@@ -69,6 +69,15 @@ if js and js.window then
       end
       return names
     end,
+    -- The space's files (not its pages), a value of files picked from them; one deleted (a database's files with it)
+    listDocuments = function()
+      local names = {}
+      for _, document in ipairs(space.listDocuments()) do
+        table.insert(names, document.name)
+      end
+      return names
+    end,
+    deleteDocument = space.deleteDocument,
     -- Links to the page followed (SilverBullet's Page: Rename); it answers the same whether it renamed or not: the JS checks
     renamePage = function(from, to)
       return system.invokeFunction("index.renamePageCommand", { oldPage = from, page = to })

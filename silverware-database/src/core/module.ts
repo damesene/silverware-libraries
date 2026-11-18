@@ -10,6 +10,7 @@
 import type { Icons } from "../../../shared/icons.ts";
 import type { EditorLook, Editors, FieldDrawing, LinkOpening } from "../../../shared/editor.ts";
 import type { DocumentsHost } from "./documents.ts";
+import type { MediaHost } from "./media.ts";
 import type { MentionsHost } from "./mentions.ts";
 import type { Settings, UserInterface } from "../../../shared/platform.ts";
 import type { TypeRegistry } from "../domain/types/registry.ts";
@@ -80,7 +81,7 @@ export type ModuleInstance = {
 };
 
 /** What a module gets: the core's writes, the store's reads, the types, the user, its own settings, the others' offers */
-export type ModuleHost = DocumentsHost & MentionsHost & {
+export type ModuleHost = DocumentsHost & MentionsHost & MediaHost & {
   readonly document: Document;
   /** What draws and picks icons (Silverware Icons, or its stand-in saying it is needed: shared/icons.ts) */
   readonly icons: Icons;

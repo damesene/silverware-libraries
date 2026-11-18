@@ -182,7 +182,7 @@ function card(host: ViewHost, by: Property, item: Item, column: ItemGroup, drag:
     ...host.look.shownProperties.flatMap((property) => {
       if (property.key === by.key) return [];
       // (As it stands alone: a required one without a value said missing, nothing where empty)
-      const shown = fieldNodes(host, item, property);
+      const shown = fieldNodes(host, item, property, { files: "small" });
       return shown.length ? [el(doc, "span", { class: "swd-board-value", title: property.label, attrs: { "data-key": property.key } }, ...shown)] : [];
     }),
   );

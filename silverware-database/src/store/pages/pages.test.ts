@@ -69,6 +69,9 @@ describe("the pages store", () => {
     );
     expect(memory.pages.get("db-tasks/Fix login")).toBe('---\ntags: [db]\nstatus: Todo\ndue: "2026-11-10"\n_database:\n  rank: a0\n---\nSteps');
     expect(store.documentOf(made.created.get("a")!)).toBe("db-tasks/Fix login");
+    // (Its files under its root page, beside its items; a database it does not know none)
+    expect(store.filesFolderOf("tasks")).toBe("db-tasks/files");
+    expect(store.filesFolderOf("other")).toBeUndefined();
   });
 
   it("reads a root page's version under format, its name before, as the same, and writes it as version", async () => {

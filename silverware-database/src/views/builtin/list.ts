@@ -13,7 +13,7 @@ function line(host: ViewHost, item: Item, list: () => HTMLElement): HTMLElement 
   const doc = host.document;
   // (Each property's value as it stands alone, a required one without a value said missing: those showing anything)
   const shown = host.look.shownProperties.flatMap((property) => {
-    const nodes = fieldNodes(host, item, property);
+    const nodes = fieldNodes(host, item, property, { files: "small" });
     return nodes.length ? [{ property, nodes }] : [];
   });
   const li: HTMLElement = el(doc, "li", { class: "swd-list-item", attrs: { "data-item": item.key } });

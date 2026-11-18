@@ -214,8 +214,17 @@ show over Assets' panel: checked in a UI test, the panel lifted where it must be
    (`domain/loose.ts`) and a converter's links (`converters/infer.ts`).
 5. **`media` through the core** (`PlaceOptions`, `ViewHost`, `ModuleHost`, `EditorHost`), the binding's (Assets, the
    file listing in the init page) and the playground's; the fallbacks without Assets unit-tested (the UI tests' space
-   has every plugin).
-6. **The look** in table, list, peek and the other views' lines; the click on a file.
+   has every plugin). Done 2026-11-18: `core/media.ts` (`MediaSource` the binding's, `mediaHost` the core's, as
+   `documents` and `mentions`; `media.remove` beside the plan's four), `host/silverbullet/media.ts`, the store's
+   `filesFolderOf`, the playground's files pictures made of their names. Differs from *Sizes*: the box's numbers are
+   the caller's (`draw(target, { width, height, min })`), and an image is sized in px once loaded (`fittedSize`); step 6
+   decides whether a view takes them from the style page's variables.
+6. **The look** in table, list, peek and the other views' lines; the click on a file. Done 2026-11-18: `views/values.ts`
+   `valueNodes` / `fieldNodes` take `{ files: "small" | "large" }` (table, list, board's card lines small; the peek
+   large, its pencil after the files; calendar and timeline none: their files' names). The sizes and the count of a
+   small line are constants there (`FILE_BOXES`, `FILES_IN_LINE` 3), not the style page's variables: the image's size and
+   a preview's room are reckoned in the script, which reads no CSS (nothing measured). An image smaller than its box is
+   drawn larger to fit it. `ui-tests/files.spec.ts`.
 7. **The popup editor**: remove, reorder (keys too), + Add, Upload.
 8. **Paste and drop** on a cell, the popup, a card, the peek's row.
 9. **The board's cover** (*Card preview*).

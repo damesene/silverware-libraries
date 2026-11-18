@@ -3125,6 +3125,112 @@ tr:focus-within .swd-open {
 .swd-reference-folder {
   opacity: 0.7;
 }
+/* Files (Files & media): side by side, each a button opening it. A small line of a fixed height (a table's cell, a list's
+   row, a card's line), the rest counted; a large one (the peek's row) wrapping. An image sized by the script once
+   loaded (fitted in its box, cropped to its middle where too narrow or too low); another file its preview, else its
+   icon and name */
+.swd-media-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.swd-media-strip.swd-media-small {
+  height: 28px;
+  overflow: hidden;
+}
+.swd-media-strip.swd-media-large {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.swd-media-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+}
+/* A small line narrower than its files (a board's card): each shrinks, a name cut, an image its middle shown; the
+   rest's count kept whole */
+.swd-media-small .swd-media-button {
+  flex: 0 1 auto;
+  min-width: 20px;
+}
+.swd-media-small .swd-media,
+.swd-media-small .swd-media-name {
+  min-width: 0;
+}
+.swd-media-button:focus-visible {
+  outline: 2px solid var(--swd-accent);
+  outline-offset: 1px;
+}
+.swd-media {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+}
+.swd-media img {
+  display: block;
+  border-radius: 3px;
+}
+.swd-media-small .swd-media {
+  max-width: 84px;
+  max-height: 28px;
+}
+.swd-media-large .swd-media {
+  max-width: 240px;
+  max-height: 180px;
+}
+/* A file not drawn: its icon and name, a quiet pill */
+.swd-media[data-swd-media="file"] {
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--swd-line);
+  border-radius: 4px;
+  background: var(--swd-surface);
+}
+.swd-media-small .swd-media[data-swd-media="file"] {
+  height: 24px;
+  box-sizing: border-box;
+  font-size: 0.85em;
+}
+.swd-media-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--swd-quiet);
+}
+.swd-media-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.swd-media-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swd-media-button:hover .swd-media[data-swd-media="file"] {
+  background: var(--swd-hover);
+}
+/* A preview of another plugin's: as large as its box lets it */
+.swd-media[data-swd-media="preview"] > * {
+  max-width: 100%;
+  max-height: 100%;
+}
+.swd-media-more {
+  flex: none;
+  padding: 0 4px;
+  color: var(--swd-quiet);
+  font-size: 0.85em;
+}
 /* References' editor: a search over the pages, the pages picked then those found, a box each; the list scrolls */
 .swd-editor-documents {
   min-width: 16em;

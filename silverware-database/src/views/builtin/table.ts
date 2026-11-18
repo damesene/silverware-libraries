@@ -185,7 +185,7 @@ function content(host: ViewHost, item: Item, column: Column): Node[] {
     box.addEventListener("change", () => void toggle(host, item, property.key));
     return [box];
   }
-  return property ? valueNodes(host, item, property) : [doc.createTextNode(host.text(item, column.key))];
+  return property ? valueNodes(host, item, property, { files: "small" }) : [doc.createTextNode(host.text(item, column.key))];
 }
 
 function actions(host: ViewHost, item: Item): HTMLElement {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { areFiles, fileName, namesFile, readFile, readFiles, typedFiles, validateFileTarget, writeFile } from "./files.ts";
+import { areFiles, fileName, isImageTarget, isWebTarget, namesFile, readFile, readFiles, typedFiles, validateFileTarget, writeFile } from "./files.ts";
 import { TypeRegistry } from "./registry.ts";
 
 describe("files as kept", () => {
@@ -34,6 +34,12 @@ describe("files as kept", () => {
     expect(areFiles([["[[a.png]]", "[[Notes]]"]])).toBe(false);
     expect(areFiles([[]])).toBe(false);
     expect(areFiles([])).toBe(false);
+  });
+
+  it("tell an image the browser draws by its extension, and an address of the web from a path", () => {
+    for (const image of ["a.PNG", "Photos/b.jpeg", "https://example.com/c.webp?size=2", "d.svg"]) expect(isImageTarget(image), image).toBe(true);
+    for (const other of ["a.pdf", "png", "https://example.com/png", "Photos/b.jpeg.md"]) expect(isImageTarget(other), other).toBe(false);
+    expect([isWebTarget(" https://example.com/a.png"), isWebTarget("Photos/a.png")]).toEqual([true, false]);
   });
 
   it("name a file by its last part: a path's name, an address's (decoded), else the address", () => {

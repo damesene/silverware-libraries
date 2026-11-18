@@ -1,5 +1,9 @@
 # Silverware Assets: changelog
 
+## 1.0.2 (2026-11-18)
+
+- Fixes: a link's arrow always opens its menu (in a grid's cell a click on it sometimes opened the link instead); a file's open menu no longer closes when another plugin (Silverware Assets PDF, DOCX or XLSX) registers its file type.
+
 ## 1.0.1 (2026-11-17)
 
 - Works with SilverBullet's next version (3.0) as well as 2.12.1: settings saved to `Library/Config` where SilverBullet keeps them there, and files it draws as an embedded page's card shown as Silverware Assets draws them.

@@ -74,6 +74,19 @@ describe("full screen", () => {
     expect(element.classList.contains("swd-over-window")).toBe(false);
   });
 
+  it("is shown over the window again by its icon pressed as Esc ended it, before the tools are drawn anew", async () => {
+    const { element, tool } = await setup();
+    tool()!.click();
+    await new Promise((resolve) => setTimeout(resolve));
+    const before = tool()!;
+    before.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    expect(element.classList.contains("swd-over-window")).toBe(false);
+    // (The icon drawn while it was over the window, pressed at once)
+    before.click();
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(element.classList.contains("swd-over-window")).toBe(true);
+  });
+
   it("ends with Esc from the page's body too (a press in its empty room), leaves its element as it was when gone, starts so where told", async () => {
     const { element, place, tool } = await setup();
     tool()!.click();

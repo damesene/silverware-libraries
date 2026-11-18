@@ -671,8 +671,11 @@ export class Controller {
       return;
     }
     // (A panel's keys its own: its Esc closes it alone)
-    if (this.popup.isOpen || this.panel.isOpen || !this.bar.shown) return;
-    // (Shown always: it stays, Esc is the editor's)
+    if (this.popup.isOpen || this.panel.isOpen) return;
+    // (Shown always: it stays, Esc is the editor's. Else a selection or a caret still to be told is not: hidden, or not
+    // shown yet, the toolbar stays so)
+    if (e.key === "Escape" && !this.persistent()) this.watcher.dismiss();
+    if (!this.bar.shown) return;
     if (e.key === "Escape") {
       if (!this.persistent()) this.hideBar();
     } else if (this.atCaret && !this.persistent() && !["Shift", "Control", "Alt", "Meta"].includes(e.key)) this.hideBar();

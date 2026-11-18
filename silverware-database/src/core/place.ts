@@ -255,7 +255,15 @@ export class DatabasePlace {
 
   /** What a module is told of the place: its database, whether it is over the window and the way to put it so */
   private context(doc: Document, database: Database): PlaceContext {
-    return { document: doc, database, overWindow: this.overWindow, setOverWindow: (on) => void this.setOverWindow(on) };
+    const isOver = () => this.overWindow;
+    return {
+      document: doc,
+      database,
+      get overWindow() {
+        return isOver();
+      },
+      setOverWindow: (on) => void this.setOverWindow(on),
+    };
   }
 
   /**

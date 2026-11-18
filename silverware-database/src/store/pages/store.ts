@@ -102,6 +102,9 @@ type Held = {
   written?: boolean;
   told?: boolean;
   indexing?: boolean;
+  // The index's passes over the page to see through before one lets it go: written again before the index had the
+  // write before, the next pass told whole may have read that one (told of later than it read the page)
+  skips?: number;
 };
 
 // What a part wrote: the writer's report of its page, what the store had before, the making it went into
@@ -148,6 +151,12 @@ export class PagesStore implements DatabaseStore {
   private readonly listeners = new Set<(change: { readonly database: string }) => void>();
   // Each database's root page as last read, to tell which database a page changed is of
   private readonly roots = new Map<string, string>();
+  // Databases read and not found (their root not in the index yet, as a page opens while the index is still being
+  // built): told once the index has their root, so what shows one reads it again
+  private readonly missing = new Set<string>();
+  // The roots being read for them, and whether another change asked meanwhile
+  private checking: Promise<void> | undefined;
+  private checkAgain = false;
   // Each item's page's facts as last read (its dates, its tags): its system properties' values, and what a page the store
   // wrote keeps of them until the index has it
   private readonly facts = new Map<string, SystemFacts>();
@@ -181,7 +190,12 @@ export class PagesStore implements DatabaseStore {
         held.told = true;
         // Started on the page after the write was done, then told whole: what the index has now is the page as it is
         if (held.written && change.early) held.indexing = true;
-        else if (held.indexing && !change.early) this.wrote.delete(change.document);
+        else if (held.indexing && !change.early) {
+          if (held.skips) {
+            held.skips -= 1;
+            held.indexing = false;
+          } else this.wrote.delete(change.document);
+        }
       }
       // (Its readers told once the index has the change whole: read early, they would read it without it)
       if (change.early) return;
@@ -194,7 +208,41 @@ export class PagesStore implements DatabaseStore {
         }
       };
       tell();
+      // A database not found yet told once the index has its root (any page may be it): the roots read once for every
+      // one missing, none told while none is found (a block's id mistyped, a database deleted)
+      if (this.missing.size) this.checkFound();
     });
+  }
+
+  /**
+   * The roots read for the databases not found before, one reading at a time: those asked for meanwhile (the index
+   * built page by page as a space opens) one reading after it, not one each
+   */
+  private checkFound(): void {
+    if (this.checking) {
+      this.checkAgain = true;
+      return;
+    }
+    this.checking = this.tellFound()
+      // (The index failing as it is rebuilt: asked again at its next change)
+      .catch((error: unknown) => console.warn("Silverware Database: the databases not found yet were not read again", error))
+      .finally(() => {
+        this.checking = undefined;
+        const again = this.checkAgain;
+        this.checkAgain = false;
+        if (again && this.missing.size) this.checkFound();
+      });
+  }
+
+  /** The databases not found before whose root the index has now: their roots known, told, so what shows one reads it */
+  private async tellFound(): Promise<void> {
+    for (const object of await this.objects(ROOT_TAG)) {
+      const read = this.versionNamed(versionOf(object)).readRoot(object, versionOf(object));
+      if ("problem" in read || !this.missing.delete(read.record.database.id)) continue;
+      // (Known at once: its pages indexed before it is read again are its changes)
+      this.roots.set(read.record.database.id, String(object.name));
+      for (const listener of this.listeners) listener({ database: read.record.database.id });
+    }
   }
 
   async databases(): Promise<readonly DatabaseSummary[]> {
@@ -205,6 +253,7 @@ export class PagesStore implements DatabaseStore {
       if ("problem" in read || seen.has(read.record.database.id)) continue;
       seen.add(read.record.database.id);
       this.roots.set(read.record.database.id, String(object.name));
+      this.missing.delete(read.record.database.id);
       out.push({ id: read.record.database.id, name: read.record.database.name });
     }
     return out;
@@ -586,7 +635,9 @@ export class PagesStore implements DatabaseStore {
     // The holds this write makes (another write of the page at once makes its own: each marks and puts back its own alone)
     const mine = new Map<string, Held>();
     if (planned.renamedTo !== undefined) mine.set(planned.page, { object: undefined, tags });
-    mine.set(to, part.after === undefined ? { object: undefined, tags } : { object: this.objectOf(part, to, planned.page), tags, facts: this.heldFactsOf(part, to, planned.page), ...(part.gone?.length ? { gone: part.gone } : {}) });
+    // (Written again before the index had the write before: its pass seen through, a query having this one lets it go)
+    const skips = held.get(to)?.written ? { skips: 1 } : {};
+    mine.set(to, part.after === undefined ? { object: undefined, tags, ...skips } : { object: this.objectOf(part, to, planned.page), tags, facts: this.heldFactsOf(part, to, planned.page), ...(part.gone?.length ? { gone: part.gone } : {}), ...skips });
     for (const [one, hold] of mine) this.wrote.set(one, hold);
     const report = await this.writer.apply(part.pagePlan);
     // (The write done: what the index starts on from now has it)
@@ -657,6 +708,7 @@ export class PagesStore implements DatabaseStore {
       if ("problem" in read || read.record.database.id !== id) continue;
       const root = String(object.name);
       this.roots.set(id, root);
+      this.missing.delete(id);
       const items = new Map<ItemKey, { page: string; item: ItemState; revision: string }>();
       // (This database's pages' facts read anew: one gone forgets its own, so a page made again under its name is not given them)
       for (const page of [...this.facts.keys()]) if (page.startsWith(`${root}/`)) this.facts.delete(page);
@@ -679,9 +731,10 @@ export class PagesStore implements DatabaseStore {
       }
       return { root, folder: root, made: this.makingOf(root), version, record: read.record, recordRevision: revisionOf(read.record), items };
     }
-    // No root of the id: a root made again later is another making
+    // No root of the id: a root made again later is another making; told as the index changes until it is found
     const root = this.roots.get(id);
     if (root) this.makings.delete(root);
+    this.missing.add(id);
     return undefined;
   }
 
@@ -752,9 +805,17 @@ export class PagesStore implements DatabaseStore {
   }
 }
 
+/** A root page's properties in their order (their keys), none where it holds none */
+function propertyOrder(object: IndexedObject): string {
+  const properties = systemOf(object).properties;
+  return properties && typeof properties === "object" && !Array.isArray(properties) ? Object.keys(properties).join("\n") : "";
+}
+
 /** Whether the index has a page as the store wrote it: its own data and its values (its tags may be more), none of the keys it took off */
 function caughtUp(indexed: IndexedObject, mine: IndexedObject, gone: readonly string[] = []): boolean {
   if (stableText(systemOf(indexed)) !== stableText(systemOf(mine))) return false;
+  // (The properties' order too, which the text above sorts away: a property moved is a change of the order alone)
+  if (propertyOrder(indexed) !== propertyOrder(mine)) return false;
   if (gone.some((key) => key in indexed)) return false;
   // (The index's values in the model's form, as the store holds them: a list of numbers as texts, a map as its JSON)
   return Object.entries(mine).every(([key, value]) => key === "name" || key === "tags" || key === "_database" || stableText(modelValue(indexed[key])) === stableText(value));

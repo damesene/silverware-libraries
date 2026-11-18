@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { pageChanges } from "../../../../shared/pages/changes.ts";
 import { pageWriter } from "../../../../shared/pages/writer.ts";
 import { writeYamlEntry } from "../../../../shared/yaml/tree.ts";
@@ -116,6 +116,34 @@ describe("the pages store", () => {
     expect(await shown()).toEqual(before);
     const [fix] = (await store.items("tasks")).value;
     expect((await store.apply(await store.plan({ ...changes("tasks", { kind: "setValue", item: fix!.key, key: "status", value: "Todo" }), expects: { items: { [fix!.key]: fix!.revision } } }))).written).toHaveLength(1);
+  });
+
+  it("tells a database read before the index had its root page once a page is indexed, until it is found", async () => {
+    const { memory, store } = harness([]);
+    const told: string[] = [];
+    store.onChanged((change) => told.push(change.database));
+    // (Read as a page opens, the index still being built: not there)
+    expect(await store.database("tasks")).toBeUndefined();
+    memory.writeOutside("db-tasks", "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n---\n");
+    await vi.waitFor(() => expect(told).toEqual(["tasks"]));
+    expect((await store.database("tasks"))?.value.name).toBe("Tasks");
+    // Found: told only as its own pages change
+    memory.writeOutside("Elsewhere", "x");
+    expect(told).toEqual(["tasks"]);
+  });
+
+  it("tells a database never found (its id mistyped) at no page indexed, another found the while told", async () => {
+    const { memory, store } = harness([]);
+    const told: string[] = [];
+    store.onChanged((change) => told.push(change.database));
+    expect(await store.database("taks")).toBeUndefined();
+    expect(await store.database("tasks")).toBeUndefined();
+    memory.writeOutside("Elsewhere", "x");
+    memory.writeOutside("Another", "y");
+    memory.writeOutside("db-tasks", "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n---\n");
+    // (The roots read one reading after another: the one that finds "tasks" is after those of the pages before)
+    await vi.waitFor(() => expect(told).toContain("tasks"));
+    expect(told).toEqual(["tasks"]);
   });
 
   it("tells a change of a database's pages made outside it, and reads a page renamed outside as another item", async () => {
@@ -433,6 +461,21 @@ describe("the pages store", () => {
     await core.apply(proposal);
     expect(memory.pages.get("db-tasks")).toContain("note:");
     expect(memory.pages.get("db-tasks/Fix login")).toContain("note: keep me");
+  });
+
+  it("keeps a page written twice as written last though the index's pass over the first write is told after the second", async () => {
+    const text = (key: string) => ({ key, label: key.toUpperCase(), type: "text" as const, params: {}, readonly: false });
+    const { memory, store } = harness([{ database: { id: "tasks", name: "Tasks", properties: ["a", "b", "c", "d"].map(text) }, items: [] }], { lagging: true });
+    const core = new DatabaseCore(store, new TypeRegistry(), { notify: () => {}, ask: () => true });
+    expect(await core.moveProperty("tasks", "a", 1)).not.toHaveProperty("problem");
+    const first = memory.pages.get("db-tasks")!;
+    expect(await core.moveProperty("tasks", "a", 2)).not.toHaveProperty("problem");
+    // (The index read the page after the first write, and tells of it after the second, as SilverBullet's may)
+    memory.indexAs("db-tasks", first);
+    expect((await store.database("tasks"))!.value.properties.map((one) => one.key)).toEqual(["b", "c", "a", "d"]);
+    expect(await core.moveProperty("tasks", "a", 3)).not.toHaveProperty("problem");
+    memory.catchUp();
+    expect((await store.database("tasks"))!.value.properties.map((one) => one.key)).toEqual(["b", "c", "d", "a"]);
   });
 
   it("shows what it wrote where the index tells of the page before a query has it, as SilverBullet's does", async () => {

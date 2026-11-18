@@ -6,7 +6,8 @@
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect } from "@playwright/test";
+import { commandDefined } from "../../scripts/ui-test-helpers.ts";
 import ExcelJS from "exceljs";
 import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 
@@ -34,8 +35,10 @@ export const test = base.extend<{ space: Space }>({
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => {
-      // (SilverBullet answers what it looks for and does not find with a 404, which the page logs)
-      if (m.type() === "error" && !/404/.test(m.text())) errors.push(m.text());
+      // (SilverBullet answers what it looks for and does not find with a 404, which the page logs. Its edge, 2026-11,
+      // indexes a file deleted or renamed after it is gone, its index plug's `indexDocument` failing to read it: its
+      // own, not ours; a preview kept is taken away and written again by Regenerate preview, as Silverware Assets' tests allow)
+      if (m.type() === "error" && !/404|indexDocument|document:index/.test(m.text())) errors.push(m.text());
     });
     try {
       await use(page);
@@ -86,13 +89,6 @@ export const test = base.extend<{ space: Space }>({
 
 // (Silverware Assets' command: defined once its init page ran, Silverware Assets XLSX's after it)
 const ASSETS_SETTINGS = "Silverware Assets: Settings";
-
-type Client = { clientSystem: { commandHook: { buildAllCommands(): Map<string, unknown> } } };
-
-/** Waits until Space Lua has defined a command (it loads after the page): its plugin started */
-async function commandDefined(page: Page, name: string): Promise<void> {
-  await page.waitForFunction((command) => (window as unknown as { client: Client }).client.clientSystem.commandHook.buildAllCommands().has(command), name);
-}
 
 /** A workbook made with ExcelJS in Node, as `build` fills it */
 export async function xlsxOf(build: (workbook: ExcelJS.Workbook) => void): Promise<Uint8Array> {

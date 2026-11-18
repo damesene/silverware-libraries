@@ -112,6 +112,8 @@ test.describe("The held header", () => {
     const rows = Array.from({ length: 40 }, (_, i) => `| Row ${i + 1} | ${i * 3} |`).join("\n");
     await setPage(page, `# Test\n\nText above.\n\n| Name | Qty |\n|---|---|\n${rows}\n\nText below.\n`);
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(40);
+    // (Its header sticky against its box: told as the table is laid out, after its rows are drawn)
+    await expect(table(page)).toHaveClass(/swt-sticky-inside/);
     // Scrolled and read in one go, before any scroll event's script: where the browser alone holds the header
     const at = await table(page).evaluate((w) => {
       w.scrollTop = 250;

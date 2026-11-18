@@ -1,5 +1,9 @@
 # Silverware Toolbar: changelog
 
+## 1.1.1 (2026-11-18)
+
+- Fix: Esc pressed right after closing the actions popup hides the toolbar for good (it came back a moment later).
+
 ## 1.1.0 (2026-11-17)
 
 - Works with SilverBullet's next version (3.0) as well as 2.12.1: its settings are saved in `Library/Config` there, where SilverBullet keeps them (`CONFIG` in 2.12.1 and before).

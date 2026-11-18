@@ -1,4 +1,4 @@
-import { editorText, expect, fieldReady, fieldText, item, root, runCommand, test, waitForIndex } from "./helpers.ts";
+import { boxOf, caretAtEnd, editorText, expect, fieldReady, fieldText, item, root, runCommand, test, waitForIndex } from "./helpers.ts";
 
 // (The test's own view named: the built-in ones come first in the switcher)
 const BLOCK = "```silverware-database\nid: tasks\nview: names\n```\n";
@@ -14,6 +14,20 @@ async function pickView(page: import("@playwright/test").Page, label: string, pl
 async function choose(page: import("@playwright/test").Page, label: string): Promise<void> {
   await page.locator(".swd-menu .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: new RegExp(`^${label}(:|$)`) }) }).first().click();
 }
+
+test("a block whose database the index has not yet (its root page indexed after the page opened) draws it once it has", async ({ page, space }) => {
+  // The page alone: its database's pages come after it is drawn, as the index has them later (SilverBullet indexing a
+  // space as a page opens). An id of its own: another test's database of the server's space is none of this one's
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: latecomer\nview: list\n```\n" }, "Page");
+  await expect(page.locator(".swd-place")).toContainText('No database "latecomer"');
+  type Client = { clientSystem: { localSyscall(name: string, args: unknown[]): Promise<unknown> } };
+  const pages = { "Page/db-latecomer": root("latecomer", "Latecomer"), "Page/db-latecomer/Fix login": item("Todo", "a0"), "Page/db-latecomer/Write docs": item("Done", "a1") };
+  for (const [name, text] of Object.entries(pages)) {
+    await page.evaluate(([name, text]) => (window as unknown as { client: Client }).client.clientSystem.localSyscall("space.writePage", [name, text]), [`${space.folder}/${name}`, text] as const);
+  }
+  // Drawn as the index has its root page and items, nothing else done
+  await expect(page.locator(".swd-list-name")).toHaveText(["Fix login", "Write docs"]);
+});
 
 test("a block draws its database: the view shown in its picker, the views on in its menu, the one shown its items", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${BLOCK}`, ...TASKS }, "Page");
@@ -228,21 +242,58 @@ ${BLOCK}`, ...TASKS }, "Page");
 test("a press beside the block, on its lines, does not show its markdown", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${BLOCK}\nAfter\n`, ...TASKS }, "Page");
   await expect(page.locator(".test-item")).toHaveCount(2);
-  const widget = (await page.locator(".swd-widget").boundingBox())!;
-  const place = (await page.locator(".swd-place").boundingBox())!;
-  const closing = (await page.locator(".cm-line.sb-fenced-code-hide").first().boundingBox())!;
-  const content = (await page.locator(".cm-content").boundingBox())!;
+  // (The caret out of the block, at the page's end, before each press: SilverBullet after 2.12.1 puts it at the block's
+  // start as the focus goes into the block (a press in its margin), its markdown then shown once the editor has the focus
+  // again, whatever a press beside did; each press is told by what it does alone)
+  type Box = { x: number; y: number; width: number; height: number };
+  const box = (selector: string) => () => boxOf(page.locator(selector).first());
+  const [widget, place, closing, content] = [box(".swd-widget"), box(".swd-place"), box(".cm-line.sb-fenced-code-hide"), box(".cm-content")];
+  // A point of the content's padding right of the block where the press lands in the editor: not on what another
+  // plugin lays beside the block there (Silverware Layout's handle of its width), whose press is that plugin's
+  const besideRight = async (from: Box, to: Box, y: number): Promise<readonly [number, number]> => {
+    const x = await page.evaluate(
+      ([left, right, y]) => {
+        for (let x = right; x > left; x--) {
+          const hit = document.elementFromPoint(x, y);
+          if (hit && hit.closest(".cm-editor") && !hit.closest(".swd-widget")) return x;
+        }
+        return undefined;
+      },
+      [from.x + from.width + 1, to.x + to.width - 2, y] as const,
+    );
+    if (x === undefined) throw new Error("no point right of the block is the editor's");
+    return [x, y];
+  };
   // In the widget's margin above the place, on the closing fence hidden under it, and left and right of the block in the
-  // editor, on none of its lines (the content's padding, the room beside it), which CodeMirror puts on the block's line
-  const middle = widget.y + widget.height / 2;
-  for (const [where, x, y] of [
-    ["the widget's margin", widget.x + 40, (widget.y + place.y) / 2],
-    ["the closing fence", closing.x + 40, closing.y + closing.height / 2],
-    ["the content's padding, left", Math.max(content.x + 2, widget.x - 8), middle],
-    ["the content's padding, right", Math.min(content.x + content.width - 2, widget.x + widget.width + 8), middle],
-    ["right of the content", content.x + content.width + 20, middle],
-  ] as const) {
+  // editor, on none of its lines (the content's padding, the room beside it), which CodeMirror puts on the block's line.
+  // Each measured as it is pressed, what it needs alone: a press before may have the block drawn anew (as a line, or a
+  // block of its own: no closing fence's line then), or laid out again (its width)
+  const points: readonly (readonly [string, () => Promise<readonly [number, number]>])[] = [
+    ["the widget's margin", async () => {
+      const [w, p] = [await widget(), await place()];
+      return [w.x + 40, (w.y + p.y) / 2];
+    }],
+    ["the closing fence", async () => {
+      const c = await closing();
+      return [c.x + 40, c.y + c.height / 2];
+    }],
+    ["the content's padding, left", async () => {
+      const [w, c] = [await widget(), await content()];
+      return [Math.max(c.x + 2, w.x - 8), w.y + w.height / 2];
+    }],
+    ["the content's padding, right", async () => {
+      const [w, c] = [await widget(), await content()];
+      return besideRight(w, c, w.y + w.height / 2);
+    }],
+    ["right of the content", async () => {
+      const [w, c] = [await widget(), await content()];
+      return [c.x + c.width + 20, w.y + w.height / 2];
+    }],
+  ];
+  for (const [where, at] of points) {
     await test.step(where, async () => {
+      await caretAtEnd(page);
+      const [x, y] = await at();
       await page.mouse.click(x, y);
       await expect(page.locator(".swd-place")).toBeVisible();
       await expect(page.locator(".cm-line", { hasText: "```silverware-database" })).toHaveCount(0);
@@ -472,9 +523,10 @@ test("a table grouped under Group by is one table, a part per group with its own
   await expect(groups.locator(".swd-table-headrow")).toHaveCount(2);
   // Each group's header cells where the other's are: one table's columns
   const lefts = (at: number) => groups.nth(at).locator(".swd-table-headrow > th").evaluateAll((all) => all.map((one) => Math.round(one.getBoundingClientRect().left)));
+  // (Measured once every row is there: the long name widens its column)
+  await expect(groups.nth(1).locator("tr[data-item]")).toHaveCount(2);
   expect(await lefts(0)).toEqual(await lefts(1));
   const before = await lefts(1);
-  await expect(groups.nth(1).locator("tr[data-item]")).toHaveCount(2);
   await groups.nth(1).locator(".swd-table-add").click();
   await expect.poll(() => space.saved("Page/db-tasks/Untitled")).toContain("status: Done");
   await expect(groups.nth(1).locator("tr[data-item]")).toHaveCount(3);
@@ -539,10 +591,7 @@ test("the command New database makes its root page beside the page open and its 
   await space.open({ Page: "# Page\n\ntext\n" }, "Page");
   // (The page's text loaded first: loading it puts the cursor at its start)
   await expect.poll(() => editorText(page)).toBe("# Page\n\ntext\n");
-  await page.evaluate(() => {
-    const view = (window as unknown as { client: { editorView: { state: { doc: { length: number } }; dispatch(spec: unknown): void } } }).client.editorView;
-    view.dispatch({ selection: { anchor: view.state.doc.length } });
-  });
+  await caretAtEnd(page);
   await runCommand(page, "Silverware Database: New database");
   const field = page.locator(".sb-modal-box input").first();
   await field.fill("Ideas");
@@ -804,6 +853,10 @@ test("a reference: pages picked, kept as wiki links, opened by a press, renamed 
 test("a property's key changed in Properties follows into its views' blocks on every page, said in the review, its items with it", async ({ page, space }) => {
   const other = "# Other\n\n```silverware-database\nid: tasks\nview: list\nlist.colorBy: status\nlist.filter: {\"status\":\"Todo\"}\n```\n";
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: board\nboard.groupBy: status\n```\n", "Page/Other": other, ...TASKS }, "Page");
+  // (Its items and pages in the index first: a change written over items the index had not all yet is refused, as
+  // changed since it was planned)
+  for (const name of ["Fix login", "Write docs"]) await waitForIndex(page, "db", `${space.folder}/Page/db-tasks/${name}`);
+  await waitForIndex(page, "page", `${space.folder}/Page/Other`);
   await page.locator(".swd-more").click();
   await choose(page, "Properties");
   await page.locator('[data-property="status"] .swd-prop-head').click();
@@ -996,6 +1049,8 @@ test("an item's icon picked in the peek, an icon of Silverware Icons then an emo
   await page.locator(".swd-peek-color").click();
   await page.locator('.swd-peek-pop-color[aria-label="Green"]').click();
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("color: green");
+  // (The colors' choice gone first: open, Esc would close it, not the peek)
+  await expect(page.locator(".swd-peek-pop-color")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.locator(".swd-peek")).toHaveCount(0);
   const card = page.locator(".swd-board-card", { hasText: "Fix login" });
@@ -1149,15 +1204,25 @@ test("in the peek's editor a task's box looks as the page's, though the peek han
     await expect(body.locator(".cm-content")).toBeVisible({ timeout: 1000 });
   }).toPass({ timeout: 20_000 });
   await expect.poll(() => fieldReady(body)).toBe(true);
+  // (None where the box found was gone as it was measured: the editor draws its line anew)
   const look = (box: import("@playwright/test").Locator) =>
     box.evaluate((one) => {
+      if (!one.isConnected) return undefined;
       const style = getComputedStyle(one);
       return [Math.round(parseFloat(style.width)), Math.round(parseFloat(style.height)), style.borderTopLeftRadius, style.borderTopColor, style.backgroundColor];
     });
-  const inPage = page.locator("#sb-main .cm-content input[type=checkbox]").first();
+  // (The page's own, out of the database's place: the sample of the page's look the peek reads is put there a moment)
+  const inPage = page.locator("#sb-main .cm-content input[type=checkbox]:not(.swd-place *)").first();
   const inPeek = body.locator("input[type=checkbox]").first();
   await expect(inPeek).toBeVisible();
-  expect(await look(inPeek)).toEqual(await look(inPage));
+  // (Both measured as they are in the page: the two looks, or which one was not)
+  await expect
+    .poll(async () => {
+      const [peek, own] = [await look(inPeek), await look(inPage)];
+      if (!peek || !own) return "measuring";
+      return JSON.stringify(peek) === JSON.stringify(own) ? "the same" : { peek, own };
+    })
+    .toBe("the same");
 });
 
 test("Delete database… in ⋯ deletes its pages and its blocks on every page once its name is typed; Undo brings them back", async ({ page, space }) => {
@@ -1261,16 +1326,23 @@ test("the peek's properties scroll in their own box past a height, the content u
   });
   await peek.locator(`.swd-peek-row[data-property="${lowest}"]`).hover();
   await peek.locator(`.swd-peek-row[data-property="${lowest}"] .swd-peek-grip`).focus();
+  // (The properties' order as the root page keeps it)
+  const savedOrder = async () => [...((await space.saved("Page/db-tasks")) ?? "").matchAll(/^ {4}(p\d+):/gm)].map((one) => one[1]);
+  const moved = (await savedOrder()).filter((key) => key !== lowest);
+  moved.splice((await savedOrder()).indexOf(lowest) + 3, 0, lowest);
   for (let n = 0; n < 3; n++) {
     await page.keyboard.press("Alt+ArrowDown");
     await expect.poll(() => shownInBox(lowest)).toBe(true);
   }
+  // (Each move written, one after another, before a row is dragged)
+  await expect.poll(savedOrder).toEqual(moved);
   // A row dragged by its grip to the box's bottom edge: the box scrolls on (the rows past it reachable)
   await box.evaluate((one) => (one.scrollTop = 0));
   const first = peek.locator('.swd-peek-row[data-property="p0"]');
   await first.hover();
-  const grip = (await first.locator(".swd-peek-grip").boundingBox())!;
-  const edges = (await box.boundingBox())!;
+  // (The grip shown as its row is hovered: its box once it is)
+  const grip = await boxOf(first.locator(".swd-peek-grip"));
+  const edges = await boxOf(box);
   await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
   await page.mouse.down();
   await page.mouse.move(grip.x + grip.width / 2, edges.y + edges.height - 6, { steps: 8 });

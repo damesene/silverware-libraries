@@ -7,6 +7,7 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Page } from "@playwright/test";
+import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 
 export { expect };
@@ -38,12 +39,17 @@ export const test = base.extend<{ open: (text: string) => Promise<void> }>({
     }
   },
   open: async ({ page }, use) => {
+    let watching = false;
     await use(async (text) => {
       const name = `${FOLDER}/${test.info().title.replace(/[^\w ]/g, "").slice(0, 40).trim()}`;
       const path = join(server().space, `${name}.md`);
       await mkdir(dirname(path), { recursive: true });
       await writeFile(path, text);
+      // (Loaded whole: SilverBullet draws its editor anew once its first index is complete, a menu open then closed)
+      if (!watching) await watchReloads(page);
+      watching = true;
       await page.goto(`http://127.0.0.1:${server().port}/${name}`);
+      await loaded(page);
     });
   },
 });

@@ -591,6 +591,57 @@ describe("Rename… in a file's menu", () => {
 });
 
 describe("a link's menu", () => {
+  it("stays open as the links are decorated again with the same (the files drawn again for a type registered), its arrow the same", async () => {
+    const { decorator } = setUp("See [[report.pdf]] here.\n");
+    const element = Object.assign(document.createElement("a"), { textContent: "report.pdf", href: "report.pdf" });
+    document.body.append(element);
+    await decorator.decorateLinks([{ element, target: "report.pdf", style: "wiki" }]);
+    const arrow = element.querySelector<HTMLElement>(".swa-link-marker")!;
+    arrow.click();
+    expect(document.querySelector(".swa-popup")).not.toBeNull();
+    await decorator.redecorateAll();
+    expect(element.querySelector(".swa-link-marker")).toBe(arrow);
+    expect(document.querySelector(".swa-popup")).not.toBeNull();
+  });
+
+  it("opens from its arrow after the link was out of the page as others were decorated, and back (a grid's cell taken over)", async () => {
+    const { decorator } = setUp("See [[report.pdf]] and [[other.pdf]] here.\n");
+    const cell = document.createElement("div");
+    const element = Object.assign(document.createElement("a"), { textContent: "report.pdf", href: "report.pdf" });
+    let followed = 0;
+    element.addEventListener("click", () => followed++);
+    cell.append(element);
+    document.body.append(cell);
+    await decorator.decorateLinks([{ element, target: "report.pdf", style: "wiki" }]);
+    cell.remove();
+    const other = Object.assign(document.createElement("a"), { textContent: "other.pdf", href: "other.pdf" });
+    document.body.append(other);
+    await decorator.decorateLinks([{ element: other, target: "other.pdf", style: "wiki" }]);
+    document.body.append(cell);
+    element.querySelector<HTMLElement>(".swa-link-marker")!.click();
+    expect(document.querySelector(".swa-popup")).not.toBeNull();
+    expect(followed).toBe(0);
+  });
+
+  it("keeps its arrow as a type registered replaces the link's own, its menu opened by it as of that type", async () => {
+    const { registry, decorator } = setUp("See [[report.pdf]] here.\n");
+    const element = Object.assign(document.createElement("a"), { textContent: "report.pdf", href: "report.pdf" });
+    let followed = 0;
+    element.addEventListener("click", () => followed++);
+    document.body.append(element);
+    await decorator.decorateLinks([{ element, target: "report.pdf", style: "wiki" }]);
+    const arrow = element.querySelector<HTMLElement>(".swa-link-marker")!;
+    registry.types.register({ name: "pdf", match: { kind: ["file"], ext: ["pdf"] }, icon: "<svg class='own-pdf'/>" } as AssetType);
+    await decorator.redecorateAll();
+    // (The same element: a press on it as it is decorated again stays its own)
+    expect(element.querySelectorAll(".swa-link-marker")).toHaveLength(1);
+    expect(element.querySelector(".swa-link-marker")).toBe(arrow);
+    expect(element.querySelector(".own-pdf")).not.toBeNull();
+    arrow.click();
+    expect(document.querySelector(".swa-popup")).not.toBeNull();
+    expect(followed).toBe(0);
+  });
+
   it("offers an image's preview, as an embed of it has one (the browser's drawing, smaller), and writes the embed shown so", async () => {
     const { state, decorator } = setUp("See [[cat.png]] here.\n");
     const element = Object.assign(document.createElement("a"), { textContent: "cat.png", href: "cat.png" });

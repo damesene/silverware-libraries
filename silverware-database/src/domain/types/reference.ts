@@ -2,9 +2,9 @@
 // (`[[Projects/Alpha]]`, a text of its own after a bar: `[[Projects/Alpha|Alpha]]`)
 // in a list, one or several: so the index takes it for a link, the document
 // it names lists the item among its links, and a rename of that document
-// (SilverBullet's: the links in frontmatter lists followed since its build of
-// main, 2026-10) writes the new name into it, nothing of the database's
-// doing. One written by hand as a single link, not in a list, reads too.
+// (SilverBullet's: the links in a frontmatter list followed as those in the
+// text, its 2.12.1 release too, probed 2026-11-18: docs/silverware-database-files.md)
+// writes the new name into it, nothing of the database's doing. One written by hand as a single link, not in a list, reads too.
 
 /** A reference read: the document it names (as a link names it: a heading after `#` kept), the text it shows where it has one, and how it was written */
 export type Reference = { readonly target: string; readonly text?: string; readonly written: string };

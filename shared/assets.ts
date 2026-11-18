@@ -113,8 +113,11 @@ export type AssetType = {
 /** What an action is handed */
 export type ActionContext = {
   readonly asset: Asset;
-  /** The asset rendered in a container of the action's (a panel, a popover), as Silverware Assets renders it */
-  render(view: Exclude<AssetView, "card">, container: HTMLElement): Promise<void>;
+  /**
+   * The asset rendered in a container of the action's (a panel, a popover), as Silverware Assets renders it; what the
+   * rendering started ends with `signal` (the action's: its panel closed), else as the file is drawn anew in the page
+   */
+  render(view: Exclude<AssetView, "card">, container: HTMLElement, signal?: AbortSignal): Promise<void>;
   /** A URL opened in a new tab of the browser */
   open(url: string): void;
   /** Where a panel beside the page goes, as the host gives it (none: the window) */
@@ -146,6 +149,22 @@ export function assetName(asset: Asset): string {
   return asset.page;
 }
 
+/** The room a preview is drawn into (px): it fits in it, its proportions kept */
+export type PreviewBox = { readonly width: number; readonly height: number };
+
+/**
+ * Files given by an event (a paste, a drop), read in it (its clipboard's and its drop's data are read there alone):
+ * the files, the HTML and the address list beside them, which may hold an image's address on the web; where they came
+ * from (a pasted image's name is the time's: the clipboard names every one alike)
+ */
+export type GivenFiles = { readonly files: readonly File[]; readonly html?: string; readonly uriList?: string; readonly source: "clipboard" | "drop" };
+
+/** A file added through Silverware Assets' dialog: the target a link names, its title where one was given */
+export type AddedFile = { readonly target: string; readonly title?: string };
+
+/** Where files uploaded through Silverware Assets' dialog go: the folder their names are offered in (from the space's top) */
+export type FilesPlace = { readonly folder: string };
+
 /** What a plugin registers types and actions with */
 export type Assets = {
   readonly version: number;
@@ -158,6 +177,29 @@ export type Assets = {
    * (not started yet, no file's)
    */
   readonly fieldDrawing?: (page: string) => FieldDrawing;
+  /**
+   * Optional: a file's preview, its target as a link names it (a path of the space resolved against `page`, or an
+   * address of the web), by its type's own renderer, fitted in `box`: no frame, label, menu nor click of its own. Where
+   * its type keeps previews in the space (a PDF's, a document's), only the one kept is drawn, none made anew. Resolved
+   * once drawn; null where none is (no type takes it, none kept, it failed): the caller draws its own. What it started
+   * ends with `signal`
+   */
+  readonly drawPreview?: (target: string, page: string, box: PreviewBox, signal: AbortSignal) => Promise<HTMLElement | null>;
+  /** Optional: a file shown in Silverware Assets' side panel, its target as a link names it (an address of the web: in a new tab where no panel takes it) */
+  readonly showFile?: (target: string, page: string) => void;
+  /**
+   * Optional: files added through Silverware Assets' insert dialog: those an event gave (a link alone too: `uriList`),
+   * or picked in it (the device's files, a link, a file of the space), their names offered in `place.folder`, nothing
+   * asked of how they are shown (a link is the caller's to write). Resolved once they are written: each the target a
+   * link names (a path of the space, an address of the web linked) and its title where one was given, in their order;
+   * undefined where cancelled. A file not written is said, and left out
+   */
+  readonly insertFiles?: (given: GivenFiles | undefined, place: FilesPlace) => Promise<readonly AddedFile[] | undefined>;
+  /**
+   * Optional: files of the space deleted, as *Delete file…* deletes one, the previews kept of them with them; nothing
+   * asked (the caller asks, naming them). Resolved with the paths not deleted, nothing said of them (the caller says)
+   */
+  readonly deleteFiles?: (paths: readonly string[]) => Promise<readonly string[]>;
 };
 
 /** Silverware Assets' API as handed over, where it is of this version; else the stand-in, registering nothing */

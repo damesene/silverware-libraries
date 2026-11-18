@@ -45,6 +45,10 @@ export type Bridge = {
   deletePage(name: string): Promise<void>;
   // Every page's name
   listPages(): Promise<readonly string[]>;
+  // Every file's path (not the pages'): the files a value of files is picked from; none: none listed
+  listDocuments?(): Promise<unknown>;
+  // A file deleted from the space (a database's files deleted with it); none: none deleted
+  deleteDocument?(path: string): Promise<void>;
   // index.renamePageCommand: links followed; its answer is the same whether it renamed or not
   renamePage(from: string, to: string): Promise<unknown>;
   // index.renamePrefixCommand, without asking
@@ -78,7 +82,7 @@ export type Bridge = {
  * table was empty, which comes to JS as an empty object (seen 2026-11-07: a
  * space with no database, its query of `db-root` none)
  */
-function listOf<T>(value: unknown): T[] {
+export function listOf<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 

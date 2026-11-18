@@ -77,7 +77,7 @@ test("other plugins' actions in a grid's cell: Upload file puts the file into th
   await popup(page).locator('[data-swb-action="actions.assetsUploadFile"]').click();
   const dialog = page.locator(".swa-dialog.swa-insert-window");
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "Files…" }).click();
+  await dialog.getByRole("button", { name: "Browse…" }).click();
   await (await chooser).setFiles({ name: "photo.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") });
   const path = await dialog.locator(".swa-insert-path").inputValue();
   await dialog.getByRole("button", { name: "Insert" }).click();

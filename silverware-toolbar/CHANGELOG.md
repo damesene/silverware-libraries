@@ -1,5 +1,10 @@
 # Silverware Toolbar: changelog
 
+## 1.1.2 (2026-11-19)
+
+- Fixed: letting go of a favourite dragged in the settings, or cancelling the drag with Esc, no longer counts as a click on what lies under the pointer.
+- The settings' lists and the actions' popup scroll with a thin scrollbar, the same in every Silverware plugin.
+
 ## 1.1.1 (2026-11-18)
 
 - Fix: Esc pressed right after closing the actions popup hides the toolbar for good (it came back a moment later).

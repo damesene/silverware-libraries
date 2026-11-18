@@ -1,5 +1,9 @@
 # Silverware Chart: changelog
 
+## 1.2.1 (2026-11-19)
+
+- Panels, menus and dialogs scroll with a thin scrollbar, the same in every Silverware plugin; SilverBullet's own scrollbar is unchanged.
+
 ## 1.2.0 (2026-11-17)
 
 - Works with SilverBullet's next version (3.0) as well as 2.12.1; there, custom formats are given in a `space-lua` block on a page under `Library/`.

@@ -1228,19 +1228,8 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   padding-top: var(--swd-cell-pad-y);
   padding-bottom: var(--swd-cell-pad-y);
 }
-/* The grip's own cell no higher than the others' (their first line and its room), the grip in the middle of that: a
-   row as high as its text makes it, as a table's of Silverware Table whose handle adds nothing, however small the font
-   (a block, not on the line's baseline, which put it lower in a large font) */
-:is(#sb-main, html) .swd-place .swd-table td.swd-table-grip {
-  --swd-grip-pad-y: max(0px, (1lh + 2 * var(--swd-cell-pad-y) - 22px) / 2);
-  padding-top: var(--swd-grip-pad-y);
-  padding-bottom: var(--swd-grip-pad-y);
-}
-.swd-table td.swd-table-grip .swd-row-grip {
-  display: flex;
-}
-.swd-table th:not(.swd-table-gripcol):not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]),
-.swd-table td:not(.swd-table-grip):not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]) {
+.swd-table th:not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]),
+.swd-table td:not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]) {
   min-width: 6em;
   max-width: var(--swd-cell-max-width, 24em);
   overflow-wrap: anywhere;
@@ -1362,12 +1351,23 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 .swd-table td[data-key="name"] {
   min-width: 8em;
 }
-/* A row's grip: dragged to its place by hand (the table's first column, a list's line's start); shown as its row is hovered or
-   it has the focus, always on a touch screen; none to press while the view is sorted */
-.swd-table th.swd-table-gripcol,
-.swd-table td.swd-table-grip {
-  width: 18px;
-  padding: 4px 0 4px 2px;
+/* A row's grip: dragged to its place by hand (a table's at the left edge of its name's cell, as Silverware Table's grip lies
+   at a table's edge, no column of its own; a list's line's start); shown as its row is hovered or it has the focus, always
+   on a touch screen; none to press while the view is sorted. The name's cell and its header as far in, whatever room
+   SilverBullet gives a cell (8px in 2.12.1, 16px since): :is() weighs as an id */
+:is(#sb-main, html) .swd-place .swd-table :is(td[data-key="name"], .swd-table-headrow > th:first-child) {
+  padding-left: 20px;
+}
+/* (Its cell's, not its content's: kept so where the content is held under an editor, adding no width. The cell's font and
+   line: `1lh` below its first line's, not a button's own) */
+.swd-table td[data-key="name"] .swd-row-grip {
+  font: inherit;
+  line-height: inherit;
+  position: absolute;
+  left: 2px;
+  /* (By the name's first line, in its middle) */
+  top: calc(var(--swd-cell-pad-y) + (1lh - 22px) / 2);
+  width: 16px;
 }
 /* (Its size whatever the font's, as Silverware Table's handle) */
 .swd-row-grip {
@@ -2765,6 +2765,15 @@ tr:focus-within .swd-open {
 .swd-delete-ask[hidden] {
   display: none;
 }
+/* Its uploaded files, deleted with it where ticked */
+.swd-delete-files {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.swd-delete-files[hidden] {
+  display: none;
+}
 .swd-delete-name {
   padding: 6px 8px;
   border: 1px solid var(--swd-settings-line);
@@ -3125,6 +3134,126 @@ tr:focus-within .swd-open {
 .swd-reference-folder {
   opacity: 0.7;
 }
+/* Files (Files & media): side by side, each a button opening it. A small line of a fixed height (a table's cell, a list's
+   row, a card's line), the rest counted; a large one (the peek's row) wrapping. Each file in its box, whose size the
+   script sets on it as variables (`--swd-media-width`, `--swd-media-height`), times the content's zoom
+   (`--sw-content-scale`, Silverware Layout's: files zoom with the text); an image held in it from the first (a large one
+   drawn before it has loaded), then sized by the script once loaded (fitted in its box, cropped to its middle where too
+   narrow or too low); another file its preview, else its icon and name */
+.swd-media-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.swd-media-strip.swd-media-small {
+  height: var(--swd-media-height);
+  overflow: hidden;
+}
+.swd-media-strip.swd-media-large {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.swd-media-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+}
+/* A small line narrower than its files (a board's card): each shrinks, a name cut, an image its middle shown; the
+   rest's count kept whole */
+.swd-media-small .swd-media-button {
+  flex: 0 1 auto;
+  min-width: 20px;
+}
+.swd-media-small .swd-media,
+.swd-media-small .swd-media-name {
+  min-width: 0;
+}
+.swd-media-button:focus-visible {
+  outline: 2px solid var(--swd-accent);
+  outline-offset: 1px;
+}
+/* At most its box's width, in px alone: a percentage there counts for nothing as its button is sized by its content, which
+   took a long name's whole width (the button wider than its card, hovered and pressed past it to the line's end). Narrower
+   where its button is (a flex item of it, shrinking) */
+.swd-media {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: var(--swd-media-width, 100%);
+  max-height: var(--swd-media-height, none);
+}
+.swd-media img {
+  display: block;
+  max-width: var(--swd-media-width);
+  max-height: var(--swd-media-height);
+  object-fit: contain;
+  border-radius: 3px;
+}
+/* A file not drawn: its icon and name, a quiet pill */
+.swd-media[data-swd-media="file"] {
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--swd-line);
+  border-radius: 4px;
+  background: var(--swd-surface);
+}
+.swd-media-small .swd-media[data-swd-media="file"] {
+  /* (Within its line's box, as much of it at any zoom: 24px of 28 at none) */
+  height: calc(var(--swd-media-height) * 6 / 7);
+  box-sizing: border-box;
+  font-size: 0.85em;
+}
+.swd-media-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--swd-quiet);
+}
+/* (As large as the name beside it: zoomed with the text) */
+.swd-media-icon svg {
+  width: 1.15em;
+  height: 1.15em;
+}
+.swd-media-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swd-media-button:hover .swd-media[data-swd-media="file"] {
+  background: var(--swd-hover);
+}
+/* A preview of another plugin's: as large as its box lets it, cut at its right where it is wider (a document's) */
+.swd-media[data-swd-media="preview"] {
+  justify-content: flex-start;
+  overflow: hidden;
+}
+.swd-media[data-swd-media="preview"] > * {
+  max-width: 100%;
+  max-height: 100%;
+}
+/* Where files dragged over it go (a value of files: a table's cell, a card, the peek's row, the files' editor) */
+.swd-files-over {
+  outline: 2px dashed var(--swd-accent);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--swd-accent) 8%, transparent);
+}
+.swd-media-more {
+  flex: none;
+  padding: 0 4px;
+  color: var(--swd-quiet);
+  font-size: 0.85em;
+}
 /* References' editor: a search over the pages, the pages picked then those found, a box each; the list scrolls */
 .swd-editor-documents {
   min-width: 16em;
@@ -3204,6 +3333,166 @@ button.swd-editor-document-folder:hover,
   padding: 2px 4px;
   color: var(--swd-quiet);
   font-size: 0.9em;
+}
+/* Files' editor: its files a row each (a grip, the file drawn, its name, ×), scrolled where many; a search of the space's
+   files under them, those found a button each (its name, its folder under it), Upload last */
+.swd-editor-files {
+  /* (Its height cut to the room it has: its list alone scrolls, the field always in view) */
+  overflow: hidden;
+  gap: 6px;
+  /* (As wide as a file's picture, at most 150px, with its grip and its ⋯) */
+  width: min(250px, 90vw);
+  font-size: 0.9em;
+}
+.swd-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* (Room left under it for the field, Upload and what is found: a phone's screen too) */
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(40vh, 30em);
+  overflow-y: auto;
+}
+.swd-files-list:empty {
+  display: none;
+}
+.swd-files-row {
+  display: grid;
+  /* (Every ⋯ at the right, a few px from the edge: one place to press, whatever the picture's width) */
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding-right: 4px;
+  gap: 6px;
+  align-items: center;
+  padding: 2px;
+  border-radius: 4px;
+}
+.swd-files-row:hover {
+  background: var(--swd-hover);
+}
+.swd-files-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swd-files-grip,
+.swd-files-more {
+  display: inline-flex;
+  padding: 3px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--swd-quiet);
+  cursor: pointer;
+}
+.swd-files-grip {
+  cursor: grab;
+  touch-action: none;
+}
+.swd-files-grip svg {
+  width: 14px;
+  height: 14px;
+}
+/* A file's menu: by its ⋯ (beside the file), over everything, the script placing it within the window */
+.swd-files-menu-box {
+  position: relative;
+}
+.swd-files-menu {
+  position: fixed;
+  z-index: var(--sw-layer-dialog);
+  display: flex;
+  flex-direction: column;
+  min-width: 10em;
+  padding: 4px;
+  border: 1px solid var(--swd-line);
+  border-radius: 6px;
+  background: var(--root-background-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.swd-files-menu[hidden] {
+  display: none;
+}
+.swd-files-menu > * {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.swd-files-menu > :hover,
+.swd-files-menu > :focus-visible {
+  background: var(--swd-hover);
+}
+.swd-files-grip:hover,
+.swd-files-more:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: var(--root-color, currentColor);
+}
+/* The field adding a file, Upload beside it; those found under them, a line each, cut where long */
+.swd-files-add {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.swd-files-add .swd-editor-search {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+}
+.swd-files-upload {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--swd-line);
+  border-radius: 4px;
+  background: var(--swd-surface);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.swd-files-upload:hover:not(:disabled) {
+  background: var(--swd-hover);
+}
+.swd-files-upload:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.swd-files-found {
+  max-height: 12em;
+  overflow-x: hidden;
+}
+.swd-files-found[hidden] {
+  display: none;
+}
+.swd-files-found-item {
+  display: grid;
+  justify-items: start;
+  width: 100%;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.swd-files-found-item:hover,
+.swd-files-found-item:focus-visible {
+  background: var(--swd-hover);
+}
+.swd-files-found-item .swd-editor-document-folder {
+  grid-column: 1;
+}
+.swd-files-found-item > * {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .swd-editor-new {
   color: var(--swd-quiet);
@@ -4077,7 +4366,8 @@ button.swd-peek-label:hover {
 }
 /* An editor of choices in the peek (a select's boxes, references, a link's fields): in its row, not over it (a panel over
    the properties' box was cut by its edge), as narrow as the row is (a phone's), framed as a field rather than lifted */
-.swd-peek-value > .swd-editor-choices {
+/* (The files' popup not: laid over the page, as in a table, not cut by the properties' box) */
+.swd-peek-value > .swd-editor-choices:not(.swd-editor-files) {
   position: static;
   width: 100%;
   min-width: 0;
@@ -4139,4 +4429,14 @@ button.swd-peek-label:hover {
 .swd-peek-body:is(:focus, :focus-within) {
   background: var(--swd-surface);
 }
+/* <shared-scrollbar> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* The boxes of the plugin's own that scroll (a view, a list, a panel, a dialog's body, a menu): a thin scrollbar, its
+   thumb quiet in the text's color and its track clear, the same in every plugin (Silverware Table's first). The page's
+   own scrollbar is SilverBullet's, left as it is. Of no weight of its own (`:where`): a rule of the plugin's for one of
+   them (a strip whose scrollbar is hidden) still holds. A theme sets another thumb by `--sw-scrollbar-thumb` */
+:where(.swd-peek, .swd-peek-props-box, .swd-place-body, .swd-place.swd-over-window, .swd-table-box, .swd-board, .swd-tl-box, .swd-cal-undated-items, .swd-files-list, .swd-editor-list, .swd-floated, .swd-suggest, .swd-menu, .swd-settings-body, .swd-conflict-body) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sw-scrollbar-thumb, color-mix(in srgb, var(--root-color, #333) 30%, transparent)) transparent;
+}
+/* </shared-scrollbar> */
 ```

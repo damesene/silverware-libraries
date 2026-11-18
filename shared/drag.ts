@@ -161,16 +161,37 @@ export function reorder(e: PointerEvent, options: Reorder): void {
     win.removeEventListener("contextmenu", noMenu, true);
     win.cancelAnimationFrame(scrolling);
   };
-  const finish = (dropped: boolean) => {
+  // A drag is no click: the one the browser sends as the pointer goes up (to what holds both the press and where it was let
+  // go: a table's cell, which a click edits) taken before anyone has it; none sent, the catch gone with this turn
+  const noClick = () => {
+    const swallow = (c: MouseEvent) => {
+      c.preventDefault();
+      c.stopPropagation();
+      win.removeEventListener("click", swallow, true);
+    };
+    win.addEventListener("click", swallow, true);
+    win.setTimeout(() => win.removeEventListener("click", swallow, true), 0);
+  };
+  // `held`: ended while the pointer is still down (Esc): the click its going up sends taken too
+  const finish = (dropped: boolean, held = false) => {
     leave();
     const moved = !!ghost;
     ghost?.remove();
     element.classList.remove(`${base}-placeholder`);
+    if (moved && held) {
+      const upped = (u: PointerEvent) => {
+        if (u.pointerId !== e.pointerId) return;
+        win.removeEventListener("pointerup", upped, true);
+        noClick();
+      };
+      win.addEventListener("pointerup", upped, true);
+    }
     if (!dropped || !moved) {
       options.done(undefined);
       if (dropped) options.clicked?.();
       return;
     }
+    noClick();
     const containers = options.containers();
     const container = containers.findIndex((c) => c.contains(element));
     const index = container < 0 ? -1 : options.items(containers[container]!).indexOf(element);
@@ -190,7 +211,7 @@ export function reorder(e: PointerEvent, options: Reorder): void {
     if (k.key !== "Escape" || !ghost) return;
     k.preventDefault();
     k.stopPropagation();
-    finish(false);
+    finish(false, true);
   };
   win.addEventListener("pointermove", move, true);
   win.addEventListener("pointerup", up, true);

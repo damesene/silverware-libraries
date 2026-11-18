@@ -1,7 +1,7 @@
 ---
 name: Library/damesene/silverware-assets
 tags: meta/library
-version: 1.0.3
+version: 1.1.0
 description: "Silverware Assets: embedded files shown full, as a preview or as a card (a zip or a document too), a link to a file with its icon and a menu, a file opened in a side panel or enlarged, a link turned into an embed and back."
 files:
 - silverware-assets.js
@@ -50,15 +50,20 @@ A click on a card or a preview opens the file in a new tab; Shift+click does the
 
 **Paste a file** (Ctrl+V: a screenshot, an image copied from a web page, a file copied), **drop files** on the page, or **upload** (**File: Upload**, the toolbar's paperclip, `/upload`; with Silverware Toolbar, its action **Upload file**, which also puts the files into a grid's cell being edited or a database's peek where you run it there), and a dialog asks how to put them in, a row per file:
 
-- **Its name** in your space, in the page's folder. A file pasted without a name of its own (a screenshot, a photo of the camera) is named by the date and time (`2026-11-15_13-09-48.png`), as SilverBullet names it. A name SilverBullet would not take is offered changed (**Use …**). A file of the same name already in your space is kept, the new one named `-1` after it, unless you choose **Replace it**; two files of one name in the same batch are named apart.
+- **Its title** first: an image's alt text, a link's text (empty: none, the file's name shown where it is named). Under it, what happens to the file (**Upload**, **Link**, **Already in your space**) and its name in your space, in the page's folder: ✎ changes it. A file pasted without a name of its own (a screenshot, a photo) is named by the date and time (`2026-11-15_13-09-48.png`), as SilverBullet names it. A name SilverBullet would not take, or a link could not name (`@`, `#`, `|`, `<`, `>`, `$`, a bracket), shows its field with the name offered (**Use …**). A file of the same name already in your space is kept, the new one named `-1` after it, unless you choose **Replace it**; two files of one name in the same batch are named apart.
 - **Inserted as**: a **link**, a **card**, a **preview** or **full**, and under it the file as it will be in the page (at most 320 px high here). It starts as the settings say (below). A large document (DOCX, XLSX) is shown here only on **Show here**, as reading it takes a while.
-- **Kept**, for an image copied from a web page or dragged from one: **Linked from the web** (the default: nothing uploaded, its address written in its place, `![](https://…)`) or **In the space** (uploaded, as any file). A linked image shows only while its site keeps it there, and not offline; some sites do not let other pages show their images. One too large for your space can only be linked.
+- For an image copied from a web page or dragged from one, or a link added: **Link** (the default: nothing uploaded, its address written in its place, `![](https://…)`) or **Save a copy** (uploaded, as any file; a site that refuses other sites' fetching cannot be copied: link it). A linked image shows only while its site keeps it there, and not offline; some sites do not let other pages show their images. One too large for your space can only be linked.
 - With several files, **All files** above them sets every file at once, one you set yourself too; it shows a choice only while all the files have the same.
-- On a phone the dialog covers the screen; to upload, pick **Files…** or take a photo with **Camera…**.
+- Over the rows, one field adds more: paste a link (**Add link**), or type words of a file's name in your space (what it finds is offered under it: ↑ ↓ and Enter or a click add one, nothing uploaded); **Browse…** beside it picks your device's files (on a phone its picker offers the camera too), and files dropped anywhere on the dialog are added. The foot says what happens (`2 to upload · 1 link · 1 from your space`) and its button counts the files (**Insert 4 files**); Ctrl+Enter presses it from anywhere.
+- On a phone the dialog covers the screen.
 
 **Insert** writes the files and puts them where you pasted (a selection is replaced) or dropped them (dropped on an embedded file or a grid: on a line of their own beside it; in a grid's cell being edited: at its cursor); **Cancel** writes nothing. While the files upload, a panel at the bottom right shows each with whether it is waiting, uploading, uploaded or failed, and how many are done; they go where the cursor was when you pressed **Insert**, even if you go on writing elsewhere meanwhile. A link is written as SilverBullet's `defaultLinkStyle` says. Several files go one under another, or a space apart in a table's row or a line of text. Undo takes the markdown out; the files stay in your space. A file larger than SilverBullet takes (`maximumDocumentSize`, 10 MiB by default) is left out, said in its row (an image of the web is linked instead). Text you paste stays text, and nothing is taken in a code block or the front matter.
 
 **How a file is inserted** is set on the settings' **Files** tab, by **Inserted as**: **Same as shown** (the default: as **Shown as** says, nothing written into the embed, so changing **Shown as** later changes it too), **Link**, **Card**, **Preview** or **Full**, for all files and for each kind. To let SilverBullet insert files as it does without Silverware Assets, turn off **Use the insert dialog for pasted, dropped and uploaded files** under it; on by default.
+
+## Files of Silverware Database
+
+[Silverware Database](https://github.com/damesene/silverware-libraries/blob/main/silverware-database/silverware-database.md)'s **Files & media** uses Silverware Assets for its files: their small pictures (a PDF's, a document's as its kept preview), the side panel a file opens in, the dialog its uploads go through (their names alone asked: the database keeps a link of its own) and the deletion of its files (their kept previews with them). Files dropped or pasted on a database's value of files are the database's, not put into the page.
 
 ## Where it is kept
 

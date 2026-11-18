@@ -24,6 +24,11 @@ export type DeleteDatabaseHost = {
   notify(message: string): void;
   /** Told once the deletion was written (in part too): the places shown follow it (a block left shows its database gone) */
   written?(): void;
+  /**
+   * The space's files and their deletion (the host's): where the database keeps a folder of files uploaded for it
+   * (`DatabaseCore.filesFolderOf`) and it holds any, offered for deletion with it (not by default). None: not offered
+   */
+  readonly files?: { list(): Promise<readonly string[]>; remove(paths: readonly string[]): Promise<readonly string[]> };
 };
 
 const number = (n: number) => n.toLocaleString("en-US");
@@ -38,6 +43,11 @@ export function openDeleteDatabase(host: DeleteDatabaseHost, id: string, name: s
   const said = el(doc, "ul", { class: "swd-delete-lines", attrs: { hidden: "" } });
   const field = el(doc, "input", { class: "swd-delete-name", attrs: { "aria-label": `The database's name, ${name}`, autocomplete: "off", spellcheck: "false", disabled: "" } });
   const ask = el(doc, "label", { class: "swd-delete-ask", attrs: { hidden: "" } }, el(doc, "span", { text: `Type ${name} to delete it` }), field);
+  // Its folder of files, where it has any: deleted with it where ticked
+  const filesBox = el(doc, "input", { attrs: { type: "checkbox" } });
+  const filesNote = el(doc, "span");
+  const filesAsk = el(doc, "label", { class: "swd-delete-files", attrs: { hidden: "" } }, filesBox, filesNote);
+  let files: readonly string[] = [];
   // Planning (its documents read), then ready, then writing: Esc and Cancel close it until it writes
   let state: "finding" | "ready" | "writing" | "done" = "finding";
   let proposal: Proposal | undefined;
@@ -55,7 +65,7 @@ export function openDeleteDatabase(host: DeleteDatabaseHost, id: string, name: s
     title: `Delete the database "${name}"`,
     subtitle: `Its items, its own ${noun.one} and its views`,
     className: "swd-delete-database",
-    content: el(doc, "div", "swd-delete-body", status, said, ask),
+    content: el(doc, "div", "swd-delete-body", status, said, filesAsk, ask),
     // (Its buttons alone: the dialog puts them in its foot)
     footer: buttons(doc, cancel, remove),
     focus: cancel,
@@ -96,6 +106,14 @@ export function openDeleteDatabase(host: DeleteDatabaseHost, id: string, name: s
     ];
     said.replaceChildren(...lines.filter(Boolean).map((text) => el(doc, "li", { text })));
     said.hidden = false;
+    // (Its files listed as it is found; none, or not listed: nothing offered)
+    const folder = host.core.filesFolderOf(id);
+    files = folder !== undefined && host.files ? (await host.files.list().catch(() => [])).filter((path) => path.startsWith(`${folder}/`)) : [];
+    if (state !== "finding") return;
+    if (files.length) {
+      filesNote.textContent = `Also delete its uploaded files: ${many(files.length, "file", "files")} in ${folder}. Undo does not bring them back.`;
+      filesAsk.hidden = false;
+    }
     status.textContent = "";
     ask.hidden = false;
     field.disabled = false;
@@ -118,6 +136,11 @@ export function openDeleteDatabase(host: DeleteDatabaseHost, id: string, name: s
       const result = await host.core.apply(proposal, (done, of) => (status.textContent = `Deleted ${number(done)} of ${number(of)}…`));
       // (Refused or left: said by the core; deleted: said here, how to have it back with it)
       if (!("problem" in result)) host.notify(`The database "${name}" was deleted. Undo brings it back while this window stays open.`);
+      // Its files where asked (once it is gone: a database left in part keeps them)
+      if (!("problem" in result) && filesBox.checked && files.length && host.files) {
+        const kept = await host.files.remove(files).catch(() => files);
+        if (kept.length) host.notify(`Not deleted: ${many(kept.length, "file", "files")} of "${name}"`);
+      }
     } catch (error) {
       host.notify(`Deleting the database "${name}" failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {

@@ -32,6 +32,10 @@ describe("a file inserted: its name and path", () => {
     expect(cleanName(".env", "txt")).toBe("env.txt");
     expect(cleanName("###.png", "png")).toBe("file.png");
     expect(validateFilePath(cleanName("a|b<c>.png", "png"))).toBeUndefined();
+    // A bracket alone too: no wiki link can name it (`[[a]b.png]]`)
+    expect(validateFilePath("Notes/a]b.png")).toBe("the name has a bracket in it");
+    expect(validateFilePath("[draft] plan.pdf")).toBe("the name has a bracket in it");
+    expect(cleanName("[draft] plan.pdf", "pdf")).toBe("draft plan.pdf");
   });
 
   it("takes the paths of a batch apart, case alike; one taken in the space kept both where asked", () => {

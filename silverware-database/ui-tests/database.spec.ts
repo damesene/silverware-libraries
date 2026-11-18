@@ -540,8 +540,10 @@ test("a table grouped under Group by is one table, a part per group with its own
 
 test("long text wraps: a table's cell at most its maximum width, a board's columns each as wide as the others", async ({ page, space }) => {
   const long = "a long note that goes on ".repeat(12) + "Pneumonoultramicroscopicsilicovolcanoconiosis".repeat(3);
-  const root = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n    notes: { type: text, label: Notes }\n---\n";
-  const longItem = `---\ntags: [db]\nstatus: Todo\nnotes: ${long}\n_database:\n  rank: a2\n---\n`;
+  const root = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n    notes: { type: text, label: Notes }\n    more: { type: text, label: More }\n---\n";
+  // (Two long values: the table's width all taken by its columns, none left over to share out among them, which a table
+  // does past a cell's max-width)
+  const longItem = `---\ntags: [db]\nstatus: Todo\nnotes: ${long}\nmore: ${long}\n_database:\n  rank: a2\n---\n`;
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS, "Page/db-tasks": root, "Page/db-tasks/Long one": longItem }, "Page");
   const cell = page.locator('td[data-key="notes"]').filter({ hasText: "a long note" });
   await expect(cell).toBeVisible();
@@ -1623,18 +1625,52 @@ test("a property made required in Properties is kept in the root page, marked *,
   await expect(page.locator('tbody tr:first-child td[data-key="status"]')).not.toHaveClass(/swd-missing/);
 });
 
-test("a table's row dragged by its grip to the top is written there, by its rank alone", async ({ page, space }) => {
+test("a table's row dragged by its grip to the top is written there, by its rank alone; let go over its name, not renamed", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS }, "Page");
   await expect(page.locator(".swd-table tbody tr")).toHaveCount(2);
   const last = page.locator(".swd-table tbody tr").last();
   await last.hover();
   const grip = (await last.locator(".swd-row-grip").boundingBox())!;
+  // (By the name's first line, in its middle; left of its text)
+  const line = await last.locator(".swd-table-name").evaluate((name) => {
+    const range = document.createRange();
+    range.selectNodeContents(name);
+    const first = range.getClientRects()[0]!;
+    return { middle: first.top + first.height / 2, left: first.left };
+  });
+  expect(Math.abs(grip.y + grip.height / 2 - line.middle)).toBeLessThanOrEqual(1.5);
+  expect(grip.x + grip.width).toBeLessThanOrEqual(line.left);
   const first = (await page.locator(".swd-table tbody tr").first().boundingBox())!;
-  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  const name = (await page.locator(".swd-table tbody tr").first().locator(".swd-table-name").boundingBox())!;
+  // (Taken by its right end and let go over the name's text, in the row's own cell where it lands: the click the browser
+  // sends then is the cell's, which a click edits)
+  await page.mouse.move(grip.x + grip.width - 2, grip.y + grip.height / 2);
   await page.mouse.down();
-  await page.mouse.move(grip.x + 4, first.y + 2, { steps: 12 });
+  await page.mouse.move(name.x + 8, first.y + 4, { steps: 12 });
   await page.mouse.up();
   await expect(page.locator(".swd-table-name")).toHaveText(["Write docs", "Fix login"]);
+  await expect(page.locator(".swd-table .swd-editor")).toHaveCount(0);
+  // Dragged and let go where it was, over its name: nothing moved, and no rename either (the press and the release in
+  // one cell, the browser's click is that cell's)
+  const top = page.locator(".swd-table tbody tr").first();
+  await top.hover();
+  const own = (await top.locator(".swd-row-grip").boundingBox())!;
+  const itsName = (await top.locator(".swd-table-name").boundingBox())!;
+  await page.mouse.move(own.x + own.width - 2, own.y + own.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(itsName.x + 30, own.y + own.height / 2, { steps: 12 });
+  await page.mouse.up();
+  await expect(page.locator(".swd-table-name")).toHaveText(["Write docs", "Fix login"]);
+  await expect(page.locator(".swd-table .swd-editor")).toHaveCount(0);
+  // Cancelled by Esc while held, then let go there: no rename either
+  await top.hover();
+  await page.mouse.move(own.x + own.width - 2, own.y + own.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(itsName.x + 30, own.y + own.height / 2, { steps: 12 });
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  await expect(page.locator(".swd-table-name")).toHaveText(["Write docs", "Fix login"]);
+  await expect(page.locator(".swd-table .swd-editor")).toHaveCount(0);
   await expect.poll(() => space.saved("Page/db-tasks/Write docs")).not.toContain("rank: a1");
   expect(await space.saved("Page/db-tasks/Write docs")).toContain("status: Done");
 });

@@ -4920,4 +4920,14 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
   font-size: 12px;
   opacity: 0.7;
 }
+/* <shared-scrollbar> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* The boxes of the plugin's own that scroll (a view, a list, a panel, a dialog's body, a menu): a thin scrollbar, its
+   thumb quiet in the text's color and its track clear, the same in every plugin (Silverware Table's first). The page's
+   own scrollbar is SilverBullet's, left as it is. Of no weight of its own (`:where`): a rule of the plugin's for one of
+   them (a strip whose scrollbar is hidden) still holds. A theme sets another thumb by `--sw-scrollbar-thumb` */
+:where(.sb-table-widget.swt-table, .swt-view-scroll, .swt-sheet-board, .swt-dialog-body, .swt-settings-body, .swt-choices, .swt-choices-preview-values, .swt-filter-values, .swt-functions-list, .swt-functions-detail, .swt-formula-choices, .swt-formulafield-choices, .swt-result-box, .swt-excel-skipped, .swt-cell-popup .swt-cell-popup-field, .swt-menu) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sw-scrollbar-thumb, color-mix(in srgb, var(--root-color, #333) 30%, transparent)) transparent;
+}
+/* </shared-scrollbar> */
 ```

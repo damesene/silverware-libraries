@@ -160,8 +160,8 @@ test("an image copied from a web page: linked at its address on the web instead 
   const path = await rows(page).first().locator(".swa-insert-path").inputValue();
   expect(path).toMatch(/\.png$/);
   // (Linked by default: its address in place of its name)
-  await expect(rows(page).first().locator('.swa-insert-kept [aria-checked="true"]')).toHaveText("Linked from the web");
-  await expect(rows(page).first().locator(".swa-insert-address")).toHaveText(url);
+  await expect(rows(page).first().locator('.swa-insert-kept [aria-checked="true"]')).toHaveText("Link");
+  await expect(rows(page).first().locator(".swa-insert-name")).toHaveAttribute("title", url);
   await dialog(page).getByRole("button", { name: "Insert" }).click();
   await expect.poll(() => space.saved("Page")).toContain(`![](${url})`);
   // (Nothing uploaded: no panel, no file of the space)
@@ -199,6 +199,33 @@ test("a file dropped on the lower half of a widget (a grid): a line of its own u
   await expect.poll(() => space.saved("Page")).toContain(`</grid>\n![[${space.folder}/photo.png]]\n`);
 });
 
+test("a drop or a paste on another plugin's element that takes files itself (marked) is left to it: no dialog, nothing written", async ({ page, space }) => {
+  const text = "# Page\n\n<grid>\n<cell>\n\nLeft\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n\nAfter\n";
+  await space.open({ Page: text }, "Page");
+  await gridsDrawn(page);
+  const grid = page.locator("#sb-main .swl-grid");
+  // (The element marked as a database marks its cell of files, and taking what reaches it, as that cell will)
+  await grid.evaluate((element) => {
+    element.setAttribute("data-silverware-takes-files", "");
+    const got: string[] = [];
+    (window as unknown as { got: string[] }).got = got;
+    for (const type of ["dragover", "drop", "paste"])
+      element.addEventListener(type, (event) => {
+        got.push(`${type}${event.defaultPrevented ? " prevented" : ""}`);
+        event.preventDefault();
+        event.stopPropagation();
+      });
+  });
+  const box = (await grid.boundingBox())!;
+  await drop(page, box.x + box.width / 2, box.y + box.height - 2, [{ name: "photo.png", type: "image/png" }]);
+  await paste(grid, [{ name: "image.png", type: "image/png" }]);
+  // (Each reached the element, none taken before it)
+  expect(await page.evaluate(() => (window as unknown as { got: string[] }).got)).toEqual(["dragover", "drop", "paste"]);
+  await expect(dialog(page)).toHaveCount(0);
+  expect(await space.saved("Page")).toBe(text);
+  expect(space.hasFile("photo.png")).toBe(false);
+});
+
 test("Cancel writes nothing; a part of a page pasted (HTML with text), or a paste in a fenced block, is SilverBullet's", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nText\n\n```\ncode\n```\n" }, "Page");
   await cursorAfter(page, "Text");
@@ -229,7 +256,7 @@ test("File: Upload opens the dialog empty, the files picked in it inserted at th
   await runCommand(page, "File: Upload");
   await expect(dialog(page)).toBeVisible();
   const chooser = page.waitForEvent("filechooser");
-  await dialog(page).getByRole("button", { name: "Files…" }).click();
+  await dialog(page).getByRole("button", { name: "Browse…" }).click();
   await (await chooser).setFiles([{ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hello") }]);
   await expect(rows(page)).toHaveCount(1);
   await expect(rows(page).first().locator(".swa-insert-path")).toHaveValue(`${space.folder}/notes.txt`);

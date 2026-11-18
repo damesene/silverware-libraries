@@ -126,6 +126,8 @@ export interface DatabaseStore {
   documentOf(item: ItemKey): string | undefined;
   /** A database's own document (its root page), as last read; undefined where it has none */
   databaseDocumentOf(database: string): string | undefined;
+  /** Where files uploaded for a database go (a folder of the space's: its root page's own `files`), undefined where it keeps none */
+  filesFolderOf(database: string): string | undefined;
   /**
    * The documents `report` removed for `targets` (items' pages) that an undo
    * could not make again, kept as documents of their own, outside the

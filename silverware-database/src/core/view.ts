@@ -4,6 +4,7 @@
 // here: no view leans on the core's insides, and a custom view outside the
 // bundle uses the same.
 import type { DocumentsHost } from "./documents.ts";
+import type { MediaHost } from "./media.ts";
 import type { MentionsHost } from "./mentions.ts";
 import type { GroupArrangement, ItemGroup } from "../domain/grouping.ts";
 import type { Filter, SortKey } from "../domain/listing.ts";
@@ -135,7 +136,7 @@ export type ViewLook = ItemLooks & {
 };
 
 /** What a view gets: its database's data as it asks for it, the core's writes for that database, its own meta and settings */
-export type ViewHost = DocumentsHost & MentionsHost & {
+export type ViewHost = DocumentsHost & MentionsHost & MediaHost & {
   readonly document: Document;
   readonly database: Database;
   /** The items as the view shows them: filtered and sorted by its listing, else in the order by hand */
@@ -161,6 +162,12 @@ export type ViewHost = DocumentsHost & MentionsHost & {
   rename(item: Item, name: string): Promise<Result>;
   remove(items: readonly Item[]): Promise<Result>;
   move(item: Item, place: Place): Promise<Result>;
+  /**
+   * An item as the store has it now, not as the view was last given it (another place's write the view has not been
+   * drawn with yet): what a change made a while after the view showed it starts from (files uploaded added to its value);
+   * undefined where it is gone
+   */
+  current(item: Item): Promise<Item | undefined>;
   /** The database's last change put back where still as written (undefined: nothing to undo) */
   undo(progress?: WriteProgress): Promise<Result | undefined>;
   /** The item opened: in a module's own way where one takes it (the peek), else where the store says it can be (its page); a failure is said to the user */

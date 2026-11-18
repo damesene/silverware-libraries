@@ -10,6 +10,7 @@ import { BUILT_IN_MODULES } from "../silverware-database/src/modules/builtin.ts"
 import { DatabasePlace } from "../silverware-database/src/core/place.ts";
 import { openDeleteDatabase } from "../silverware-database/src/core/deletedatabase.ts";
 import { documentsHost, type DocumentsSource } from "../silverware-database/src/core/documents.ts";
+import { mediaHost, type MediaSource } from "../silverware-database/src/core/media.ts";
 import { mentionsHost } from "../silverware-database/src/core/mentions.ts";
 import { ViewRegistry } from "../silverware-database/src/core/views.ts";
 import { TypeRegistry } from "../silverware-database/src/domain/types/registry.ts";
@@ -65,6 +66,19 @@ const settings = { get: (_path: string, fallback: unknown) => fallback };
 let store: MemoryStore;
 // The pages a reference may name: the playground has no space of its own
 const PAGES: DocumentsSource = { list: () => ["Projects/Alpha", "Projects/Beta", "People/Ada", "People/Linus", "Notes/Weekly"], open: (name) => flash(`Open ${name}`), folderSeparator: "/" };
+// The files as the playground has them: a few of the space's (images drawn by their address here), one opened said,
+// none uploaded nor deleted (the memory store keeps no folder of files)
+const MEDIA: MediaSource = {
+  // (A picture made of the file's name: the playground serves no files; wide and tall ones, as the cropping is tried on)
+  url: (path) => {
+    const [width, height] = path.includes("tall") ? [60, 400] : path.includes("wide") ? [800, 60] : [160, 100];
+    const hue = [...path].reduce((sum, one) => sum + one.charCodeAt(0), 0) % 360;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="hsl(${hue} 60% 55%)"/><text x="50%" y="50%" font-size="14" text-anchor="middle" fill="white">${path.split("/").pop()}</text></svg>`;
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  },
+  open: (target) => flash(`Open ${target}`),
+  files: () => ["Photos/sunset.png", "Photos/cat.png", "Photos/wide.png", "Photos/tall.png", "Docs/report.pdf", "Docs/plan.docx"],
+};
 // The editor as the playground has one: a page opened and a person's mentions said, not shown
 const EDITOR = { open: (ref: string) => flash(`Open ${ref}`), openMention: (name: string) => flash(`Where @${name} is mentioned`) };
 
@@ -95,6 +109,7 @@ function start(): void {
       openDocument: async (item) => flash(`Open ${store.documentOf(item.key) ?? item.name}`),
       ...documentsHost(PAGES, core.noun, ui),
       ...mentionsHost(EDITOR, ui),
+      media: mediaHost(MEDIA, store, ui, document),
       // (The playground's page has no editor apart: the window)
       editorArea: () => undefined,
       onChanged: (listener) => store.onChanged((change) => listener(change.database)),
@@ -113,7 +128,7 @@ function start(): void {
     element.className = "swd-place";
     section.append(element);
     main.append(section);
-    const place = new DatabasePlace({ element, database: database.id, state: new StoredViewState(`silverware-playground.database.state.${database.id}`), store, core, types, views, settings, ui, editor: EDITOR, documents: PAGES, moduleMenu: (where, menu) => modules.placeMenu(where, menu), moduleTools: (where) => modules.placeTools(where), placeDrawn: (where) => modules.placeDrawn(where), openItem: (item, database, from) => modules.openItem(item, database, from), deleteDatabase: (id, name) => openDeleteDatabase({ document, core, noun: core.noun, notify: (message) => flash(message), written: () => places.forEach((one) => void one.render()) }, id, name) });
+    const place = new DatabasePlace({ element, database: database.id, state: new StoredViewState(`silverware-playground.database.state.${database.id}`), store, core, types, views, settings, ui, editor: EDITOR, documents: PAGES, media: MEDIA, moduleMenu: (where, menu) => modules.placeMenu(where, menu), moduleTools: (where) => modules.placeTools(where), placeDrawn: (where) => modules.placeDrawn(where), openItem: (item, database, from) => modules.openItem(item, database, from), deleteDatabase: (id, name) => openDeleteDatabase({ document, core, noun: core.noun, notify: (message) => flash(message), written: () => places.forEach((one) => void one.render()) }, id, name) });
     return place;
   });
   void modules.start().then(() => places.forEach((place) => void place.render()));

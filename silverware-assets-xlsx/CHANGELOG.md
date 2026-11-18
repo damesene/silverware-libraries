@@ -1,5 +1,9 @@
 # Silverware Assets XLSX: changelog
 
+## 1.0.2 (2026-11-19)
+
+- The document reader scrolls with a thin scrollbar, the same in every Silverware plugin; SilverBullet's own scrollbar is unchanged.
+
 ## 1.0.1 (2026-11-17)
 
 - A sheet keeps a spreadsheet's look in SilverBullet's next version (3.0), whose own styling of a table in an embed (striped rows, bold header, padding) no longer shows over it.

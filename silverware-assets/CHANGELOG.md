@@ -1,5 +1,13 @@
 # Silverware Assets: changelog
 
+## 1.1.0 (2026-11-19)
+
+- The insert dialog is simpler: one field at its top adds a link (pasted) or finds a file already in your space by words of its name, offered in a list under the field (arrow keys and Enter, or a click); **Browse…** picks your device's files (on a phone its picker offers the camera); files dropped anywhere on the dialog are added.
+- Each file's row starts with its title (an embed's alt text, a link's text) and says what happens to it: uploaded, linked, or already in your space; its name in the space is changed with ✎. An image of the web is linked or saved as a copy in your space.
+- The dialog's button says what it does and how many (**Insert 3 files**), Ctrl+Enter presses it from anywhere, and the dialog keeps one height as rows come and go.
+- Other plugins can use Silverware Assets for their files: previews, the side panel, the upload dialog and deleting files with their kept previews (Silverware Database's Files & media does). Files dropped on such a plugin's element are left to it.
+- Panels, menus and the dialog scroll with a thin scrollbar, the same in every Silverware plugin.
+
 ## 1.0.3 (2026-11-18)
 
 - A file's preview in a grid's cell or a database's item as tall as in the page (it was 6 px taller).

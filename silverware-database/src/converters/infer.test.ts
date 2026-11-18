@@ -32,6 +32,9 @@ describe("inferProperty", () => {
     ]);
     expect(infer(people)).toEqual({ type: "person", params: { options: ["ada", "bob", "cyd"], multiple: true, anyone: true }, values: [["ada"], ["bob", "cyd"]] });
     expect(infer(new Map<number, ReadValue>([[0, { kind: "links", targets: ["A", "B"] }]]))).toMatchObject({ type: "reference", values: [["[[A]]", "[[B]]"]] });
+    // (Links to files alone: files; one to a page among them: references)
+    expect(infer(new Map<number, ReadValue>([[0, { kind: "links", targets: ["a.png", "Docs/b.pdf"] }]]))).toMatchObject({ type: "files", values: [["[[a.png]]", "[[Docs/b.pdf]]"]] });
+    expect(infer(new Map<number, ReadValue>([[0, { kind: "links", targets: ["a.png", "Notes"] }]]))).toMatchObject({ type: "reference" });
     expect(infer(new Map<number, ReadValue>([[0, { kind: "people", names: ["ada"] }], [1, { kind: "plain", value: "x" }]]))).toMatchObject({ type: "text", values: ["@ada", "x"] });
   });
 });

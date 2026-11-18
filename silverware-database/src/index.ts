@@ -23,6 +23,7 @@ import type { Platform } from "../../shared/platform.ts";
 import { DatabaseCore } from "./core/core.ts";
 import { Modules } from "./core/module.ts";
 import { documentsHost, platformDocuments } from "./core/documents.ts";
+import { mediaHost, type MediaSource } from "./core/media.ts";
 import { mentionsHost } from "./core/mentions.ts";
 import { DatabasePlace, VIEW_KEY, viewSettingPath } from "./core/place.ts";
 import { STATE_KEYS } from "./core/statekeys.ts";
@@ -38,8 +39,9 @@ import { TypeRegistry } from "./domain/types/registry.ts";
 import type { PropertyType } from "./domain/types/type.ts";
 import { BLOCK_LANGUAGE, BlockState, readBlock, writeBlock as blockWithState } from "./host/silverbullet/block.ts";
 import { blockPlaces } from "./host/silverbullet/places.ts";
+import { silverBulletMedia } from "./host/silverbullet/media.ts";
 import { layoutEntries, withLayout } from "./host/silverbullet/layout.ts";
-import { type Bridge, editorArea, editorLook, fieldLook, silverBulletPlatform, watchEditorArea } from "./host/silverbullet/platform.ts";
+import { type Bridge, editorArea, editorLook, fieldLook, listOf as luaList, silverBulletPlatform, watchEditorArea } from "./host/silverbullet/platform.ts";
 import { LOOK_SAMPLE } from "../../shared/editorlook.ts";
 import { PagesStore } from "./store/pages/store.ts";
 import { BUILT_IN_MODULES } from "./modules/builtin.ts";
@@ -82,6 +84,8 @@ type App = {
   readonly writer: PageWriter;
   readonly modules: Modules;
   readonly shown: Map<HTMLElement, Shown>;
+  // The files a value of files names, as SilverBullet and Silverware Assets give them (host/silverbullet/media.ts)
+  readonly media: MediaSource;
   // The page a database made by a command goes beside (its root `<page>/db-<id>`)
   home: string;
 };
@@ -154,6 +158,17 @@ export function init(bridge: Bridge): void {
   let sampled: Promise<string | undefined> | undefined;
   kept ??= keptParts();
   const { platform, store, writer, core, ui, own } = kept;
+  // The files a value of files names: Silverware Assets' where it is installed, else SilverBullet's own
+  const media = silverBulletMedia(
+    {
+      navigate: (ref) => bridge.navigate(ref),
+      ...(bridge.listDocuments ? { listDocuments: async () => luaList<string>(await bridge.listDocuments!()) } : {}),
+      ...(bridge.deleteDocument ? { deleteDocument: (path: string) => bridge.deleteDocument!(path) } : {}),
+    },
+    assetsOf(bridge.assets),
+    (url) => void window.open(url, "_blank", "noopener"),
+  );
+  const modulesMedia = mediaHost(media, store, platform.ui, document);
   const modules = new Modules(
     BUILT_IN_MODULES,
     {
@@ -205,6 +220,7 @@ export function init(bridge: Bridge): void {
         ),
       ...documentsHost(platformDocuments(platform), core.noun, platform.ui),
       ...mentionsHost(platform.editor, platform.ui),
+      ...(modulesMedia ? { media: modulesMedia } : {}),
       editorArea: () => editorArea(document),
       onEditorAreaChanged: (listener) => watchEditorArea(document, listener),
       editorLook: () => editorLook(document),
@@ -225,7 +241,7 @@ export function init(bridge: Bridge): void {
     },
     platform.settings,
   );
-  app = Object.assign(own, { platform, store, core, writer, modules, shown: before });
+  app = Object.assign(own, { platform, store, core, writer, modules, media, shown: before });
   for (const [element, shown] of before) if (element.isConnected) start(element, shown);
   // The modules on started (their settings read), the places drawn with what they add
   void modules.start().then(redrawAll);
@@ -438,7 +454,7 @@ function start(element: HTMLElement, shown: Shown): void {
   // (The place before it for this block over the window: this one so from its first drawing, no frame in the page between)
   const before = handovers.get(JSON.stringify([shown.page, shown.current]));
   const overWindow = !!before && before.until > Date.now() && before.from !== shown.place && before.from.isOverWindow;
-  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, converters: () => converters.all(), overWindow, settings: platform.settings, ui: platform.ui, editor: platform.editor, documents: platformDocuments(app!.platform), moduleMenu: (place, menu) => app!.modules.placeMenu(place, menu), moduleTools: (place) => app!.modules.placeTools(place), placeDrawn: (place) => app!.modules.placeDrawn(place), openItem: (item, database, from) => app!.modules.openItem(item, database, from), editSource: () => void editSource(element, shown), deleteDatabase: (one, name) => deleteDatabase(core, one, name), takeOver });
+  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, converters: () => converters.all(), overWindow, settings: platform.settings, ui: platform.ui, editor: platform.editor, documents: platformDocuments(app!.platform), media: app!.media, moduleMenu: (place, menu) => app!.modules.placeMenu(place, menu), moduleTools: (place) => app!.modules.placeTools(place), placeDrawn: (place) => app!.modules.placeDrawn(place), openItem: (item, database, from) => app!.modules.openItem(item, database, from), editSource: () => void editSource(element, shown), deleteDatabase: (one, name) => deleteDatabase(core, one, name), takeOver });
   void shown.place.render();
 }
 
@@ -630,7 +646,20 @@ function redrawAll(): void {
 /** The database's deletion opened (core/deletedatabase.ts): asked, written, the places shown following it once written */
 function deleteDatabase(core: DatabaseCore, id: string, name: string): void {
   const { platform } = app!;
-  openDeleteDatabase({ document, core, noun: core.noun, notify: (message) => platform.ui.notify(message), written: () => app!.shown.forEach((shown) => void shown.place?.refresh()) }, id, name);
+  const { files, remove } = app!.media;
+  openDeleteDatabase(
+    {
+      document,
+      core,
+      noun: core.noun,
+      notify: (message) => platform.ui.notify(message),
+      written: () => app!.shown.forEach((shown) => void shown.place?.refresh()),
+      // (Its files offered with it where the space's files are listed and deleted)
+      ...(files && remove ? { files: { list: async () => files(), remove } } : {}),
+    },
+    id,
+    name,
+  );
 }
 
 /** A database made by the command: its name asked, its root beside the page open, its block at the cursor */

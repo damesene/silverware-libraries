@@ -358,6 +358,10 @@ export class MemoryStore implements DatabaseStore {
     return undefined;
   }
 
+  filesFolderOf(): string | undefined {
+    return undefined;
+  }
+
   /** An item changed outside the core (what a page edited by hand is to the pages store): written at once, told to the listeners */
   changeOutside(database: string, item: ItemKey, change: OutsideChange): void {
     const kept = this.kept.get(database);

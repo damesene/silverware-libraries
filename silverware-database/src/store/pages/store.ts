@@ -580,6 +580,12 @@ export class PagesStore implements DatabaseStore {
     return this.roots.get(database);
   }
 
+  // (Under the root page, beside its items: an item named `files` shows them as its subpages, accepted 2026-11-16)
+  filesFolderOf(database: string): string | undefined {
+    const root = this.roots.get(database);
+    return root === undefined ? undefined : `${root}/files`;
+  }
+
   async recoverRemoved(report: TransactionReport, targets: readonly Target[]): Promise<{ readonly kept: readonly string[]; readonly left: readonly Target[] }> {
     const kept: string[] = [];
     const left: Target[] = [];

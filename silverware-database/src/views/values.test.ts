@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { optionPill, pill } from "./values.ts";
+import { fieldNodes, optionPill, pill, valueNodes } from "./values.ts";
 import { TypeRegistry } from "../domain/types/registry.ts";
 import { itemColor } from "../core/look.ts";
 import type { ItemKey } from "../model/database.ts";
@@ -64,5 +64,51 @@ describe("a person's mentions", () => {
     // (A host showing none: a mention's look, nothing to press; a select's: no mention)
     expect(optionPill(document, property, "ada", type).getAttribute("role")).toBeNull();
     expect(optionPill(document, { ...property, type: "select" }, "ada", types.of("select", params), () => {}).classList.contains("swd-mention")).toBe(false);
+  });
+});
+
+describe("files as a view draws them", () => {
+  const types = new TypeRegistry();
+  const property = { key: "photos", label: "Photos", type: "files", params: {}, readonly: false };
+  const item = (value: unknown) => ({ key: "a" as ItemKey, revision: "1", name: "A", values: { photos: value as string[] }, rank: undefined });
+  const drawn: [string, number][] = [];
+  const opened: string[] = [];
+  const media = {
+    draw: (target: string, box: { width: number }) => (drawn.push([target, box.width]), Object.assign(document.createElement("span"), { className: "swd-media", textContent: target })),
+    open: (target: string) => void opened.push(target),
+    files: async () => [],
+  };
+  const host = (withMedia = true) => ({ document, type: (one: typeof property) => types.of(one.type, one.params), text: (one: ReturnType<typeof item>) => types.of("files", {})!.text(one.values.photos, {}), openByName: async () => undefined, ...(withMedia ? { media } : {}) });
+  const five = ["[[a.png]]", "[[b.png]]", "https://example.com/c.jpg", "[[d.pdf]]", "[[e.pdf]]"];
+
+  it("draw a line's first three, the rest counted with their names; the peek's every one larger", () => {
+    drawn.length = 0;
+    const [line] = valueNodes(host() as never, item(five), property, { files: "small" }) as HTMLElement[];
+    expect([...line!.querySelectorAll(".swd-media-button")].map((one) => one.getAttribute("aria-label"))).toEqual(["Open a.png", "Open b.png", "Open c.jpg"]);
+    expect(line!.querySelector(".swd-media-more")!.textContent).toBe("+2");
+    expect(line!.querySelector<HTMLElement>(".swd-media-more")!.title).toBe("d.pdf, e.pdf");
+    expect(drawn).toEqual([["a.png", 84], ["b.png", 84], ["https://example.com/c.jpg", 84]]);
+    const [large] = valueNodes(host() as never, item(five), property, { files: "large" }) as HTMLElement[];
+    expect(large!.querySelectorAll(".swd-media-button")).toHaveLength(5);
+    expect(large!.querySelector(".swd-media-more")).toBeNull();
+    expect(drawn.at(-1)).toEqual(["e.pdf", 240]);
+  });
+
+  it("open a file pressed, the press not reaching what holds it (a cell's editor)", () => {
+    const cell = document.createElement("td");
+    let edited = 0;
+    cell.addEventListener("click", () => void edited++);
+    cell.append(...valueNodes(host() as never, item(["[[a.png]]"]), property, { files: "small" }));
+    cell.querySelector<HTMLButtonElement>(".swd-media-button")!.click();
+    expect([opened.at(-1), edited]).toEqual(["a.png", 0]);
+  });
+
+  it("show their names where no size is asked (a calendar's line), where the host draws no files, or where the value does not read", () => {
+    const names = (nodes: Node[]) => nodes.map((one) => one.textContent).join("");
+    expect(names(valueNodes(host() as never, item(["[[a.png]]", "[[b.pdf]]"]), property))).toBe("a.png, b.pdf");
+    expect(names(fieldNodes(host() as never, item(["[[a.png]]"]), property))).toBe("a.png");
+    expect(names(valueNodes(host(false) as never, item(["[[a.png]]"]), property, { files: "small" }))).toBe("a.png");
+    expect(names(valueNodes(host() as never, item(["a.png"]), property, { files: "small" }))).toBe("a.png");
+    expect(valueNodes(host() as never, item([]), property, { files: "small" })).toEqual([]);
   });
 });

@@ -5,10 +5,13 @@
 // its type's text. The colors are the style page's, read from SilverBullet's own
 // so they follow its light and dark looks.
 import { el } from "../../../shared/elements.ts";
+import { scaledPx } from "../../../shared/contentscale.ts";
 import { wholePercent } from "../domain/types/builtin/progress.ts";
 import { fullAddress, isOpenable, prettyUrl, readLink } from "../domain/types/link.ts";
 import { pathOf } from "../domain/folders.ts";
 import { linkedDocument, type Reference, readReferences } from "../domain/types/reference.ts";
+import { type FileEntry, fileLabel, readFiles } from "../domain/types/files.ts";
+import type { Media, MediaBox } from "../core/media.ts";
 import type { ViewHost } from "../core/view.ts";
 import { colorsOf, optionColor } from "../domain/types/options.ts";
 import type { PropertyType } from "../domain/types/type.ts";
@@ -184,16 +187,34 @@ function chosen(value: Value | undefined): string[] {
 }
 
 /**
+ * How files are drawn where a view draws them (the look `media`): `small` in a line of a fixed height (a table's cell, a
+ * list's row, a card's line), the first few and the rest counted; `large` each larger (the peek's row). None: their
+ * names, as text (a calendar's or a timeline's line, which opens its item)
+ */
+export type FilesSize = "small" | "large";
+export type ValueOptions = { readonly files?: FilesSize };
+
+/** The box each file is drawn in (px): it fits in it, an image too narrow or too low cropped to its least side */
+export const FILE_BOXES: Readonly<Record<FilesSize, MediaBox>> = { small: { width: 84, height: 28, min: 14 }, large: { width: 240, height: 180, min: 90 } };
+/** How many files a small line draws, the rest counted (`+2`) */
+export const FILES_IN_LINE = 3;
+
+/**
  * A value drawn as its type's look says (`PropertyType.look`): its options as
  * pills, a share as a bar beside its percent, a link to open, links to the
- * documents it names, labels as quiet pills; else its type's text; nothing where it is empty. A
- * checkbox is the view's own (a box to tick, or its property's name on a card).
+ * documents it names, labels as quiet pills, files as themselves where
+ * `options.files` says how large (else their names); else its type's text;
+ * nothing where it is empty. A checkbox is the view's own (a box to tick, or
+ * its property's name on a card).
  */
-export function valueNodes(host: Pick<ViewHost, "document" | "type" | "text" | "openByName" | "openMention" | "folderSeparator">, item: Item, property: Property): Node[] {
+export function valueNodes(host: Pick<ViewHost, "document" | "type" | "text" | "openByName" | "openMention" | "folderSeparator" | "media">, item: Item, property: Property, options: ValueOptions = {}): Node[] {
   const doc = host.document;
   const type = host.type(property);
   const value = item.values[property.key];
   if (type.look === "options") return chosen(value).map((one) => optionPill(doc, property, one, type, host.openMention));
+  // (Files only of a value that reads as the type, where the host draws them: else their names, or the value as kept)
+  const files = type.look === "media" && options.files && host.media && type.validate(value ?? null, property.params) === undefined ? readFiles(value) : undefined;
+  if (files?.length) return [filesNode(doc, host.media!, files, options.files!)];
   // (Labels: each a quiet pill, none of them an option; a value that is no list shown as kept, marked by the view)
   if (type.look === "labels" && Array.isArray(value)) return value.map((one) => pill(doc, String(one), 0));
   // (Links only of a value that reads as the type: one that does not is shown as kept, marked by the view)
@@ -218,12 +239,36 @@ export function valueNodes(host: Pick<ViewHost, "document" | "type" | "text" | "
  * where it has no value (no name alone). A view drawing values under a header
  * naming them (a table's column) draws them with `valueNodes`
  */
-export function fieldNodes(host: Pick<ViewHost, "document" | "type" | "text" | "openByName" | "openMention" | "folderSeparator">, item: Item, property: Property): Node[] {
+export function fieldNodes(host: Pick<ViewHost, "document" | "type" | "text" | "openByName" | "openMention" | "folderSeparator" | "media">, item: Item, property: Property, options: ValueOptions = {}): Node[] {
   const doc = host.document;
   if (missing(host, item, property)) return [missingPill(doc, property)];
   if (host.type(property).look === "check") return item.values[property.key] === true ? [doc.createTextNode(`✓ ${property.label}`)] : [];
-  const nodes = valueNodes(host, item, property);
+  const nodes = valueNodes(host, item, property, options);
   return property.showName && nodes.length ? [el(doc, "span", { class: "swd-field-name", text: `${property.label}: ` }), ...nodes] : nodes;
+}
+
+/**
+ * Files side by side, each a button opening it (its press its own: not the value's editor, which a press beside them
+ * opens); a small line draws the first few, the rest counted, their names its title
+ */
+function filesNode(doc: Document, media: Media, files: readonly FileEntry[], size: FilesSize): HTMLElement {
+  const shown = size === "small" ? files.slice(0, FILES_IN_LINE) : files;
+  const rest = files.slice(shown.length);
+  const buttons = shown.map((file) => {
+    const name = fileLabel(file);
+    const button = el(doc, "button", { class: "swd-media-button", title: name, attrs: { type: "button", "aria-label": `Open ${name}` } }, media.draw(file.target, FILE_BOXES[size]));
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      media.open(file.target);
+    });
+    return button;
+  });
+  const more = rest.length ? [el(doc, "span", { class: "swd-media-more", text: `+${rest.length}`, title: rest.map(fileLabel).join(", ") })] : [];
+  const strip = el(doc, "span", { class: `swd-media-strip swd-media-${size}` }, ...buttons, ...more);
+  // (A small line as high as its files' box, zoomed with the content as they are)
+  strip.style.setProperty("--swd-media-height", scaledPx(FILE_BOXES[size].height));
+  return strip;
 }
 
 /**

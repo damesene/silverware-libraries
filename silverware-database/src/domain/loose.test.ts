@@ -8,6 +8,14 @@ describe("keys outside the schema", () => {
     expect(guessedType(["2026-11-08", "2026-12-01"])).toEqual({ type: "date" });
     // (Links to pages, in lists or alone: references; a list of other texts a multi-select)
     expect(guessedType([["[[A]]", "[[B]]"], "[[C]]"])).toEqual({ type: "reference" });
+    // (Links to files, addresses of the web beside them: files; a page's link among them, or a page's name with a dot: references)
+    expect(guessedType([["[[Photos/a.png]]", "https://example.com/b.jpg"], "[[Docs/report.pdf]]"])).toEqual({ type: "files" });
+    expect(guessedType([["[[a.png]]", "[[Notes]]"]])).toEqual({ type: "reference" });
+    expect(guessedType([["[[Notes.md]]"]])).toEqual({ type: "reference" });
+    expect(guessedType([["[[Notes#v1.2]]"]])).toEqual({ type: "reference" });
+    // (Addresses alone: a URL's, or a multi-select's, as before)
+    expect(guessedType(["https://example.com/b.jpg"])).toEqual({ type: "url" });
+    expect(guessedType([["https://example.com/b.jpg"]])).toEqual({ type: "select", params: { multiple: true } });
     expect(guessedType([["[[A]]", "b"]])).toEqual({ type: "select", params: { multiple: true } });
     expect(guessedType(["https://silverbullet.md"])).toEqual({ type: "url" });
     expect(guessedType([["a", "b"], ["c"]])).toEqual({ type: "select", params: { multiple: true } });

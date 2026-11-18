@@ -1,5 +1,17 @@
 # Silverware Database: changelog
 
+## 1.3.0 (2026-11-19)
+
+- New property type **Files & media**: images, PDFs, documents, any file of your space or an address of the web, several in one value. Tables, lists and cards show them as small pictures (a PDF, Word or Excel file as its first page with Silverware Assets and its viewer), the item's panel larger; a press opens a file in Silverware Assets' side panel.
+- Files are added in a small panel by the value (each with a menu: view the original, download, remove; dragged to reorder), dropped on a cell, a card or the item's panel, or pasted on a cell. Uploads go through Silverware Assets' dialog into the database's own `files` folder; each file may get a title.
+- Files are kept in the item's page as wiki links, so renaming a file or the database keeps them linked, and queries read them as any link.
+- Removing an item offers to delete the uploaded files only it used; deleting a database can delete its uploaded files too (a box, not ticked by default).
+- Files zoom with the text where Silverware Layout zooms files.
+- **Convert selection to database** reads links to files as a Files & media property.
+- A table's row grip no longer takes a column of its own: it shows at the left edge of the name, on its first line, so names start close to the table's edge.
+- Fixed: letting go of a dragged row (or cancelling the drag with Esc) over a name no longer starts renaming it; a file's card in a cell reacts to the pointer on the card alone, not up to the cell's end.
+- Panels, the peek's sidebar and its properties box scroll with a thin scrollbar, the same in every Silverware plugin.
+
 ## 1.2.2 (2026-11-18)
 
 - In an item's peek, files zoom with the text, as in the page.

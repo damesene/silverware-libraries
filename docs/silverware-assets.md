@@ -221,7 +221,7 @@ Reviewed 2026-11-13 against Silverware Layout's layers (`src/isolation.test.ts`)
 - `signal` (the web APIs' name: `fetch(url, { signal })`, `addEventListener(…, { signal })`): aborted when the render ends (SilverBullet drew the widget anew, the view changed, the page closed); what a renderer started (listeners, timers, observers, fetches) is cleaned up by it, so no `destroy`.
 - A renderer returns an element, or `null` for the host to draw that asset. It is never handed the host's drawing or the card: what is rendered is the core's choice.
 - **What the core decides**: the type (*Matching*), the view (*Views*), the viewport (*Size and the viewport*), then the type's renderer, the host's drawing, or the card.
-- **An action**: `{ name, fits(asset), run(ctx) }` (*Actions*); its context the asset, the render (`ctx.render(view, container)`) and what the platform opens (`ctx.open(url)`).
+- **An action**: `{ name, fits(asset), run(ctx) }` (*Actions*); its context the asset, the render (`ctx.render(view, container, signal?)`: what it started ends with the action's signal, its panel closed) and what the platform opens (`ctx.open(url)`).
 
   ```ts
   export const openTab: AssetAction = {
@@ -397,3 +397,24 @@ The user's wish: delete a file from its menu, plain that the file itself goes, n
 
 A wiki link's href in the editor is its target URL-encoded (2.12.1): `drawnLink` decodes it, else a file in a folder with a space was not found to delete.
 
+## Another plugin's files (2026-11-18)
+
+For Silverware Database's property of files (docs/silverware-database-files.md), optional members of the API
+(`shared/assets.ts`, the version unchanged: an older Assets lacks them, its callers' stand-ins draw and open alike):
+
+- `drawPreview(target, page, box, signal)`: a file's preview by its type's own renderer in a box of `box`'s size, no
+  frame, label, menu nor click (`decorate.ts`); a type keeping previews in the space, or costly to draw, only from the
+  one kept (none made: a list of many files would make each); an image with no renderer of its own the browser's
+  `<img>`; null where none is drawn.
+- `showFile(target, page)`: the side panel's action (`open-panel`) run on the file as a link's is; a file no panel
+  draws, its URL in a new tab.
+- `insertFiles(given, { folder })`: the insert dialog with its names alone (`nameOnly`: no *Inserted as*), its folder
+  the caller's, always the caller's companion; the files written by `writeChosen` (the write half of `insertChosen`),
+  resolved with each file added (`AddedFile`: the target a link names and its title where one was given), undefined
+  where cancelled; nothing put in a page. `given` may be a link alone (no file, its `uriList`): a row of it.
+- `deleteFiles(paths)`: each as *Delete file…* deletes one, its kept previews with it, nothing asked; those not deleted
+  given back.
+
+An action's `render(view, container, signal?)` takes the action's own signal (a panel closed ends what its file's
+drawing started). Elements of another plugin's marked `data-silverware-takes-files` (`shared/takesfiles.ts`) are left
+their drops and pastes. A name offered by the insert dialog holds no single bracket either (a wiki link cannot name it).

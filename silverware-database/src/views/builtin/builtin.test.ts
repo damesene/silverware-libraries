@@ -64,8 +64,9 @@ const choose = (label: string) => {
 describe("the table", () => {
   it("shows a row per item and a column per property, a value that does not read marked with why", async () => {
     const { all, q } = await setup("table");
-    // (The grips' column first, the actions' last: no name)
-    expect(all("th").map((th) => th.textContent)).toEqual(["", "Name", "Status", "Estimate", "Done", ""]);
+    // (The name's column first, its row's grip at its edge, no column of its own; the actions' last: no name)
+    expect(all("th").map((th) => th.textContent)).toEqual(["Name", "Status", "Estimate", "Done", ""]);
+    expect(all("tbody tr").every((tr) => tr.querySelector(':scope > td[data-key="name"]:first-child > .swd-row-grip:first-child'))).toBe(true);
     expect(all("tbody tr").map((tr) => tr.querySelector('[data-key="name"] .swd-table-name')!.textContent)).toEqual(["Fix login", "Write docs", "Plan"]);
     const lot = q('tbody tr:nth-child(2) [data-key="estimate"]');
     expect([lot.classList.contains("swd-invalid"), lot.title]).toEqual([true, "no number"]);
@@ -166,8 +167,8 @@ describe("the table grouped", () => {
     expect(parts.map((part) => part.querySelector(".swd-group-label")!.textContent)).toEqual(["Todo", "Done", "Later (none of its options)"]);
     expect(parts.map((part) => part.querySelectorAll(".swd-table-headrow").length)).toEqual([1, 1, 1]);
     expect(parts.map((part) => [...part.querySelectorAll("tr[data-item]")].map((row) => row.querySelector(".swd-table-name")!.textContent))).toEqual([["Fix login"], ["Write docs"], ["Plan"]]);
-    // (Its group's head over the whole width: the grips' column, the name's, each property's, the actions')
-    expect(parts[0]!.querySelector(".swd-table-group-head > th")!.getAttribute("colspan")).toBe("6");
+    // (Its group's head over the whole width: the name's column, each property's, the actions')
+    expect(parts[0]!.querySelector(".swd-table-group-head > th")!.getAttribute("colspan")).toBe("5");
     parts[1]!.querySelector<HTMLButtonElement>(".swd-table-add")!.click();
     await settle();
     expect((await named("Untitled")).values.status).toBe("Done");

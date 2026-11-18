@@ -50,12 +50,21 @@ export interface PropertyType {
    * a browser's date, time or date and time field, a link's address and text;
    * `toggle`: no field, a press turning it (true or not: its empty value
    * unticked, never missing); `documents`: some of the space's documents
-   * picked, a list of references (domain/types/reference.ts); a text field
-   * where none (or where a value kept does not read as it)
+   * picked, a list of references (domain/types/reference.ts); `files`: files
+   * of the space and of the web in a popup of their own, added, uploaded,
+   * reordered (domain/types/files.ts); a text field where none (or where a
+   * value kept does not read as it)
    */
-  readonly editor?: "select" | "multi-select" | "date" | "time" | "datetime-local" | "link" | "toggle" | "documents";
-  /** How a value shows where not as its text alone: its options as pills, a share as a bar, a link to open, a box ticked or not, links to the documents it names, labels (texts as quiet pills, no options) */
-  readonly look?: "options" | "share" | "link" | "check" | "documents" | "labels";
+  readonly editor?: "select" | "multi-select" | "date" | "time" | "datetime-local" | "link" | "toggle" | "documents" | "files";
+  /** How a value shows where not as its text alone: its options as pills, a share as a bar, a link to open, a box ticked or not, links to the documents it names, labels (texts as quiet pills, no options), files as their previews (`media`) */
+  readonly look?: "options" | "share" | "link" | "check" | "documents" | "labels" | "media";
+  /** False where its values are no groups (a list of files): not offered in Group by, nor a board's columns */
+  readonly groups?: false;
+  /**
+   * The documents a value names that are kept besides its item (a value of files: its files of the space), offered for
+   * deletion with the item where no other item names them; none: it names none
+   */
+  leaves?(value: Value, params: Params): readonly string[];
   /** Why a property's params are not this type's (a select's options no list of texts), undefined where they are */
   validateParams?(params: Params): string | undefined;
   /** Why a value does not read as this type (shown invalid, kept as read), undefined where it does; an empty value always does (`isEmpty`) */

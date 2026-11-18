@@ -1,5 +1,9 @@
 # Silverware Tags: changelog
 
+## 1.1.1 (2026-11-19)
+
+- Panels, menus and dialogs scroll with a thin scrollbar, the same in every Silverware plugin; SilverBullet's own scrollbar is unchanged.
+
 ## 1.1.0 (2026-11-17)
 
 - Works with SilverBullet's next version (3.0) as well as 2.12.1: settings are saved in `Library/Config` there, and *Hide and protect meta pages* hides and protects SilverBullet's own pages (those under `Library/`) as it tells them there.

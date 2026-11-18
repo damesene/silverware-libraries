@@ -27,6 +27,7 @@ import { propertyIcon, typeIcon, VIEW_ICONS } from "../../views/icons.ts";
 import type { PropertiesOffer } from "../properties/index.ts";
 import { type LookControls, lookControls } from "./look.ts";
 import { missing, valueNodes } from "../../views/values.ts";
+import { takeFiles, uploadInto } from "../../views/takefiles.ts";
 
 // The panel's width where none is set (the module's setting `width`), the narrowest it may be set to, and its share of the
 // editor's area at most (the page beside it still seen)
@@ -446,7 +447,7 @@ export class PeekPanel {
       let done: Result;
       try {
         // As shown (its own writes taken on, `own`): removed only where what it loses is still so, as from a view
-        done = await this.host.core.remove(shown.database, [shown.item]);
+        done = await this.host.core.remove(shown.database, [shown.item], this.host.media?.remove ? { remove: this.host.media.remove } : undefined);
       } finally {
         this.asking = false;
       }
@@ -475,6 +476,8 @@ export class PeekPanel {
       // (Its editors edit the item shown: written from the item the panel writes against then, `own`)
       update: (_item: Item, key: string, value: Value | undefined) => this.own(shown, (one) => withValue(one, key, value), (base) => core.update(shown.database, base, key, value)),
       rename: (_item: Item, name: string) => this.own(shown, (one) => ({ ...one, name: name.trim() }), (base) => core.rename(shown.database, base, name)),
+      // (The item it shows is kept as it is now: its writes are against it)
+      current: async () => shown.item,
       notify: (text) => ui.notify(text, { type: "error" }),
       documents: () => this.host.documents(),
       validateDocumentName: (name) => this.host.validateDocumentName(name),
@@ -482,6 +485,7 @@ export class PeekPanel {
       ...(this.host.folderSeparator ? { folderSeparator: this.host.folderSeparator } : {}),
       openByName: (name) => this.host.openByName(name),
       ...(this.host.openMention ? { openMention: this.host.openMention } : {}),
+      ...(this.host.media ? { media: this.host.media } : {}),
     };
   }
 
@@ -669,11 +673,11 @@ export class PeekPanel {
     const show = () => {
       const now = shown.item;
       if (editor.type(property).look === "check") return void value.replaceChildren(el(doc, "span", { class: `swd-peek-check${now.values[property.key] === true ? " swd-on" : ""}`, html: now.values[property.key] === true ? typeIcon("checkbox") : "", attrs: { "aria-label": now.values[property.key] === true ? "Yes" : "No" } }));
-      const shownNodes = valueNodes(editor, now, property);
+      const shownNodes = valueNodes(editor, now, property, { files: "small" });
       const lacking = missing(editor, now, property);
-      // A value drawn as a link takes its press, so a pencil after it edits it whatever room is left beside it: only a
-      // pointer's way, the value itself being the button the keys edit (Enter, F2), its press reaching it
-      const pencil = !property.readonly && shownNodes.some((node) => node instanceof Element && node.matches("a")) ? [el(doc, "span", { class: "swd-peek-edit", html: VIEW_ICONS.edit, title: `Edit ${property.label}`, attrs: { "aria-hidden": "true" } })] : [];
+      // A value drawn as a link or as files takes its press, so a pencil after it edits it whatever room is left beside it:
+      // only a pointer's way, the value itself being the button the keys edit (Enter, F2), its press reaching it
+      const pencil = !property.readonly && shownNodes.some((node) => node instanceof Element && node.matches("a, .swd-media-strip")) ? [el(doc, "span", { class: "swd-peek-edit", html: VIEW_ICONS.edit, title: `Edit ${property.label}`, attrs: { "aria-hidden": "true" } })] : [];
       value.replaceChildren(...(shownNodes.length ? shownNodes : [el(doc, "span", { class: `swd-peek-empty${lacking ? " swd-peek-missing" : ""}`, text: lacking ? "Required" : "Empty" })]), ...pencil);
     };
     show();
@@ -691,6 +695,8 @@ export class PeekPanel {
         event.preventDefault();
         edit();
       });
+      // A value of files: files dropped on its row, or pasted while it has the focus, uploaded and added to the item shown
+      if (editor.type(property).look === "media") takeFiles(value, (given) => uploadInto(editor, shown.item, property.key, property.label, given), { paste: true });
     } else value.classList.add("swd-peek-readonly");
     // Its name: opens it in Properties (its name, type, options, required, hidden, removed) where that module is on
     const properties = this.host.offered<PropertiesOffer>("properties");

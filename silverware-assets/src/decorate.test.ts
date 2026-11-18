@@ -967,3 +967,125 @@ describe("Download", () => {
     expect(downloadName({ kind: "web", url: "https://example.com/" })).toBe("download");
   });
 });
+
+describe("another plugin's files (the API's drawPreview, showFile, deleteFiles)", () => {
+  const box = { width: 84, height: 28 };
+
+  it("draws an image as the browser does, nothing for a file no type previews, and nothing once aborted", async () => {
+    const { decorator } = setUp("");
+    const image = await decorator.drawPreview("Photos/cat.png", "Notes/Page", box, new AbortController().signal);
+    expect(image?.localName).toBe("img");
+    expect(image?.getAttribute("src")).toBe(".fs/Photos/cat.png");
+    // (No frame, label nor menu: the element alone, the caller's to place)
+    expect(image?.closest(".swa-frame")).toBeNull();
+    expect(await decorator.drawPreview("archive.zip", "Notes/Page", box, new AbortController().signal)).toBeNull();
+    expect(await decorator.drawPreview("notes.txt", "Notes/Page", box, new AbortController().signal)).toBeNull();
+    expect(await decorator.drawPreview("  ", "Notes/Page", box, new AbortController().signal)).toBeNull();
+    const control = new AbortController();
+    control.abort();
+    expect(await decorator.drawPreview("cat.png", "Notes/Page", box, control.signal)).toBeNull();
+  });
+
+  it("draws a type's preview that keeps one in the space only from the one kept, in the box given; none kept, none made", async () => {
+    const times: Record<string, number> = { "kept.pdf": 1, "_silverware-assets-previews/kept.pdf.1-1.webp": 2, "new.pdf": 1 };
+    const previewFiles = {
+      facts: async (path: string) => (path in times ? { modified: times[path]!, size: 1 } : undefined),
+      read: async (path: string) => (path in times ? new Uint8Array([1]) : undefined),
+      write: async () => undefined,
+      remove: async () => undefined,
+    };
+    const { registry, decorator } = setUp("", {}, { previewFiles });
+    const given: { width: number; height: number; kept: string }[] = [];
+    registry.types.register({
+      name: "pdf",
+      match: { kind: ["file"], ext: ["pdf"] },
+      icon: "<svg/>",
+      storesPreview: true,
+      views: {
+        preview: async (context) => {
+          given.push({ width: context.viewport.width, height: context.viewport.height, kept: (await context.stored?.read("image/webp"))?.type ?? "none" });
+          return Object.assign(document.createElement("div"), { className: "test-kept" });
+        },
+      },
+    } as AssetType);
+    const drawn = await decorator.drawPreview("kept.pdf", "Notes/Page", box, new AbortController().signal);
+    expect(drawn?.className).toBe("test-kept");
+    expect(given).toEqual([{ width: 84, height: 28, kept: "image/webp" }]);
+    expect(await decorator.drawPreview("new.pdf", "Notes/Page", box, new AbortController().signal)).toBeNull();
+    expect(given).toHaveLength(1);
+    // Previews not kept, as the settings say: none drawn
+    const { registry: offRegistry, decorator: off } = setUp("", { storePreviews: false }, { previewFiles });
+    offRegistry.types.register({ name: "pdf", match: { kind: ["file"], ext: ["pdf"] }, icon: "<svg/>", storesPreview: true, views: { preview: () => document.createElement("div") } } as AssetType);
+    expect(await off.drawPreview("kept.pdf", "Notes/Page", box, new AbortController().signal)).toBeNull();
+  });
+
+  it("draws nothing of a type costly to draw that keeps no preview, nor where its renderer fails", async () => {
+    const { registry, decorator } = setUp("");
+    registry.types.register({ name: "sheet", match: { kind: ["file"], ext: ["xlsx"] }, icon: "<svg/>", costly: true, views: { preview: () => document.createElement("div") } } as AssetType);
+    registry.types.register({ name: "broken", match: { kind: ["file"], ext: ["bad"] }, icon: "<svg/>", views: { preview: () => Promise.reject(new Error("no")) } } as AssetType);
+    expect(await decorator.drawPreview("a.xlsx", "P", box, new AbortController().signal)).toBeNull();
+    expect(await decorator.drawPreview("a.bad", "P", box, new AbortController().signal)).toBeNull();
+  });
+
+  it("shows a file in the side panel, the one before ended; a file no panel draws opened in a tab", async () => {
+    const { state, decorator } = setUp("");
+    decorator.showFile("Photos/cat.png", "Notes/Page");
+    await vi.waitFor(() => expect(document.querySelector(".swa-side-panel .swa-panel-body img")?.getAttribute("src")).toBe(".fs/Photos/cat.png"));
+    decorator.showFile("dog.png", "Notes/Page");
+    await vi.waitFor(() => expect(document.querySelector(".swa-side-panel .swa-panel-body img")?.getAttribute("src")).toBe(".fs/dog.png"));
+    expect(document.querySelectorAll(".swa-side-panel")).toHaveLength(1);
+    decorator.showFile("archive.zip", "Notes/Page");
+    expect(state.opened).toEqual([".fs/archive.zip"]);
+    expect(state.problems).toEqual([]);
+  });
+
+  it("ends a file's drawing in the side panel as the panel closes: shown for another plugin, or from an embed's menu", async () => {
+    const { registry, decorator } = setUp("![[a.swatest]]\n", { views: { types: { swatest: "card" } } });
+    const signals: AbortSignal[] = [];
+    registry.types.register({
+      name: "swatest",
+      match: { kind: ["file"], ext: ["swatest"] },
+      icon: "<svg/>",
+      views: { full: (context) => (signals.push(context.signal), Object.assign(document.createElement("div"), { className: "test-full" })) },
+    } as AssetType);
+    decorator.showFile("a.swatest", "Notes/Page");
+    await vi.waitFor(() => expect(document.querySelector(".swa-side-panel .test-full")).not.toBeNull());
+    expect(signals[0]!.aborted).toBe(false);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(document.querySelector(".swa-side-panel")).toBeNull();
+    expect(signals[0]!.aborted).toBe(true);
+    // From an embed's menu: its panel's end, not the embed's (still drawn in the page)
+    const one = frame("a.swatest", false);
+    await decorator.decorate([one]);
+    await vi.waitFor(() => expect(one.frame.querySelector(".swa-card [role=button]")).not.toBeNull());
+    one.frame.querySelector<HTMLElement>(".swa-card [role=button]")!.click();
+    [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")].find((item) => item.textContent?.trim() === "Open in side panel")!.click();
+    await vi.waitFor(() => expect(signals).toHaveLength(2));
+    expect(signals[1]!.aborted).toBe(false);
+    document.querySelector<HTMLButtonElement>(".swa-side-panel .swa-panel-close")!.click();
+    expect(signals[1]!.aborted).toBe(true);
+    expect(one.frame.querySelector(".swa-card")).not.toBeNull();
+  });
+
+  it("deletes files with their kept previews, nothing asked, and gives back those not deleted; none where the host deletes no file", async () => {
+    const kept: Record<string, true> = { "_silverware-assets-previews/a.pdf.5-3.webp": true };
+    const there = new Set(["a.pdf", "b.png"]);
+    let asked = 0;
+    const { decorator } = setUp("", {}, {
+      confirm: async () => (asked++, true),
+      deleteFile: async (path) => (there.delete(path) ? undefined : "no such file"),
+      previewFiles: {
+        facts: async (path) => (there.has(path) ? { modified: 5, size: 3 } : kept[path] ? { modified: 1, size: 1 } : undefined),
+        read: async () => undefined,
+        write: async () => undefined,
+        remove: async (path) => void delete kept[path],
+      },
+    });
+    expect(await decorator.deleteFiles(["a.pdf", "gone.pdf", "b.png"])).toEqual(["gone.pdf"]);
+    expect([...there]).toEqual([]);
+    expect(Object.keys(kept)).toEqual([]);
+    expect(asked).toBe(0);
+    const { decorator: none } = setUp("");
+    expect(await none.deleteFiles(["a.pdf"])).toEqual(["a.pdf"]);
+  });
+});

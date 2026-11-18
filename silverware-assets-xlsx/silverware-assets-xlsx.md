@@ -1,7 +1,7 @@
 ---
 name: Library/damesene/silverware-assets-xlsx
 tags: meta/library
-version: 1.0.1
+version: 1.0.2
 description: "Silverware Assets XLSX: Excel workbooks (.xlsx) in your pages, with Silverware Assets: a preview shows the first sheet's first cells, and a workbook shown full, in the side panel or enlarged is a reader of every sheet as a spreadsheet shows it. Works offline."
 files:
 - silverware-assets-xlsx.js

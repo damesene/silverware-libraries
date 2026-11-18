@@ -5,7 +5,7 @@
 // grids draw outside the editor (shared/rendered.ts).
 import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { layoutOf } from "../../shared/layout.ts";
-import type { Assets } from "../../shared/assets.ts";
+import type { AddedFile, Assets, FilesPlace, GivenFiles } from "../../shared/assets.ts";
 import { applyLayers } from "../../shared/layers.ts";
 import { pageWriter } from "../../shared/pages/writer.ts";
 import { renderedOf } from "../../shared/rendered.ts";
@@ -16,7 +16,7 @@ import { AssetRegistry } from "./core/registry.ts";
 import { type ListedFile, movedPreviews, orphanedPreviews } from "./core/stored.ts";
 import { AssetDecorator, type AssetHost } from "./decorate.ts";
 import { bytesOf, factsOf, silverBulletAssetHost } from "./host/silverbullet/assets.ts";
-import { pageNamesOf, silverBulletPlatform } from "../../shared/silverbullet/platform.ts";
+import { documentUrl, pageNamesOf, silverBulletPlatform } from "../../shared/silverbullet/platform.ts";
 import { ASSETS_PATH, type AssetSettings, readAssetSettings, readSyntaxModeSettings, storedAssetPaths, SYNTAX_PATHS, type SyntaxModeSettings, validatePreviewFolder } from "./model/settings.ts";
 import { SILVERBULLET_SYNTAX_PAGE, SYNTAX_OPTION } from "./host/silverbullet/syntaxmode.ts";
 import { assetProvider } from "./provider.ts";
@@ -24,8 +24,8 @@ import { mediaTabs } from "./ui/mediatab.ts";
 import { markdownTab, SettingsWindow } from "./ui/settingswindow.ts";
 import { Dialogs } from "../../shared/dialog.ts";
 import { type EditingSurface, editorsOf } from "../../shared/editor.ts";
-import { folderOf } from "./core/insert.ts";
-import { insertChosen, type InsertTarget, uploadBy, watchInserts } from "./host/silverbullet/insert.ts";
+import { folderOf, webNameOf, webUrlOf } from "./core/insert.ts";
+import { insertChosen, type InsertTarget, uploadBy, watchInserts, writeChosen } from "./host/silverbullet/insert.ts";
 import { DIALOG_LOOK } from "./ui/dialoglook.ts";
 import { type InsertChoice, type InsertFile, openInsertDialog } from "./ui/insertdialog.ts";
 import { showUploadProgress } from "./ui/uploadprogress.ts";
@@ -70,6 +70,12 @@ export const api: Assets = {
     linkIcon: (markdown) => decorator?.fieldDrawing(page).linkIcon?.(markdown),
     linkAfter: (markdown) => decorator?.fieldDrawing(page).linkAfter?.(markdown),
   }),
+  // (Another plugin's files: a database's property of files. Each none's until the files are decorated: nothing drawn,
+  // shown, uploaded nor deleted before)
+  drawPreview: async (target, page, box, signal) => (decorator ? decorator.drawPreview(target, page, box, signal) : null),
+  showFile: (target, page) => decorator?.showFile(target, page),
+  insertFiles: (given, place) => uploadFiles(given, place),
+  deleteFiles: async (paths) => (decorator ? decorator.deleteFiles(paths) : [...paths]),
 };
 
 // The files decorated, one per window (its observers live as long), its host the bridge handed over last
@@ -93,8 +99,8 @@ let inserting: AbortController | undefined;
 let insertDialogs: Dialogs | undefined;
 // The largest file SilverBullet's space takes by default (MiB: its `maximumDocumentSize`, `plug-api/constants.ts`)
 const MAX_DOCUMENT_MIB = 10;
-/** The files chosen written and put in, their upload told meanwhile in a panel at the window's bottom right */
-function uploadChosen(bridge: Bridge, drawing: AssetDecorator, settings: AssetSettings, target: InsertTarget, chosen: readonly InsertChoice[]): void {
+/** The files chosen written, their upload told meanwhile in a panel at the window's bottom right: those written */
+async function writeWithProgress(bridge: Bridge, drawing: AssetDecorator, settings: AssetSettings, chosen: readonly InsertChoice[]): Promise<readonly InsertChoice[]> {
   // (Those of the web linked are not uploaded: no row of theirs, no panel where all are)
   const uploaded = chosen.flatMap((one, index) => (one.url ? [] : [index]));
   const progress = uploaded.length
@@ -106,44 +112,85 @@ function uploadChosen(bridge: Bridge, drawing: AssetDecorator, settings: AssetSe
         }),
       )
     : undefined;
-  void insertChosen(bridge, target, chosen, (index, state) => progress?.state(uploaded.indexOf(index), state))
-    .then(() => progress?.finish())
-    .catch((error: unknown) => {
-      progress?.finish();
-      void bridge.flash(`Silverware Assets: not inserted: ${error instanceof Error ? error.message : String(error)}`, "error");
-    });
+  try {
+    return await writeChosen(bridge, chosen, (index, state) => progress?.state(uploaded.indexOf(index), state));
+  } finally {
+    progress?.finish();
+  }
 }
 
-/** The insert dialog opened for these files (none: an upload, picked in it), the files chosen written and put in */
-async function openInsert(files: readonly InsertFile[], target: InsertTarget): Promise<void> {
+/** The files chosen written and put in */
+function uploadChosen(bridge: Bridge, drawing: AssetDecorator, settings: AssetSettings, target: InsertTarget, chosen: readonly InsertChoice[]): void {
+  void insertChosen(bridge, target, chosen, (some) => writeWithProgress(bridge, drawing, settings, some)).catch((error: unknown) => void bridge.flash(`Silverware Assets: not inserted: ${error instanceof Error ? error.message : String(error)}`, "error"));
+}
+
+/**
+ * The insert dialog opened for these files (none: an upload, picked in it) in a folder; `done` given the files chosen
+ * as Insert is pressed (none: cancelled), with what the dialog was opened by
+ */
+async function openDialog(
+  files: readonly InsertFile[],
+  folder: string,
+  options: { readonly companion: boolean; readonly nameOnly?: boolean },
+  done: (chosen: readonly InsertChoice[] | undefined, by: { readonly bridge: Bridge; readonly drawing: AssetDecorator; readonly settings: AssetSettings }) => void,
+): Promise<boolean> {
   const bridge = current;
   const drawing = decorator;
-  if (!bridge || !drawing) return;
+  if (!bridge || !drawing) return false;
   const settings = heldOr(readAssetSettings(bridge.getConfig ? await bridge.getConfig(ASSETS_PATH, undefined) : undefined).settings);
   const mib = Number(bridge.getConfig ? await bridge.getConfig("maximumDocumentSize", MAX_DOCUMENT_MIB) : MAX_DOCUMENT_MIB) || MAX_DOCUMENT_MIB;
-  const page = target.kind === "page" ? target.page : (lastPage ?? "");
   insertDialogs ??= new Dialogs(document, DIALOG_LOOK);
   openInsertDialog(
     document,
     insertDialogs,
     files,
     {
-      folder: folderOf(page),
+      folder,
       maxBytes: mib * 1024 * 1024,
       now: () => new Date(),
       existing: async () => new Set(bridge.listFiles ? pageNamesOf(await bridge.listFiles()).map((path) => path.toLowerCase()) : []),
       typeOf: (file, path) => drawing.insertTypeOf(file, path, settings),
       drawSample: (container, file, path, view, signal) => drawing.drawSample(container, file, path, view, signal),
-      touch: !!window.matchMedia?.("(pointer: coarse)").matches,
-      companion: target.kind === "surface",
+      companion: options.companion,
+      ...(options.nameOnly ? { nameOnly: true } : {}),
+      // (Space: the space's files, pages and the previews kept left out; drawn from SilverBullet's files)
+      ...(bridge.listFiles ? { spaceFiles: async () => pageNamesOf(await bridge.listFiles!()).filter((path) => !path.endsWith(".md") && !path.startsWith("_")), urlOf: (path: string) => documentUrl(path) } : {}),
     },
-    (chosen) => {
-      // (A field of another plugin's given its focus back at once, as the dialog closes: else it is taken for left, a
-      // grid's cell written and closed before the files are put in)
-      if (target.kind === "surface") target.surface.focus();
-      if (chosen?.length) uploadChosen(bridge, drawing, settings, target, chosen);
-    },
+    (chosen) => done(chosen, { bridge, drawing, settings }),
   );
+  return true;
+}
+
+/** The insert dialog opened for these files (none: an upload, picked in it), the files chosen written and put in */
+async function openInsert(files: readonly InsertFile[], target: InsertTarget): Promise<void> {
+  const page = target.kind === "page" ? target.page : (lastPage ?? "");
+  await openDialog(files, folderOf(page), { companion: target.kind === "surface" }, (chosen, { bridge, drawing, settings }) => {
+    // (A field of another plugin's given its focus back at once, as the dialog closes: else it is taken for left, a
+    // grid's cell written and closed before the files are put in)
+    if (target.kind === "surface") target.surface.focus();
+    if (chosen?.length) uploadChosen(bridge, drawing, settings, target, chosen);
+  });
+}
+
+/**
+ * Files uploaded for another plugin (the API's `insertFiles`): the dialog of their names alone, the companion of what
+ * opened it (a database's popup stays open under it), the files given by an event its rows (an image's address on the
+ * web found in what came with them); resolved once written with the targets a link names, undefined where cancelled.
+ * Not ruled by the setting of SilverBullet's own pasting (`insert.enabled`): asked for by the plugin
+ */
+function uploadFiles(given: GivenFiles | undefined, place: FilesPlace): Promise<readonly AddedFile[] | undefined> {
+  const url = given ? webUrlOf({ files: given.files.length, html: given.html ?? "", ...(given.uriList ? { uriList: given.uriList } : {}) }) : undefined;
+  // (A link alone, no file: a row of it, its data fetched where it is kept in the space)
+  const link = given && !given.files.length ? given.uriList?.split(/\r?\n/).find((one) => /^https?:\/\//i.test(one.trim()))?.trim() : undefined;
+  const files: InsertFile[] = link ? [{ file: new File([], webNameOf(link)), source: "link", url: link, remote: true }] : (given?.files ?? []).map((file) => ({ file, source: given!.source, ...(url ? { url } : {}) }));
+  return new Promise((resolve, reject) => {
+    openDialog(files, place.folder, { companion: true, nameOnly: true }, (chosen, { bridge, drawing, settings }) => {
+      if (!chosen) return resolve(undefined);
+      writeWithProgress(bridge, drawing, settings, chosen).then((written) => resolve(written.map((one) => ({ target: one.url ?? one.path, ...(one.title ? { title: one.title } : {}) }))), reject);
+    })
+      .then((opened) => opened || resolve(undefined))
+      .catch(reject);
+  });
 }
 
 /**

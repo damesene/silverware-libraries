@@ -9,7 +9,7 @@ import { renamable } from "./core/rename.ts";
 import { actionFor, mimeOf, typeFor, viewFor } from "./core/choose.ts";
 import { closestContext, embedAt, type LineContext, linkAt, outside, placeAmong, type Placed, type Range, sameTarget, writtenContext } from "./core/locate.ts";
 import { metadataOf } from "./core/metadata.ts";
-import { forgetPreviews, type PreviewFiles, storedPreview } from "./core/stored.ts";
+import { forgetPreviews, hasStoredPreview, type PreviewFiles, storedPreview } from "./core/stored.ts";
 import type { AssetRegistry } from "./core/registry.ts";
 import { type AssetSettings, fullHeight, type Gesture, insertAsFor, labelFor, previewSize, type View, VIEWS } from "./model/settings.ts";
 import { addCardFields, dateText, drawCard, iconElement, markFailed, menuMarker, sizeText } from "./ui/card.ts";
@@ -284,7 +284,7 @@ export class AssetDecorator {
     // preview its drawing smaller; an image of the space has no preview of its type's own, and still has one)
     const native = !!plainMedium(this.doc, asset, mimeOf(asset));
     const capabilities: Capabilities = { views: ["card", ...(type.views?.preview || native ? (["preview"] as const) : []), ...(type.views?.full || native ? (["full"] as const) : [])] };
-    const actions = this.actionItems(asset, capabilities, (container, as) => this.drawInto(container, as, type, asset, settings, signal));
+    const actions = this.actionItems(asset, capabilities, (container, as, ends) => this.drawInto(container, as, type, asset, settings, eitherEnds(signal, ends)));
     const settled = settings.views.types[type.name] ?? settings.views.default;
     const { toEmbed, deleteFile } = writes;
     return {
@@ -581,7 +581,7 @@ export class AssetDecorator {
   private actionItems(
     asset: Asset,
     can: Capabilities,
-    render: (container: HTMLElement, as: "preview" | "full") => Promise<void>,
+    render: (container: HTMLElement, as: "preview" | "full", ends?: AbortSignal) => Promise<void>,
   ): { readonly open: MenuItem[]; readonly copy: MenuItem[]; readonly file: MenuItem[] } {
     const items = this.registry.actions.all
       .filter((action) => action.fits(asset, can))
@@ -591,7 +591,7 @@ export class AssetDecorator {
         copy: action.name.startsWith("copy"),
         label: action.label ?? action.name,
         run: () => {
-          const context: ActionContext = { asset, open: (url) => this.host.open(url), render: (as, container) => render(container, as), sheetArea: this.host.sheetArea };
+          const context: ActionContext = { asset, open: (url) => this.host.open(url), render: (as, container, ends) => render(container, as, ends), sheetArea: this.host.sheetArea };
           void Promise.resolve(action.run(context)).catch((error: unknown) => this.host.problem(`Silverware Assets: ${action.name}: ${message(error)}`));
         },
       }));
@@ -635,6 +635,85 @@ export class AssetDecorator {
     };
     const element = await type.views?.[as]?.({ asset, viewport, metadata: metadataOf({}, async () => "a link keeps no metadata"), signal, placement: "inline", fills: true });
     container.replaceChildren(element ?? plainMedium(this.doc, asset, mimeOf(asset)) ?? this.card(type, asset, settings));
+  }
+
+  /** The asset a link's target names, resolved against a page as an embed of it is (a path of the space, an address of the web) */
+  private targetAsset(target: string, page: string): Asset | undefined {
+    const written = target.trim();
+    if (!written) return undefined;
+    const embed = readEmbeds(WEB_TARGET.test(written) ? `![](${written})` : `![[${written}]]`)[0];
+    return embed ? this.host.assetOf(embed, page) : undefined;
+  }
+
+  /**
+   * A file's preview for another plugin (the API's `drawPreview`): its type's own, fitted in a box, no frame, label,
+   * menu nor click; where its type keeps previews in the space, or is costly to draw, only one kept is drawn (none made
+   * anew: a list of many files would make each); else the browser's image of an image. Null where none is drawn
+   */
+  async drawPreview(target: string, page: string, box: { readonly width: number; readonly height: number }, signal: AbortSignal): Promise<HTMLElement | null> {
+    const asset = this.targetAsset(target, page);
+    const type = asset && typeFor(this.registry.types.all, asset);
+    if (!asset || !type || signal.aborted) return null;
+    const settings = await this.host.settings();
+    const files = settings.storePreviews && type.storesPreview && asset.kind === "file" ? this.host.previewFiles : undefined;
+    if (type.storesPreview || type.costly) {
+      if (!files || asset.kind !== "file" || !(await hasStoredPreview(files, settings.previewFolder, asset.path))) return null;
+    }
+    if (signal.aborted) return null;
+    let element: HTMLElement | null = null;
+    const renderer = type.views?.preview;
+    if (renderer) {
+      try {
+        element = await renderer({
+          asset,
+          viewport: { width: box.width, height: box.height, onChange: () => undefined },
+          metadata: metadataOf({}, async () => "a preview drawn for another plugin keeps no metadata"),
+          signal,
+          placement: "block",
+          ...(files && asset.kind === "file" ? { stored: storedPreview(files, settings.previewFolder, asset.path) } : {}),
+        });
+      } catch {
+        return null;
+      }
+    }
+    // (None of its type's: the browser's image of an image; no other medium, a video's player in a box of a few px)
+    if (!element) {
+      const native = plainMedium(this.doc, asset, mimeOf(asset));
+      element = native?.localName === "img" ? native : null;
+    }
+    return signal.aborted ? null : element;
+  }
+
+  /**
+   * A file shown in the side panel for another plugin (the API's `showFile`), drawn as a link's file is drawn there;
+   * where no panel takes it (the action not registered, a file it cannot draw), its URL in a new tab
+   */
+  showFile(target: string, page: string): void {
+    const asset = this.targetAsset(target, page);
+    if (!asset) return;
+    const type = typeFor(this.registry.types.all, asset);
+    const action = this.registry.actions.get(SIDE_PANEL);
+    const native = hasPlainMedium(mimeOf(asset));
+    const can: Capabilities = { views: (["card", "preview", "full"] as const).filter((view) => view === "card" || !!type?.views?.[view] || native) };
+    if (!type || !action?.fits(asset, can)) {
+      if ("url" in asset) this.host.open(asset.url);
+      return;
+    }
+    void this.host
+      .settings()
+      .then((settings) => {
+        const context: ActionContext = { asset, open: (url) => this.host.open(url), render: (as, container, ends) => this.drawInto(container, as, type, asset, settings, ends ?? NEVER_ENDS), sheetArea: this.host.sheetArea };
+        return action.run(context);
+      })
+      .catch((error: unknown) => this.host.problem(`Silverware Assets: ${SIDE_PANEL}: ${message(error)}`));
+  }
+
+  /** Files deleted for another plugin (the API's `deleteFiles`), each as *Delete file…* deletes one, its previews kept with it, nothing asked: those not deleted */
+  async deleteFiles(paths: readonly string[]): Promise<string[]> {
+    if (!this.host.deleteFile) return [...paths];
+    const left: string[] = [];
+    for (const path of paths) if (await this.deleteWithPreviews(path).catch((error: unknown) => message(error))) left.push(path);
+    return left;
   }
 
   /**
@@ -994,8 +1073,9 @@ export class AssetDecorator {
     };
     const capabilities = { views: (["card", "preview", "full"] as const).filter(can) };
     // The asset drawn into a container of an action's (a panel): its type's view, else a copy of the host's drawing, else its card
-    const renderInto = async (as: "preview" | "full", container: HTMLElement) => {
-      const element = await type.views?.[as]?.({ ...context, viewport: viewportOf(container, found.embed, as, settings, control.signal), fills: true });
+    const renderInto = async (as: "preview" | "full", container: HTMLElement, ends?: AbortSignal) => {
+      const signal = eitherEnds(control.signal, ends);
+      const element = await type.views?.[as]?.({ ...context, viewport: viewportOf(container, found.embed, as, settings, signal), signal, fills: true });
       container.replaceChildren(element ?? shownCopy(native) ?? this.card(type, asset, settings));
     };
     const runAction = (gesture: Gesture) => {
@@ -1009,7 +1089,7 @@ export class AssetDecorator {
     const settled = settings.views.types[type.name] ?? settings.views.default;
     const notWritten = (problem: string | undefined) => problem && this.host.problem(`Silverware Assets: not written: ${problem}`);
     const menu = (): MoreMenu => {
-        const actions = this.actionItems(asset, capabilities, (container, as) => renderInto(as, container));
+        const actions = this.actionItems(asset, capabilities, (container, as, ends) => renderInto(as, container, ends));
         return {
           title: assetName(asset),
           // How it is shown: a view written into its embed (the settings' own as none), or the embed written as a link
@@ -1302,6 +1382,24 @@ const RENAMED_POLL_MS = 200;
 
 // Why a frame's embed was not written: not found in the page as it is now; drawn in an editor's field
 const NOT_FOUND = "this file was not found in the page";
+// What no one ends: a file drawn for another plugin by an action that gives no signal of its own
+const NEVER_ENDS = new AbortController().signal;
+
+/** A signal that ends as either ends (`b` none: `a` itself): a file's drawing in an action's container, ended by the file drawn anew or the action's end */
+function eitherEnds(a: AbortSignal, b: AbortSignal | undefined): AbortSignal {
+  if (!b || b === a) return a;
+  if (a.aborted || b.aborted) return a.aborted ? a : b;
+  const both = new AbortController();
+  const end = () => both.abort();
+  a.addEventListener("abort", end, { once: true, signal: both.signal });
+  b.addEventListener("abort", end, { once: true, signal: both.signal });
+  return both.signal;
+}
+
+// A target that is an address of the web (a scheme before it), not a path of the space
+const WEB_TARGET = /^[a-z][a-z0-9+.-]*:/i;
+// The side panel's action (builtin/panels.ts), by its name as anyone's: another plugin's file shown there
+const SIDE_PANEL = "open-panel";
 const READ_ONLY = "this file is drawn in a field being edited";
 
 /** An embed of the text with its place among those of its text, which the page writer finds it by */

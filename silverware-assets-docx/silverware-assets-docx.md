@@ -1,7 +1,7 @@
 ---
 name: Library/damesene/silverware-assets-docx
 tags: meta/library
-version: 1.0.0
+version: 1.0.1
 description: "Silverware Assets DOCX: Word documents (.docx) in your pages, with Silverware Assets: a preview shows the first page, and a document shown full, in the side panel or enlarged is a reader of the whole document with zoom. Works offline."
 files:
 - silverware-assets-docx.js

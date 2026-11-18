@@ -1,5 +1,9 @@
 # Silverware Icons: changelog
 
+## 1.0.1 (2026-11-19)
+
+- Panels, menus and dialogs scroll with a thin scrollbar, the same in every Silverware plugin; SilverBullet's own scrollbar is unchanged.
+
 ## 1.0.0 (2026-11-11)
 
 First versioned release.

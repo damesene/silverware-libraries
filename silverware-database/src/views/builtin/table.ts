@@ -18,6 +18,7 @@ import { createInGroup, foldedOf, groupHead, setFolded } from "../groups.ts";
 import { ownIcon, VIEW_ICONS } from "../icons.ts";
 import { rowGrip } from "../order.ts";
 import { missing, problemOf, valueNodes } from "../values.ts";
+import { takeFiles, uploadInto } from "../takefiles.ts";
 
 const ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M2 7h12M6 3v10" stroke="currentColor" stroke-width="1.3"/></svg>';
 
@@ -42,8 +43,6 @@ function draw(host: ViewHost, element: HTMLElement, editing: Editing): void {
     doc,
     "tr",
     "swd-table-headrow",
-    // (The grips' column: no name)
-    el(doc, "th", { class: "swd-table-gripcol", attrs: { scope: "col", "aria-label": "Order" } }),
     ...columns.map((column) =>
       el(
         doc,
@@ -61,11 +60,13 @@ function draw(host: ViewHost, element: HTMLElement, editing: Editing): void {
     ),
     el(doc, "th", { class: "swd-table-actions", attrs: { scope: "col", "aria-label": "Actions" } }),
   );
-  // An item's row: its grip first, dragged to its place by hand among the rows of its part (the table's body, its group's)
+  // An item's row: its grip, dragged to its place by hand among the rows of its part (the table's body, its group's), at the
+  // left edge of its name's cell, as Silverware Table's grip lies at a table's edge: no column of its own
   const row = (item: Item, part: () => HTMLElement) => {
     const tr: HTMLElement = el(doc, "tr", { attrs: { "data-item": item.key } });
     host.look.item(item, tr);
-    tr.append(el(doc, "td", "swd-table-grip", rowGrip(host, item, () => tr, part, ":scope > tr[data-item]")), ...columns.map((column) => cell(host, item, column, editing)), actions(host, item));
+    const grip = rowGrip(host, item, () => tr, part, ":scope > tr[data-item]");
+    tr.append(...columns.map((column) => cell(host, item, column, editing, column.key === NAME ? grip : undefined)), actions(host, item));
     return tr;
   };
   const shown = host.items.length === host.total ? "" : `${host.items.length} of ${host.total} shown`;
@@ -82,7 +83,7 @@ function draw(host: ViewHost, element: HTMLElement, editing: Editing): void {
   const folded = foldedOf(host);
   // (A group's head pressed: the focus on it again, the table drawn anew)
   const fold = (key: string, open: boolean) => setFolded(host, key, open).then(() => element.querySelector<HTMLElement>(`.swd-table-group[data-group="${CSS.escape(key)}"] .swd-group-head`)?.focus({ preventScroll: true }));
-  const span = String(columns.length + 2);
+  const span = String(columns.length + 1);
   const parts = grouping.groups.map((group) => {
     const open = !folded.has(group.key);
     const part: HTMLElement = el(doc, "tbody", { class: `swd-table-group${open ? "" : " swd-folded"}`, attrs: { "data-group": group.key, "aria-label": `${grouping.property.label}: ${group.label}` } });
@@ -99,8 +100,11 @@ function draw(host: ViewHost, element: HTMLElement, editing: Editing): void {
   element.replaceChildren(el(doc, "div", "swd-table-box", el(doc, "table", "swd-table", ...parts)), ...(count || add ? [el(doc, "div", "swd-table-foot", add, count)] : []));
 }
 
-/** A value's cell: as its type shows it (invalid: marked, its reason the title), edited by a click (a checkbox turned) */
-function cell(host: ViewHost, item: Item, column: Column, editing: Editing): HTMLElement {
+/**
+ * A value's cell: as its type shows it (invalid: marked, its reason the title), edited by a click (a checkbox turned);
+ * `lead` kept first in it however its content is drawn again (the row's grip, in the name's cell)
+ */
+function cell(host: ViewHost, item: Item, column: Column, editing: Editing, lead?: HTMLElement): HTMLElement {
   const doc = host.document;
   const { property } = column;
   // (Its type named on it: the style page keeps a date or a number on one line)
@@ -110,7 +114,7 @@ function cell(host: ViewHost, item: Item, column: Column, editing: Editing): HTM
     const was = editing.cell === td;
     if (was) editing.cell = undefined;
     td.classList.remove("swd-editing");
-    td.replaceChildren(...content(host, written ?? item, column));
+    td.replaceChildren(...(lead ? [lead] : []), ...content(host, written ?? item, column));
     // An edit ended (saved or put aside) with the data changed meanwhile: drawn now
     if (was && editing.pending) {
       editing.pending = false;
@@ -141,6 +145,9 @@ function cell(host: ViewHost, item: Item, column: Column, editing: Editing): HTM
     };
     // Reached by Tab, edited by Enter or F2, as a click edits it
     td.tabIndex = 0;
+    // A value of files: files dropped on it, or pasted while it has the focus, uploaded and added to it
+    if (property && host.type(property).look === "media")
+      takeFiles(td, (given) => uploadInto(host, item, property.key, property.label, given), { paste: true });
     td.addEventListener("click", (event) => {
       // (A link in it is followed, not edited)
       if (!(event.target as Element).closest("a, button")) edit();
@@ -185,7 +192,7 @@ function content(host: ViewHost, item: Item, column: Column): Node[] {
     box.addEventListener("change", () => void toggle(host, item, property.key));
     return [box];
   }
-  return property ? valueNodes(host, item, property) : [doc.createTextNode(host.text(item, column.key))];
+  return property ? valueNodes(host, item, property, { files: "small" }) : [doc.createTextNode(host.text(item, column.key))];
 }
 
 function actions(host: ViewHost, item: Item): HTMLElement {

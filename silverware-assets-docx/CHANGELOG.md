@@ -1,5 +1,9 @@
 # Silverware Assets DOCX: changelog
 
+## 1.0.1 (2026-11-19)
+
+- The document reader scrolls with a thin scrollbar, the same in every Silverware plugin; SilverBullet's own scrollbar is unchanged.
+
 ## 1.0.0 (2026-11-14)
 
 First release.

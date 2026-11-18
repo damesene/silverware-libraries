@@ -15,6 +15,7 @@ import type { GroupArrangement } from "../domain/grouping.ts";
 import type { Database, Item, Property } from "../model/database.ts";
 import { type DatabaseCore, isRefused } from "./core.ts";
 import { documentsHost, type DocumentsSource } from "./documents.ts";
+import { type Media, mediaHost, type MediaSource } from "./media.ts";
 import { mentionsHost } from "./mentions.ts";
 import { arrangedGroups, focusGroupList, type GroupFocus, groupedBy, groupEntry } from "./groupmenu.ts";
 import { appliedToViews, type LookOf, type LookPart, type ToAll } from "./applyall.ts";
@@ -50,6 +51,8 @@ export type PlaceOptions = {
   readonly editor?: Pick<Editor, "open" | "openMention">;
   /** The documents references name (core/documents.ts); none: no document offered nor opened */
   readonly documents?: DocumentsSource;
+  /** The files a value of files names (core/media.ts); none: shown as their names */
+  readonly media?: MediaSource;
   /** What the modules on put in the place's menu (core/module.ts), asked as it opens */
   readonly moduleMenu?: (place: PlaceContext, menu: PlaceMenuBuilder) => readonly PlaceMenuGroup[];
   /** What the modules on put among the place's tools (core/module.ts), asked as it is drawn */
@@ -150,6 +153,8 @@ export class DatabasePlace {
   private drawn: Drawn | undefined;
   // What draws its items' and properties' own icons (Silverware Icons, or its stand-in), resolved once
   private readonly icons: Icons;
+  // The files a value of files names, drawn and opened as the host gives them (none: shown as their names)
+  private readonly media: Media | undefined;
   // The views on as the place was last drawn (its picker's): those Apply to all views gives to
   private on: readonly ViewDefinition[] = [];
   // The view picker's menu: closed as the place is drawn anew (its box goes, an open menu's listeners with it)
@@ -184,6 +189,7 @@ export class DatabasePlace {
 
   constructor(private readonly options: PlaceOptions) {
     this.icons = iconsOf(options.ui.icons);
+    this.media = mediaHost(options.media, options.store, options.ui, options.element.ownerDocument);
     this.stopListening = options.store.onChanged((change) => {
       if (change.database === options.database) void this.refresh();
     });
@@ -1059,9 +1065,11 @@ export class DatabasePlace {
       update: (item, key, value) => refreshed(core.update(id, item, key, value)),
       create: (draft, where) => refreshed(core.create(id, draft, where)),
       rename: (item, name) => refreshed(core.rename(id, item, name)),
-      remove: (items) => refreshed(core.remove(id, items)),
+      // (The files the items alone named offered for deletion with them, where the host deletes files)
+      remove: (items) => refreshed(core.remove(id, items, this.media?.remove ? { remove: this.media.remove } : undefined)),
       move: (item, where) => refreshed(core.move(id, item, where)),
       undo: (progress) => refreshed(core.undo(id, progress)),
+      current: async (item) => (await store.items(id)).value.find((one) => one.key === item.key),
       open: async (item) => {
         if (this.options.openItem?.(item, id, place.openerOf())) return;
         const document = store.documentOf(item.key);
@@ -1074,6 +1082,7 @@ export class DatabasePlace {
       },
       ...documentsHost(this.options.documents, core.noun, ui),
       ...mentionsHost(editor, ui),
+      ...(this.media ? { media: this.media } : {}),
       getMeta: (key) => state.get(prefixed(key)),
       setMeta,
       setting: (key) => settings.get(key),

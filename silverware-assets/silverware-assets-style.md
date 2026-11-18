@@ -157,8 +157,11 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 /* The insert dialog (src/ui/insertdialog.ts): a row per file (its icon and path, its note, how it is inserted, the
    file as it will be, at most 320 px high); with several, a row for all of them above; picked in it to upload */
+/* (Of one height, as the settings window: a source opened, a row added or its note changed does not move it; its rows
+   scroll within) */
 .swa-dialog.swa-insert-window {
   min-height: 0;
+  height: min(560px, calc(var(--sw-view-height, 100dvh) - 32px));
 }
 .swa-insert {
   display: flex;
@@ -188,6 +191,141 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 .swa-insert-row[data-swa-left-out] {
   opacity: 0.6;
+}
+.swa-insert-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+/* Its one field (a link, words of the space's files) and Browse… in a row; what the field offers under it, a line each */
+.swa-insert-pickers {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+/* The field adding a file, its offers (a link, files of the space: shared/suggest.ts) in a popup under it, over the rows */
+.swa-insert-add {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+.swa-insert-add-field {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+}
+.swa-insert-suggest {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: min(16em, 50vh);
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--root-background-color);
+  border: 1px solid var(--swa-dialog-line);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+.swa-insert-suggest[hidden] {
+  display: none;
+}
+.swa-insert-suggest-item {
+  display: grid;
+  justify-items: start;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swa-insert-suggest-item > *,
+.swa-insert-suggest-item:not(:has(> *)) {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swa-insert-suggest-detail {
+  opacity: 0.65;
+  font-size: 0.85em;
+}
+.swa-insert-suggest-item:hover,
+.swa-insert-suggest-item[aria-selected="true"] {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+/* A row: its title first, under it what happens to the file (Upload, Link, Already in your space), its name and ✎ */
+.swa-insert-title {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+}
+.swa-insert-row-what {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  opacity: 0.75;
+  font-size: 0.85em;
+}
+.swa-insert-what {
+  flex: none;
+  font-weight: 600;
+}
+.swa-insert-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swa-insert-edit {
+  flex: none;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.swa-insert-edit[hidden],
+.swa-insert-path[hidden] {
+  display: none;
+}
+.swa-insert-picture {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+}
+/* Files dragged over the dialog: it takes them */
+.swa-dialog.swa-insert-over {
+  outline: 2px dashed var(--ui-accent-color, #4a6cf7);
+  outline-offset: -4px;
+}
+/* Another plugin's upload: a row of two lines, its file a small picture at its left */
+[data-swa-compact] .swa-insert-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 4px 10px;
+  align-items: start;
+}
+[data-swa-compact] .swa-insert-sample {
+  width: 56px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 4px;
+}
+[data-swa-compact] .swa-insert-sample :is(img, video, canvas) {
+  max-width: 56px;
+  max-height: 48px;
+  object-fit: cover;
+}
+[data-swa-compact] .swa-insert-sample .swa-label-line {
+  display: none;
 }
 /* An image of the web: its address in place of its name in the space, where it is linked; where it is kept */
 .swa-insert-address {
@@ -2072,4 +2210,14 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   }
 }
 /* </shared-segments> */
+/* <shared-scrollbar> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* The boxes of the plugin's own that scroll (a view, a list, a panel, a dialog's body, a menu): a thin scrollbar, its
+   thumb quiet in the text's color and its track clear, the same in every plugin (Silverware Table's first). The page's
+   own scrollbar is SilverBullet's, left as it is. Of no weight of its own (`:where`): a rule of the plugin's for one of
+   them (a strip whose scrollbar is hidden) still holds. A theme sets another thumb by `--sw-scrollbar-thumb` */
+:where(.swa-panel-body, .swa-dialog-body, .swa-insert-suggest, .swa-upload-progress-rows, .swa-menu) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sw-scrollbar-thumb, color-mix(in srgb, var(--root-color, #333) 30%, transparent)) transparent;
+}
+/* </shared-scrollbar> */
 ```

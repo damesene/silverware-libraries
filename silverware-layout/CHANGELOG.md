@@ -1,5 +1,9 @@
 # Silverware Layout: changelog
 
+## 2.0.2 (2026-11-19)
+
+- Panels, menus and dialogs scroll with a thin scrollbar, the same in every Silverware plugin; SilverBullet's own scrollbar is unchanged.
+
 ## 2.0.1 (2026-11-18)
 
 - A grid's cell draws quotes, headings, bold text, code and `---` as the page does: their colours, font, sizes and spacing.

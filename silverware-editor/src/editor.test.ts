@@ -4,7 +4,7 @@
 // bundle, loaded when idle).
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { COMPANION_ATTRIBUTE, COMPANION_LOOK_MS, EDITOR_VERSION, editorsOf, textareaEditor, type TextEditor } from "../../shared/editor.ts";
-import { codeMirrorEditor } from "./codemirror.ts";
+import { codeMirrorEditor, highlightCode } from "./codemirror.ts";
 import * as cm from "./vendor.ts";
 import { forceParsing } from "@codemirror/language";
 
@@ -315,6 +315,14 @@ describe("the CodeMirror editor's live preview", () => {
 
   it("picks a code block's language by its info's first word exactly, a tag's data block YAML", () => {
     expect(["cs", "C#", "python title=x", "text", "jsonc", "context", "#task"].map((info) => cm.codeLanguage(info)?.name ?? null)).toEqual(["csharp", "csharp", "python", null, null, null, "yaml"]);
+  });
+
+  it("highlights a code's text for another plugin as its code blocks are: its parts in order, each in its token's look; none of a language it does not know", async () => {
+    const parts = (await highlightCode(cm, 'return "x";', "cs"))!;
+    expect(parts.map((part) => part.text).join("")).toBe('return "x";');
+    expect(parts.find((part) => part.text === "return")?.look).toEqual({ "font-weight": "bold" });
+    expect(parts.find((part) => part.text === '"x"')?.look?.color).toContain("--editor-code-string-color");
+    expect(await highlightCode(cm, "x", "nope")).toBeUndefined();
   });
 
   it("hides a quote's `>` on the lines of a code block in it", () => {

@@ -3,7 +3,7 @@
 // loaded as Space Lua starts, once the browser is idle: an editor asked for before it is loaded is the stand-in's
 // (a `<textarea>`), after it CodeMirror's. The editors made are the editing surfaces Silverware Toolbar acts on.
 import { EDITOR_VERSION, type EditingSurface, type Editors, ownHistory, textareaEditor, type TextEditor } from "../../shared/editor.ts";
-import { type CodeMirror, codeMirrorEditor } from "./codemirror.ts";
+import { type CodeMirror, codeMirrorEditor, highlightCode } from "./codemirror.ts";
 import type { EditorView } from "@codemirror/view";
 
 const CODEMIRROR_FILE = "./silverware-editor-codemirror.js";
@@ -86,6 +86,10 @@ export const api: Editors = {
     // (A node in an editor's shadow root is in its element's: the root's host is the element)
     for (const editor of live.keys()) if (editor.element.contains(node) || editor.element.shadowRoot?.contains(node)) return editor;
     return undefined;
+  },
+  // (CodeMirror loaded first, where it is not yet: a code drawn before it is highlighted once it is)
+  async highlightCode(code, language) {
+    return highlightCode(await loadCodeMirror(), code, language);
   },
 };
 

@@ -156,7 +156,13 @@ export type Editors = {
   create(doc: Document, options: EditorOptions): TextEditor;
   // The editing surface a node is in (an editor focused, for Silverware Toolbar), none where it is in none
   surfaceOf(node: Node): EditingSurface | undefined;
+  // A code's text highlighted in its language (a code block's info, `csharp`), as the editor highlights a code block:
+  // its parts in order, none where the language is not known. Optional: an editor that highlights none has none
+  highlightCode?(code: string, language: string): Promise<readonly CodePart[] | undefined>;
 };
+
+/** A part of a code's text as it is highlighted: its text, the look it is drawn in (CSS properties; none: the text's own) */
+export type CodePart = { readonly text: string; readonly look?: LookProperties };
 
 /**
  * Marks an element that acts on an editor from outside it (Silverware Toolbar's bar, its popup, its panel): the focus

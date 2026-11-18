@@ -37,7 +37,7 @@ export { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from
 export { insertNewlineContinueMarkupCommand, markdown, markdownKeymap, markdownLanguage } from "@codemirror/lang-markdown";
 export { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/language";
 export { autocompletion, closeBrackets, closeBracketsKeymap, closeCompletion, completionKeymap, completionStatus } from "@codemirror/autocomplete";
-export { tags } from "@lezer/highlight";
+export { highlightTree, tagHighlighter, tags } from "@lezer/highlight";
 
 // A fenced code block's languages, by the names SilverBullet's editor highlights (its client/languages.ts, 2026-11-15:
 // the same modes, Lua's the legacy mode in place of its own parser); each made as a block of it is first highlighted

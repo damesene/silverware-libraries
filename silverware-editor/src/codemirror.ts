@@ -7,8 +7,9 @@
 // it by 360 px (2026-11-14); what it inherits (the font, the colours, the theme's variables) still reaches it.
 import type { Completion, CompletionContext, CompletionResult } from "@codemirror/autocomplete";
 import type { Extension } from "@codemirror/state";
+import type { Tag } from "@lezer/highlight";
 import type { EditorView as View, KeyBinding } from "@codemirror/view";
-import { companionBlur, type EditorOptions, type TextEditor } from "../../shared/editor.ts";
+import { type CodePart, companionBlur, type EditorOptions, type LookProperties, type TextEditor } from "../../shared/editor.ts";
 import { highlights, livePreview, PREVIEW_THEME, wikiLinks } from "./livepreview.ts";
 import { listEnter } from "./listenter.ts";
 import { lookRules } from "./look.ts";
@@ -56,17 +57,44 @@ function highlight(cm: CodeMirror): Extension {
       { tag: [t.link, t.url], color: "var(--editor-link-color, var(--link-color, #0969da))" },
       // (Inline code's font and ground on its mark, src/livepreview.ts)
       { tag: [t.processingInstruction, t.meta], color: "color-mix(in srgb, currentColor 50%, transparent)" },
-      // (A code block's language's parts, in the theme's colours of code as SilverBullet's editor draws them)
-      { tag: t.keyword, fontWeight: "bold" },
-      { tag: [t.atom, t.bool], color: "var(--editor-code-atom-color, inherit)" },
-      { tag: [t.string, t.regexp, t.escape, t.special(t.string)], color: "var(--editor-code-string-color, inherit)" },
-      { tag: t.number, color: "var(--editor-code-number-color, inherit)" },
-      { tag: t.operator, color: "var(--editor-code-operator-color, inherit)" },
-      { tag: t.variableName, color: "var(--editor-code-variable-color, inherit)" },
-      { tag: t.typeName, color: "var(--editor-code-typename-color, inherit)" },
-      { tag: t.comment, color: "var(--editor-code-comment-color, color-mix(in srgb, currentColor 55%, transparent))" },
+      ...codeTokens(cm).map(({ tag, look }) => ({ tag, ...look })),
     ]),
   );
+}
+
+/** A code's tokens' looks, in the theme's colours of code as SilverBullet's editor draws them (a code block's, here and highlighted for others: `highlightCode`) */
+function codeTokens(cm: CodeMirror): readonly { readonly tag: Tag | readonly Tag[]; readonly look: LookProperties }[] {
+  const t = cm.tags;
+  return [
+    { tag: t.keyword, look: { "font-weight": "bold" } },
+    { tag: [t.atom, t.bool], look: { color: "var(--editor-code-atom-color, inherit)" } },
+    { tag: [t.string, t.regexp, t.escape, t.special(t.string)], look: { color: "var(--editor-code-string-color, inherit)" } },
+    { tag: t.number, look: { color: "var(--editor-code-number-color, inherit)" } },
+    { tag: t.operator, look: { color: "var(--editor-code-operator-color, inherit)" } },
+    { tag: t.variableName, look: { color: "var(--editor-code-variable-color, inherit)" } },
+    { tag: t.typeName, look: { color: "var(--editor-code-typename-color, inherit)" } },
+    { tag: t.comment, look: { color: "var(--editor-code-comment-color, color-mix(in srgb, currentColor 55%, transparent))" } },
+  ];
+}
+
+/** A code's text highlighted in a language of a code block's (`codeLanguage`), its parts as an editor's code block draws them; none where the language is not known */
+export async function highlightCode(cm: CodeMirror, code: string, language: string): Promise<readonly CodePart[] | undefined> {
+  const described = cm.codeLanguage(language);
+  if (!described) return undefined;
+  const support = await described.load();
+  const tokens = codeTokens(cm);
+  // (Each token's look by its index: a part's classes name the tokens it is)
+  const highlighter = cm.tagHighlighter(tokens.map(({ tag }, index) => ({ tag: tag as Tag | Tag[], class: `t${index}` })));
+  const parts: CodePart[] = [];
+  let at = 0;
+  cm.highlightTree(support.language.parser.parse(code), highlighter, (from, to, classes) => {
+    if (from > at) parts.push({ text: code.slice(at, from) });
+    const look = Object.assign({}, ...classes.split(" ").map((name) => tokens[Number(name.slice(1))]?.look ?? {})) as LookProperties;
+    parts.push({ text: code.slice(from, to), look });
+    at = to;
+  });
+  if (at < code.length) parts.push({ text: code.slice(at) });
+  return parts;
 }
 
 /** `[[links]]` completed from the space's pages: what is typed after `[[` matched anywhere in a page's name */

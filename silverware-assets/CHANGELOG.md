@@ -1,5 +1,9 @@
 # Silverware Assets: changelog
 
+## 1.0.3 (2026-11-18)
+
+- A file's preview in a grid's cell or a database's item as tall as in the page (it was 6 px taller).
+
 ## 1.0.2 (2026-11-18)
 
 - Fixes: a link's arrow always opens its menu (in a grid's cell a click on it sometimes opened the link instead); a file's open menu no longer closes when another plugin (Silverware Assets PDF, DOCX or XLSX) registers its file type.

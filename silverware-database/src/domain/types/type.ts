@@ -60,6 +60,11 @@ export interface PropertyType {
   readonly look?: "options" | "share" | "link" | "check" | "documents" | "labels" | "media";
   /** False where its values are no groups (a list of files): not offered in Group by, nor a board's columns */
   readonly groups?: false;
+  /**
+   * The documents a value names that are kept besides its item (a value of files: its files of the space), offered for
+   * deletion with the item where no other item names them; none: it names none
+   */
+  leaves?(value: Value, params: Params): readonly string[];
   /** Why a property's params are not this type's (a select's options no list of texts), undefined where they are */
   validateParams?(params: Params): string | undefined;
   /** Why a value does not read as this type (shown invalid, kept as read), undefined where it does; an empty value always does (`isEmpty`) */

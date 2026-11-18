@@ -20,6 +20,8 @@ export const files: PropertyType = {
     return new Set(read.map((one) => one.target)).size === read.length ? undefined : "one named twice";
   },
   text: (value) => readFiles(value)?.map(fileName).join(", ") ?? keptText(value),
+  // (Its files of the space: an address of the web is no file kept)
+  leaves: (value) => readFiles(value)?.flatMap((one) => (one.web ? [] : [one.target])) ?? [],
   parse: (typed) => {
     const read = typedFiles(typed);
     if ("problem" in read) return read;

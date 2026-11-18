@@ -3,7 +3,8 @@
 A property type of files and images, in the spirit of Notion's *Files & media*: several files in one value, shown as
 small previews where the item is shown, a popup to manage them, a file opened in Silverware Assets' side panel, new
 files uploaded through Silverware Assets' insert dialog. Planned 2026-11-16 with the user, reviewed against the code the
-same day and again on 2026-11-18 after step 1's probe (their findings are in this plan). Nothing built yet.
+same day and again on 2026-11-18 after step 1's probe (their findings are in this plan). Built on 2026-11-18, steps 1 to 11
+on the branch `feat/database-files`; each step's note says what it became where it differs from what was planned.
 
 ## Decisions (the user's, 2026-11-16)
 
@@ -240,7 +241,10 @@ show over Assets' panel: checked in a UI test, the panel lifted where it must be
    dropped on just after showed the value before it and the write was refused (the file uploaded, its link lost):
    `ViewHost.current(item)`, the item as the store has it now, is what the files are added to. Without Silverware Assets
    a drop is still taken there and said (nothing put in the page).
-9. **The board's cover** (*Card preview*).
+9. **The board's cover** (*Card preview*). Done 2026-11-18: `views/builtin/board.ts` (`coverMenu` in ⋯'s view slot, the meta
+   `cardPreview` in `propertyMeta`; a cover the first image of the value, a button opening it, drawn in a box of 320 × 160
+   with 60 its least side and cropped by the style page to the card's width). Files dropped on a card with a cover go to
+   its property. Its user docs with step 11.
 10. **Files offered for deletion**: deleting a database (`core/deletedatabase.ts`) and an item ask about their files;
     the files an item alone names found by the store (every item's values of a files type read), deleted by
     `media.remove` (Silverware Assets' `deleteFiles`, its kept previews with them); Undo of the deletion does not bring
@@ -248,9 +252,14 @@ show over Assets' panel: checked in a UI test, the panel lifted where it must be
     each a `removeItem` change of a transaction), so the question is asked in one place, the core's, as it applies
     removals, and generically: a type tells what a removed value leaves behind (a member of its own, `leaves?`), the core
     knows no files. That logic is a file of its own in `core/` (what removed values leave, the question), not more of
-    `core.ts`, which is long already.
+    `core.ts`, which is long already. Done 2026-11-18: `PropertyType.leaves` (the files type's: its files of the space),
+    `core/leftbehind.ts` (`leftBehind`, `namedFew`), `core.remove(database, items, documents?)` asking after the removal
+    is written, `documents` the caller's (the place's and the peek's `media.remove`); the deletion dialog's *Also delete
+    its uploaded files* (`DeleteDatabaseHost.files`, `DatabaseCore.filesFolderOf`), not ticked by default, deleted once
+    the database is gone. A type of the user's leaves nothing (`leaves` is not taken from a definition).
 11. **Docs**: silverware-database.md (the type, the cover, `media` of `ViewHost`), silverware-assets.md (the API), the
-    CLAUDE.md of both.
+    CLAUDE.md of both. Done 2026-11-18: the users' pages say what a user sees (Assets' page: what it does for a database's
+    files; its API for plugins in docs/silverware-assets.md, *Another plugin's files*).
 
 Each step a commit with its tests (`ui-tests/` of Database for every pointer, key, paste and drop), deployed to the
 local SilverBullet after the larger ones. A release proposed once it is whole (Database and Assets MINOR, the other

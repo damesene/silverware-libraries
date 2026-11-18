@@ -1065,7 +1065,8 @@ export class DatabasePlace {
       update: (item, key, value) => refreshed(core.update(id, item, key, value)),
       create: (draft, where) => refreshed(core.create(id, draft, where)),
       rename: (item, name) => refreshed(core.rename(id, item, name)),
-      remove: (items) => refreshed(core.remove(id, items)),
+      // (The files the items alone named offered for deletion with them, where the host deletes files)
+      remove: (items) => refreshed(core.remove(id, items, this.media?.remove ? { remove: this.media.remove } : undefined)),
       move: (item, where) => refreshed(core.move(id, item, where)),
       undo: (progress) => refreshed(core.undo(id, progress)),
       current: async (item) => (await store.items(id)).value.find((one) => one.key === item.key),

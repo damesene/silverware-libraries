@@ -646,7 +646,20 @@ function redrawAll(): void {
 /** The database's deletion opened (core/deletedatabase.ts): asked, written, the places shown following it once written */
 function deleteDatabase(core: DatabaseCore, id: string, name: string): void {
   const { platform } = app!;
-  openDeleteDatabase({ document, core, noun: core.noun, notify: (message) => platform.ui.notify(message), written: () => app!.shown.forEach((shown) => void shown.place?.refresh()) }, id, name);
+  const { files, remove } = app!.media;
+  openDeleteDatabase(
+    {
+      document,
+      core,
+      noun: core.noun,
+      notify: (message) => platform.ui.notify(message),
+      written: () => app!.shown.forEach((shown) => void shown.place?.refresh()),
+      // (Its files offered with it where the space's files are listed and deleted)
+      ...(files && remove ? { files: { list: async () => files(), remove } } : {}),
+    },
+    id,
+    name,
+  );
 }
 
 /** A database made by the command: its name asked, its root beside the page open, its block at the cursor */

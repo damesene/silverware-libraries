@@ -86,6 +86,8 @@ export type Space = {
   saved(name: string): Promise<string | undefined>;
   /** The space's CONFIG page as saved (the settings dialog writes it; put back as it was after the test) */
   config(): Promise<string | undefined>;
+  /** Whether a file is in the space (its name under the folder, with its extension) */
+  hasFile(name: string): boolean;
 };
 
 /**
@@ -147,6 +149,7 @@ export const test = base.extend<{ space: Space }>({
       },
       saved: async (name) => (existsSync(path(name)) ? (await readFile(path(name), "utf8")).replace(/\r\n/g, "\n") : undefined),
       config: async () => (existsSync(configPath) ? (await readFile(configPath, "utf8")).replace(/\r\n/g, "\n") : undefined),
+      hasFile: (name) => existsSync(join(server().space, folder, name)),
     });
     // (The page closed first: an open client would take CONFIG written under it for a change of its own)
     await page.close();

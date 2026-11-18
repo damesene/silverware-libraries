@@ -447,7 +447,7 @@ export class PeekPanel {
       let done: Result;
       try {
         // As shown (its own writes taken on, `own`): removed only where what it loses is still so, as from a view
-        done = await this.host.core.remove(shown.database, [shown.item]);
+        done = await this.host.core.remove(shown.database, [shown.item], this.host.media?.remove ? { remove: this.host.media.remove } : undefined);
       } finally {
         this.asking = false;
       }

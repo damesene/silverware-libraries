@@ -28,6 +28,7 @@ import { type Converted, validateConverted } from "./converter.ts";
 import type { Changes } from "./changes.ts";
 import { TransactionHistory } from "./history.ts";
 import { placeStateRenamed } from "./placestate.ts";
+import { leftBehind, namedFew } from "./leftbehind.ts";
 import { type DatabaseStore, type LooseKey, type PlaceChange, type PlacesPlan, type PlacesReport, type PlaceStore, type PreviewRun, REMOVE_PLACE, type Skipped, type Target, type TransactionPlan, type TransactionReport, type WriteProgress } from "./store.ts";
 
 /** What the core asks of the user: told what was refused or left, asked before anything is removed */
@@ -321,15 +322,43 @@ export class DatabaseCore {
   }
 
   /** Items removed, the user asked first: each where what it loses (its name, values and look) is still as shown, the others left, said; see `onItems` */
-  async remove(database: string, items: readonly Item[]): Promise<Result> {
+  /**
+   * Items removed, asked first; where `documents` deletes documents (the host's files), those the removed items alone
+   * named in the database's folder of them (a type's `leaves`) offered for deletion after, asked again: Undo of the
+   * removal does not bring them back
+   */
+  async remove(database: string, items: readonly Item[], documents?: { remove(paths: readonly string[]): Promise<readonly string[]> }): Promise<Result> {
     if (!items.length) return unchanged("Nothing to remove");
     const what = items.length === 1 ? `"${items[0]!.name}"` : `${items.length} items`;
     if (!(await this.ui.ask(`Remove ${what}? Undo brings ${items.length === 1 ? "it" : "them"} back.`, { destructive: true }))) return { problem: "Not removed", cause: "declined" };
-    return this.onItems(database, items, { allValues: true, name: true, look: true }, (now) => {
+    // (What they leave, found as they are before they go: the others' values read with them)
+    const left = documents ? await this.leftBy(database, items) : [];
+    const result = await this.onItems(database, items, { allValues: true, name: true, look: true }, (now) => {
       const changes = databaseChanges(database);
       for (const item of now) changes.item(item, (i) => i.remove());
       return { changes: changes.build(), label: now.length === 1 ? `Remove "${now[0]!.name}"` : `Remove ${now.length} items` };
     });
+    if ("problem" in result || !left.length || !documents) return result;
+    const one = left.length === 1;
+    const count = one ? "file" : `${left.length.toLocaleString("en-US")} files`;
+    const whose = items.length === 1 ? `its ${count}` : `the ${count} only they named`;
+    const question = `Delete ${whose} too (${namedFew(left)})? No other item names ${one ? "it" : "them"}; Undo of the removal does not bring ${one ? "it" : "them"} back.`;
+    if (!(await this.ui.ask(question, { destructive: true }))) return result;
+    const kept = await documents.remove(left).catch(() => left);
+    if (kept.length) this.ui.notify(`Not deleted: ${namedFew(kept)}`, { type: "error" });
+    return result;
+  }
+
+  /** The documents removed items alone name in the database's folder of them (none where it keeps none) */
+  private async leftBy(database: string, items: readonly Item[]): Promise<string[]> {
+    const read = await this.store.database(database);
+    if (!read) return [];
+    return leftBehind(read.value, this.types, items, (await this.store.items(database)).value, this.store.filesFolderOf(database));
+  }
+
+  /** Where files uploaded for a database go (a folder of the space's), undefined where it keeps none */
+  filesFolderOf(database: string): string | undefined {
+    return this.store.filesFolderOf(database);
   }
 
   /**

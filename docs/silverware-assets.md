@@ -397,3 +397,23 @@ The user's wish: delete a file from its menu, plain that the file itself goes, n
 
 A wiki link's href in the editor is its target URL-encoded (2.12.1): `drawnLink` decodes it, else a file in a folder with a space was not found to delete.
 
+## Another plugin's files (2026-11-18)
+
+For Silverware Database's property of files (docs/silverware-database-files.md), optional members of the API
+(`shared/assets.ts`, the version unchanged: an older Assets lacks them, its callers' stand-ins draw and open alike):
+
+- `drawPreview(target, page, box, signal)`: a file's preview by its type's own renderer in a box of `box`'s size, no
+  frame, label, menu nor click (`decorate.ts`); a type keeping previews in the space, or costly to draw, only from the
+  one kept (none made: a list of many files would make each); an image with no renderer of its own the browser's
+  `<img>`; null where none is drawn.
+- `showFile(target, page)`: the side panel's action (`open-panel`) run on the file as a link's is; a file no panel
+  draws, its URL in a new tab.
+- `insertFiles(given, { folder })`: the insert dialog with its names alone (`nameOnly`: no *Inserted as*), its folder
+  the caller's, always the caller's companion; the files written by `writeChosen` (the write half of `insertChosen`),
+  resolved with the targets a link names, undefined where cancelled; nothing put in a page.
+- `deleteFiles(paths)`: each as *Delete file…* deletes one, its kept previews with it, nothing asked; those not deleted
+  given back.
+
+An action's `render(view, container, signal?)` takes the action's own signal (a panel closed ends what its file's
+drawing started). Elements of another plugin's marked `data-silverware-takes-files` (`shared/takesfiles.ts`) are left
+their drops and pastes. A name offered by the insert dialog holds no single bracket either (a wiki link cannot name it).

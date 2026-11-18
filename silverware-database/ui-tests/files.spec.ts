@@ -190,6 +190,98 @@ test("files dropped on the files' popup: added to its list, written as it is lef
   await expect.poll(() => space.saved("Page/db-files/Holiday")).toContain(`  - "[[${space.folder}/Page/db-files/files/dropped.png]]"`);
 });
 
+test("a board's Card preview: the first image of the property picked over each card, opened by a press, files dropped there added to it; None takes it off", async ({ page, space }) => {
+  const root = ROOT.replace("    photos: { type: files, label: Photos }", "    status: { type: select, label: Status, options: [Todo] }\n    docs: { type: files, label: Docs }\n    photos: { type: files, label: Photos }");
+  const card = `---\ntags: [db]\nstatus: Todo\ndocs: ["[[${space.folder}/files/a.png]]"]\nphotos: ["[[${space.folder}/files/report.pdf]]", "[[${space.folder}/files/b.png]]"]\n_database:\n  rank: a0\n---\n`;
+  await space.open(
+    { Page: "# Page\n\n```silverware-database\nid: files\nview: board\n```\n", "Page/db-files": root, "Page/db-files/Holiday": card },
+    "Page",
+    { "files/a.png": PNG, "files/b.png": PNG, "files/report.pdf": "%PDF-1.4\n" },
+  );
+  const holiday = page.locator(".swd-board-card", { hasText: "Holiday" });
+  await expect(holiday).toBeVisible();
+  await expect(holiday.locator(".swd-board-cover")).toHaveCount(0);
+  // Card preview in ⋯: None and the properties of files, Photos picked
+  await page.locator(".swd-more").click();
+  await page.locator(".swd-menu .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: /^Card preview/ }) }).click();
+  await expect(page.locator(".swd-menu:not([hidden]) .swd-menu-item .swd-label")).toContainText(["None", "Docs", "Photos"]);
+  await page.locator(".swd-menu:not([hidden]) .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: /^Photos$/ }) }).click();
+  // (Kept in the block; its first image, the PDF before it passed over)
+  await expect.poll(() => space.saved("Page")).toContain("board.cardPreview: photos");
+  const cover = holiday.locator(".swd-board-cover");
+  await expect(cover).toHaveAttribute("aria-label", "Open b.png");
+  await expect(cover.locator("img")).toHaveAttribute("src", /files\/b\.png$/);
+  // (As wide as the card at most)
+  const [coverBox, cardBox] = [(await cover.boundingBox())!, (await holiday.boundingBox())!];
+  expect(coverBox.width).toBeLessThanOrEqual(cardBox.width + 0.5);
+  await cover.click();
+  await expect(page.locator(".swa-side-panel .swa-panel-title")).toHaveText("b.png");
+  await page.keyboard.press("Escape");
+  // Files dropped on the cover: added to its property, not the first of the card
+  await give(cover, ["beach.png"], "drop");
+  const dialog = page.locator(".swa-dialog.swa-insert-window");
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Insert" }).click();
+  await expect.poll(() => space.saved("Page/db-files/Holiday")).toContain("beach.png");
+  const saved = (await space.saved("Page/db-files/Holiday"))!;
+  expect(saved).toContain(`docs: ["[[${space.folder}/files/a.png]]"]`);
+  // (In the order kept, the new one last, in the list's own form: a list on one line kept so)
+  expect(saved).toMatch(/photos: \["\[\[[^\n"]*report\.pdf\]\]", "\[\[[^\n"]*b\.png\]\]", "\[\[[^\n"]*beach\.png\]\]"\]/);
+  // None: no cover
+  await page.locator(".swd-more").click();
+  await page.locator(".swd-menu .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: /^Card preview/ }) }).click();
+  await page.locator(".swd-menu:not([hidden]) .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: /^None$/ }) }).click();
+  await expect(holiday.locator(".swd-board-cover")).toHaveCount(0);
+  await expect.poll(() => space.saved("Page")).not.toContain("cardPreview");
+});
+
+/** SilverBullet's question answered (its modal's Ok or Cancel), once it says what is given */
+async function answer(page: import("@playwright/test").Page, says: string, ok: boolean): Promise<void> {
+  const prompt = page.locator("dialog.sb-modal-box .sb-prompt");
+  await expect(prompt).toContainText(says);
+  await prompt.locator(".sb-prompt-buttons button", { hasText: ok ? "Ok" : "Cancel" }).click();
+  await expect(prompt).toHaveCount(0);
+}
+
+test("an item removed: the files it alone named in the database's folder offered for deletion, deleted where asked; those another item names kept", async ({ page, space }) => {
+  const at = (name: string) => `${space.folder}/Page/db-files/files/${name}`;
+  const value = (...names: string[]) => `---\ntags: [db]\nphotos:\n${names.map((one) => `  - "[[${at(one)}]]"`).join("\n")}\n_database:\n  rank: a0\n---\n`;
+  await space.open(
+    { Page: "# Page\n\n```silverware-database\nid: files\nview: table\n```\n", "Page/db-files": ROOT, "Page/db-files/Holiday": value("alone.png", "shared.png"), "Page/db-files/Work": value("shared.png").replace("a0", "a1") },
+    "Page",
+    { "Page/db-files/files/alone.png": PNG, "Page/db-files/files/shared.png": PNG },
+  );
+  await page.locator(".swd-table tbody tr", { hasText: "Holiday" }).locator(".swd-remove").click();
+  await answer(page, 'Remove "Holiday"?', true);
+  await answer(page, "Delete its file too (alone.png)? No other item names it; Undo of the removal does not bring it back.", true);
+  await expect.poll(() => space.hasFile("Page/db-files/files/alone.png")).toBe(false);
+  expect(space.hasFile("Page/db-files/files/shared.png")).toBe(true);
+  await expect(page.locator(".swd-table tbody tr")).toHaveCount(1);
+});
+
+test("a database deleted with its files where ticked in its dialog", async ({ page, space }) => {
+  await space.open(
+    { Page: "# Page\n\n```silverware-database\nid: files\nview: table\n```\n", "Page/db-files": ROOT, "Page/db-files/Holiday": withFiles(space.folder, "a0", ["a.png"]) },
+    "Page",
+    { "files/a.png": PNG, "Page/db-files/files/up.png": PNG, "Page/db-files/files/more.png": PNG },
+  );
+  await page.locator(".swd-more").click();
+  await page.locator(".swd-menu .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: /^Delete database/ }) }).click();
+  const dialog = page.locator(".swd-delete-database");
+  const files = dialog.locator(".swd-delete-files");
+  await expect(files).toContainText(`Also delete its uploaded files: 2 files in ${space.folder}/Page/db-files/files. Undo does not bring them back.`);
+  // (Not by default)
+  await expect(files.locator("input")).not.toBeChecked();
+  await files.locator("input").check();
+  await dialog.locator(".swd-delete-name").fill("Files");
+  await dialog.locator(".swd-delete-confirm").click();
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(() => space.hasFile("Page/db-files/files/up.png")).toBe(false);
+  expect(space.hasFile("Page/db-files/files/more.png")).toBe(false);
+  // (A file it linked outside its folder kept)
+  expect(space.hasFile("files/a.png")).toBe(true);
+});
+
 test("a board's card narrower than its files: they shrink, their names cut, the rest's count whole within the card", async ({ page, space }) => {
   const root = ROOT.replace("    photos:", "    status: { type: select, label: Status, options: [Todo] }\n    photos:");
   const names = ["first report.pdf", "second report.pdf", "third report.pdf", "fourth.pdf"];

@@ -163,10 +163,21 @@ export class AssetDecorator {
   private readonly drawn = new WeakMap<HTMLElement, DrawnEmbed>();
   // Embeds drawn in an editor's field that gives their markdown to edit (a grid's cell edited): no frame of the page's
   private readonly fieldDrawn = new WeakMap<HTMLElement, DrawnEmbed>();
-  // The links decorated (decorated again as the settings change; those gone from the page left out then)
-  private readonly links = new Set<DrawnLink>();
+  // The links decorated, each element as its host told it last (its place in the page may be another: what its menu
+  // acts on; decorated again as the settings change, those gone from the page left out then)
+  private readonly links = new Map<HTMLElement, DrawnLink>();
   // Each link's menu: what ends it (its icon drawn again, or the link gone)
   private readonly linkMenus = new WeakMap<HTMLElement, AbortController>();
+  // What each link was decorated with (its file, its type, the settings its icon and menu are of): decorated again with
+  // the same, as the files are drawn again for a type another plugin registered, it is left as it is (its menu open
+  // stays open: it closed with the arrow taken away under the pointer)
+  private readonly linkDecorated = new WeakMap<HTMLElement, { readonly asset: string; readonly type: AssetType; readonly settings: string }>();
+  // What each frame was drawn with (its file, its type, its embed's markdown, the settings), alike: as the files are
+  // drawn again for a type another plugin registered, one drawn the same is left as it is (its "…" menu open stays open)
+  private readonly frameDecorated = new WeakMap<
+    HTMLElement,
+    { readonly asset: string; readonly type: AssetType; readonly embed: string; readonly settings: string }
+  >();
   // The frames whose preview is to be made anew as they are drawn next (Regenerate preview)
   private readonly anew = new WeakSet<HTMLElement>();
   /** Told as a frame is decorated (its width laid out again) */
@@ -195,18 +206,31 @@ export class AssetDecorator {
   async decorateLinks(links: readonly DrawnLink[]): Promise<void> {
     if (!links.length || !this.host.linkAsset) return;
     const [page, settings] = await Promise.all([this.host.pageName(), this.host.settings()]);
-    for (const old of this.links) {
-      if (old.element.isConnected) continue;
-      this.links.delete(old);
-      this.linkMenus.get(old.element)?.abort();
+    const settingsKey = JSON.stringify(settings);
+    for (const element of this.links.keys()) {
+      if (element.isConnected) continue;
+      this.links.delete(element);
+      this.linkMenus.get(element)?.abort();
     }
     for (const link of links) {
-      this.links.add(link);
-      link.element.querySelectorAll(`:scope > :is(.${LINK_ICON}, .swa-menu-marker)`).forEach((one) => one.remove());
-      this.linkMenus.get(link.element)?.abort();
+      this.links.set(link.element, link);
       const asset = this.host.linkAsset(link, page);
       const type = asset && typeFor(this.registry.types.all, asset);
+      const assetKey = asset && JSON.stringify(asset);
+      // Decorated with the same, whole, its menu live: left as it is
+      const was = this.linkDecorated.get(link.element);
+      const live = this.linkMenus.get(link.element)?.signal.aborted === false;
+      const whole =
+        !!link.element.querySelector(":scope > .swa-menu-marker") &&
+        link.element.getAttribute("data-swa-link") === type?.name &&
+        (!settings.link.fields.includes("icon") || !!link.element.querySelector(`:scope > .${LINK_ICON}`));
+      if (type && was && live && whole && was.asset === assetKey && was.type === type && was.settings === settingsKey) continue;
+      link.element.querySelectorAll(`:scope > :is(.${LINK_ICON}, .swa-menu-marker)`).forEach((one) => one.remove());
+      this.linkMenus.get(link.element)?.abort();
+      this.linkDecorated.delete(link.element);
+      link.element.removeAttribute("data-swa-link");
       if (!type) continue;
+      this.linkDecorated.set(link.element, { asset: assetKey!, type, settings: settingsKey });
       // Its type's icon before it (where the user shows it), a picture alone; its menu's way in a small arrow after it,
       // always (an icon that opened the menu was found by nobody new: docs/silverware-assets-menu.md, *The arrow*)
       if (settings.link.fields.includes("icon")) link.element.prepend(this.linkIcon(type));
@@ -217,16 +241,17 @@ export class AssetDecorator {
       // what it changes written into the page, the link found there as it is now
       const control = new AbortController();
       this.linkMenus.set(link.element, control);
+      const now = () => this.links.get(link.element) ?? link;
       const menu = () =>
         this.linkMenu(asset, type, settings, control.signal, {
-          ...(this.host.linkToEmbed ? { toEmbed: (view: View | undefined) => void this.toEmbed(link, view) } : {}),
+          ...(this.host.linkToEmbed ? { toEmbed: (view: View | undefined) => void this.toEmbed(now(), view) } : {}),
           markdown: () =>
-            this.linkInPage(link).then((found) => {
+            this.linkInPage(now()).then((found) => {
               if (!found) throw new Error("this link was not found in the page");
               return found.link.text;
             }),
-          ...(this.deletable(asset, "link") ? { deleteFile: (file: Asset & { readonly kind: "file" }) => void this.deleteLinked(link, file) } : {}),
-          ...(this.host.writeLinkText ? { rename: () => void this.renameLinked(link, asset) } : {}),
+          ...(this.deletable(asset, "link") ? { deleteFile: (file: Asset & { readonly kind: "file" }) => void this.deleteLinked(now(), file) } : {}),
+          ...(this.host.writeLinkText ? { rename: () => void this.renameLinked(now(), asset) } : {}),
         });
       opensMenu(this.doc, POPUP, marker, () => popupOf(menu()), control.signal);
     }
@@ -530,7 +555,7 @@ export class AssetDecorator {
       found = { link: there, occurrence: sameText.indexOf(there), of: sameText.length };
     } else if (at === undefined) {
       // The editor's links of its form drawn now, in the page's order: a run of those of the text (as a widget's, above)
-      const drawn = [...this.links].filter((one) => one.element.isConnected && !one.position && one.style === link.style);
+      const drawn = [...this.links.values()].filter((one) => one.element.isConnected && !one.position && one.style === link.style);
       drawn.sort((a, b) => (a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
       const editorLinks = outside(links, this.host.renderedRanges(text)).filter((one) => one.style === link.style);
       const inText = editorLinks.map((one): Placed => ({ target: sameTarget(one.target), at: one.from / Math.max(text.length, 1) }));
@@ -801,9 +826,10 @@ export class AssetDecorator {
   }
 
   /** Embeds drawn, decorated */
-  async decorate(drawn: readonly DrawnEmbed[]): Promise<void> {
+  async decorate(drawn: readonly DrawnEmbed[], unchangedKept = false): Promise<void> {
     if (!drawn.length) return;
     const [text, page, settings] = await Promise.all([this.host.pageText(), this.host.pageName(), this.host.settings()]);
+    const settingsKey = JSON.stringify(settings);
     // (Each marked first: a widget's run is of all those drawn, this batch's too)
     for (const one of drawn) {
       this.drawn.set(one.frame, one);
@@ -816,7 +842,13 @@ export class AssetDecorator {
       const asset = this.host.assetOf(found.embed, page);
       const type = typeFor(this.registry.types.all, asset);
       if (!type) continue;
+      // (Drawn again for the registry's change: one drawn with the same, its drawing live, left as it is)
+      const was = this.frameDecorated.get(one.frame);
+      const drawnAs = { asset: JSON.stringify(asset), type, embed: found.embed.text, settings: settingsKey };
+      const same = was && was.asset === drawnAs.asset && was.type === type && was.embed === drawnAs.embed && was.settings === settingsKey;
+      if (unchangedKept && same && this.renders.get(one.frame)?.signal.aborted === false) continue;
       this.render(one, found, asset, type, settings);
+      this.frameDecorated.set(one.frame, drawnAs);
     }
     this.onDecorated?.();
   }
@@ -866,8 +898,8 @@ export class AssetDecorator {
   /** Every embed decorated in the page decorated again (the settings saved) */
   async redecorateAll(): Promise<void> {
     const frames = [...this.doc.querySelectorAll<HTMLElement>("[data-swa-target]")];
-    for (const link of this.links) if (!link.element.isConnected) this.links.delete(link);
-    await Promise.all([this.decorate(frames.flatMap((frame) => this.drawn.get(frame) ?? [])), this.decorateLinks([...this.links])]);
+    for (const element of this.links.keys()) if (!element.isConnected) this.links.delete(element);
+    await Promise.all([this.decorate(frames.flatMap((frame) => this.drawn.get(frame) ?? []), true), this.decorateLinks([...this.links.values()])]);
   }
 
   /** A frame decorated: the box it is drawn in, where it is not the page's text (a grid's cell) */

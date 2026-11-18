@@ -270,6 +270,24 @@ test("a file in a cell edited while another cell's write drew the grid anew, lef
   await expect(cells.nth(1).locator(".swa-frame .swa-frame")).toHaveCount(0);
 });
 
+test("a link's menu stays open as another plugin registers a type (the files drawn again), its arrow the same", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\nSee [[${space.folder}/doc.pdf]] and [[${space.folder}/note.swatest]].\n` }, "Page", { "doc.pdf": "%PDF-1.4\n", "note.swatest": "x" });
+  const pdf = page.locator("#sb-main [data-swa-link='pdf']");
+  await expect(pdf.locator(".swa-link-marker")).toHaveCount(1);
+  await pdf.locator(".swa-link-marker").click();
+  await expect(page.locator(".swa-popup")).toBeVisible();
+  // A type registered as a plugin's init page does, through Silverware Assets' API (the module SilverBullet loaded)
+  await page.evaluate(async () => {
+    type Api = { types: { register(type: unknown): () => void } };
+    const url = "/.fs/Library/damesene/silverware-assets.js";
+    const { api } = (await import(url)) as { api: Api };
+    api.types.register({ name: "swatest", match: { kind: ["file"], ext: ["swatest"] }, icon: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'></svg>" });
+  });
+  // (Drawn again: the other link of its type now)
+  await expect(page.locator("#sb-main [data-swa-link='swatest']")).toHaveCount(1);
+  await expect(page.locator(".swa-popup")).toBeVisible();
+});
+
 test("a link to a file shows its type's icon, in a grid too; a link to a page none", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\nSee [[${space.folder}/doc.pdf]] and [[${space.folder}/Other]].\n\n${grid(`In a cell [[${space.folder}/doc.pdf]]`, "Right")}`, Other: "# Other\n" }, "Page", { "doc.pdf": "%PDF-1.4\n" });
   await gridsDrawn(page);

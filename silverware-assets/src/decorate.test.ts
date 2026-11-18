@@ -591,6 +591,19 @@ describe("Rename… in a file's menu", () => {
 });
 
 describe("a link's menu", () => {
+  it("stays open as the links are decorated again with the same (the files drawn again for a type registered), its arrow the same", async () => {
+    const { decorator } = setUp("See [[report.pdf]] here.\n");
+    const element = Object.assign(document.createElement("a"), { textContent: "report.pdf", href: "report.pdf" });
+    document.body.append(element);
+    await decorator.decorateLinks([{ element, target: "report.pdf", style: "wiki" }]);
+    const arrow = element.querySelector<HTMLElement>(".swa-link-marker")!;
+    arrow.click();
+    expect(document.querySelector(".swa-popup")).not.toBeNull();
+    await decorator.redecorateAll();
+    expect(element.querySelector(".swa-link-marker")).toBe(arrow);
+    expect(document.querySelector(".swa-popup")).not.toBeNull();
+  });
+
   it("offers an image's preview, as an embed of it has one (the browser's drawing, smaller), and writes the embed shown so", async () => {
     const { state, decorator } = setUp("See [[cat.png]] here.\n");
     const element = Object.assign(document.createElement("a"), { textContent: "cat.png", href: "cat.png" });

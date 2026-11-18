@@ -151,6 +151,9 @@ export class PagesStore implements DatabaseStore {
   // Databases read and not found (their root not in the index yet, as a page opens while the index is still being
   // built): told once the index has their root, so what shows one reads it again
   private readonly missing = new Set<string>();
+  // The roots being read for them, and whether another change asked meanwhile
+  private checking: Promise<void> | undefined;
+  private checkAgain = false;
   // Each item's page's facts as last read (its dates, its tags): its system properties' values, and what a page the store
   // wrote keeps of them until the index has it
   private readonly facts = new Map<string, SystemFacts>();
@@ -198,16 +201,38 @@ export class PagesStore implements DatabaseStore {
       };
       tell();
       // A database not found yet told once the index has its root (any page may be it): the roots read once for every
-      // one missing, none told while none is found (a block's id mistyped, a database deleted: one query a change)
-      if (this.missing.size) void this.tellFound();
+      // one missing, none told while none is found (a block's id mistyped, a database deleted)
+      if (this.missing.size) this.checkFound();
     });
   }
 
-  /** The databases not found before whose root the index has now: told, so what shows one reads it */
+  /**
+   * The roots read for the databases not found before, one reading at a time: those asked for meanwhile (the index
+   * built page by page as a space opens) one reading after it, not one each
+   */
+  private checkFound(): void {
+    if (this.checking) {
+      this.checkAgain = true;
+      return;
+    }
+    this.checking = this.tellFound()
+      // (The index failing as it is rebuilt: asked again at its next change)
+      .catch((error: unknown) => console.warn("Silverware Database: the databases not found yet were not read again", error))
+      .finally(() => {
+        this.checking = undefined;
+        const again = this.checkAgain;
+        this.checkAgain = false;
+        if (again && this.missing.size) this.checkFound();
+      });
+  }
+
+  /** The databases not found before whose root the index has now: their roots known, told, so what shows one reads it */
   private async tellFound(): Promise<void> {
     for (const object of await this.objects(ROOT_TAG)) {
       const read = this.versionNamed(versionOf(object)).readRoot(object, versionOf(object));
       if ("problem" in read || !this.missing.delete(read.record.database.id)) continue;
+      // (Known at once: its pages indexed before it is read again are its changes)
+      this.roots.set(read.record.database.id, String(object.name));
       for (const listener of this.listeners) listener({ database: read.record.database.id });
     }
   }

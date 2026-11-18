@@ -132,16 +132,18 @@ describe("the pages store", () => {
     expect(told).toEqual(["tasks"]);
   });
 
-  it("tells a database never found (its id mistyped) at no page indexed", async () => {
-    const { memory, store } = harness(SEED);
+  it("tells a database never found (its id mistyped) at no page indexed, another found the while told", async () => {
+    const { memory, store } = harness([]);
     const told: string[] = [];
     store.onChanged((change) => told.push(change.database));
     expect(await store.database("taks")).toBeUndefined();
+    expect(await store.database("tasks")).toBeUndefined();
     memory.writeOutside("Elsewhere", "x");
     memory.writeOutside("Another", "y");
-    // (The roots read as the store reads them for a missing one, after its own reading: that one done by then)
-    await store.databases();
-    expect(told).toEqual([]);
+    memory.writeOutside("db-tasks", "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n---\n");
+    // (The roots read one reading after another: the one that finds "tasks" is after those of the pages before)
+    await vi.waitFor(() => expect(told).toContain("tasks"));
+    expect(told).toEqual(["tasks"]);
   });
 
   it("tells a change of a database's pages made outside it, and reads a page renamed outside as another item", async () => {

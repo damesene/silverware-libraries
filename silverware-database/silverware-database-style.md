@@ -1358,8 +1358,11 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 :is(#sb-main, html) .swd-place .swd-table :is(td[data-key="name"], .swd-table-headrow > th:first-child) {
   padding-left: 20px;
 }
-/* (Its cell's, not its content's: kept so where the content is held under an editor, adding no width) */
+/* (Its cell's, not its content's: kept so where the content is held under an editor, adding no width. The cell's font and
+   line: `1lh` below its first line's, not a button's own) */
 .swd-table td[data-key="name"] .swd-row-grip {
+  font: inherit;
+  line-height: inherit;
   position: absolute;
   left: 2px;
   /* (By the name's first line, in its middle) */

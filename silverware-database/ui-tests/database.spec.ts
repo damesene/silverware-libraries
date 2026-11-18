@@ -1631,6 +1631,15 @@ test("a table's row dragged by its grip to the top is written there, by its rank
   const last = page.locator(".swd-table tbody tr").last();
   await last.hover();
   const grip = (await last.locator(".swd-row-grip").boundingBox())!;
+  // (By the name's first line, in its middle; left of its text)
+  const line = await last.locator(".swd-table-name").evaluate((name) => {
+    const range = document.createRange();
+    range.selectNodeContents(name);
+    const first = range.getClientRects()[0]!;
+    return { middle: first.top + first.height / 2, left: first.left };
+  });
+  expect(Math.abs(grip.y + grip.height / 2 - line.middle)).toBeLessThanOrEqual(1.5);
+  expect(grip.x + grip.width).toBeLessThanOrEqual(line.left);
   const first = (await page.locator(".swd-table tbody tr").first().boundingBox())!;
   const name = (await page.locator(".swd-table tbody tr").first().locator(".swd-table-name").boundingBox())!;
   // (Taken by its right end and let go over the name's text, in the row's own cell where it lands: the click the browser

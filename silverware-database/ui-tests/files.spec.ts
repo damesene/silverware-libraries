@@ -359,6 +359,24 @@ test("a large image in the files' popup held in its box while it loads, not draw
   expect([Math.round(loaded.width), Math.round(loaded.height)]).toEqual([150, 113]);
 });
 
+test("a file's card with a long name: pressed and hovered on the card alone, not on to the line's end", async ({ page, space }) => {
+  const name = "a recording of a long meeting kept here.pdf";
+  await space.open(
+    { Page: "# Page\n\n```silverware-database\nid: files\nview: table\n```\n", "Page/db-files": ROOT, "Page/db-files/Holiday": withFiles(space.folder, "a0", [name]) },
+    "Page",
+    { [`files/${name}`]: "%PDF-1.4\n" },
+  );
+  const cell = page.locator(".swd-table tbody tr", { hasText: "Holiday" }).locator('td[data-key="photos"]');
+  const button = cell.locator(".swd-media-button");
+  await expect(button.locator(".swd-media-name")).toBeVisible();
+  // (Its name cut within its box: the button as wide as the card, the cell wider)
+  const [pressed, card, line] = [(await button.boundingBox())!, (await button.locator(".swd-media").boundingBox())!, (await cell.boundingBox())!];
+  expect(Math.abs(pressed.width - card.width)).toBeLessThanOrEqual(1);
+  expect(pressed.x + pressed.width).toBeLessThan(line.x + line.width - 40);
+  // Beside the card, in the cell: no file under the pointer
+  expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x!, y!)?.closest(".swd-media-button"), [card.x + card.width + 10, card.y + card.height / 2])).toBe(false);
+});
+
 test("a board's card narrower than its files: they shrink, their names cut, the rest's count whole within the card", async ({ page, space }) => {
   const root = ROOT.replace("    photos:", "    status: { type: select, label: Status, options: [Todo] }\n    photos:");
   const names = ["first report.pdf", "second report.pdf", "third report.pdf", "fourth.pdf"];

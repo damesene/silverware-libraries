@@ -3202,10 +3202,14 @@ tr:focus-within .swd-open {
   outline: 2px solid var(--swd-accent);
   outline-offset: 1px;
 }
+/* At most its box's width, in px alone: a percentage there counts for nothing as its button is sized by its content, which
+   took a long name's whole width (the button wider than its card, hovered and pressed past it to the line's end). Narrower
+   where its button is (a flex item of it, shrinking) */
 .swd-media {
   display: inline-flex;
   align-items: center;
-  max-width: min(100%, var(--swd-media-width, 100%));
+  min-width: 0;
+  max-width: var(--swd-media-width, 100%);
   max-height: var(--swd-media-height, none);
 }
 .swd-media img {

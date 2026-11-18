@@ -1,5 +1,10 @@
 # Silverware Database: changelog
 
+## 1.2.1 (2026-11-18)
+
+- Fixes: a database block shows its database once SilverBullet has indexed it (opened before that, it stayed "not found" until reloaded); moving properties quickly in the peek with Alt+↑/↓ no longer fails with "changed elsewhere"; the full screen icon works when pressed right after Esc.
+- The peek's content keeps the page's line spacing and list layout.
+
 ## 1.2.0 (2026-11-17)
 
 - Works with SilverBullet's next version (3.0) as well as 2.12.1: settings are saved in `Library/Config` there, SilverBullet's own pages (under `Library/`) are not offered as references, and your own views and types go in a `space-lua` block on a page under `Library/`.

@@ -166,7 +166,7 @@ export class AssetDecorator {
   // The links decorated, each element as its host told it last (its place in the page may be another: what its menu
   // acts on; decorated again as the settings change, those gone from the page left out then)
   private readonly links = new Map<HTMLElement, DrawnLink>();
-  // Each link's menu: what ends it (its icon drawn again, or the link gone)
+  // Each link's menu: what ends it (the link decorated anew otherwise)
   private readonly linkMenus = new WeakMap<HTMLElement, AbortController>();
   // What each link was decorated with (its file, its type, the settings its icon and menu are of): decorated again with
   // the same, as the files are drawn again for a type another plugin registered, it is left as it is (its menu open
@@ -207,11 +207,9 @@ export class AssetDecorator {
     if (!links.length || !this.host.linkAsset) return;
     const [page, settings] = await Promise.all([this.host.pageName(), this.host.settings()]);
     const settingsKey = JSON.stringify(settings);
-    for (const element of this.links.keys()) {
-      if (element.isConnected) continue;
-      this.links.delete(element);
-      this.linkMenus.get(element)?.abort();
-    }
+    // (Those out of the page left out, their menus kept: a grid drawn anew takes over the cells of another drawing, its
+    // links out of the page a moment and back, told no more; their arrows bound to nothing were the link's, followed)
+    for (const element of this.links.keys()) if (!element.isConnected) this.links.delete(element);
     for (const link of links) {
       this.links.set(link.element, link);
       const asset = this.host.linkAsset(link, page);

@@ -221,7 +221,7 @@ Reviewed 2026-11-13 against Silverware Layout's layers (`src/isolation.test.ts`)
 - `signal` (the web APIs' name: `fetch(url, { signal })`, `addEventListener(…, { signal })`): aborted when the render ends (SilverBullet drew the widget anew, the view changed, the page closed); what a renderer started (listeners, timers, observers, fetches) is cleaned up by it, so no `destroy`.
 - A renderer returns an element, or `null` for the host to draw that asset. It is never handed the host's drawing or the card: what is rendered is the core's choice.
 - **What the core decides**: the type (*Matching*), the view (*Views*), the viewport (*Size and the viewport*), then the type's renderer, the host's drawing, or the card.
-- **An action**: `{ name, fits(asset), run(ctx) }` (*Actions*); its context the asset, the render (`ctx.render(view, container)`) and what the platform opens (`ctx.open(url)`).
+- **An action**: `{ name, fits(asset), run(ctx) }` (*Actions*); its context the asset, the render (`ctx.render(view, container, signal?)`: what it started ends with the action's signal, its panel closed) and what the platform opens (`ctx.open(url)`).
 
   ```ts
   export const openTab: AssetAction = {

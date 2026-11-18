@@ -65,6 +65,14 @@ export function previewPathsOf(folder: string, path: string, facts: FileFacts): 
   return Object.keys(PREVIEW_KINDS).map((kind) => previewPath(folder, path, versionOf(facts), kind)!);
 }
 
+/** Whether a preview of any kind is kept of a file's version now (none known: no) */
+export async function hasStoredPreview(files: PreviewFiles, folder: string, path: string): Promise<boolean> {
+  const facts = await files.facts(path).catch(() => undefined);
+  if (!facts) return false;
+  for (const at of previewPathsOf(folder, path, facts)) if (await files.facts(at).catch(() => undefined)) return true;
+  return false;
+}
+
 /** A file's previews of a version taken away, of every kind (`facts`: that version; none: the file's now) */
 export async function forgetPreviews(files: PreviewFiles, folder: string, path: string, facts?: FileFacts): Promise<void> {
   const version = facts ?? (await files.facts(path).catch(() => undefined));

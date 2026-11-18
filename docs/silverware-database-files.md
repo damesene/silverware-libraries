@@ -101,11 +101,13 @@ preview at the box's size (below), else its icon and name.
 ## Silverware Assets' API (shared/assets.ts)
 
 Optional members, the version unchanged (an older Assets without them: the stand-ins above). Each plugin whose bundle
-`shared/assets.ts` reaches gets its changelog entry at release.
+`shared/assets.ts` reaches gets its changelog entry at release. Built in step 3 (2026-11-18) as below; where it differs
+from what was first planned, the built one is written here.
 
-- `drawPreview?(target, page, box: { width, height }, signal): HTMLElement | null`: a file's preview by its type's own
-  renderer, its room the box, no frame, label, menu or settings' height; the stored preview where the type keeps one,
-  none drawn anew where `costly` (null: Database draws the icon); what it started ends with `signal`. Not `fieldDrawing`:
+- `drawPreview?(target, page, box: { width, height }, signal): Promise<HTMLElement | null>`: a file's preview by its
+  type's own renderer, its room the box, no frame, label, menu or settings' height; where its type keeps previews or is
+  `costly`, only the one kept is drawn, none made anew (null: Database draws the icon); an image with no renderer of its
+  type the browser's `<img>`; resolved once drawn (a renderer is async); what it started ends with `signal`. Not `fieldDrawing`:
   that draws as the page does (the view and height of the settings, the frame, labels), which a 28 px box cannot hold
   without Database styling Assets' classes, and it holds a registry subscription until aborted. It draws through the
   registry and the types' renderers as `decorate.ts` does (which type takes the file, its stored preview), sharing that
@@ -113,19 +115,20 @@ Optional members, the version unchanged (an older Assets without them: the stand
 - `showFile?(target, page)`: a file shown in Assets' side panel (its action `open-panel`, `builtin/panels.ts`, run without a frame as links
   already run their actions: `decorate.ts` `drawInto`). Its name says what it does: a caller wanting the click's
   action of the settings later gets a member of its own.
-- `insertFiles?(given, { folder, page }): Promise<readonly string[] | undefined>`: the insert dialog for what an event
-  gave (`given`: a snapshot `{ files, html, uriList }` read in the event, so Assets finds an image's address of the web
+- `insertFiles?(given, { folder }): Promise<readonly string[] | undefined>`: the insert dialog for what an event
+  gave (`given`: a snapshot `{ files, html, uriList, source }` read in the event (`source` "clipboard" or "drop": a
+  pasted image is named by the time), so Assets finds an image's address of the web
   itself, `webUrlOf`; none: opened empty to upload, Files and Camera), the paths offered in `folder`, *Inserted as*
-  hidden (its column and the all-files row); written as now (names apart from the space's, its progress panel), and
+  hidden (its column and the all-files row: the dialog's `nameOnly`, each file drawn as the first view its type has); written as now (names apart from the space's, its progress panel), and
   resolved only once written, with the targets a link names (paths of the space, or addresses of the web where linked);
-  undefined where cancelled. The write half of `host/silverbullet/insert.ts` (`insertChosen`, `putIn`) and
-  `index.ts` (`uploadChosen`) split so a caller gets what was written without its being put in a page. Not ruled by
+  undefined where cancelled. The write half of `host/silverbullet/insert.ts` (`writeChosen`, which `insertChosen`
+  calls before `putIn`) and `index.ts` (`writeWithProgress`) split so a caller gets what was written without its being put in a page. Not ruled by
   `insert.enabled` (that setting is about SilverBullet's own pasting into pages). The dialog opened as an editor's
   companion always (the dialog's option `companion`, today set for a field of another plugin's alone), so Database's
   popup, which ends on its `focusout`, stays open under it.
 - `deleteFiles?(paths): Promise<readonly string[]>`: files deleted from the space as *Delete file…* deletes one
   (`deleteFile` of `host/silverbullet/assets.ts`), the previews kept of them with them (`core/stored.ts`); no question
-  asked (the caller asked it, naming them all); the paths not deleted given back, each said once. Without it a
+  asked (the caller asked it, naming them all); the paths not deleted given back, nothing said of them (the caller says). Without it a
   database's files deleted leave their kept previews behind, for *Clean up previews*.
 - **Drops and pastes Assets leaves alone**: today Assets' document capture (`watchInserts`, `targetOf`) takes a drop on
   any widget of the page (a database's cell or card included: its search ends at `.cm-content`) and stops it, embedding
@@ -196,9 +199,12 @@ show over Assets' panel: checked in a UI test, the panel lifted where it must be
 1. **Probe** (2.12.1): a file named by a wiki link in a frontmatter list; the file renamed, the database renamed: are the
    links written anew? Done 2026-11-18: yes, both (*How a value is kept*); names with `@ # | < > $` cannot be linked.
 2. **Drops Assets leaves alone**: the mark in `shared/`, Assets' `targetOf`, an Assets UI test (a drop on a database's
-   cell is not Assets').
+   cell is not Assets'). Done 2026-11-18: `shared/takesfiles.ts` (`markTakesFiles`, `takesFilesAt` an event, in a
+   shadow root too), checked first in Assets' paste, dragover and drop; Assets' UI test marks a grid as the stand-in,
+   as Database marks nothing yet: a drop and a paste on a real cell of files are Database's UI tests in step 8.
 3. **Assets' API**: `drawPreview`, `showFile`, `insertFiles`, `deleteFiles` (the write half split, *Inserted as* hidden, names without
-   `[ ] @ # | < > $`), unit and UI tests in Assets.
+   `[ ] @ # | < > $`), unit and UI tests in Assets. Done 2026-11-18: a single bracket is refused in every name Assets
+   offers now (a page's insert too: no wiki link can name it), Assets' `ui-tests/api.spec.ts`.
 4. **The type and its value** (domain, `groups: false`, `custom.ts`), unit tests; offered in the properties' dialog.
 5. **`media` through the core** (`PlaceOptions`, `ViewHost`, `ModuleHost`, `EditorHost`), the binding's (Assets, the
    file listing in the init page) and the playground's; the fallbacks without Assets unit-tested (the UI tests' space

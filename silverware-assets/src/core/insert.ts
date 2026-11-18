@@ -74,14 +74,15 @@ export function validateFilePath(path: string): string | undefined {
   if (disk) return `the file's name has a "${disk[0]}" in it`;
   if (/^\/?[.^]/.test(path)) return "the name starts with a dot or ^";
   if (path.split("/").some((part) => part === "" || part === "." || part === "..")) return "the path has an empty part, or . or ..";
-  if (/\[\[|\]\]/.test(path)) return "the name has [[ or ]] in it";
+  // (A bracket alone too: a wiki link's target cannot hold one, `[[a]b.png]]`)
+  if (/[[\]]/.test(path)) return "the name has a bracket in it";
   if (/\.[a-zA-Z0-9]+\.md$/.test(path)) return "the name ends in .md after another extension";
   return undefined;
 }
 
 /** A name SilverBullet would refuse made one it takes: what it refuses taken out, its start's dots too; nothing left: `file.<ext>` */
 export function cleanName(name: string, ext: string): string {
-  const refused = (text: string) => text.replace(/[@#|<>$\\:*?"/\u0000-\u001f]|\[\[|\]\]/g, "");
+  const refused = (text: string) => text.replace(/[@#|<>$[\]\\:*?"/\u0000-\u001f]/g, "");
   // (Its name and its extension apart: a name of nothing but what is refused is no name, its extension kept)
   const dot = name.lastIndexOf(".");
   const own = dot > 0 ? refused(name.slice(dot + 1)).replace(/[^a-zA-Z0-9]/g, "") : "";

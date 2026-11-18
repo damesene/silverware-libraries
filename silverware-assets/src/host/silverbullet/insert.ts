@@ -8,7 +8,10 @@
 // only, a fenced block or the front matter (SilverBullet's line classes, both versions) left to SilverBullet. The
 // files are written once Insert is pressed, then their markdown put in at the selection then (a drop's: where it was
 // dropped), in one edit; the page changed meanwhile, they are written and their markdown said, not put in another.
+// An element of another plugin's that takes files itself (marked, shared/takesfiles.ts: a database's cell of files) is
+// left alone, its drop and paste not taken, wherever it is.
 import type { EditingSurface } from "../../../../shared/editor.ts";
+import { takesFilesAt } from "../../../../shared/takesfiles.ts";
 import type { Bridge } from "../../bridge.ts";
 import { joinedMarkdown, type LinkStyle, mappedPlace, markdownOf, placeIn, takesPaste, webMarkdownOf, webNameOf, webUrlOf } from "../../core/insert.ts";
 import type { InsertChoice, InsertFile } from "../../ui/insertdialog.ts";
@@ -76,7 +79,8 @@ export function watchInserts(doc: Document, watch: InsertWatch, signal: AbortSig
       if (!watch.enabled() || !data) return;
       const files = [...data.files];
       const kinds = { files: files.length, types: [...data.types], html: data.types.includes("text/html") ? data.getData("text/html") : "" };
-      if (!takesPaste(kinds)) return;
+      // (Another plugin's element taking files itself: its own, even in a field or the page's text)
+      if (!takesPaste(kinds) || takesFilesAt(event)) return;
       const target = targetOf(doc, event.target as Node | null, selectionLine(doc), watch);
       if (!target) return;
       event.preventDefault();
@@ -94,7 +98,7 @@ export function watchInserts(doc: Document, watch: InsertWatch, signal: AbortSig
   doc.addEventListener(
     "dragover",
     (event) => {
-      if (!watch.enabled() || !dropped(event)) return;
+      if (!watch.enabled() || !dropped(event) || takesFilesAt(event)) return;
       const line = doc.elementFromPoint(event.clientX, event.clientY)?.closest(".cm-line");
       if (!targetOf(doc, event.target as Node | null, line, watch)) return;
       // (Not stopped: SilverBullet's editor and Silverware Layout's grids watch it too)
@@ -106,7 +110,7 @@ export function watchInserts(doc: Document, watch: InsertWatch, signal: AbortSig
   doc.addEventListener(
     "drop",
     (event) => {
-      if (!watch.enabled() || !dropped(event)) return;
+      if (!watch.enabled() || !dropped(event) || takesFilesAt(event)) return;
       const line = doc.elementFromPoint(event.clientX, event.clientY)?.closest(".cm-line");
       const target = targetOf(doc, event.target as Node | null, line, watch, editorPositionAt(doc, event.clientX, event.clientY));
       if (!target) return;
@@ -163,15 +167,14 @@ async function placeNow(bridge: Bridge, target: InsertTarget): Promise<{ readonl
   }
 }
 
+/** How a file's upload goes, by its index among those chosen */
+export type UploadState = (index: number, state: "uploading" | "done" | "failed") => void;
+
 /**
- * The files chosen written into the space (each in turn: one that fails said, the rest still written), then their
- * markdown put in where they go, one edit; what was not put in (another page open, the field closed, a failure) said
- * with its markdown
+ * The files chosen written into the space, each in turn (one that fails said, the rest still written): those written,
+ * in their order. What a page inserts (`insertChosen`) and what another plugin uploads (the API's `insertFiles`) alike
  */
-export async function insertChosen(bridge: Bridge, target: InsertTarget, chosen: readonly InsertChoice[], progress?: (index: number, state: "uploading" | "done" | "failed") => void): Promise<void> {
-  // Where they go is where it is as Insert is pressed, moved by what is typed
-  // elsewhere while they upload; where it is typed over, where the cursor is then
-  const asPressed = await placeNow(bridge, target);
+export async function writeChosen(bridge: Bridge, chosen: readonly InsertChoice[], progress?: UploadState): Promise<InsertChoice[]> {
   const written: InsertChoice[] = [];
   const failed: string[] = [];
   for (const [index, one] of chosen.entries()) {
@@ -192,6 +195,19 @@ export async function insertChosen(bridge: Bridge, target: InsertTarget, chosen:
     }
   }
   if (failed.length) void bridge.flash(`Silverware Assets: not written: ${failed.join(", ")}`, "error");
+  return written;
+}
+
+/**
+ * The files chosen written into the space (`write`: `writeChosen`, its upload told as it goes), then their markdown put
+ * in where they go, one edit; what was not put in (another page open, the field closed, a failure) said with its
+ * markdown
+ */
+export async function insertChosen(bridge: Bridge, target: InsertTarget, chosen: readonly InsertChoice[], write: (chosen: readonly InsertChoice[]) => Promise<readonly InsertChoice[]>): Promise<void> {
+  // Where they go is where it is as Insert is pressed, moved by what is typed
+  // elsewhere while they upload; where it is typed over, where the cursor is then
+  const asPressed = await placeNow(bridge, target);
+  const written = await write(chosen);
   if (!written.length) return;
   let style: LinkStyle = "wikilink";
   try {

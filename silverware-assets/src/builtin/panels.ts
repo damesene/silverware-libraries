@@ -21,9 +21,12 @@ function show(kind: "side-panel" | "enlarged", context: ActionContext, build: (c
   open.get(kind)?.();
   const doc = document;
   let closed = false;
+  // What its file's drawing started, ended as it closes (a document still read, its size watched)
+  const drawing = new AbortController();
   const close = () => {
     if (closed) return;
     closed = true;
+    drawing.abort();
     stop?.();
     root.remove();
     doc.removeEventListener("keydown", key, true);
@@ -40,7 +43,7 @@ function show(kind: "side-panel" | "enlarged", context: ActionContext, build: (c
   doc.body.append(root);
   doc.addEventListener("keydown", key, true);
   open.set(kind, close);
-  void context.render("full", body).catch(() => body.replaceChildren(el(doc, "div", { class: "swa-panel-failed", text: "This file cannot be shown here" })));
+  void context.render("full", body, drawing.signal).catch(() => body.replaceChildren(el(doc, "div", { class: "swa-panel-failed", text: "This file cannot be shown here" })));
   return close;
 }
 

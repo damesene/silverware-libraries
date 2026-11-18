@@ -63,6 +63,28 @@ describe("the insert dialog", () => {
     ]);
   });
 
+  it("asks each file's name alone for another plugin's upload: no choice of how it is shown, each drawn as the first view its type has", async () => {
+    const { result, given } = open(
+      [
+        { file: fileOf("photo.png", "image/png"), source: "drop" },
+        { file: fileOf("Report.zip", "application/zip"), source: "drop" },
+      ],
+      host([], { nameOnly: true }),
+    );
+    await settle();
+    expect(document.querySelector(".swa-dialog-subtitle, .swa-dialog .swa-dialog-head")?.textContent).toContain("Its name in the space");
+    expect(document.querySelector(".swa-dialog")?.textContent).not.toContain("how it is put in the page");
+    expect(rows().every((row) => row.querySelector<HTMLElement>(".swa-insert-choices")!.hidden)).toBe(true);
+    expect(document.querySelector<HTMLElement>(".swa-insert-all")!.hidden).toBe(true);
+    // (The image its preview, the zip its card: not a link's name, which says nothing of what is uploaded)
+    expect(given.drawn.slice(-2)).toEqual([
+      ["Notes/photo.png", "preview"],
+      ["Notes/Report.zip", "card"],
+    ]);
+    button("Insert").click();
+    expect((await result)?.map((one) => one.path)).toEqual(["Notes/photo.png", "Notes/Report.zip"]);
+  });
+
   it("takes a batch's names apart, keeps both of one taken in the space or replaces it as chosen", async () => {
     const { result } = open(
       [

@@ -46,6 +46,9 @@ export type InsertDialogHost = {
   // Opened for a field of another plugin's (a grid's cell): the dialog acts on its editor, the focus going to it is not
   // the field left (shared/editor.ts `COMPANION_ATTRIBUTE`)
   readonly companion?: boolean;
+  // Each file's name asked alone, nothing of how it is shown (another plugin's upload: it writes a link of its own,
+  // shared/assets.ts `insertFiles`); a file drawn as the first view its type has
+  readonly nameOnly?: boolean;
 };
 
 // What each choice is called
@@ -128,6 +131,9 @@ function firstChoice(type: InsertType): Exclude<InsertAs, "shown"> {
   return (["full", "preview", "card"] as const).find((view) => type.can(view)) ?? "card";
 }
 
+/** How a file is drawn where nothing is asked of how it is shown (`nameOnly`): the first view its type can be drawn in */
+const sampleView = (type: InsertType): View => (["preview", "full", "card"] as const).find((view) => type.can(view)) ?? "card";
+
 /**
  * The dialog opened over the page: `files` its rows (none: an upload, picked in it); `done` given the files as chosen
  * as Insert is pressed (none: cancelled). `pick` opens the browser's picker (several files; `camera`: a photo taken)
@@ -191,7 +197,7 @@ export function openInsertDialog(
         // (Its folders made what SilverBullet takes too: what it refuses taken out, an empty one left out)
         const folder = (row.wanted.includes("/") ? row.wanted.slice(0, row.wanted.lastIndexOf("/")) : "")
           .split("/")
-          .map((part) => part.replace(/[@#|<>$\u0000-\u001f]|\[\[|\]\]/g, "").replace(/^[.^\s]+/, "").trim())
+          .map((part) => part.replace(/[@#|<>$[\]\u0000-\u001f]/g, "").replace(/^[.^\s]+/, "").trim())
           .filter((part) => part && part !== "..")
           .join("/");
         row.note.append(
@@ -223,7 +229,7 @@ export function openInsertDialog(
     });
     insert.disabled = looking || !ready || rows.some((row) => !row.web && !row.tooLarge && !!validateFilePath(row.wanted));
     note.textContent = looking && rows.length ? "Looking for files of these names in the space…" : unknown ? "The space's files could not be listed: a file of a name taken is replaced." : "";
-    allBox.hidden = rows.filter((row) => !leftOut(row)).length < 2;
+    allBox.hidden = !!host.nameOnly || rows.filter((row) => !leftOut(row)).length < 2;
     for (const row of rows) row.element.toggleAttribute("data-swa-left-out", leftOut(row));
     syncAll();
     empty.hidden = rows.length > 0;
@@ -272,7 +278,7 @@ export function openInsertDialog(
     const rowNote = el(doc, "div", { class: `${BASE}-row-note`, attrs: { id: noteId, role: "status", "aria-live": "polite" } });
     field.setAttribute("aria-describedby", noteId);
     const sample = el(doc, "div", `${BASE}-sample`);
-    const as = firstChoice(type);
+    const as = host.nameOnly ? sampleView(type) : firstChoice(type);
     const row: Row = {
       file: one.file,
       type,
@@ -320,13 +326,13 @@ export function openInsertDialog(
           row.web ? "web" : "space",
           (value) => {
             row.web = value === "web";
-            choices.element.hidden = leftOut(row);
+            choices.element.hidden = !!host.nameOnly || leftOut(row);
             update();
             draw(row);
           },
         ).element
       : undefined;
-    choices.element.hidden = leftOut(row);
+    choices.element.hidden = !!host.nameOnly || leftOut(row);
     row.element.append(
       el(doc, "div", `${BASE}-row-head`, el(doc, "span", { class: `${BASE}-icon`, html: type.icon }), field, row.address),
       ...(kept ? [el(doc, "div", `${BASE}-kept`, el(doc, "span", `${BASE}-kept-label`, "Kept"), kept)] : []),
@@ -408,7 +414,7 @@ export function openInsertDialog(
   };
   const dialog = dialogs.open({
     title: files.length === 1 ? "Insert file" : "Insert files",
-    subtitle: "Its name in the space, and how it is put in the page",
+    subtitle: host.nameOnly ? "Its name in the space" : "Its name in the space, and how it is put in the page",
     className: "swa-insert-window",
     content,
     footer,

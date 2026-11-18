@@ -523,9 +523,10 @@ test("a table grouped under Group by is one table, a part per group with its own
   await expect(groups.locator(".swd-table-headrow")).toHaveCount(2);
   // Each group's header cells where the other's are: one table's columns
   const lefts = (at: number) => groups.nth(at).locator(".swd-table-headrow > th").evaluateAll((all) => all.map((one) => Math.round(one.getBoundingClientRect().left)));
+  // (Measured once every row is there: the long name widens its column)
+  await expect(groups.nth(1).locator("tr[data-item]")).toHaveCount(2);
   expect(await lefts(0)).toEqual(await lefts(1));
   const before = await lefts(1);
-  await expect(groups.nth(1).locator("tr[data-item]")).toHaveCount(2);
   await groups.nth(1).locator(".swd-table-add").click();
   await expect.poll(() => space.saved("Page/db-tasks/Untitled")).toContain("status: Done");
   await expect(groups.nth(1).locator("tr[data-item]")).toHaveCount(3);
@@ -852,6 +853,10 @@ test("a reference: pages picked, kept as wiki links, opened by a press, renamed 
 test("a property's key changed in Properties follows into its views' blocks on every page, said in the review, its items with it", async ({ page, space }) => {
   const other = "# Other\n\n```silverware-database\nid: tasks\nview: list\nlist.colorBy: status\nlist.filter: {\"status\":\"Todo\"}\n```\n";
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: board\nboard.groupBy: status\n```\n", "Page/Other": other, ...TASKS }, "Page");
+  // (Its items and pages in the index first: a change written over items the index had not all yet is refused, as
+  // changed since it was planned)
+  for (const name of ["Fix login", "Write docs"]) await waitForIndex(page, "db", `${space.folder}/Page/db-tasks/${name}`);
+  await waitForIndex(page, "page", `${space.folder}/Page/Other`);
   await page.locator(".swd-more").click();
   await choose(page, "Properties");
   await page.locator('[data-property="status"] .swd-prop-head').click();

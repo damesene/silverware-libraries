@@ -3,7 +3,7 @@
 A property type of files and images, in the spirit of Notion's *Files & media*: several files in one value, shown as
 small previews where the item is shown, a popup to manage them, a file opened in Silverware Assets' side panel, new
 files uploaded through Silverware Assets' insert dialog. Planned 2026-11-16 with the user, reviewed against the code the
-same day (its findings are in this plan). Nothing built yet.
+same day and again on 2026-11-18 after step 1's probe (their findings are in this plan). Nothing built yet.
 
 ## Decisions (the user's, 2026-11-16)
 
@@ -64,13 +64,21 @@ photos:
 ```
 
 - Wiki links, so the index takes them for links: the file lists the item among its links, and a rename of the file is
-  written into the value by SilverBullet. From the fork's source (`plugs/index/refactor.ts`): `renameDocument` updates
-  backlinks; renaming a database (`renamePrefixCommand`) moves the documents under it, `files/` with them; renaming an
-  item (`renamePage`) leaves `files/` where it is. Whether the 2.12.1 release rewrites links in frontmatter lists is
-  step 1's probe.
-- Read by a reading of its own (`domain/types/files.ts`), not the reference's: a reference's target is cut at `#` and
-  `@` (`linkedDocument`), which a file's name may hold (`photo@2x.png`). A name with `[`, `]` or `|` cannot be a wiki
-  link: refused where picked, and Assets' names offered for an upload must avoid them (checked in step 3).
+  written into the value by SilverBullet. **Probed in the 2.12.1 release (2026-11-18, step 1)**: the index takes each
+  entry of a frontmatter list, and a single link (`cover: "[[…]]"`), as a link with its range (tags `link` and
+  `relation`, `toTag: "document"`); *Document: Rename Document* rewrites them in the frontmatter as in the body;
+  *Page: Batch Rename Prefix* of a database (`Databases/db-ab12` to `Databases/db-cd34`) moves its root page, its
+  items and `files/`, and rewrites the items' values to the new paths; an item renamed or moved to another folder
+  (*Page: Rename*) leaves `files/` where it is and its value unchanged, still right (the links are absolute).
+- **A name SilverBullet cannot link** (its reference grammar, `plug-api/lib/ref.ts` `refRegex`: a path holds none of
+  `@ # | < > $`, nor `[[` or `]]`): probed, `[[…/photo@2x.png]]` is no link in the index (`@` starts a position) and
+  SilverBullet's own rename of the file does nothing. Such a name is refused where a file is picked (+ Add), and the
+  names Assets offers for an upload avoid them (checked in step 3), as `[`, `]` do. The value is still read by a
+  reading of its own (`domain/types/files.ts`), not the reference's, so a value written by hand with such a name shows
+  the file rather than a cut name. It builds on the reference's (`domain/types/reference.ts`: `readReference`,
+  `writeReference`, the same wiki links) and differs where a reference has none: an entry may be an address of the
+  web, and a name is checked by the rules above (a check of its own, not `validateReferenceTarget`, which a page's
+  reference keeps).
 - One link alone, not in a list, reads too (written by hand). Filtered and sorted by the files' names (`text`).
 
 ## Sizes
@@ -97,10 +105,12 @@ Optional members, the version unchanged (an older Assets without them: the stand
 
 - `drawPreview?(target, page, box: { width, height }, signal): HTMLElement | null`: a file's preview by its type's own
   renderer, its room the box, no frame, label, menu or settings' height; the stored preview where the type keeps one,
-  none drawn anew where `costly` (null: Database draws the icon); what it started ends with `signal`. Not `drawEmbed` (now `fieldDrawing`):
+  none drawn anew where `costly` (null: Database draws the icon); what it started ends with `signal`. Not `fieldDrawing`:
   that draws as the page does (the view and height of the settings, the frame, labels), which a 28 px box cannot hold
-  without Database styling Assets' classes, and it holds a registry subscription until aborted.
-- `showFile?(target, page)`: a file shown in Assets' side panel (its action `peek`, run without a frame as links
+  without Database styling Assets' classes, and it holds a registry subscription until aborted. It draws through the
+  registry and the types' renderers as `decorate.ts` does (which type takes the file, its stored preview), sharing that
+  code, not a copy of it.
+- `showFile?(target, page)`: a file shown in Assets' side panel (its action `open-panel`, `builtin/panels.ts`, run without a frame as links
   already run their actions: `decorate.ts` `drawInto`). Its name says what it does: a caller wanting the click's
   action of the settings later gets a member of its own.
 - `insertFiles?(given, { folder, page }): Promise<readonly string[] | undefined>`: the insert dialog for what an event
@@ -110,7 +120,13 @@ Optional members, the version unchanged (an older Assets without them: the stand
   resolved only once written, with the targets a link names (paths of the space, or addresses of the web where linked);
   undefined where cancelled. The write half of `host/silverbullet/insert.ts` (`insertChosen`, `putIn`) and
   `index.ts` (`uploadChosen`) split so a caller gets what was written without its being put in a page. Not ruled by
-  `insert.enabled` (that setting is about SilverBullet's own pasting into pages).
+  `insert.enabled` (that setting is about SilverBullet's own pasting into pages). The dialog opened as an editor's
+  companion always (the dialog's option `companion`, today set for a field of another plugin's alone), so Database's
+  popup, which ends on its `focusout`, stays open under it.
+- `deleteFiles?(paths): Promise<readonly string[]>`: files deleted from the space as *Delete file…* deletes one
+  (`deleteFile` of `host/silverbullet/assets.ts`), the previews kept of them with them (`core/stored.ts`); no question
+  asked (the caller asked it, naming them all); the paths not deleted given back, each said once. Without it a
+  database's files deleted leave their kept previews behind, for *Clean up previews*.
 - **Drops and pastes Assets leaves alone**: today Assets' document capture (`watchInserts`, `targetOf`) takes a drop on
   any widget of the page (a database's cell or card included: its search ends at `.cm-content`) and stops it, embedding
   the files beside the block. A generic mark in `shared/` (as `overwindow.ts` is), `data-silverware-takes-files`: an
@@ -122,26 +138,31 @@ Optional members, the version unchanged (an older Assets without them: the stand
 - **domain/types/files.ts, domain/types/builtin/files.ts**: the value's reading (`readFiles`, `writeFile`) and the type
   (`name: "files"`, `label: "Files & media"`, `lists: true`, `editor: "files"`, `look: "media"`, `groups: false`). Pure.
 - **domain/types/type.ts**: `editor` and `look` widened by `"files"` and `"media"`; `groups?: false`, a type not offered
-  in Group by (`core/groupmenu.ts` `groupable`) nor taken as a board's columns (`board.ts` `groupedBy`'s fallback).
+  in Group by (`core/groupmenu.ts` `groupable`); a board takes its columns from what Group by offers (its `groupBy:
+  { required, prefer }`), so the one check keeps a files property out of both.
   `domain/types/custom.ts`: users' types may take `files` / `media` too (its `EDITORS`, `LOOKS`), documented.
 - **core/view.ts, core/place.ts, core/module.ts**: `media` given by the binding through `PlaceOptions` into each
   place's `ViewHost`, and into the window's `ModuleHost`:
   - `draw(target, box: { width, height }, signal): HTMLElement` (an image, a preview, an icon and name),
   - `open(target)`,
   - `upload(database, given?): Promise<readonly string[] | undefined>` (the folder from the store, below),
-  - `files(): Promise<readonly string[]>` (the space's files, for + Add).
+  - `files(): Promise<readonly string[]>` (the space's files, for + Add),
+  - `remove(paths): Promise<readonly string[]>` (files deleted, those not deleted given back).
 
   Optional: a host without it draws names and opens nothing. `valueNodes`, `fieldNodes` and `EditorHost` (a `Pick`,
-  made by the peek's `editorHost()` too) take it. `ViewHost` is the API for users' views: `media` documented in
+  made by the peek's `editorHost()` too) take it. `ViewHost` is the API for users' views: `media` on it is a promise
+  kept from then on (a MINOR release; changing it later breaks users' views), so it is kept small and documented in
   silverware-database.md (its examples run by `docs.test.ts`).
 - **Lifetimes**: values are drawn synchronously and cells thrown away on each change, aborting nothing. What `draw`
   starts is ended by a signal the binding aborts once the element is out of the document (checked on the next change
   and by `index.ts`' tidy), so no preview redraws a detached element.
 - **views/values.ts**: `look: "media"`: the strip, `+N`, each file a button (a click on it `media.open`, stopped so the
   cell's editor does not open).
-- **views/editors.ts**: `editor: "files"`, a popup of its own (`floatPanel` as the other editors): its list writes the
+- **views/fileseditor.ts** (`editor: "files"`, dispatched from `views/editors.ts`, which is long already): a popup of
+  its own (`floatPanel` as the other editors): its list writes the
   value itself (no joined text through `parse`: an address or a name may hold a comma); + Add searches `media.files()`
-  (the search list of the documents editor factored out and shared, no new document offered); Upload by `media.upload`.
+  (the search list of the documents editor factored out into a small file of its own, shared by both, no new document
+  offered); Upload by `media.upload`.
   Assets' dialog is the editor's companion (`COMPANION_ATTRIBUTE`, opened with `companion: true`), so the popup does not
   finish on the focus going to it; what comes back is added to the item as it is then (read again by its key), not as
   it was as the popup opened.
@@ -158,8 +179,9 @@ Optional members, the version unchanged (an older Assets without them: the stand
 - **modules/peek/panel.ts**: the property's row as a cell's, larger; its pencil as a link's row has; paste and drop.
 - **store/**: a database's files' folder, `databaseDocumentOf(id)` and `/files`, the store's alone.
 - **host/silverbullet/ and index.ts**: `media` made of Silverware Assets' API (`drawPreview`, `showFile`,
-  `insertFiles`) and the init page's file listing (SilverBullet's `space.listDocuments`, handed over by the bridge),
-  else Database's own images and SilverBullet's opening.
+  `insertFiles`, `deleteFiles`), else Database's own images, SilverBullet's opening and its `space.deleteDocument`.
+  The bridge has neither yet: the init page hands over pages alone (`listPages`), and the platform's `Space` is pages
+  (`list`, `remove`); `listDocuments` and `deleteDocument` are added to the bridge for `media`, not to `Space`.
 - **playground/database.ts**: a stand-in `media` over the memory store (images by URL, no upload).
 
 ## Layers on screen
@@ -172,11 +194,11 @@ show over Assets' panel: checked in a UI test, the panel lifted where it must be
 ## Steps
 
 1. **Probe** (2.12.1): a file named by a wiki link in a frontmatter list; the file renamed, the database renamed: are the
-   links written anew? Its answer recorded here.
+   links written anew? Done 2026-11-18: yes, both (*How a value is kept*); names with `@ # | < > $` cannot be linked.
 2. **Drops Assets leaves alone**: the mark in `shared/`, Assets' `targetOf`, an Assets UI test (a drop on a database's
    cell is not Assets').
-3. **Assets' API**: `drawPreview`, `showFile`, `insertFiles` (the write half split, *Inserted as* hidden, names without
-   `[`, `]`, `|`), unit and UI tests in Assets.
+3. **Assets' API**: `drawPreview`, `showFile`, `insertFiles`, `deleteFiles` (the write half split, *Inserted as* hidden, names without
+   `[ ] @ # | < > $`), unit and UI tests in Assets.
 4. **The type and its value** (domain, `groups: false`, `custom.ts`), unit tests; offered in the properties' dialog.
 5. **`media` through the core** (`PlaceOptions`, `ViewHost`, `ModuleHost`, `EditorHost`), the binding's (Assets, the
    file listing in the init page) and the playground's; the fallbacks without Assets unit-tested (the UI tests' space
@@ -186,8 +208,13 @@ show over Assets' panel: checked in a UI test, the panel lifted where it must be
 8. **Paste and drop** on a cell, the popup, a card, the peek's row.
 9. **The board's cover** (*Card preview*).
 10. **Files offered for deletion**: deleting a database (`core/deletedatabase.ts`) and an item ask about their files;
-    the files an item alone names found by the store (every item's values of a files type read), deleted through the
-    platform's space; Undo of the deletion does not bring the files back, the question says so.
+    the files an item alone names found by the store (every item's values of a files type read), deleted by
+    `media.remove` (Silverware Assets' `deleteFiles`, its kept previews with them); Undo of the deletion does not bring
+    the files back, the question says so. An item is removed from several places (the peek's *Delete*, a table's rows,
+    each a `removeItem` change of a transaction), so the question is asked in one place, the core's, as it applies
+    removals, and generically: a type tells what a removed value leaves behind (a member of its own, `leaves?`), the core
+    knows no files. That logic is a file of its own in `core/` (what removed values leave, the question), not more of
+    `core.ts`, which is long already.
 11. **Docs**: silverware-database.md (the type, the cover, `media` of `ViewHost`), silverware-assets.md (the API), the
     CLAUDE.md of both.
 

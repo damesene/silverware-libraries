@@ -1030,8 +1030,12 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   outline: 1px solid var(--ui-surface-border-color, transparent);
   outline-offset: -1px;
 }
+/* A code block in the page's code font (the theme's, after 2.12.1; 2.12.1 draws code in its editor's font: the cell's),
+   its parts highlighted as the page's editor does where Silverware Editor is there (host/silverbullet/codeblocks.ts) */
 .swl-grid-cell > pre:not(#swl-none) {
-  padding: 12px 16px;
+  font-family: var(--editor-monospace-font, inherit);
+  /* (Its text inset as the page's editor's code block: read of it, --swl-code-inset on the grid, src/grid/grids.ts) */
+  padding: 12px var(--swl-code-inset, 16px);
   overflow-x: auto;
   border-radius: var(--ui-radius-lg, 0);
   background-color: var(--editor-code-background-color, transparent);

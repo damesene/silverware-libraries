@@ -69,6 +69,8 @@ export type GridHost = {
   ask?(question: string, value: string): Promise<string | undefined>;
   /** A cell's markdown rendered as the host renders a page (its elements marked with `data-pos`, their offsets in it; an offset of 0 may be left unmarked) */
   renderMarkdown(text: string): Promise<string>;
+  /** A grid drawn's code blocks highlighted as the host's editor highlights them (none: as rendered) */
+  highlightCode?(grid: HTMLElement): void;
   /** The look of what the host's editor draws of its own (headings, code, a rule; none: the rendering's alone) */
   pageEditorLook?(): EditorLook;
   /** The page's text now */
@@ -328,6 +330,9 @@ export class Grids {
     this.drawnIn.set(element, text);
     this.bodies.set(element, body);
     this.attributes.set(element, attributes);
+    // (After the cells taken over: theirs are highlighted already)
+    this.host.highlightCode?.(element);
+    this.showPageLook(element);
     this.changedSinceTold = true;
     // Where its cells are in the page (the first grid of its body; set again as it is found among its alike)
     if (first) {
@@ -398,6 +403,8 @@ export class Grids {
     showFit(element, fitsColumns(grid.attributes.columns));
     showBorder(element, borderOf(grid.attributes));
     this.keepBlankLines(element, cells.map((cell) => cell.content));
+    this.host.highlightCode?.(element);
+    this.showPageLook(element);
     element.classList.add("swl-grid-shown");
     return element;
   }
@@ -447,6 +454,17 @@ export class Grids {
         console.error("Silverware Layout: a listener of what grids draw failed", error);
       }
     }
+  }
+
+  /**
+   * A grid drawn given what its cells' rendering takes of the host's editor's look where no theme's variable tells it,
+   * as variables of its own the style page reads: a code block's inset (`--swl-code-inset`: 16 px after SilverBullet
+   * 2.12.1, none on it); none where the host reads none (the style page's own)
+   */
+  private showPageLook(element: HTMLElement): void {
+    const inset = this.host.pageEditorLook?.().codeBlock?.["padding-left"];
+    if (inset) element.style.setProperty("--swl-code-inset", inset);
+    else element.style.removeProperty("--swl-code-inset");
   }
 
   /** Each cell of a grid drawn given the blank lines of its markdown the host's rendering left out */

@@ -56,3 +56,25 @@ no language (SilverBullet's `--editor-code-color`) is not read: its language's p
 
 Each part: its test entries taken out, `npm run test:ui:sb` and `:edge` for the look folder and the plugin's own, a
 release proposed once done.
+
+## Silverware Layout: a rendered cell (2026-11-18)
+
+- **A quote** (built): the theme's colours and ground (`--editor-blockquote-color`, `-background-color`,
+  `-border-color`, on 2.12.1 and edge alike), its text after two of the page's columns, as the page's editor lays its
+  `> ` out (`--editor-column`, else a character's width). Not sampled: SilverBullet sets a quote's indent on its line
+  from its JavaScript, so a sample's line has none.
+- **A code block highlighted** (decided with the user: A, Silverware Editor's highlighter through its API):
+  SilverBullet's rendering highlights no code (`<pre data-lang="csharp">`, its lines between `<br>`s).
+  - The contract (`shared/editor.ts`): `Editors.highlightCode?(code, language)`, the code's parts in order, each with
+    the look it is drawn in (CSS properties; none: the text's own); none where the language is not known. Optional:
+    an older Silverware Editor has none, and the code stays as SilverBullet renders it.
+  - Silverware Editor: one table of the code's tokens' looks (`src/codemirror.ts`), its own highlight and this alike;
+    CodeMirror and the language loaded first (a cell drawn before they are is highlighted once they are: its colours
+    and weight alone change, not its room).
+  - Silverware Layout's core asks its host once a grid is drawn (`GridHost.highlightCode?(grid)`); the binding
+    (`host/silverbullet/`) knows SilverBullet's rendering: each `pre[data-lang]` not yet highlighted
+    (`data-swl-highlighted`), its text read with its `<br>`s, its parts drawn as spans of their look between the same
+    `<br>`s (the text's offsets as they were: a press in it still finds its markdown). A cell taken over unchanged
+    keeps its highlighting.
+- **Code's font and the rest** (headings' colour and size, bold, the space round headings and a rule, a code block's
+  inset): by the theme's variables where they are; what is not, measured against the page as each is built.

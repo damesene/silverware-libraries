@@ -348,9 +348,9 @@ async function read(page: Page, surface: Surface): Promise<{ look: Look; crops: 
   await page.mouse.move(1, 1);
   // (Its files drawn by Silverware Assets, as it does a moment after the text: a preview, a card, a link's icon)
   for (const selector of ['[data-swa-view="preview"]', ".swa-card", ".swa-link-icon"]) await expect(surface.target.locator(selector).first()).toBeVisible();
-  // (The code block highlighted in its language, which an editor (the page's, a field's) loads as the block is first
-  // drawn: its string a node of its own. Not by SilverBullet's rendering of a grid's cell, which highlights none)
-  if (surface.name !== "grid") await expect(surface.target.locator(".cm-line span", { hasText: /^"text"$/ }).first()).toBeVisible();
+  // (The code block highlighted in its language, which an editor (the page's, a field's, the one a grid's rendered cell
+  // asks) loads as the block is first drawn: its string a node of its own)
+  await expect(surface.target.locator("span", { hasText: /^"text"$/ }).first()).toBeVisible();
   const look = await surface.target.evaluate(readLook, surface.shadow);
   const crops: Record<string, Buffer> = {};
   for (const [block, [first, last]] of Object.entries(BLOCKS)) {
@@ -385,8 +385,7 @@ const KNOWN: readonly { readonly surfaces: readonly string[]; readonly keys: rea
   // A grid's cell rendered: SilverBullet's rendering, Silverware Layout's rules on it
   { surfaces: ["grid"], keys: ["heading 1", "heading 2", "heading 3"], parts: ["font", "color"], why: "headings' colour (2.12.1) and size (edge) not yet the page's" },
   { surfaces: ["grid"], keys: ["bold", "inline code"], parts: ["font"], why: "a strong text's weight and code's font not yet the page's" },
-  { surfaces: ["grid"], keys: ["code", "code's string"], why: "a code block not highlighted (SilverBullet's rendering), its font not the page's" },
-  { surfaces: ["grid"], keys: ["return", "Second level under First level", "Third level under Second level", "Below rule under Above rule"], why: "a code block's indent, the space round headings and a rule not yet the page's" },
+  { surfaces: ["grid"], keys: ["Second level under First level", "Third level under Second level", "Below rule under Above rule"], why: "the space round headings and a rule not yet the page's" },
 ];
 
 /** The fixture opened on every surface, read, its pixels attached, each surface's measurements compared with the page's */

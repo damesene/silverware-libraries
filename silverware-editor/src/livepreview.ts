@@ -58,8 +58,18 @@ const MARKED = new Set(["Emphasis", "StrongEmphasis", "Strikethrough", "InlineCo
 const MARKS = new Set(["EmphasisMark", "StrikethroughMark", "CodeMark", "HighlightMark", "SuperscriptMark", "SubscriptMark"]);
 // What is drawn in a look of its own, its marks hidden or not: a highlight, a superscript, a subscript
 const LOOKS: Readonly<Record<string, string>> = { Highlight: "swe-highlight", Superscript: "swe-sup", Subscript: "swe-sub" };
-// What a URL of its own (`https://…`, `<https://…>`) is not: a part of a link, an image or a link's reference
+// What a URL of its own (`https://…`, `<https://…>`) is not in: a link, an image or a link's reference
 const URL_OWNERS = new Set(["Link", "Image", "LinkReference"]);
+// A URL with its scheme (`www.…` and an e-mail address, which GitHub's markdown links too, have none: a link would
+// take them for a page of the space)
+const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
+/** Whether a node is a URL of its own: one with its scheme, in no link, image or link's reference */
+function ownUrl(state: EditorState, node: SyntaxNode): boolean {
+  if (node.name !== "URL" || !SCHEME.test(state.sliceDoc(node.from, node.to))) return false;
+  for (let up = node.parent; up; up = up.parent) if (URL_OWNERS.has(up.name)) return false;
+  return true;
+}
 
 /** A table's cell's content as drawn: its text, and its inline parts in elements of their own */
 export type Inline = string | { readonly tag: string; readonly class?: string; readonly parts: readonly Inline[] };
@@ -92,7 +102,7 @@ function inlineOf(state: EditorState, node: SyntaxNode, from: number, to: number
     text(child.from);
     at = child.to;
     // (A URL of its own a link: a link's or an image's left out)
-    if (child.name === "URL" && !URL_OWNERS.has(node.name)) {
+    if (ownUrl(state, child)) {
       parts.push({ tag: "span", class: "swe-link", parts: [state.sliceDoc(child.from, child.to)] });
       continue;
     }
@@ -170,7 +180,7 @@ export function linkAt(state: EditorState, tree: { resolveInner(at: number, side
   for (let node: SyntaxNode | null = tree.resolveInner(at, 1); node; node = node.parent) {
     if (node.name === "WikiLink" || node.name === "Link") return state.sliceDoc(node.from, node.to);
     // (A URL of its own as the markdown link it stands for: what its user follows a link's markdown by)
-    if (node.name === "URL" && !URL_OWNERS.has(node.parent?.name ?? "")) {
+    if (ownUrl(state, node)) {
       const url = state.sliceDoc(node.from, node.to);
       return `[${url}](${url})`;
     }
@@ -481,13 +491,19 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
       for (let child = node.firstChild; child; child = child.nextSibling) all.push(child);
       return all;
     };
+    // A code block entered: in it only a quote's marks are read (a block in a quote), its language's nodes not as
+    // markdown's
+    let code: SyntaxNode | undefined;
     cm.syntaxTree(state).iterate({
       enter: ({ name, from, to, node }) => {
+        if (code && from >= code.from && to <= code.to && node !== code) {
+          if (name !== "QuoteMark") return false;
+        } else code = undefined;
         if (MARKED.has(name)) {
           const look = looks.get(name);
           if (look) out.push(look.range(from, to));
           if (!shown(from, to)) for (const child of children(node)) if (MARKS.has(child.name)) hide(child.from, child.to);
-        } else if (name === "URL" && !URL_OWNERS.has(node.parent?.name ?? "")) {
+        } else if (ownUrl(state, node)) {
           // `https://…` and `<https://…>`: a link, its `<` `>` hidden
           out.push(link.range(from, to));
           const auto = node.parent?.name === "Autolink" ? node.parent : undefined;
@@ -505,7 +521,7 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
           const first = state.doc.lineAt(from).number;
           const last = state.doc.lineAt(to).number;
           for (let n = first; n <= last; n++) out.push(codeLine(n === first, n === last, false).range(state.doc.line(n).from));
-          return false;
+          code = node;
         } else if (/^ATXHeading\d$/.test(name)) {
           const mark = node.firstChild;
           // (The `#`s and the space after them; a heading of no text keeps them, else nothing is left of it)
@@ -543,8 +559,7 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
           const last = state.doc.lineAt(to).number;
           for (let n = first; n <= last; n++) out.push(codeLine(n === first, n === last, covered && fences.has(n)).range(state.doc.line(n).from));
           if (covered) for (const child of children(node)) if (child.name === "CodeInfo") out.push(codeInfo.range(child.from, child.to));
-          // (Its language's nodes not read as markdown's)
-          return false;
+          code = node;
         } else if (name === "HorizontalRule") {
           if (shown(from, to)) return;
           hide(from, to);

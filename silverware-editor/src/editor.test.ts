@@ -298,6 +298,29 @@ describe("the CodeMirror editor's live preview", () => {
     editor.destroy();
   });
 
+  it("takes no address without its scheme for a link, nor a URL in a link's text for one of its own", () => {
+    const opened: string[] = [];
+    const editor = parsedEditor(cm, document, { text: "x\nsee www.a.b, bob@a.b and [see *https://a.b*](Other)", selection: 0, openLink: (markdown) => opened.push(markdown) }, { made: () => undefined, gone: () => undefined });
+    const root = editor.element.shadowRoot!;
+    const links = [...root.querySelectorAll(".swe-link")];
+    expect(links.map((one) => one.textContent)).toEqual(["see https://a.b"]);
+    // (The URL's own element in the link's text)
+    const url = [...links[0]!.querySelectorAll("*")].find((one) => one.textContent === "https://a.b")!;
+    url.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
+    expect(opened).toEqual(["[see *https://a.b*](Other)"]);
+    editor.destroy();
+  });
+
+  it("picks a code block's language by its info's first word exactly, a tag's data block YAML", () => {
+    expect(["cs", "C#", "python title=x", "text", "jsonc", "context", "#task"].map((info) => cm.codeLanguage(info)?.name ?? null)).toEqual(["csharp", "csharp", "python", null, null, null, "yaml"]);
+  });
+
+  it("hides a quote's `>` on the lines of a code block in it", () => {
+    const { editor, lines } = make("x\n> ```js\n> let a = 1;\n> ```\n> after", 0);
+    expect(lines()).toEqual(["x", "```js", "let a = 1;", "```", "after"]);
+    editor.destroy();
+  });
+
   it("draws a highlight, a superscript and a subscript in their looks, their marks where the selection touches them", () => {
     const { editor, root, lines } = make("x\na ==marked== x^2^ H~2~O", 0);
     expect(lines()[1]).toBe("a marked x2 H2O");

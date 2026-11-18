@@ -91,12 +91,15 @@ const LANGUAGES: readonly (readonly [names: readonly [string, ...string[]], lang
 const descriptions: readonly LanguageDescription[] = LANGUAGES.map(([[name, ...alias], language]) =>
   LanguageDescription.of({ name, alias, load: async () => new LanguageSupport(language()) }),
 );
-const tagged = descriptions[0]!;
+// (A tag's data block's: YAML, found by its name)
+const tagged = LanguageDescription.matchLanguageName(descriptions, "yaml", false)!;
 
 /**
- * The language a fenced code block is highlighted in, by its info (`markdown`'s `codeLanguages`): its name or an alias,
+ * The language a fenced code block is highlighted in, by its info's first word (`markdown`'s `codeLanguages`): its name or an alias,
  * a tag's data block (`#tag`) YAML, as SilverBullet's editor has it
  */
 export function codeLanguage(info: string): LanguageDescription | null {
-  return info.startsWith("#") ? tagged : LanguageDescription.matchLanguageName(descriptions, info, true);
+  // (Its first word exactly, as SilverBullet's editor reads it: `text` is no `tex`, `jsonc` no `json`)
+  const name = info.trim().split(/\s/)[0] ?? "";
+  return name.startsWith("#") ? tagged : LanguageDescription.matchLanguageName(descriptions, name, false);
 }

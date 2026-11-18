@@ -695,6 +695,16 @@ describe("the peek", () => {
     expect((await store.database("tasks"))!.value.properties.map((one) => one.key)).toEqual(["estimate", "status", "done"]);
   });
 
+  it("moves a property by Alt+↓ pressed twice at once two places, each from the schema the one before wrote", async () => {
+    const { q, peek, store, told } = await setup(true, true);
+    await peek("Fix login");
+    const before = (await store.database("tasks"))!.value.properties.map((one) => one.key);
+    const grip = q(`.swd-peek-row[data-property="${before[0]}"] .swd-peek-grip`);
+    for (let n = 0; n < 2; n++) grip.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", altKey: true, bubbles: true }));
+    await vi.waitFor(async () => expect((await store.database("tasks"))!.value.properties.map((one) => one.key)).toEqual([before[1], before[2], before[0], ...before.slice(3)]), { timeout: 5_000 });
+    expect(told).toEqual([]);
+  });
+
   it("draws nothing anew while a property's row is dragged, a change told meanwhile drawn once it is let go", async () => {
     const { q, peek, named, store } = await setup();
     await peek("Fix login");

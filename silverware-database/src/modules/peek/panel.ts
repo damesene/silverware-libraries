@@ -100,6 +100,9 @@ export class PeekPanel {
   private readonly edits = new Set<Promise<unknown>>();
   // The panel's own writes of its item, one after another: each from the item as the one before it left the panel (`own`)
   private queue: Promise<unknown> = Promise.resolve();
+  // Properties moved by the keyboard, one after another: each from the schema as the one before it wrote it (pressed
+  // again before, a move read the schema the one before was changing, and was refused as changed elsewhere)
+  private moves: Promise<unknown> = Promise.resolve();
   // Items asked to be shown, counted: a press beside the panel closes it only where it asked for none (`beside`)
   private asked = 0;
   // A press beside the panel being followed to its end (its listeners, its timers): ended as the panel goes or another comes
@@ -713,20 +716,24 @@ export class PeekPanel {
     const row = el(doc, "div", { class: `swd-peek-row${hiddenIn === undefined ? "" : " swd-peek-hidden"}`, attrs: { "data-property": property.key } }, grip, label, value);
     // Its place among the properties (those a view hides too), written as the schema's order at once
     const keysOf = () => [...list.querySelectorAll<HTMLElement>(":scope > .swd-peek-row")].map((one) => one.dataset.property);
-    // (`keys`: the list's order before the move: a drag moves the row in the list as it goes)
-    const moveTo = (index: number, keys = keysOf()) => {
-      const target = keys[Math.max(0, Math.min(keys.length - 1, index))];
-      const to = shown.schema.properties.findIndex((one) => one.key === target);
-      const from = shown.schema.properties.findIndex((one) => one.key === property.key);
-      if (to < 0 || to === from) return void this.draw();
-      void this.host.core
-        .moveProperty(shown.database, property.key, to)
-        .then(() => {
+    // Moved next to the property `target` names in the schema as it is then: moves one after another, each read once the
+    // one before wrote (a move read with one still writing was refused as changed elsewhere); none once another item shows
+    const moveTo = (target: (schema: readonly string[]) => string | undefined) => {
+      this.moves = this.moves
+        .then(async () => {
+          if (this.shown !== shown) return;
+          const schema = (await this.host.database(shown.database))?.value.properties.map((one) => one.key) ?? [];
+          const key = target(schema);
+          const to = key === undefined ? -1 : schema.indexOf(key);
+          if (to < 0 || to === schema.indexOf(property.key)) return void this.draw();
+          await this.host.core.moveProperty(shown.database, property.key, to);
           this.host.refreshPlaces();
-          return this.follow();
+          await this.follow();
         })
         .catch((error: unknown) => this.host.ui.notify(`Silverware Database: ${error instanceof Error ? error.message : String(error)}`, { type: "error" }));
     };
+    // (`keys`: the list's order before the move, a drag moving the row in the list as it goes; a row's place in it)
+    const at = (keys: readonly (string | undefined)[], index: number) => keys[Math.max(0, Math.min(keys.length - 1, index))];
     grip.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
       // (No focus moved yet: a field being edited is written, and the panel drawn anew, only once the row is let go)
@@ -745,7 +752,7 @@ export class PeekPanel {
           // (Moved: written, then followed. Not: the list as it was, and a change told meanwhile read and drawn now)
           if (to) {
             shown.stale = false;
-            return moveTo(to.index, before);
+            return moveTo(() => at(before, to.index));
           }
           this.draw();
           if (shown.stale && this.shown === shown && !this.drawingPutOff()) {
@@ -758,8 +765,14 @@ export class PeekPanel {
     grip.addEventListener("keydown", (event) => {
       if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
       event.preventDefault();
-      const keys = keysOf();
-      moveTo(keys.indexOf(property.key) + (event.key === "ArrowUp" ? -1 : 1), keys);
+      const step = event.key === "ArrowUp" ? -1 : 1;
+      const shownKeys = new Set(keysOf());
+      // (Its neighbour among the rows shown, in the schema as it is then: a move before may have changed it)
+      moveTo((schema) => {
+        const order = schema.filter((key) => shownKeys.has(key));
+        const from = order.indexOf(property.key);
+        return from < 0 ? undefined : at(order, from + step);
+      });
     });
     return row;
   }

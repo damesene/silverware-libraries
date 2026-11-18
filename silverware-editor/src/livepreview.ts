@@ -289,7 +289,8 @@ export function livePreview(cm: CodeMirror, drawing?: FieldDrawing, openLink?: (
     }
     toDOM(view: EditorView): HTMLElement {
       const container = view.dom.ownerDocument.createElement("span");
-      container.className = this.lead ? "swe-embed swe-link-lead" : "swe-embed";
+      // (One before a link's text in its link's colour, a wiki link's or a markdown link's, as the page draws it)
+      container.className = this.lead ? `swe-embed swe-link-lead${this.markdown.startsWith("[[") ? " swe-link-lead-wiki" : ""}` : "swe-embed";
       const control = new AbortController();
       Embed.ends.set(container, control);
       // (Its height known as it is drawn, perhaps later: the editor measures its lines again)
@@ -739,6 +740,8 @@ export const PREVIEW_THEME = {
   ".swe-sub": { verticalAlign: "sub", fontSize: "smaller" },
   ".swe-link": { color: "var(--editor-link-color, var(--link-color, #0969da))", textDecoration: "underline" },
   ".swe-wiki-link": { color: "var(--editor-wiki-link-page-color, var(--link-color, #0969da))" },
+  ".swe-link-lead": { color: "var(--editor-link-color, var(--link-color, #0969da))" },
+  ".swe-link-lead-wiki": { color: "var(--editor-wiki-link-page-color, var(--link-color, #0969da))" },
   // (A hashtag as SilverBullet 2.12.1 draws one rendered, a grid's cell's too: its theme's colours and corners, the
   // text's place as there, so it does not move as the cell is edited)
   ".swe-hashtag": {

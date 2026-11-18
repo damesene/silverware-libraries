@@ -224,6 +224,8 @@ describe("the CodeMirror editor's live preview", () => {
     const root = editor.element.shadowRoot!;
     expect(drawn).toEqual(["[[a.pdf]]", "[doc](b.pdf)"]);
     expect(root.querySelectorAll(".swe-embed .test-icon")).toHaveLength(2);
+    // (Each in its link's colour: a wiki link's, a markdown link's)
+    expect([...root.querySelectorAll(".swe-link-lead")].map((lead) => lead.classList.contains("swe-link-lead-wiki"))).toEqual([true, false]);
     // (The link's text still shown after its icon)
     expect(root.querySelectorAll(".cm-line")[1]!.textContent).toBe("a.pdf and Page and doc");
     root.querySelector<HTMLElement>(".test-icon")!.click();

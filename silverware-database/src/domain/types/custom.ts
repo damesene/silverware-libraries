@@ -39,12 +39,16 @@ export function validateType(type: PropertyType): string | undefined {
   if ((type.editor === "toggle") !== (type.look === "check")) return `the type "${type.name}": the editor "toggle" and the look "check" go together`;
   // (Labels are a list's: a type of them says its values are lists, grouped so)
   if (type.look === "labels" && type.lists !== true) return `the type "${type.name}": the look "labels" is a list's: say lists: true`;
+  // (Files are a list's too, the editor "files" and the look "media" theirs: one without the other draws one thing and edits another)
+  if ((type.editor === "files") !== (type.look === "media")) return `the type "${type.name}": the editor "files" and the look "media" go together`;
+  if (type.look === "media" && type.lists !== true) return `the type "${type.name}": the look "media" is a list's: say lists: true`;
+  if (type.groups !== undefined && type.groups !== false) return `the type "${type.name}": groups is false or left out`;
   return undefined;
 }
 
 // The kinds of editor and of look a type may say (domain/types/type.ts)
-const EDITORS: readonly string[] = ["select", "multi-select", "date", "time", "datetime-local", "link", "toggle", "documents"];
-const LOOKS: readonly string[] = ["options", "share", "link", "check", "documents", "labels"];
+const EDITORS: readonly string[] = ["select", "multi-select", "date", "time", "datetime-local", "link", "toggle", "documents", "files"];
+const LOOKS: readonly string[] = ["options", "share", "link", "check", "documents", "labels", "media"];
 
 // What is done where a method failed, as the user is told
 const DONE: Readonly<Record<string, string>> = {
@@ -92,6 +96,7 @@ export function guardedType(type: PropertyType, told: (problem: string) => void)
     ...(type.look ? { look: type.look } : {}),
     ...(type.offered === false ? { offered: false } : {}),
     ...(type.lists === true ? { lists: true } : {}),
+    ...(type.groups === false ? { groups: false as const } : {}),
     ...(type.validateParams ? { validateParams: (params: Params) => call("validateParams", () => type.validateParams!(params), problemOrNone, (problem) => problem) } : {}),
     validate: (value: Value, params: Params) => call("validate", () => type.validate(value, params), problemOrNone, (problem) => problem),
     text: (value: Value, params: Params) => call("text", () => type.text(value, params), text, () => keptText(value)),

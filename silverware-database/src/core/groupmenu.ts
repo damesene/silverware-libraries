@@ -18,11 +18,14 @@ import type { ViewDefinition, ViewHost } from "./view.ts";
 // A grip: six dots
 const GRIP = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><circle cx="6" cy="4" r="1.1"/><circle cx="10" cy="4" r="1.1"/><circle cx="6" cy="8" r="1.1"/><circle cx="10" cy="8" r="1.1"/><circle cx="6" cy="12" r="1.1"/><circle cx="10" cy="12" r="1.1"/></svg>';
 
-/** The properties a view may be grouped by (those of the types it groups by; every one where it names none) */
+/** The properties a view may be grouped by (those of the types it groups by; every one where it names none), none of a type whose values are no groups (files) */
 export function groupable(view: ViewDefinition, host: ViewHost): readonly Property[] {
   const groupBy = view.groupBy;
   if (groupBy === false) return [];
-  return host.database.properties.filter((one) => !groupBy?.types || groupBy.types.includes(host.type(one).name));
+  return host.database.properties.filter((one) => {
+    const type = host.type(one);
+    return type.groups !== false && (!groupBy?.types || groupBy.types.includes(type.name));
+  });
 }
 
 /**

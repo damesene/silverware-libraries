@@ -3,6 +3,7 @@
 // added again or taken off the items: what type their values look like, a
 // property's label from a key.
 import { isEmpty, type Params, type Value } from "../model/database.ts";
+import { areFiles } from "./types/files.ts";
 import { readReferences } from "./types/reference.ts";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -11,13 +12,16 @@ const URL_RE = /^https?:\/\/\S+$/;
 /**
  * The type a key's values look like, of those offered for a property of the
  * user's: every value logical a checkbox, a number a number, a date as ISO a
- * date, a web address a URL, links to pages references, a list of texts a
+ * date, a web address a URL, links to files (and addresses beside them)
+ * files, links to pages references, a list of texts a
  * select of several options; else a text. Its params where the type needs
  * some to read them (a select's `multiple`)
  */
 export function guessedType(values: readonly Value[]): { readonly type: string; readonly params?: Params } {
   const given = values.filter((one) => !isEmpty(one));
   const every = (test: (one: Value) => boolean) => given.length > 0 && given.every(test);
+  // (Files before references: a link to a file reads as a reference too)
+  if (areFiles(given)) return { type: "files" };
   if (every((one) => readReferences(one) !== undefined)) return { type: "reference" };
   if (every(Array.isArray)) return { type: "select", params: { multiple: true } };
   // (Lists among values of one: a text, nothing of them refused)

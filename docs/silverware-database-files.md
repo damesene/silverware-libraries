@@ -205,7 +205,13 @@ show over Assets' panel: checked in a UI test, the panel lifted where it must be
 3. **Assets' API**: `drawPreview`, `showFile`, `insertFiles`, `deleteFiles` (the write half split, *Inserted as* hidden, names without
    `[ ] @ # | < > $`), unit and UI tests in Assets. Done 2026-11-18: a single bracket is refused in every name Assets
    offers now (a page's insert too: no wiki link can name it), Assets' `ui-tests/api.spec.ts`.
-4. **The type and its value** (domain, `groups: false`, `custom.ts`), unit tests; offered in the properties' dialog.
+4. **The type and its value** (domain, `groups: false`, `custom.ts`), unit tests; offered in the properties' dialog. Done 2026-11-18:
+   `domain/types/files.ts` (`readFile`, `readFiles`, `writeFile`, `validateFileTarget`, `fileName`, `typedFiles`: a typed
+   text's links and addresses, a plain name refused as it may hold a comma), `domain/types/builtin/files.ts` (after
+   Reference), `groups: false` read by `groupable` alone (`groupedBy` takes from it), its icon a paperclip. Until steps 6
+   and 7 a value shows as its files' names and is edited as text. Links to files guessed as files, not references
+   (`namesFile`: an extension other than `.md`, as SilverBullet tells them; `areFiles`), for a key outside the schema
+   (`domain/loose.ts`) and a converter's links (`converters/infer.ts`).
 5. **`media` through the core** (`PlaceOptions`, `ViewHost`, `ModuleHost`, `EditorHost`), the binding's (Assets, the
    file listing in the init page) and the playground's; the fallbacks without Assets unit-tested (the UI tests' space
    has every plugin).

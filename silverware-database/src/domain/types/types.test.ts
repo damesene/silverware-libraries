@@ -19,7 +19,7 @@ describe("property keys", () => {
 
 describe("the built-in types", () => {
   it("are in their order, a day, a time and both side by side; tags and progress, the system properties' own, offered for no property of the user's", () => {
-    expect(types.all().map((one) => one.name)).toEqual(["text", "number", "checkbox", "date", "time", "datetime", "select", "person", "url", "reference", "tags", "progress"]);
+    expect(types.all().map((one) => one.name)).toEqual(["text", "number", "checkbox", "date", "time", "datetime", "select", "person", "url", "reference", "files", "tags", "progress"]);
     expect(types.all().filter((one) => one.offered === false).map((one) => one.name)).toEqual(["tags", "progress"]);
     // (Tags: labels, no options to check them against; a list of texts)
     const tags = type("tags");
@@ -167,7 +167,7 @@ describe("the registry", () => {
     const mine: PropertyType = { name: "date", label: "My date", validate: () => undefined, text: String, parse: (text) => ({ value: text }) };
     const stars: PropertyType = { name: "stars", label: "Stars", validate: () => undefined, text: String, parse: (text) => ({ value: text }) };
     registry.define([stars, mine]);
-    expect(registry.all().map((one) => one.label)).toEqual(["Text", "Number", "Checkbox", "My date", "Time", "Date & time", "Select", "Person", "URL", "Reference", "Tags", "Progress", "Stars"]);
+    expect(registry.all().map((one) => one.label)).toEqual(["Text", "Number", "Checkbox", "My date", "Time", "Date & time", "Select", "Person", "URL", "Reference", "Files & media", "Tags", "Progress", "Stars"]);
     registry.define([]);
     expect(registry.named("date")!.label).toBe("Date");
     expect(registry.named("stars")).toBeUndefined();

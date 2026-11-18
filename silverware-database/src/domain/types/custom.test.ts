@@ -40,6 +40,13 @@ describe("custom types", () => {
     // (Never one without the other: a box edited as text, or a value turned by a press shown as text with nothing to turn it)
     expect(validateType({ ...fine, editor: "toggle" })).toContain("go together");
     expect(validateType({ ...fine, editor: "select", look: "check" })).toContain("go together");
+    // (Files: their editor and their look together, a list's, never grouped by where it says so)
+    expect(validateType({ ...fine, editor: "files", look: "media", lists: true })).toBeUndefined();
+    expect(validateType({ ...fine, editor: "files", lists: true })).toContain("go together");
+    expect(validateType({ ...fine, editor: "files", look: "media" })).toContain("say lists: true");
+    expect(validateType({ ...fine, groups: true } as unknown as PropertyType)).toContain("groups is false or left out");
+    expect(guardedType({ ...fine, groups: false }, () => {}).groups).toBe(false);
+    expect(guardedType(fine, () => {}).groups).toBeUndefined();
   });
 
   it("tell a failure once per method, whatever its message, saying what was done", () => {

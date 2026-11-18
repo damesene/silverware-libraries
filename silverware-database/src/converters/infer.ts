@@ -6,6 +6,7 @@
 // date, a list a select of several options, else a text.
 import type { ConvertedProperty } from "../core/converter.ts";
 import { guessedType, optionsOfValues } from "../domain/loose.ts";
+import { namesFile } from "../domain/types/files.ts";
 import { readMoment } from "../domain/types/moment.ts";
 import type { Value } from "../model/database.ts";
 
@@ -47,13 +48,17 @@ export function inferProperty(key: string, label: string, read: ReadonlyMap<numb
       return multiple ? [...names] : (names[0] ?? null);
     });
   }
-  if (entries.every(([, one]) => one.kind === "links")) return made(property("reference"), (one) => (one.kind === "links" ? linksOf(one.targets) : null));
+  // (Links to files alone: files; to pages, or to both: references)
+  if (entries.every(([, one]) => one.kind === "links")) {
+    const files = entries.every(([, one]) => one.kind === "links" && one.targets.every(namesFile));
+    return made(property(files ? "files" : "reference"), (one) => (one.kind === "links" ? linksOf(one.targets) : null));
+  }
   const plain = entries.map(([, one]) => plainOf(one));
   // Days, a time to any: a date and time (which reads a day alone too)
   const moments = plain.map(momentOf);
   if (moments.every(Boolean) && moments.some((one) => one!.time !== undefined)) return made(property("datetime"), plainOf);
   const guessed = guessedType(plain);
-  if (guessed.type === "reference") return made(property("reference"), (one) => listOf(plainOf(one)));
+  if (guessed.type === "reference" || guessed.type === "files") return made(property(guessed.type), (one) => listOf(plainOf(one)));
   // Several values in any item (one in others too): a select of several options (values kept loose read so a text)
   if (plain.some(Array.isArray) && plain.every((one) => Array.isArray(one) || typeof one === "string" || typeof one === "number"))
     return made(property("select", { multiple: true, options: optionsOfValues(plain) }), (one) => listOf(plainOf(one)));

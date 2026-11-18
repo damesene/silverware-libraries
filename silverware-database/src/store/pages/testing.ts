@@ -19,6 +19,11 @@ export type MemoryPages = {
   writeOutside(page: string, text: string): void;
   /** A page removed outside the store, the index told */
   removeOutside(page: string): void;
+  /**
+   * The index's pass over a page that read it as `text` (before a write since: SilverBullet's index reads a page and is
+   * told of it later), told as it starts and whole
+   */
+  indexAs(page: string, text: string): void;
 };
 
 /** A page's index object as SilverBullet's index has it: its frontmatter's keys, its name and tags over them */
@@ -131,6 +136,11 @@ export function memoryPages(initial: Readonly<Record<string, string>> = {}, opti
     removeOutside: (page) => {
       pages.delete(page);
       changed(page);
+    },
+    indexAs: (page, text) => {
+      tell(page, true);
+      indexed.set(page, dated(page, text));
+      tell(page, false);
     },
   };
 }

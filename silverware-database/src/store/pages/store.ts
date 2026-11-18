@@ -102,6 +102,9 @@ type Held = {
   written?: boolean;
   told?: boolean;
   indexing?: boolean;
+  // The index's passes over the page to see through before one lets it go: written again before the index had the
+  // write before, the next pass told whole may have read that one (told of later than it read the page)
+  skips?: number;
 };
 
 // What a part wrote: the writer's report of its page, what the store had before, the making it went into
@@ -187,7 +190,12 @@ export class PagesStore implements DatabaseStore {
         held.told = true;
         // Started on the page after the write was done, then told whole: what the index has now is the page as it is
         if (held.written && change.early) held.indexing = true;
-        else if (held.indexing && !change.early) this.wrote.delete(change.document);
+        else if (held.indexing && !change.early) {
+          if (held.skips) {
+            held.skips -= 1;
+            held.indexing = false;
+          } else this.wrote.delete(change.document);
+        }
       }
       // (Its readers told once the index has the change whole: read early, they would read it without it)
       if (change.early) return;
@@ -627,7 +635,9 @@ export class PagesStore implements DatabaseStore {
     // The holds this write makes (another write of the page at once makes its own: each marks and puts back its own alone)
     const mine = new Map<string, Held>();
     if (planned.renamedTo !== undefined) mine.set(planned.page, { object: undefined, tags });
-    mine.set(to, part.after === undefined ? { object: undefined, tags } : { object: this.objectOf(part, to, planned.page), tags, facts: this.heldFactsOf(part, to, planned.page), ...(part.gone?.length ? { gone: part.gone } : {}) });
+    // (Written again before the index had the write before: its pass seen through, a query having this one lets it go)
+    const skips = held.get(to)?.written ? { skips: 1 } : {};
+    mine.set(to, part.after === undefined ? { object: undefined, tags, ...skips } : { object: this.objectOf(part, to, planned.page), tags, facts: this.heldFactsOf(part, to, planned.page), ...(part.gone?.length ? { gone: part.gone } : {}), ...skips });
     for (const [one, hold] of mine) this.wrote.set(one, hold);
     const report = await this.writer.apply(part.pagePlan);
     // (The write done: what the index starts on from now has it)
@@ -795,9 +805,17 @@ export class PagesStore implements DatabaseStore {
   }
 }
 
+/** A root page's properties in their order (their keys), none where it holds none */
+function propertyOrder(object: IndexedObject): string {
+  const properties = systemOf(object).properties;
+  return properties && typeof properties === "object" && !Array.isArray(properties) ? Object.keys(properties).join("\n") : "";
+}
+
 /** Whether the index has a page as the store wrote it: its own data and its values (its tags may be more), none of the keys it took off */
 function caughtUp(indexed: IndexedObject, mine: IndexedObject, gone: readonly string[] = []): boolean {
   if (stableText(systemOf(indexed)) !== stableText(systemOf(mine))) return false;
+  // (The properties' order too, which the text above sorts away: a property moved is a change of the order alone)
+  if (propertyOrder(indexed) !== propertyOrder(mine)) return false;
   if (gone.some((key) => key in indexed)) return false;
   // (The index's values in the model's form, as the store holds them: a list of numbers as texts, a map as its JSON)
   return Object.entries(mine).every(([key, value]) => key === "name" || key === "tags" || key === "_database" || stableText(modelValue(indexed[key])) === stableText(value));

@@ -463,6 +463,21 @@ describe("the pages store", () => {
     expect(memory.pages.get("db-tasks/Fix login")).toContain("note: keep me");
   });
 
+  it("keeps a page written twice as written last though the index's pass over the first write is told after the second", async () => {
+    const text = (key: string) => ({ key, label: key.toUpperCase(), type: "text" as const, params: {}, readonly: false });
+    const { memory, store } = harness([{ database: { id: "tasks", name: "Tasks", properties: ["a", "b", "c", "d"].map(text) }, items: [] }], { lagging: true });
+    const core = new DatabaseCore(store, new TypeRegistry(), { notify: () => {}, ask: () => true });
+    expect(await core.moveProperty("tasks", "a", 1)).not.toHaveProperty("problem");
+    const first = memory.pages.get("db-tasks")!;
+    expect(await core.moveProperty("tasks", "a", 2)).not.toHaveProperty("problem");
+    // (The index read the page after the first write, and tells of it after the second, as SilverBullet's may)
+    memory.indexAs("db-tasks", first);
+    expect((await store.database("tasks"))!.value.properties.map((one) => one.key)).toEqual(["b", "c", "a", "d"]);
+    expect(await core.moveProperty("tasks", "a", 3)).not.toHaveProperty("problem");
+    memory.catchUp();
+    expect((await store.database("tasks"))!.value.properties.map((one) => one.key)).toEqual(["b", "c", "d", "a"]);
+  });
+
   it("shows what it wrote where the index tells of the page before a query has it, as SilverBullet's does", async () => {
     const { memory, store } = harness(SEED, { lagging: true, toldEarly: true });
     const told: string[] = [];

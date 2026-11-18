@@ -51,6 +51,15 @@ export class SelectionWatcher {
     clearTimeout(this.caretTimer);
   }
 
+  /**
+   * The selection waited for told not (the toolbar hidden by Esc): one the focus brought back a moment before (a popup
+   * closed) would show the toolbar again after it; told again once it changes
+   */
+  dismiss(): void {
+    clearTimeout(this.timer);
+    clearTimeout(this.caretTimer);
+  }
+
   /** The selection in the page's text now, if there is one (not collapsed) */
   current(): Range | undefined {
     const range = this.selection();

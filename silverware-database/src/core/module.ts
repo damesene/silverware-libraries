@@ -40,7 +40,10 @@ export type OpenedFrom = {
 export type PlaceContext = {
   readonly document: Document;
   readonly database: Database;
-  /** Whether the place is shown over the whole window (the place lays itself so: its box, Esc ending it) */
+  /**
+   * Whether the place is shown over the whole window (the place lays itself so: its box, Esc ending it): as it is now,
+   * read as a tool drawn before is pressed too (Esc ended it, the tools not yet drawn anew)
+   */
   readonly overWindow: boolean;
   /** The place shown over the whole window, or back in its document */
   setOverWindow(on: boolean): void;

@@ -1,7 +1,7 @@
 ---
 name: Library/damesene/silverware-assets
 tags: meta/library
-version: 1.0.1
+version: 1.0.2
 description: "Silverware Assets: embedded files shown full, as a preview or as a card (a zip or a document too), a link to a file with its icon and a menu, a file opened in a side panel or enlarged, a link turned into an embed and back."
 files:
 - silverware-assets.js

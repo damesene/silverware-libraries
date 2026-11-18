@@ -23,7 +23,8 @@ test("a value's files: a table's cell draws three and counts the rest, a press o
   // (Each image itself, fitted in the line: no higher than it)
   const image = buttons.first().locator("img");
   await expect(image).toHaveAttribute("src", /files\/a\.png$/);
-  await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.style.height)).toBe("28px");
+  await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && !!img.style.height)).toBe(true);
+  expect(Math.round((await image.boundingBox())!.height)).toBe(28);
   expect((await cell.locator(".swd-media-strip").boundingBox())!.height).toBeLessThanOrEqual(28.5);
   // A file pressed: in Silverware Assets' side panel, the cell not edited
   await buttons.nth(1).click();
@@ -33,16 +34,15 @@ test("a value's files: a table's cell draws three and counts the rest, a press o
   await expect(page.locator(".swd-floated")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.locator(".swa-side-panel")).toHaveCount(0);
-  // The peek: every file, larger, a pencil after them to edit the value
+  // The peek: as a table's row (small, side by side, the rest counted), a pencil after them to edit the value
   await page.locator(".swd-table tbody tr", { hasText: "Holiday" }).locator(".swd-open").click();
   const row = page.locator('.swd-peek .swd-peek-value[data-key="photos"]');
-  await expect(row.locator(".swd-media-button")).toHaveCount(4);
-  await expect(row.locator(".swd-media-more")).toHaveCount(0);
+  await expect(row.locator(".swd-media-button")).toHaveCount(3);
+  await expect(row.locator(".swd-media-more")).toHaveText("+1");
   await expect(row.locator(".swd-peek-edit")).toHaveCount(1);
-  const large = row.locator(".swd-media-button").first().locator("img");
-  await expect.poll(() => large.evaluate((img: HTMLImageElement) => img.complete && img.style.height)).toBe("180px");
-  // (A file that is no image: its icon and name, or its preview where a type keeps one)
-  await expect(row.locator(".swd-media-button").nth(3)).toHaveAttribute("aria-label", "Open report.pdf");
+  const small = row.locator(".swd-media-button").first().locator("img");
+  await expect.poll(() => small.evaluate((img: HTMLImageElement) => img.complete && !!img.style.height)).toBe(true);
+  expect(Math.round((await small.boundingBox())!.height)).toBe(28);
   // A press on a file there opens it too, the peek kept
   await row.locator(".swd-media-button").nth(2).click();
   await expect(page.locator(".swa-side-panel .swa-panel-title")).toHaveText("c.png");
@@ -52,10 +52,13 @@ test("a value's files: a table's cell draws three and counts the rest, a press o
   await page.keyboard.press("Escape");
   await expect(page.locator(".swa-side-panel")).toHaveCount(0);
   await row.locator(".swd-peek-edit").click();
-  await expect(row.locator(".swd-editor-files .swd-files-name")).toHaveText(names);
+  await expect(row.locator(".swd-editor-files .swd-files-row")).toHaveCount(names.length);
+  // (Laid over the page, not cut by the properties' box: its Upload in view)
+  await expect(page.locator(".swd-editor-files.swd-floated")).toHaveCount(1);
+  await expect(page.locator(".swd-editor-files .swd-files-upload")).toBeInViewport({ ratio: 1 });
   await row.locator(".swd-editor-files .swd-editor-search").press("Escape");
   await expect(row.locator(".swd-editor-files")).toHaveCount(0);
-  await expect(row.locator(".swd-media-button")).toHaveCount(4);
+  await expect(row.locator(".swd-media-more")).toHaveText("+1");
 });
 
 test("a value's files edited in its popup: one taken out, one dragged by its grip, one found in the space, one uploaded through Silverware Assets into the database's folder", async ({ page, space }) => {
@@ -71,14 +74,26 @@ test("a value's files edited in its popup: one taken out, one dragged by its gri
   const box = (await cell.boundingBox())!;
   await page.mouse.click(box.x + box.width - 4, box.y + box.height / 2);
   const popup = page.locator(".swd-editor-files");
-  const rows = popup.locator(".swd-files-name");
-  await expect(rows).toHaveText(["a.png", "b.png", "c.png"]);
+  const rows = popup.locator(".swd-files-row");
+  const shown = () => rows.evaluateAll((all) => all.map((one) => (one as HTMLElement).title));
+  await expect.poll(shown).toEqual(["a.png", "b.png", "c.png"]);
   await expect(popup.locator(".swd-editor-search")).toBeFocused();
+  // A file's menu: another's opened closes it; its ⋯ pressed again closes it alone, the popup kept
+  await popup.getByRole("button", { name: "a.png: its menu" }).click();
+  await popup.getByRole("button", { name: "c.png: its menu" }).click();
+  await expect(popup.locator(".swd-files-menu:visible")).toHaveCount(1);
+  // (Whole in the window: placed by the script within it)
+  await expect(popup.locator(".swd-files-menu:visible")).toBeInViewport({ ratio: 1 });
+  await popup.getByRole("button", { name: "c.png: its menu" }).click();
+  await expect(popup.locator(".swd-files-menu:visible")).toHaveCount(0);
+  await expect(popup).toBeVisible();
+  await popup.getByRole("button", { name: "b.png: its menu" }).click();
+  await expect(popup.getByRole("menuitem", { name: "Download" })).toHaveAttribute("download", "b.png");
   await popup.getByRole("button", { name: "Take b.png out" }).click();
-  await expect(rows).toHaveText(["a.png", "c.png"]);
-  // (A press on a file's name, in it but on no control: still open)
-  await rows.first().click();
-  await expect(rows).toHaveText(["a.png", "c.png"]);
+  await expect.poll(shown).toEqual(["a.png", "c.png"]);
+  // (A press on a file, in it but on no control: still open)
+  await rows.first().locator(".swd-media").click();
+  await expect.poll(shown).toEqual(["a.png", "c.png"]);
   // c.png dragged by its grip above a.png (measured once its row has its height: its image loaded and sized)
   await expect.poll(() => popup.locator(".swd-files-row img").evaluateAll((images) => images.every((one) => (one as HTMLImageElement).complete && !!(one as HTMLImageElement).style.height))).toBe(true);
   const grip = (await popup.getByRole("button", { name: /^Move c\.png/ }).boundingBox())!;
@@ -87,11 +102,11 @@ test("a value's files edited in its popup: one taken out, one dragged by its gri
   await page.mouse.down();
   await page.mouse.move(grip.x + grip.width / 2, first.y + 4, { steps: 8 });
   await page.mouse.up();
-  await expect(rows).toHaveText(["c.png", "a.png"]);
+  await expect.poll(shown).toEqual(["c.png", "a.png"]);
   // Found in the space by words of its name
   await popup.locator(".swd-editor-search").fill("elsewhere sunrise");
   await popup.getByRole("button", { name: "Add sunrise.png" }).click();
-  await expect(rows).toHaveText(["c.png", "a.png", "sunrise.png"]);
+  await expect.poll(shown).toEqual(["c.png", "a.png", "sunrise.png"]);
   // Uploaded: Silverware Assets' dialog, its name alone asked, the file written into the database's folder of files
   const chooser = page.waitForEvent("filechooser");
   await popup.getByRole("button", { name: "Upload…" }).click();
@@ -102,7 +117,7 @@ test("a value's files edited in its popup: one taken out, one dragged by its gri
   await expect(dialog.locator(".swa-insert-path")).toHaveValue(`${space.folder}/Page/db-files/files/beach.png`);
   await expect(dialog.locator(".swa-insert-choices:visible")).toHaveCount(0);
   await dialog.getByRole("button", { name: "Insert" }).click();
-  await expect(rows).toHaveText(["c.png", "a.png", "sunrise.png", "beach.png"]);
+  await expect.poll(shown).toEqual(["c.png", "a.png", "sunrise.png", "beach.png"]);
   // Left: written as listed, each a link
   await page.keyboard.press("Tab");
   await page.locator(".swd-table thead").click();
@@ -162,12 +177,12 @@ test("files dropped or pasted on a value of files: Silverware Assets' dialog of 
   // Pasted on the peek's row focused
   await page.locator(".swd-table tbody tr", { hasText: "Holiday" }).locator(".swd-open").click();
   const row = page.locator('.swd-peek .swd-peek-value[data-key="photos"]');
-  await expect(row.locator(".swd-media-button")).toHaveCount(4);
+  await expect(row.locator(".swd-media-more")).toHaveText("+1");
   await row.focus();
   await give(row, ["peek.png"], "paste");
   await insert("peek.png");
   await expect.poll(() => space.saved("Page/db-files/Holiday")).toContain(saved("dropped.png", "pasted.png", "card.png", "peek.png"));
-  await expect(row.locator(".swd-media-button")).toHaveCount(5);
+  await expect(row.locator(".swd-media-more")).toHaveText("+2");
   // The page as it was: no file put in it, by Silverware Assets nor by SilverBullet
   expect(await space.saved("Page")).toBe(text);
 });
@@ -178,13 +193,13 @@ test("files dropped on the files' popup: added to its list, written as it is lef
   const box = (await cell.boundingBox())!;
   await page.mouse.click(box.x + box.width - 4, box.y + box.height / 2);
   const popup = page.locator(".swd-editor-files");
-  await expect(popup.locator(".swd-files-name")).toHaveText(["a.png"]);
+  await expect(popup.locator(".swd-files-row")).toHaveAttribute("title", "a.png");
   await give(popup, ["dropped.png"], "drop");
   const dialog = page.locator(".swa-dialog.swa-insert-window");
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Insert" }).click();
   // (The popup kept open under the dialog: its companion)
-  await expect(popup.locator(".swd-files-name")).toHaveText(["a.png", "dropped.png"]);
+  await expect.poll(() => popup.locator(".swd-files-row").evaluateAll((all) => all.map((one) => (one as HTMLElement).title))).toEqual(["a.png", "dropped.png"]);
   await page.locator(".swd-table thead").click();
   await expect(popup).toHaveCount(0);
   await expect.poll(() => space.saved("Page/db-files/Holiday")).toContain(`  - "[[${space.folder}/Page/db-files/files/dropped.png]]"`);
@@ -280,6 +295,63 @@ test("a database deleted with its files where ticked in its dialog", async ({ pa
   expect(space.hasFile("Page/db-files/files/more.png")).toBe(false);
   // (A file it linked outside its folder kept)
   expect(space.hasFile("files/a.png")).toBe(true);
+});
+
+test("files zoom with the content (Silverware Layout's font zoom with files): a cell's line, its images and a card's cover twice as large at twice the zoom", async ({ page, space }) => {
+  const root = ROOT.replace("    photos:", "    status: { type: select, label: Status, options: [Todo] }\n    photos:");
+  const card = withFiles(space.folder, "a0", ["a.png", "report.pdf"]).replace("photos:", "status: Todo\nphotos:");
+  await space.open(
+    { Page: "# Page\n\n```silverware-database\nid: files\nview: table\n```\n\n```silverware-database\nid: files\nview: board\nboard.cardPreview: photos\n```\n", "Page/db-files": root, "Page/db-files/Holiday": card },
+    "Page",
+    { "files/a.png": PNG, "files/report.pdf": "%PDF-1.4\n" },
+  );
+  const cell = page.locator(".swd-table tbody tr", { hasText: "Holiday" }).locator('td[data-key="photos"]');
+  const image = cell.locator(".swd-media-button img");
+  const cover = page.locator(".swd-board-cover img");
+  await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && !!img.style.height)).toBe(true);
+  await expect.poll(() => cover.evaluate((img: HTMLImageElement) => img.complete && !!img.style.height)).toBe(true);
+  const sizes = async () => ({
+    strip: Math.round((await cell.locator(".swd-media-strip").boundingBox())!.height),
+    image: Math.round((await image.boundingBox())!.height),
+    file: Math.round((await cell.locator('[data-swd-media="file"]').boundingBox())!.height),
+    cover: Math.round((await cover.boundingBox())!.height),
+  });
+  const before = await sizes();
+  expect([before.strip, before.image, before.cover]).toEqual([28, 28, 160]);
+  // (The scale Silverware Layout sets on the root as the font is zoomed, files following it: nothing drawn again)
+  await page.evaluate(() => document.documentElement.style.setProperty("--sw-content-scale", "2"));
+  expect(before.file).toBe(24);
+  await expect.poll(sizes).toEqual({ strip: 56, image: 56, file: 48, cover: 320 });
+  await page.evaluate(() => document.documentElement.style.removeProperty("--sw-content-scale"));
+  await expect.poll(sizes).toEqual(before);
+});
+
+test("a large image in the files' popup held in its box while it loads, not drawn at its own size first", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: files\nview: table\n```\n", "Page/db-files": ROOT, "Page/db-files/Holiday": withFiles(space.folder, "a0", ["big.png"]) }, "Page", { "files/big.png": PNG });
+  // (A photo of 2000 × 1500 px whose data comes slowly: its size known from the first, its pixels held back)
+  const big = await page.evaluate(async () => {
+    const canvas = Object.assign(document.createElement("canvas"), { width: 2000, height: 1500 });
+    const blob = await new Promise<Blob>((done) => canvas.toBlob((made) => done(made!), "image/png"));
+    return [...new Uint8Array(await blob.arrayBuffer())];
+  });
+  let release!: () => void;
+  const held = new Promise<void>((done) => (release = done));
+  await page.route(/\/big\.png(\?.*)?$/, async (route) => {
+    await held;
+    await route.fulfill({ status: 200, contentType: "image/png", body: Buffer.from(big) });
+  });
+  const cell = page.locator(".swd-table tbody tr", { hasText: "Holiday" }).locator('td[data-key="photos"]');
+  const box = (await cell.boundingBox())!;
+  await page.mouse.click(box.x + box.width - 4, box.y + box.height / 2);
+  const image = page.locator(".swd-editor-files .swd-files-row img");
+  await expect(image).toHaveCount(1);
+  // While it loads: within its box (150 × 150) by the style page alone
+  const loading = await image.evaluate((img: HTMLImageElement) => ({ complete: img.complete, sized: img.style.height, maxWidth: getComputedStyle(img).maxWidth, maxHeight: getComputedStyle(img).maxHeight }));
+  expect(loading).toEqual({ complete: false, sized: "", maxWidth: "150px", maxHeight: "150px" });
+  release();
+  await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && !!img.style.height)).toBe(true);
+  const loaded = (await image.boundingBox())!;
+  expect([Math.round(loaded.width), Math.round(loaded.height)]).toEqual([150, 113]);
 });
 
 test("a board's card narrower than its files: they shrink, their names cut, the rest's count whole within the card", async ({ page, space }) => {

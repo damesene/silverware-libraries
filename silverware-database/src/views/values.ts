@@ -5,6 +5,7 @@
 // its type's text. The colors are the style page's, read from SilverBullet's own
 // so they follow its light and dark looks.
 import { el } from "../../../shared/elements.ts";
+import { scaledPx } from "../../../shared/contentscale.ts";
 import { wholePercent } from "../domain/types/builtin/progress.ts";
 import { fullAddress, isOpenable, prettyUrl, readLink } from "../domain/types/link.ts";
 import { pathOf } from "../domain/folders.ts";
@@ -264,7 +265,10 @@ function filesNode(doc: Document, media: Media, files: readonly FileEntry[], siz
     return button;
   });
   const more = rest.length ? [el(doc, "span", { class: "swd-media-more", text: `+${rest.length}`, title: rest.map(fileName).join(", ") })] : [];
-  return el(doc, "span", { class: `swd-media-strip swd-media-${size}` }, ...buttons, ...more);
+  const strip = el(doc, "span", { class: `swd-media-strip swd-media-${size}` }, ...buttons, ...more);
+  // (A small line as high as its files' box, zoomed with the content as they are)
+  strip.style.setProperty("--swd-media-height", scaledPx(FILE_BOXES[size].height));
+  return strip;
 }
 
 /**

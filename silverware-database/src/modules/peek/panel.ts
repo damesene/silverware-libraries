@@ -673,7 +673,7 @@ export class PeekPanel {
     const show = () => {
       const now = shown.item;
       if (editor.type(property).look === "check") return void value.replaceChildren(el(doc, "span", { class: `swd-peek-check${now.values[property.key] === true ? " swd-on" : ""}`, html: now.values[property.key] === true ? typeIcon("checkbox") : "", attrs: { "aria-label": now.values[property.key] === true ? "Yes" : "No" } }));
-      const shownNodes = valueNodes(editor, now, property, { files: "large" });
+      const shownNodes = valueNodes(editor, now, property, { files: "small" });
       const lacking = missing(editor, now, property);
       // A value drawn as a link or as files takes its press, so a pencil after it edits it whatever room is left beside it:
       // only a pointer's way, the value itself being the button the keys edit (Enter, F2), its press reaching it

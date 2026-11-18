@@ -1561,7 +1561,7 @@ tr:focus-within .swd-open {
 .swd-board-cover .swd-media {
   max-width: 100%;
 }
-.swd-board-cover img {
+.swd-board-cover .swd-media img {
   max-width: 100%;
   object-fit: cover;
   border-radius: 0;
@@ -3156,9 +3156,11 @@ tr:focus-within .swd-open {
   opacity: 0.7;
 }
 /* Files (Files & media): side by side, each a button opening it. A small line of a fixed height (a table's cell, a list's
-   row, a card's line), the rest counted; a large one (the peek's row) wrapping. An image sized by the script once
-   loaded (fitted in its box, cropped to its middle where too narrow or too low); another file its preview, else its
-   icon and name */
+   row, a card's line), the rest counted; a large one (the peek's row) wrapping. Each file in its box, whose size the
+   script sets on it as variables (`--swd-media-width`, `--swd-media-height`), times the content's zoom
+   (`--sw-content-scale`, Silverware Layout's: files zoom with the text); an image held in it from the first (a large one
+   drawn before it has loaded), then sized by the script once loaded (fitted in its box, cropped to its middle where too
+   narrow or too low); another file its preview, else its icon and name */
 .swd-media-strip {
   display: inline-flex;
   align-items: center;
@@ -3167,7 +3169,7 @@ tr:focus-within .swd-open {
   vertical-align: middle;
 }
 .swd-media-strip.swd-media-small {
-  height: 28px;
+  height: var(--swd-media-height);
   overflow: hidden;
 }
 .swd-media-strip.swd-media-large {
@@ -3206,19 +3208,15 @@ tr:focus-within .swd-open {
 .swd-media {
   display: inline-flex;
   align-items: center;
-  max-width: 100%;
+  max-width: min(100%, var(--swd-media-width, 100%));
+  max-height: var(--swd-media-height, none);
 }
 .swd-media img {
   display: block;
+  max-width: var(--swd-media-width);
+  max-height: var(--swd-media-height);
+  object-fit: contain;
   border-radius: 3px;
-}
-.swd-media-small .swd-media {
-  max-width: 84px;
-  max-height: 28px;
-}
-.swd-media-large .swd-media {
-  max-width: 240px;
-  max-height: 180px;
 }
 /* A file not drawn: its icon and name, a quiet pill */
 .swd-media[data-swd-media="file"] {
@@ -3229,7 +3227,8 @@ tr:focus-within .swd-open {
   background: var(--swd-surface);
 }
 .swd-media-small .swd-media[data-swd-media="file"] {
-  height: 24px;
+  /* (Within its line's box, as much of it at any zoom: 24px of 28 at none) */
+  height: calc(var(--swd-media-height) * 6 / 7);
   box-sizing: border-box;
   font-size: 0.85em;
 }
@@ -3238,9 +3237,10 @@ tr:focus-within .swd-open {
   flex: none;
   color: var(--swd-quiet);
 }
+/* (As large as the name beside it: zoomed with the text) */
 .swd-media-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 1.15em;
+  height: 1.15em;
 }
 .swd-media-name {
   overflow: hidden;
@@ -3250,7 +3250,11 @@ tr:focus-within .swd-open {
 .swd-media-button:hover .swd-media[data-swd-media="file"] {
   background: var(--swd-hover);
 }
-/* A preview of another plugin's: as large as its box lets it */
+/* A preview of another plugin's: as large as its box lets it, cut at its right where it is wider (a document's) */
+.swd-media[data-swd-media="preview"] {
+  justify-content: flex-start;
+  overflow: hidden;
+}
 .swd-media[data-swd-media="preview"] > * {
   max-width: 100%;
   max-height: 100%;
@@ -3350,14 +3354,20 @@ button.swd-editor-document-folder:hover,
 /* Files' editor: its files a row each (a grip, the file drawn, its name, ×), scrolled where many; a search of the space's
    files under them, those found a button each (its name, its folder under it), Upload last */
 .swd-editor-files {
+  /* (Its height cut to the room it has: its list alone scrolls, the field always in view) */
+  overflow: hidden;
   gap: 6px;
-  width: min(26em, 90vw);
+  width: min(22em, 90vw);
+  font-size: 0.9em;
 }
 .swd-files-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: min(60vh, 40em);
+  /* (Room left under it for the field, Upload and what is found: a phone's screen too) */
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(40vh, 30em);
   overflow-y: auto;
 }
 .swd-files-list:empty {
@@ -3365,7 +3375,8 @@ button.swd-editor-document-folder:hover,
 }
 .swd-files-row {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto auto;
+  justify-content: start;
   gap: 6px;
   align-items: center;
   padding: 2px;
@@ -3374,17 +3385,13 @@ button.swd-editor-document-folder:hover,
 .swd-files-row:hover {
   background: var(--swd-hover);
 }
-.swd-files-row .swd-media {
-  max-width: 240px;
-  max-height: 180px;
-}
 .swd-files-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .swd-files-grip,
-.swd-files-remove {
+.swd-files-more {
   display: inline-flex;
   padding: 3px;
   border: 0;
@@ -3397,19 +3404,89 @@ button.swd-editor-document-folder:hover,
   cursor: grab;
   touch-action: none;
 }
-.swd-files-grip svg,
-.swd-files-remove svg {
+.swd-files-grip svg {
   width: 14px;
   height: 14px;
 }
+/* A file's menu: by its ⋯ (beside the file), over everything, the script placing it within the window */
+.swd-files-menu-box {
+  position: relative;
+}
+.swd-files-menu {
+  position: fixed;
+  z-index: var(--sw-layer-dialog);
+  display: flex;
+  flex-direction: column;
+  min-width: 10em;
+  padding: 4px;
+  border: 1px solid var(--swd-line);
+  border-radius: 6px;
+  background: var(--root-background-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.swd-files-menu[hidden] {
+  display: none;
+}
+.swd-files-menu > * {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.swd-files-menu > :hover,
+.swd-files-menu > :focus-visible {
+  background: var(--swd-hover);
+}
 .swd-files-grip:hover,
-.swd-files-remove:hover {
+.swd-files-more:hover {
   background: color-mix(in srgb, currentColor 12%, transparent);
   color: var(--root-color, currentColor);
+}
+/* The field adding a file, Upload beside it; those found under them, a line each, cut where long */
+.swd-files-add {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.swd-files-add .swd-editor-search {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+}
+.swd-files-upload {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--swd-line);
+  border-radius: 4px;
+  background: var(--swd-surface);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.swd-files-upload:hover:not(:disabled) {
+  background: var(--swd-hover);
+}
+.swd-files-upload:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.swd-files-found {
+  max-height: 12em;
+  overflow-x: hidden;
+}
+.swd-files-found[hidden] {
+  display: none;
 }
 .swd-files-found-item {
   display: grid;
   justify-items: start;
+  width: 100%;
+  min-width: 0;
   padding: 3px 6px;
   border: 0;
   border-radius: 4px;
@@ -3426,9 +3503,11 @@ button.swd-editor-document-folder:hover,
 .swd-files-found-item .swd-editor-document-folder {
   grid-column: 1;
 }
-.swd-files-actions {
-  display: flex;
-  justify-content: flex-end;
+.swd-files-found-item > * {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .swd-editor-new {
   color: var(--swd-quiet);
@@ -4302,7 +4381,8 @@ button.swd-peek-label:hover {
 }
 /* An editor of choices in the peek (a select's boxes, references, a link's fields): in its row, not over it (a panel over
    the properties' box was cut by its edge), as narrow as the row is (a phone's), framed as a field rather than lifted */
-.swd-peek-value > .swd-editor-choices {
+/* (The files' popup not: laid over the page, as in a table, not cut by the properties' box) */
+.swd-peek-value > .swd-editor-choices:not(.swd-editor-files) {
   position: static;
   width: 100%;
   min-width: 0;

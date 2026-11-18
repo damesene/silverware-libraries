@@ -2,6 +2,7 @@
 // for the views' host and the modules' alike, as the platform gives them (`MediaSource`, the binding's: Silverware
 // Assets where it is installed, else the platform's own). Made once by the core from what the host gives; a host
 // without it has none (a value of files then shows as their names).
+import { scaledPx } from "../../../shared/contentscale.ts";
 import { el } from "../../../shared/elements.ts";
 import type { Awaitable, UserInterface } from "../../../shared/platform.ts";
 import { fileName, isImageTarget, isWebTarget } from "../domain/types/files.ts";
@@ -48,6 +49,8 @@ export type Media = {
   draw(target: string, box: MediaBox): HTMLElement;
   /** A file opened (none where the platform opens none) */
   open(target: string): void;
+  /** The address a file is loaded from (an address of the web as it is), none where it has none */
+  url(target: string): string | undefined;
   /** The space's files (none where the platform lists none) */
   files(): Promise<readonly string[]>;
   /**
@@ -87,6 +90,9 @@ export function mediaHost(source: MediaSource | undefined, store: Pick<DatabaseS
       const web = isWebTarget(target);
       const name = fileName({ target, web });
       const element = el(doc, "span", { class: "swd-media", title: name, attrs: { "data-swd-media": "file" } });
+      // (Its box as the style page reads it, zoomed with the content: an image held in it before it has loaded too)
+      element.style.setProperty("--swd-media-width", scaledPx(box.width));
+      element.style.setProperty("--swd-media-height", scaledPx(box.height));
       const src = isImageTarget(target) ? (web ? target : source.url?.(target)) : undefined;
       if (src) {
         element.dataset.swdMedia = "image";
@@ -121,6 +127,7 @@ export function mediaHost(source: MediaSource | undefined, store: Pick<DatabaseS
         said(`"${target}" could not be opened`, error);
       }
     },
+    url: (target) => (isWebTarget(target) ? target : source.url?.(target)),
     files: async () => {
       try {
         return (await source.files?.()) ?? [];
@@ -164,11 +171,11 @@ export function fittedSize(natural: { readonly width: number; readonly height: n
   return width < height ? { width: Math.min(box.min, box.width), height: box.height, cropped: true } : { width: box.width, height: Math.min(box.min, box.height), cropped: true };
 }
 
-/** An image loaded given its size in its box (`data-swd-cropped` where it covers it, its middle shown) */
+/** An image loaded given its size in its box, zoomed with the content (`data-swd-cropped` where it covers it, its middle shown) */
 function fitImage(image: HTMLImageElement, box: MediaBox): void {
   const size = fittedSize({ width: image.naturalWidth, height: image.naturalHeight }, box);
-  image.style.width = `${size.width}px`;
-  image.style.height = `${size.height}px`;
+  image.style.width = scaledPx(size.width);
+  image.style.height = scaledPx(size.height);
   image.style.objectFit = size.cropped ? "cover" : "";
   image.toggleAttribute("data-swd-cropped", size.cropped);
 }

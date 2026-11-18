@@ -18,6 +18,7 @@ function setup(options: { readonly media?: boolean; readonly upload?: () => Prom
   const media: Media = {
     draw: (target) => Object.assign(document.createElement("span"), { className: "swd-media", textContent: target }),
     open: () => undefined,
+    url: (target) => `.fs/${target}`,
     files: async () => ["Photos/sunset.jpg", "Photos/sunrise.jpg", "Docs/report.pdf", "Docs/a@2x.png"],
     ...(options.upload ? { upload: (database: string) => (uploads.push(database), options.upload!()) } : {}),
   };
@@ -35,7 +36,7 @@ function setup(options: { readonly media?: boolean; readonly upload?: () => Prom
   let shown = 0;
   const edit = (value?: unknown) => editValue(host, cell, item(value), "photos", () => void shown++);
   const panel = () => document.querySelector<HTMLElement>(".swd-editor-files")!;
-  const names = () => [...panel().querySelectorAll(".swd-files-name")].map((one) => one.textContent);
+  const names = () => [...panel().querySelectorAll<HTMLElement>(".swd-files-row")].map((one) => one.title);
   const search = () => panel().querySelector<HTMLInputElement>(".swd-editor-search")!;
   const type = async (text: string) => {
     search().value = text;

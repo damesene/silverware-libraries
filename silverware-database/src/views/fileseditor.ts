@@ -12,13 +12,13 @@ import { el } from "../../../shared/elements.ts";
 import type { Media } from "../core/media.ts";
 import { folderSearch, foundBy } from "../domain/folders.ts";
 import { type FileEntry, fileName, readFile, validateFileTarget, writeFile } from "../domain/types/files.ts";
-import { VIEW_ICONS } from "./icons.ts";
-import { FILE_BOXES } from "./values.ts";
 import { takeFiles } from "./takefiles.ts";
 import type { GivenFiles } from "../core/media.ts";
 
 // A grip: six dots
 const GRIP = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><circle cx="6" cy="4" r="1.1"/><circle cx="10" cy="4" r="1.1"/><circle cx="6" cy="8" r="1.1"/><circle cx="10" cy="8" r="1.1"/><circle cx="6" cy="12" r="1.1"/><circle cx="10" cy="12" r="1.1"/></svg>';
+// Each file's box in the popup (px): its longer side at most 150
+const ROW_BOX = { width: 150, height: 150, min: 60 };
 // The files a search shows at most: more are found by typing more of a name
 const SHOWN_FILES = 50;
 // What the space's paths are split into folders by
@@ -51,6 +51,15 @@ export function filesEditor(cell: HTMLElement, editing: FilesEditing, float: (pa
   // A file being dragged by its grip: the row moves in the document as it goes, which takes the focus from its grip (not
   // the popup left)
   let dragging = false;
+  // The one file's menu open (one at a time): closed, the focus back on its ⋯
+  let menuOpen: { readonly items: HTMLElement; readonly more: HTMLElement } | undefined;
+  const closeMenu = (focus: boolean) => {
+    const open = menuOpen;
+    if (!open) return;
+    menuOpen = undefined;
+    open.items.hidden = true;
+    if (focus && open.more.isConnected) open.more.focus({ preventScroll: true });
+  };
   const list = el(doc, "div", { class: "swd-files-list", attrs: { role: "list", "aria-label": label } });
   const search = el(doc, "input", { class: "swd-editor-search", attrs: { type: "text", placeholder: media ? "Find a file, or type an address…" : "Type an address (https://…)", "aria-label": `Add to ${label}` } });
   const found = el(doc, "div", { class: "swd-editor-list swd-files-found", attrs: { role: "group", "aria-label": "Files found" } });
@@ -60,7 +69,8 @@ export function filesEditor(cell: HTMLElement, editing: FilesEditing, float: (pa
     upload.disabled = true;
     upload.title = "Uploading needs Silverware Assets";
   }
-  const panel = el(doc, "div", { class: "swd-editor swd-editor-choices swd-editor-files", attrs: { tabindex: "-1" } }, list, search, found, note, el(doc, "div", "swd-files-actions", upload));
+  // (The field and Upload side by side, those found and what is said under them)
+  const panel = el(doc, "div", { class: "swd-editor swd-editor-choices swd-editor-files", attrs: { tabindex: "-1" } }, list, el(doc, "div", "swd-files-add", search, upload), found, note);
   const written = () => files.map((one) => one.written);
   const finish = () => {
     if (finished) return;
@@ -97,14 +107,42 @@ export function filesEditor(cell: HTMLElement, editing: FilesEditing, float: (pa
       ...files.map((file, at) => {
         const name = fileName(file);
         const grip = el(doc, "button", { class: "swd-files-grip", html: GRIP, title: "Drag to move (Alt+↑ ↓)", attrs: { type: "button", "aria-label": `Move ${name} (Alt+↑ ↓)` } });
-        const remove = el(doc, "button", { class: "swd-files-remove", html: VIEW_ICONS.close, title: `Take ${name} out`, attrs: { type: "button", "aria-label": `Take ${name} out` } });
-        const row = el(doc, "div", { class: "swd-files-row", attrs: { role: "listitem", title: file.target } }, grip, media ? media.draw(file.target, FILE_BOXES.large) : el(doc, "span"), el(doc, "span", { class: "swd-files-name", text: name }), remove);
+        // Its menu: the file opened in a tab, downloaded, or taken out of the value (the file stays in the space)
+        const url = media?.url(file.target);
+        const remove = el(doc, "button", { class: "swd-files-remove", text: "Remove", attrs: { type: "button", "aria-label": `Take ${name} out` } });
+        const items = el(
+          doc,
+          "div",
+          { class: "swd-files-menu", attrs: { role: "menu", hidden: "" } },
+          ...(url
+            ? [
+                el(doc, "button", { text: "View original", attrs: { type: "button", role: "menuitem" }, run: () => void doc.defaultView?.open(url, "_blank", "noopener") }),
+                el(doc, "a", { text: "Download", attrs: { href: url, download: name, role: "menuitem" } }),
+              ]
+            : []),
+          remove,
+        );
+        const more = el(doc, "button", { class: "swd-files-more", text: "⋯", title: `${name}: its menu`, attrs: { type: "button", "aria-label": `${name}: its menu`, "aria-haspopup": "menu" } });
+        // (Pressed again: closed, the focus kept on it, not lost with the menu hidden, which left the popup)
+        more.addEventListener("click", () => {
+          const was = menuOpen?.items === items;
+          closeMenu(was);
+          if (was) return;
+          items.hidden = false;
+          placeMenu(items, more);
+          menuOpen = { items, more };
+          items.querySelector<HTMLElement>("button, a")?.focus({ preventScroll: true });
+        });
+        // (An item chosen: the menu closed)
+        items.addEventListener("click", () => closeMenu(false));
+        // (Its ⋯ beside the file, its menu opening under it)
+        const row = el(doc, "div", { class: "swd-files-row", attrs: { role: "listitem", title: name } }, grip, media ? media.draw(file.target, ROW_BOX) : el(doc, "span", { class: "swd-files-name", text: name }), el(doc, "span", "swd-files-menu-box", more, items));
         remove.addEventListener("click", () => {
           files.splice(at, 1);
           drawList();
           drawFound();
           // (The focus on the row that took its place, else the search)
-          (list.querySelectorAll<HTMLElement>(".swd-files-remove")[Math.min(at, files.length - 1)] ?? search).focus({ preventScroll: true });
+          (list.querySelectorAll<HTMLElement>(".swd-files-more")[Math.min(at, files.length - 1)] ?? search).focus({ preventScroll: true });
         });
         grip.addEventListener("keydown", (event) => {
           if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
@@ -166,8 +204,9 @@ export function filesEditor(cell: HTMLElement, editing: FilesEditing, float: (pa
               search.focus({ preventScroll: true });
             },
           },
-          el(doc, "span", { class: "swd-editor-document-name", text: web || !known?.includes(target) ? `Add ${target}` : name }),
-          ...(folder ? [el(doc, "span", { class: "swd-editor-document-folder", text: folder })] : []),
+          // (An address: said so, itself quieter under it, cut where long; a file of the space its name, its folder under it)
+          el(doc, "span", { class: "swd-editor-document-name", text: web ? "Add from the web" : known?.includes(target) ? name : `Add ${name}` }),
+          ...(web ? [el(doc, "span", { class: "swd-editor-document-folder", text: target })] : folder ? [el(doc, "span", { class: "swd-editor-document-folder", text: folder })] : []),
         );
       }),
     );
@@ -238,7 +277,19 @@ export function filesEditor(cell: HTMLElement, editing: FilesEditing, float: (pa
     if (!panel.contains(event.target as Node) && !inCompanion(event.target) && !panel.contains(doc.activeElement)) finish();
   };
   doc.addEventListener("pointerdown", pressed, true);
+  // (The list scrolled: its file's menu kept by its ⋯)
+  list.addEventListener("scroll", () => menuOpen && placeMenu(menuOpen.items, menuOpen.more), { passive: true });
+  // A file's menu closed by a press elsewhere in the popup, and by Esc alone (the popup kept)
+  panel.addEventListener("pointerdown", (event) => {
+    if (menuOpen && !(event.target as Element).closest(".swd-files-menu-box")) closeMenu(false);
+  });
   panel.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && menuOpen) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      closeMenu(true);
+      return;
+    }
     // (Put aside: an upload that comes after adds to the value as it was, not to what was put aside)
     if (event.key === "Escape") {
       finished ??= editing.files.map((one) => one.written);
@@ -259,4 +310,26 @@ export function filesEditor(cell: HTMLElement, editing: FilesEditing, float: (pa
     if (!finished) drawFound();
   });
   return panel;
+}
+
+// How far a file's menu stays from the window's edges (px)
+const EDGE = 8;
+
+/**
+ * A file's menu placed by its ⋯ over everything (the list scrolls and cuts what is in it): under it from its left edge,
+ * from its right edge where it would go past the window's, over it where there is no room under it
+ */
+function placeMenu(items: HTMLElement, more: HTMLElement): void {
+  const view = items.ownerDocument.defaultView;
+  if (!view) return;
+  const at = more.getBoundingClientRect();
+  items.style.position = "fixed";
+  const { width, height } = items.getBoundingClientRect();
+  let left = at.left;
+  if (left + width > view.innerWidth - EDGE) left = at.right - width;
+  left = Math.max(EDGE, Math.min(left, view.innerWidth - width - EDGE));
+  const top = at.bottom + 2 + height > view.innerHeight - EDGE && at.top - 2 - height >= EDGE ? at.top - 2 - height : at.bottom + 2;
+  items.style.left = `${Math.round(left)}px`;
+  items.style.top = `${Math.round(top)}px`;
+  items.style.right = "auto";
 }

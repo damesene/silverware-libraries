@@ -33,6 +33,17 @@ describe("a host's files", () => {
     expect(made({}).media.draw("Photos/cat.png", BOX).dataset.swdMedia).toBe("file");
   });
 
+  it("set each file's box on it, zoomed with the content, an image sized in it so once loaded", () => {
+    const { media } = made({ url: (path) => `.fs/${path}` });
+    const image = media.draw("cat.png", BOX);
+    expect([image.style.getPropertyValue("--swd-media-width"), image.style.getPropertyValue("--swd-media-height")]).toEqual(["calc(84px * var(--sw-content-scale, 1))", "calc(28px * var(--sw-content-scale, 1))"]);
+    const img = image.querySelector("img")!;
+    Object.defineProperties(img, { naturalWidth: { value: 160 }, naturalHeight: { value: 100 } });
+    img.dispatchEvent(new Event("load"));
+    expect([img.style.width, img.style.height]).toEqual(["calc(45px * var(--sw-content-scale, 1))", "calc(28px * var(--sw-content-scale, 1))"]);
+    expect(media.draw("report.pdf", BOX).style.getPropertyValue("--swd-media-height")).toBe("calc(28px * var(--sw-content-scale, 1))");
+  });
+
   it("draw another file as its icon and name, its preview in their place once it comes; none: as they were", async () => {
     let answer!: (preview: HTMLElement | null) => void;
     const asked: [string, number][] = [];

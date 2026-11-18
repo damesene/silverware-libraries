@@ -195,6 +195,41 @@ lies over the other. A press in Assets' panel does not close the peek (its `role
 opened from the peek opens over it; closing it shows the peek again. Database's own panels over the peek (75) would
 show over Assets' panel: checked in a UI test, the panel lifted where it must be.
 
+## Files zoomed (2026-11-18, asked by the user after step 11)
+
+Files zoom with the content as Silverware Assets' do (Silverware Layout's font zoom with files, `--sw-content-scale`,
+`shared/contentscale.ts`): `media.draw` sets its box on the element as variables (`--swd-media-width`,
+`--swd-media-height`, each `scaledPx`) and an image's fitted size as `scaledPx` too, so the browser sizes them anew as
+the zoom changes, nothing drawn again; the style page reads the box from those variables alone (no size of its own: a
+small line's height, a file's pill, the popup's rows, a card's cover). A preview of Assets' is given its room at the
+scale of 1, as the contract has it. The same variables hold an image in its box before it has loaded: a large one in
+the popup was drawn at its own size until its `load` sized it (reported by the user).
+
+## Smaller in the peek and the popup (2026-11-18, asked by the user)
+
+The peek's row draws files as a table's cell does (`small`: they took the whole panel); the popup's files at most 150 px
+on their longer side, no name beside them (their title says it), and a ⋯ menu each in place of × (*View original* in a
+new tab, *Download*, *Remove* from the value; `Media.url`).
+
+## Next: sources in Silverware Assets' dialog, titles (decided with the user 2026-11-18, not built)
+
+- **The peek's popup out of the properties' flow**: laid over the page as a table's editors are (`floatPanel`), under
+  the row or over it where there is no room (over the content, over the item's name), its height the window's, its list
+  alone scrolling.
+- **A file's menu within the window**: opened under its ⋯ from its left edge, from its right edge where it would cut
+  off, over it where there is no room under it.
+- **Sources in Assets' insert dialog** (for a page too): one bar always shown, *Files…*, *Camera…* (touch), *Link*
+  (a field under the bar: an address added as a row), *Space* (a search of the space's files, a few found under it);
+  rows of two lines with a small picture (about 48 px, larger on a press): a file of the device its name, a web
+  address *Kept* (Link / Save to space), a file of the space nothing to set; the foot says what happens
+  (`1 to upload · 1 link · 1 from your space`, *Add 3*). A page's insert keeps *Inserted as*.
+- **Titles**: every row may have one (a file of the device's behind *+ Title*); a web address's shown first. In a page
+  an embed's alt / a link's text; in Database's value **B**: kept with the file, a space's file `[[path|title]]` (read
+  already), a web address `[title](url)` (a form the value reads anew), the title shown in place of the name (its
+  tooltip, its menu, the text sorted and filtered by).
+- **Database's popup**: its files and **+ Add files…** alone (the dialog); without Silverware Assets the field of today
+  in its place (an address, a file of the space). A link pasted on the open popup opens the dialog with it.
+
 ## Steps
 
 1. **Probe** (2.12.1): a file named by a wiki link in a frontmatter list; the file renamed, the database renamed: are the

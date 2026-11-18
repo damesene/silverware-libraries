@@ -27,6 +27,7 @@ import { propertyIcon, typeIcon, VIEW_ICONS } from "../../views/icons.ts";
 import type { PropertiesOffer } from "../properties/index.ts";
 import { type LookControls, lookControls } from "./look.ts";
 import { missing, valueNodes } from "../../views/values.ts";
+import { takeFiles, uploadInto } from "../../views/takefiles.ts";
 
 // The panel's width where none is set (the module's setting `width`), the narrowest it may be set to, and its share of the
 // editor's area at most (the page beside it still seen)
@@ -475,6 +476,8 @@ export class PeekPanel {
       // (Its editors edit the item shown: written from the item the panel writes against then, `own`)
       update: (_item: Item, key: string, value: Value | undefined) => this.own(shown, (one) => withValue(one, key, value), (base) => core.update(shown.database, base, key, value)),
       rename: (_item: Item, name: string) => this.own(shown, (one) => ({ ...one, name: name.trim() }), (base) => core.rename(shown.database, base, name)),
+      // (The item it shows is kept as it is now: its writes are against it)
+      current: async () => shown.item,
       notify: (text) => ui.notify(text, { type: "error" }),
       documents: () => this.host.documents(),
       validateDocumentName: (name) => this.host.validateDocumentName(name),
@@ -692,6 +695,8 @@ export class PeekPanel {
         event.preventDefault();
         edit();
       });
+      // A value of files: files dropped on its row, or pasted while it has the focus, uploaded and added to the item shown
+      if (editor.type(property).look === "media") takeFiles(value, (given) => uploadInto(editor, shown.item, property.key, property.label, given), { paste: true });
     } else value.classList.add("swd-peek-readonly");
     // Its name: opens it in Properties (its name, type, options, required, hidden, removed) where that module is on
     const properties = this.host.offered<PropertiesOffer>("properties");

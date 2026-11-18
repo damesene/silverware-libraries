@@ -15,6 +15,7 @@ import { movedValue } from "../../domain/grouping.ts";
 import type { Item, Property } from "../../model/database.ts";
 import { edgeScroll } from "../edgescroll.ts";
 import { fieldNodes, optionPill } from "../values.ts";
+import { takeFiles, uploadInto } from "../takefiles.ts";
 
 // What a card dragged carries: its own type, so dropped on the page's text it inserts nothing there
 const DRAG_TYPE = "application/x-silverware-database-item";
@@ -187,6 +188,16 @@ function card(host: ViewHost, by: Property, item: Item, column: ItemGroup, drag:
     }),
   );
   host.look.item(item, box);
+  // Files dropped on it (it takes no focus: no paste) added to a value of files: the one whose line they fell on, else the
+  // first the view shows, else the database's first
+  const files = host.database.properties.filter((one) => !one.readonly && host.type(one).look === "media");
+  if (files.length)
+    takeFiles(box, (given, at) => {
+      const line = at.closest<HTMLElement>(".swd-board-value")?.dataset.key;
+      const shown = host.look.shownProperties.map((one) => one.key);
+      const property = files.find((one) => one.key === line) ?? files.find((one) => shown.includes(one.key)) ?? files[0]!;
+      uploadInto(host, item, property.key, property.label, given);
+    });
   box.addEventListener("dragstart", (event) => {
     drag.item = item;
     drag.from = column;

@@ -1,0 +1,262 @@
+// A value of files edited (Files & media, docs/silverware-database-files.md): a popup over its cell (in the peek, in its
+// row) listing its files, each drawn larger, with a grip to move it (dragged, or Alt+↑ ↓ on it) and × to take it out;
+// under them a search of the space's files (its words each in a file's name, a folder before a separator, as references
+// are searched: domain/folders.ts) or an address of the web typed, and Upload (the host's dialog: Silverware Assets').
+// The list is written as it is (its files as they were written, the new ones as links: no text read by the type, a name
+// may hold a comma) once the popup is left or Enter pressed where no control takes it; Esc puts it aside. The upload
+// dialog is the popup's companion: going to it does not leave the popup. Files an upload gives once the popup has been
+// left are added to the value as it was written then.
+import { reorder } from "../../../shared/drag.ts";
+import { inCompanion } from "../../../shared/editor.ts";
+import { el } from "../../../shared/elements.ts";
+import type { Media } from "../core/media.ts";
+import { folderSearch, foundBy } from "../domain/folders.ts";
+import { type FileEntry, fileName, readFile, validateFileTarget, writeFile } from "../domain/types/files.ts";
+import { VIEW_ICONS } from "./icons.ts";
+import { FILE_BOXES } from "./values.ts";
+import { takeFiles } from "./takefiles.ts";
+import type { GivenFiles } from "../core/media.ts";
+
+// A grip: six dots
+const GRIP = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><circle cx="6" cy="4" r="1.1"/><circle cx="10" cy="4" r="1.1"/><circle cx="6" cy="8" r="1.1"/><circle cx="10" cy="8" r="1.1"/><circle cx="6" cy="12" r="1.1"/><circle cx="10" cy="12" r="1.1"/></svg>';
+// The files a search shows at most: more are found by typing more of a name
+const SHOWN_FILES = 50;
+// What the space's paths are split into folders by
+const SEPARATOR = "/";
+
+/** What the files' editor is given */
+export type FilesEditing = {
+  readonly label: string;
+  /** The database the files are uploaded for (its folder of files) */
+  readonly database: string;
+  /** The host's files; none: no file drawn, searched nor uploaded (an address typed still added) */
+  readonly media: Media | undefined;
+  /** The files as the value has them */
+  readonly files: readonly FileEntry[];
+  /** Esc on a field puts the editing aside */
+  readonly escape: (field: HTMLElement) => void;
+  /** The files as left, as written (an empty list: none), once the popup is left or Enter pressed */
+  readonly done: (written: readonly string[]) => void;
+  /** Files an upload gave once the popup had been left: the value as `done` was given it, and with them */
+  readonly later: (was: readonly string[], now: readonly string[]) => void;
+};
+
+/** The popup in `cell` (laid over it by `float`), the focus in its search */
+export function filesEditor(cell: HTMLElement, editing: FilesEditing, float: (panel: HTMLElement) => void): HTMLElement {
+  const doc = cell.ownerDocument;
+  const { label, media } = editing;
+  const files: FileEntry[] = [...editing.files];
+  let known: readonly string[] | undefined;
+  let finished: readonly string[] | undefined;
+  // A file being dragged by its grip: the row moves in the document as it goes, which takes the focus from its grip (not
+  // the popup left)
+  let dragging = false;
+  const list = el(doc, "div", { class: "swd-files-list", attrs: { role: "list", "aria-label": label } });
+  const search = el(doc, "input", { class: "swd-editor-search", attrs: { type: "text", placeholder: media ? "Find a file, or type an address…" : "Type an address (https://…)", "aria-label": `Add to ${label}` } });
+  const found = el(doc, "div", { class: "swd-editor-list swd-files-found", attrs: { role: "group", "aria-label": "Files found" } });
+  const note = el(doc, "div", { class: "swd-editor-note", attrs: { role: "status" } });
+  const upload = el(doc, "button", { class: "swd-files-upload", text: "Upload…", attrs: { type: "button" } });
+  if (!media?.upload) {
+    upload.disabled = true;
+    upload.title = "Uploading needs Silverware Assets";
+  }
+  const panel = el(doc, "div", { class: "swd-editor swd-editor-choices swd-editor-files", attrs: { tabindex: "-1" } }, list, search, found, note, el(doc, "div", "swd-files-actions", upload));
+  const written = () => files.map((one) => one.written);
+  const finish = () => {
+    if (finished) return;
+    finished = written();
+    doc.removeEventListener("pointerdown", pressed, true);
+    editing.done(finished);
+  };
+  const say = (text: string) => {
+    note.textContent = text;
+    note.hidden = text === "";
+  };
+  // A file added (once: one there already is not), the focus kept where it was
+  const add = (target: string): boolean => {
+    const problem = validateFileTarget(target);
+    if (problem) return say(problem), false;
+    const entry = readFile(writeFile(target));
+    if (!entry) return false;
+    if (files.some((one) => one.target === entry.target)) return say(`${fileName(entry)} is there already`), false;
+    files.push(entry);
+    say("");
+    return true;
+  };
+  // A file moved by `by` places (none past the ends), its grip focused again
+  const move = (at: number, by: number) => {
+    const to = Math.max(0, Math.min(files.length - 1, at + by));
+    if (to === at) return;
+    const [entry] = files.splice(at, 1);
+    files.splice(to, 0, entry!);
+    drawList();
+    list.querySelectorAll<HTMLElement>(".swd-files-grip")[to]?.focus({ preventScroll: true });
+  };
+  const drawList = () => {
+    list.replaceChildren(
+      ...files.map((file, at) => {
+        const name = fileName(file);
+        const grip = el(doc, "button", { class: "swd-files-grip", html: GRIP, title: "Drag to move (Alt+↑ ↓)", attrs: { type: "button", "aria-label": `Move ${name} (Alt+↑ ↓)` } });
+        const remove = el(doc, "button", { class: "swd-files-remove", html: VIEW_ICONS.close, title: `Take ${name} out`, attrs: { type: "button", "aria-label": `Take ${name} out` } });
+        const row = el(doc, "div", { class: "swd-files-row", attrs: { role: "listitem", title: file.target } }, grip, media ? media.draw(file.target, FILE_BOXES.large) : el(doc, "span"), el(doc, "span", { class: "swd-files-name", text: name }), remove);
+        remove.addEventListener("click", () => {
+          files.splice(at, 1);
+          drawList();
+          drawFound();
+          // (The focus on the row that took its place, else the search)
+          (list.querySelectorAll<HTMLElement>(".swd-files-remove")[Math.min(at, files.length - 1)] ?? search).focus({ preventScroll: true });
+        });
+        grip.addEventListener("keydown", (event) => {
+          if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
+          event.preventDefault();
+          event.stopPropagation();
+          move(at, event.key === "ArrowUp" ? -1 : 1);
+        });
+        grip.addEventListener("pointerdown", (event) => {
+          if (event.button !== 0) return;
+          event.preventDefault();
+          grip.focus({ preventScroll: true });
+          dragging = true;
+          reorder(event, {
+            element: row,
+            base: "swd-props",
+            flow: "block",
+            containers: () => [list],
+            items: (container) => [...container.querySelectorAll<HTMLElement>(":scope > .swd-files-row")],
+            done: (to) => {
+              dragging = false;
+              if (to) return move(at, to.index - at);
+              drawList();
+              list.querySelectorAll<HTMLElement>(".swd-files-grip")[at]?.focus({ preventScroll: true });
+            },
+          });
+        });
+        return row;
+      }),
+    );
+  };
+  // What the search offers: a file named whole (an address of the web, a wiki link typed or pasted), else the space's
+  // files its words find (not those added)
+  const offered = (): readonly string[] => {
+    const typed = search.value.trim();
+    const named = readFile(typed);
+    if (named) return files.some((one) => one.target === named.target) ? [] : [named.target];
+    if (!known || !typed) return [];
+    const read = folderSearch(typed, SEPARATOR);
+    return known.filter((path) => !files.some((one) => one.target === path) && foundBy(path, read)).slice(0, SHOWN_FILES);
+  };
+  const drawFound = () => {
+    found.replaceChildren(
+      ...offered().map((target) => {
+        const web = !!readFile(target)?.web;
+        const name = fileName({ target, web });
+        const folder = web ? undefined : target.slice(0, Math.max(0, target.lastIndexOf(SEPARATOR)));
+        return el(
+          doc,
+          "button",
+          {
+            class: "swd-files-found-item",
+            title: target,
+            attrs: { type: "button", "aria-label": `Add ${web ? target : name}` },
+            run: () => {
+              if (!add(target)) return;
+              search.value = "";
+              drawList();
+              drawFound();
+              search.focus({ preventScroll: true });
+            },
+          },
+          el(doc, "span", { class: "swd-editor-document-name", text: web || !known?.includes(target) ? `Add ${target}` : name }),
+          ...(folder ? [el(doc, "span", { class: "swd-editor-document-folder", text: folder })] : []),
+        );
+      }),
+    );
+    found.hidden = found.childElementCount === 0;
+  };
+  search.addEventListener("input", () => {
+    say("");
+    drawFound();
+  });
+  search.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    // (Nothing typed: saved, as Enter elsewhere; else the first found added)
+    if (!search.value.trim()) return finish();
+    const first = offered()[0];
+    if (first === undefined) return say(readFile(search.value.trim()) ? "" : media ? "No file of the space has that name: type an address with its https://, or a link ([[folder/name.png]])" : "Type an address with its https://, or a link ([[folder/name.png]])");
+    if (!add(first)) return;
+    search.value = "";
+    drawList();
+    drawFound();
+  });
+  // Files uploaded (those dropped or pasted on it, or picked in the host's dialog: none given), added once written
+  const uploadGiven = (given?: GivenFiles) => {
+    const uploading = media?.upload?.(editing.database, given);
+    if (!uploading) return say("Uploading files needs Silverware Assets");
+    void uploading.then((targets) => {
+      if (!targets?.length) {
+        if (!finished) upload.focus({ preventScroll: true });
+        return;
+      }
+      // (Left meanwhile: added to the value as it was written as the popup was left)
+      if (finished) {
+        const was = finished;
+        const now = [...was, ...targets.map(writeFile).filter((one) => !was.includes(one))];
+        if (now.length !== was.length) editing.later(was, now);
+        return;
+      }
+      for (const target of targets) add(target);
+      drawList();
+      drawFound();
+      upload.focus({ preventScroll: true });
+    });
+  };
+  upload.addEventListener("click", () => uploadGiven());
+  takeFiles(panel, (given) => uploadGiven(given), { paste: true });
+  panel.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.target === search || (event.target as Element).closest("button")) return;
+    event.preventDefault();
+    finish();
+  });
+  // (A press on its buttons keeps the focus where it is: a button pressed on its icon takes none in some browsers, which
+  // left the popup with the focus nowhere; each button's own action gives the focus where it goes)
+  panel.addEventListener("mousedown", (event) => {
+    if ((event.target as Element).closest("button")) event.preventDefault();
+  });
+  // Left: saved, unless the focus went to its companion (the upload dialog). Looked at once the focus has settled, a task
+  // later (a microtask runs between the focus leaving and coming to what was pressed): a control drawn anew (×, a grip, a
+  // file found) loses the focus as it goes, then the list gives it to another of its controls
+  panel.addEventListener("focusout", () => {
+    setTimeout(() => {
+      const now = doc.activeElement;
+      if (!finished && !dragging && !panel.contains(now) && !inCompanion(now)) finish();
+    });
+  });
+  // A press beside it where the focus is not in it (gone with the upload dialog): saved too
+  const pressed = (event: PointerEvent) => {
+    if (finished || !panel.isConnected) return doc.removeEventListener("pointerdown", pressed, true);
+    if (!panel.contains(event.target as Node) && !inCompanion(event.target) && !panel.contains(doc.activeElement)) finish();
+  };
+  doc.addEventListener("pointerdown", pressed, true);
+  panel.addEventListener("keydown", (event) => {
+    // (Put aside: an upload that comes after adds to the value as it was, not to what was put aside)
+    if (event.key === "Escape") {
+      finished ??= editing.files.map((one) => one.written);
+      doc.removeEventListener("pointerdown", pressed, true);
+    }
+  }, true);
+  editing.escape(panel);
+  drawList();
+  drawFound();
+  say("");
+  cell.replaceChildren(panel);
+  float(panel);
+  search.focus({ preventScroll: true });
+  panel.scrollIntoView?.({ block: "nearest" });
+  // (The space's files as they come: what was typed meanwhile searched among them)
+  void media?.files().then((paths) => {
+    known = paths;
+    if (!finished) drawFound();
+  });
+  return panel;
+}

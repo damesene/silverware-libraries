@@ -48,6 +48,146 @@ test("a value's files: a table's cell draws three and counts the rest, a press o
   await expect(page.locator(".swa-side-panel .swa-panel-title")).toHaveText("c.png");
   await expect(page.locator(".swd-peek")).toBeVisible();
   await expect(row.locator(".swd-editor")).toHaveCount(0);
+  // Its pencil: the files' editor in the row, Esc putting it aside
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".swa-side-panel")).toHaveCount(0);
+  await row.locator(".swd-peek-edit").click();
+  await expect(row.locator(".swd-editor-files .swd-files-name")).toHaveText(names);
+  await row.locator(".swd-editor-files .swd-editor-search").press("Escape");
+  await expect(row.locator(".swd-editor-files")).toHaveCount(0);
+  await expect(row.locator(".swd-media-button")).toHaveCount(4);
+});
+
+test("a value's files edited in its popup: one taken out, one dragged by its grip, one found in the space, one uploaded through Silverware Assets into the database's folder", async ({ page, space }) => {
+  const names = ["a.png", "b.png", "c.png"];
+  await space.open(
+    { Page: "# Page\n\n```silverware-database\nid: files\nview: table\n```\n", "Page/db-files": ROOT, "Page/db-files/Holiday": withFiles(space.folder, "a0", names) },
+    "Page",
+    { ...Object.fromEntries(names.map((name) => [`files/${name}`, PNG])), "Elsewhere/sunrise.png": PNG },
+  );
+  const cell = page.locator(".swd-table tbody tr", { hasText: "Holiday" }).locator('td[data-key="photos"]');
+  await expect(cell.locator(".swd-media-button")).toHaveCount(3);
+  // A press in the cell beside the files: the popup (laid over the page from the body), its search focused
+  const box = (await cell.boundingBox())!;
+  await page.mouse.click(box.x + box.width - 4, box.y + box.height / 2);
+  const popup = page.locator(".swd-editor-files");
+  const rows = popup.locator(".swd-files-name");
+  await expect(rows).toHaveText(["a.png", "b.png", "c.png"]);
+  await expect(popup.locator(".swd-editor-search")).toBeFocused();
+  await popup.getByRole("button", { name: "Take b.png out" }).click();
+  await expect(rows).toHaveText(["a.png", "c.png"]);
+  // (A press on a file's name, in it but on no control: still open)
+  await rows.first().click();
+  await expect(rows).toHaveText(["a.png", "c.png"]);
+  // c.png dragged by its grip above a.png (measured once its row has its height: its image loaded and sized)
+  await expect.poll(() => popup.locator(".swd-files-row img").evaluateAll((images) => images.every((one) => (one as HTMLImageElement).complete && !!(one as HTMLImageElement).style.height))).toBe(true);
+  const grip = (await popup.getByRole("button", { name: /^Move c\.png/ }).boundingBox())!;
+  const first = (await popup.locator(".swd-files-row").first().boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2, first.y + 4, { steps: 8 });
+  await page.mouse.up();
+  await expect(rows).toHaveText(["c.png", "a.png"]);
+  // Found in the space by words of its name
+  await popup.locator(".swd-editor-search").fill("elsewhere sunrise");
+  await popup.getByRole("button", { name: "Add sunrise.png" }).click();
+  await expect(rows).toHaveText(["c.png", "a.png", "sunrise.png"]);
+  // Uploaded: Silverware Assets' dialog, its name alone asked, the file written into the database's folder of files
+  const chooser = page.waitForEvent("filechooser");
+  await popup.getByRole("button", { name: "Upload…" }).click();
+  const dialog = page.locator(".swa-dialog.swa-insert-window");
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Files…" }).click();
+  await (await chooser).setFiles({ name: "beach.png", mimeType: "image/png", buffer: PNG });
+  await expect(dialog.locator(".swa-insert-path")).toHaveValue(`${space.folder}/Page/db-files/files/beach.png`);
+  await expect(dialog.locator(".swa-insert-choices:visible")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Insert" }).click();
+  await expect(rows).toHaveText(["c.png", "a.png", "sunrise.png", "beach.png"]);
+  // Left: written as listed, each a link
+  await page.keyboard.press("Tab");
+  await page.locator(".swd-table thead").click();
+  await expect(popup).toHaveCount(0);
+  await expect
+    .poll(() => space.saved("Page/db-files/Holiday"))
+    .toContain(`photos:\n  - "[[${space.folder}/files/c.png]]"\n  - "[[${space.folder}/files/a.png]]"\n  - "[[${space.folder}/Elsewhere/sunrise.png]]"\n  - "[[${space.folder}/Page/db-files/files/beach.png]]"\n`);
+  await expect(cell.locator(".swd-media-button")).toHaveCount(3);
+  await expect(cell.locator(".swd-media-more")).toHaveText("+1");
+});
+
+/** Files dropped on an element, or pasted on it (`paste`), as a browser's drop and paste carry them */
+async function give(target: import("@playwright/test").Locator, names: readonly string[], how: "drop" | "paste"): Promise<void> {
+  await target.evaluate(
+    (element, { names, how, png }) => {
+      const data = new DataTransfer();
+      for (const name of names) data.items.add(new File([Uint8Array.from(atob(png), (c) => c.charCodeAt(0))], name, { type: "image/png" }));
+      if (how === "paste") return void element.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true, composed: true }));
+      const box = element.getBoundingClientRect();
+      const at = { clientX: box.left + box.width / 2, clientY: box.top + box.height / 2 };
+      for (const type of ["dragenter", "dragover", "drop"]) element.dispatchEvent(new DragEvent(type, { dataTransfer: data, bubbles: true, cancelable: true, composed: true, ...at }));
+    },
+    { names, how, png: PNG.toString("base64") },
+  );
+}
+
+test("files dropped or pasted on a value of files: Silverware Assets' dialog of their names, the files added at the value's end, nothing put in the page", async ({ page, space }) => {
+  const root = ROOT.replace("    photos:", "    status: { type: select, label: Status, options: [Todo] }\n    photos:");
+  const text = "# Page\n\n```silverware-database\nid: files\nview: table\n```\n\n```silverware-database\nid: files\nview: board\nboard.hiddenProperties: []\n```\n";
+  await space.open({ Page: text, "Page/db-files": root, "Page/db-files/Holiday": withFiles(space.folder, "a0", ["a.png"]).replace("photos:", "status: Todo\nphotos:") }, "Page", { "files/a.png": PNG });
+  const dialog = page.locator(".swa-dialog.swa-insert-window");
+  const insert = async (name: string) => {
+    await expect(dialog).toBeVisible();
+    // (Its name in the database's folder of files, nothing asked of how it is shown)
+    await expect(dialog.locator(".swa-insert-path")).toHaveValue(new RegExp(`^${space.folder}/Page/db-files/files/.+\\.png$`));
+    await expect(dialog.locator(".swa-insert-choices:visible")).toHaveCount(0);
+    await dialog.locator(".swa-insert-path").fill(`${space.folder}/Page/db-files/files/${name}`);
+    await dialog.getByRole("button", { name: "Insert" }).click();
+    await expect(dialog).toHaveCount(0);
+  };
+  const saved = (...names: string[]) => `photos:\n  - "[[${space.folder}/files/a.png]]"\n${names.map((one) => `  - "[[${space.folder}/Page/db-files/files/${one}]]"\n`).join("")}`;
+  const cell = page.locator(".swd-table tbody tr", { hasText: "Holiday" }).locator('td[data-key="photos"]');
+  await expect(cell.locator(".swd-media-button")).toHaveCount(1);
+  // Dropped on a table's cell
+  await give(cell, ["dropped.png"], "drop");
+  await insert("dropped.png");
+  await expect.poll(() => space.saved("Page/db-files/Holiday")).toContain(saved("dropped.png"));
+  // Pasted on the cell focused (by Tab): SilverBullet's editor takes none of it
+  await cell.focus();
+  await give(cell, ["pasted.png"], "paste");
+  await insert("pasted.png");
+  await expect.poll(() => space.saved("Page/db-files/Holiday")).toContain(saved("dropped.png", "pasted.png"));
+  // Dropped on a board's card (on its name: the view's one value of files)
+  await give(page.locator(".swd-board-card", { hasText: "Holiday" }).locator(".swd-board-name"), ["card.png"], "drop");
+  await insert("card.png");
+  await expect.poll(() => space.saved("Page/db-files/Holiday")).toContain(saved("dropped.png", "pasted.png", "card.png"));
+  // Pasted on the peek's row focused
+  await page.locator(".swd-table tbody tr", { hasText: "Holiday" }).locator(".swd-open").click();
+  const row = page.locator('.swd-peek .swd-peek-value[data-key="photos"]');
+  await expect(row.locator(".swd-media-button")).toHaveCount(4);
+  await row.focus();
+  await give(row, ["peek.png"], "paste");
+  await insert("peek.png");
+  await expect.poll(() => space.saved("Page/db-files/Holiday")).toContain(saved("dropped.png", "pasted.png", "card.png", "peek.png"));
+  await expect(row.locator(".swd-media-button")).toHaveCount(5);
+  // The page as it was: no file put in it, by Silverware Assets nor by SilverBullet
+  expect(await space.saved("Page")).toBe(text);
+});
+
+test("files dropped on the files' popup: added to its list, written as it is left", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: files\nview: table\n```\n", "Page/db-files": ROOT, "Page/db-files/Holiday": withFiles(space.folder, "a0", ["a.png"]) }, "Page", { "files/a.png": PNG });
+  const cell = page.locator(".swd-table tbody tr", { hasText: "Holiday" }).locator('td[data-key="photos"]');
+  const box = (await cell.boundingBox())!;
+  await page.mouse.click(box.x + box.width - 4, box.y + box.height / 2);
+  const popup = page.locator(".swd-editor-files");
+  await expect(popup.locator(".swd-files-name")).toHaveText(["a.png"]);
+  await give(popup, ["dropped.png"], "drop");
+  const dialog = page.locator(".swa-dialog.swa-insert-window");
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Insert" }).click();
+  // (The popup kept open under the dialog: its companion)
+  await expect(popup.locator(".swd-files-name")).toHaveText(["a.png", "dropped.png"]);
+  await page.locator(".swd-table thead").click();
+  await expect(popup).toHaveCount(0);
+  await expect.poll(() => space.saved("Page/db-files/Holiday")).toContain(`  - "[[${space.folder}/Page/db-files/files/dropped.png]]"`);
 });
 
 test("a board's card narrower than its files: they shrink, their names cut, the rest's count whole within the card", async ({ page, space }) => {

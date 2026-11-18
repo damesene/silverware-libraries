@@ -18,6 +18,7 @@ import { createInGroup, foldedOf, groupHead, setFolded } from "../groups.ts";
 import { ownIcon, VIEW_ICONS } from "../icons.ts";
 import { rowGrip } from "../order.ts";
 import { missing, problemOf, valueNodes } from "../values.ts";
+import { takeFiles, uploadInto } from "../takefiles.ts";
 
 const ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M2 7h12M6 3v10" stroke="currentColor" stroke-width="1.3"/></svg>';
 
@@ -141,6 +142,9 @@ function cell(host: ViewHost, item: Item, column: Column, editing: Editing): HTM
     };
     // Reached by Tab, edited by Enter or F2, as a click edits it
     td.tabIndex = 0;
+    // A value of files: files dropped on it, or pasted while it has the focus, uploaded and added to it
+    if (property && host.type(property).look === "media")
+      takeFiles(td, (given) => uploadInto(host, item, property.key, property.label, given), { paste: true });
     td.addEventListener("click", (event) => {
       // (A link in it is followed, not edited)
       if (!(event.target as Element).closest("a, button")) edit();

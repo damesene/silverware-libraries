@@ -15,13 +15,15 @@ import { floatPanel } from "./float.ts";
 import { readLink, writeLink } from "../domain/types/link.ts";
 import { folderSearch, foundBy, pathOf } from "../domain/folders.ts";
 import { linkedDocument, type Reference, readReferences, validateReferenceTarget, writeReference } from "../domain/types/reference.ts";
+import { readFiles } from "../domain/types/files.ts";
+import { filesEditor } from "./fileseditor.ts";
 import { readMoment } from "../domain/types/moment.ts";
 import type { Item, Property, Value } from "../model/database.ts";
 import type { ViewHost } from "../core/view.ts";
 import { VIEW_ICONS } from "./icons.ts";
 
 /** What an editor needs of its host: a view's, or a module's made of the same parts (the peek's) */
-export type EditorHost = Pick<ViewHost, "document" | "database" | "type" | "text" | "update" | "rename" | "notify" | "documents" | "validateDocumentName" | "openByName" | "openMention" | "noun" | "folderSeparator" | "media">;
+export type EditorHost = Pick<ViewHost, "document" | "database" | "type" | "text" | "update" | "rename" | "notify" | "documents" | "validateDocumentName" | "openByName" | "openMention" | "noun" | "folderSeparator" | "media" | "current">;
 
 /** The built-in property every item has: its name */
 export const NAME = "name";
@@ -293,6 +295,28 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
     (boxes[0] ?? adder ?? panel).focus({ preventScroll: true });
     // (Whole in view: in a box that scrolls, the peek's properties, it may open past its edge)
     panel.scrollIntoView?.({ block: "nearest" });
+    return;
+  }
+
+  // Files: a popup of its own writing its list as it is (a value the type does not take edited as text below, kept as it is)
+  const files = type?.editor === "files" && property && (kept === "" || type.validate(now ?? null, property.params) === undefined) ? readFiles(now) : undefined;
+  if (files && property) {
+    const was = files.map((one) => one.written);
+    const panel = filesEditor(
+      cell,
+      {
+        label: property.label,
+        database: host.database.id,
+        media: host.media,
+        files,
+        escape,
+        // (The same files in the same order: nothing written; none left: the value taken off)
+        done: (list) => (list.length === was.length && list.every((one, at) => one === was[at]) ? end() : void save(list.length ? [...list] : undefined)),
+        later: (then, list) => void host.update({ ...item, values: withValue(item.values, key, then.length ? [...then] : undefined) }, key, [...list]),
+      },
+      (made) => floatPanel(made, cell, "over"),
+    );
+    editing.set(cell, panel);
     return;
   }
 

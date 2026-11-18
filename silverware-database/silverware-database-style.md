@@ -3225,6 +3225,12 @@ tr:focus-within .swd-open {
   max-width: 100%;
   max-height: 100%;
 }
+/* Where files dragged over it go (a value of files: a table's cell, a card, the peek's row, the files' editor) */
+.swd-files-over {
+  outline: 2px dashed var(--swd-accent);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--swd-accent) 8%, transparent);
+}
 .swd-media-more {
   flex: none;
   padding: 0 4px;
@@ -3310,6 +3316,89 @@ button.swd-editor-document-folder:hover,
   padding: 2px 4px;
   color: var(--swd-quiet);
   font-size: 0.9em;
+}
+/* Files' editor: its files a row each (a grip, the file drawn, its name, ×), scrolled where many; a search of the space's
+   files under them, those found a button each (its name, its folder under it), Upload last */
+.swd-editor-files {
+  gap: 6px;
+  width: min(26em, 90vw);
+}
+.swd-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: min(60vh, 40em);
+  overflow-y: auto;
+}
+.swd-files-list:empty {
+  display: none;
+}
+.swd-files-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  padding: 2px;
+  border-radius: 4px;
+}
+.swd-files-row:hover {
+  background: var(--swd-hover);
+}
+.swd-files-row .swd-media {
+  max-width: 240px;
+  max-height: 180px;
+}
+.swd-files-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swd-files-grip,
+.swd-files-remove {
+  display: inline-flex;
+  padding: 3px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--swd-quiet);
+  cursor: pointer;
+}
+.swd-files-grip {
+  cursor: grab;
+  touch-action: none;
+}
+.swd-files-grip svg,
+.swd-files-remove svg {
+  width: 14px;
+  height: 14px;
+}
+.swd-files-grip:hover,
+.swd-files-remove:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: var(--root-color, currentColor);
+}
+.swd-files-found-item {
+  display: grid;
+  justify-items: start;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.swd-files-found-item:hover,
+.swd-files-found-item:focus-visible {
+  background: var(--swd-hover);
+}
+.swd-files-found-item .swd-editor-document-folder {
+  grid-column: 1;
+}
+.swd-files-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 .swd-editor-new {
   color: var(--swd-quiet);

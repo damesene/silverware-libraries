@@ -1068,6 +1068,7 @@ export class DatabasePlace {
       remove: (items) => refreshed(core.remove(id, items)),
       move: (item, where) => refreshed(core.move(id, item, where)),
       undo: (progress) => refreshed(core.undo(id, progress)),
+      current: async (item) => (await store.items(id)).value.find((one) => one.key === item.key),
       open: async (item) => {
         if (this.options.openItem?.(item, id, place.openerOf())) return;
         const document = store.documentOf(item.key);

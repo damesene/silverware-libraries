@@ -162,6 +162,12 @@ export type ViewHost = DocumentsHost & MentionsHost & MediaHost & {
   rename(item: Item, name: string): Promise<Result>;
   remove(items: readonly Item[]): Promise<Result>;
   move(item: Item, place: Place): Promise<Result>;
+  /**
+   * An item as the store has it now, not as the view was last given it (another place's write the view has not been
+   * drawn with yet): what a change made a while after the view showed it starts from (files uploaded added to its value);
+   * undefined where it is gone
+   */
+  current(item: Item): Promise<Item | undefined>;
   /** The database's last change put back where still as written (undefined: nothing to undo) */
   undo(progress?: WriteProgress): Promise<Result | undefined>;
   /** The item opened: in a module's own way where one takes it (the peek), else where the store says it can be (its page); a failure is said to the user */

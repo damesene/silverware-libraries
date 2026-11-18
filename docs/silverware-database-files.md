@@ -225,8 +225,21 @@ show over Assets' panel: checked in a UI test, the panel lifted where it must be
    small line are constants there (`FILE_BOXES`, `FILES_IN_LINE` 3), not the style page's variables: the image's size and
    a preview's room are reckoned in the script, which reads no CSS (nothing measured). An image smaller than its box is
    drawn larger to fit it. `ui-tests/files.spec.ts`.
-7. **The popup editor**: remove, reorder (keys too), + Add, Upload.
-8. **Paste and drop** on a cell, the popup, a card, the peek's row.
+7. **The popup editor**: remove, reorder (keys too), + Add, Upload. Done 2026-11-18: `views/fileseditor.ts`, opened by
+   `editValue` for the editor `files` (a value that does not read as files edited as text). One field adds: words of a
+   file's name (the space's files, `media.files()`), an address of the web, or a link typed; the references' search is
+   not factored out, as what both share is `domain/folders.ts`' `folderSearch` and `foundBy` already. Its leaving is
+   looked at a task after the focus goes (a control drawn anew loses it in between) and not while a grip drags (its row
+   moves in the document); a press on its buttons keeps the focus where it is (a button pressed on its icon takes none).
+   An upload written after the popup was left is added to the value as the popup wrote it.
+8. **Paste and drop** on a cell, the popup, a card, the peek's row. Done 2026-11-18: `views/takefiles.ts` (`takeFiles`: the
+   element marked, `shared/takesfiles.ts`, lit while files are dragged over it; `uploadInto`: the files added to the
+   value as the store has it once written). A card's drop goes to the value of files whose line it falls on, else the
+   first the view shows, else the database's first; a list's rows take none (no focus, no drop place of their own).
+   Found by the UI test: another block of the database is drawn with a write only once the index has it, so a card
+   dropped on just after showed the value before it and the write was refused (the file uploaded, its link lost):
+   `ViewHost.current(item)`, the item as the store has it now, is what the files are added to. Without Silverware Assets
+   a drop is still taken there and said (nothing put in the page).
 9. **The board's cover** (*Card preview*).
 10. **Files offered for deletion**: deleting a database (`core/deletedatabase.ts`) and an item ask about their files;
     the files an item alone names found by the store (every item's values of a files type read), deleted by

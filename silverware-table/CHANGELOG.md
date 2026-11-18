@@ -1,5 +1,10 @@
 # Silverware Table: changelog
 
+## 1.3.1 (2026-11-19)
+
+- Fixed: letting go of something dragged in a dialog (a column's options), or cancelling the drag with Esc, no longer counts as a click on what lies under the pointer.
+- Its thin scrollbar is now shared with every Silverware plugin; it looks as before.
+
 ## 1.3.0 (2026-11-17)
 
 - Works with SilverBullet's next version (3.0) as well as 2.12.1: settings are saved in `Library/Config` there; a table scrolls sideways in its box, scrolls up and down again where it has a maximum height, and keeps its look at full screen where SilverBullet draws tables as cards. Your own functions, types, series, menu entries, conditions and themes go in a block on a page under `Library/` there.

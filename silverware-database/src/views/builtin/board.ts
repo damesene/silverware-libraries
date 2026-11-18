@@ -16,55 +16,6 @@ import type { Item, Property } from "../../model/database.ts";
 import { edgeScroll } from "../edgescroll.ts";
 import { fieldNodes, optionPill } from "../values.ts";
 import { takeFiles, uploadInto } from "../takefiles.ts";
-import { typeIcon } from "../icons.ts";
-import { fileName, isImageTarget, readFiles } from "../../domain/types/files.ts";
-import type { PlaceMenuBuilder, PlaceMenuGroup } from "../../core/placemenu.ts";
-import type { MediaBox } from "../../core/media.ts";
-
-// Card preview in ⋯: the property of files whose first image is drawn over each card, kept in the view's meta
-const COVER_KEY = "cardPreview";
-// A cover's box (px): as wide as a card is at most (an image too wide cropped by the style page to the card's width), as high
-const COVER_BOX: MediaBox = { width: 320, height: 160, min: 60 };
-
-/** The board's own properties of files a card's cover may be of (a value of files, its look `media`) */
-const coverable = (host: ViewHost): readonly Property[] => host.database.properties.filter((one) => host.type(one).look === "media");
-
-/** The property of files the cards' covers are of, where one is picked and still is one */
-function coverOf(host: ViewHost): Property | undefined {
-  const key = host.getMeta(COVER_KEY);
-  return typeof key === "string" ? coverable(host).find((one) => one.key === key) : undefined;
-}
-
-/** An item's cover: the first image its value of files names, a button opening it; none where it names none, or files are not drawn here */
-function cover(host: ViewHost, item: Item, property: Property): HTMLElement | undefined {
-  const media = host.media;
-  const image = media && readFiles(item.values[property.key])?.find((one) => isImageTarget(one.target));
-  if (!media || !image) return undefined;
-  const name = fileName(image);
-  const button = el(host.document, "button", { class: "swd-board-cover", title: name, attrs: { type: "button", "aria-label": `Open ${name}`, draggable: "false" } }, media.draw(image.target, COVER_BOX));
-  button.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    media.open(image.target);
-  });
-  return button;
-}
-
-/** Card preview in ⋯ (the view's own, as the calendar's Dates by): None, or a property of files */
-function coverMenu(host: ViewHost, menu: PlaceMenuBuilder): readonly PlaceMenuGroup[] {
-  const all = coverable(host);
-  const now = coverOf(host);
-  const set = (key: string | undefined) => void host.setMeta({ [COVER_KEY]: key }).then(() => host.refresh());
-  const none = all.length ? {} : { disabled: "No property of files (Files & media)" };
-  return [
-    menu.slot.view([
-      menu.submenu({ label: "Card preview", icon: typeIcon("files"), value: { text: now?.label ?? "None" }, ...none }, () => [
-        menu.item({ label: "None", checked: !now, run: () => set(undefined) }),
-        ...all.map((property) => menu.item({ label: property.label, checked: property.key === now?.key, run: () => set(property.key) })),
-      ]),
-    ]),
-  ];
-}
 
 // What a card dragged carries: its own type, so dropped on the page's text it inserts nothing there
 const DRAG_TYPE = "application/x-silverware-database-item";
@@ -84,9 +35,7 @@ function draw(host: ViewHost, element: HTMLElement, drag: Drag): void {
   }
   const sorted = host.listing.sort.length > 0;
   const by = grouping.property;
-  // (The covers' property read once for the board, not once a card)
-  const covered = coverOf(host);
-  const board = el(doc, "div", "swd-board", ...grouping.groups.map((column) => columnElement(host, by, column, drag, sorted, covered)));
+  const board = el(doc, "div", "swd-board", ...grouping.groups.map((column) => columnElement(host, by, column, drag, sorted)));
   boardEdgeScroll(board, drag);
   element.replaceChildren(board);
 }
@@ -149,9 +98,9 @@ function valueText(column: ItemGroup): string {
   return one === undefined ? "" : String(one);
 }
 
-function columnElement(host: ViewHost, by: Property, column: ItemGroup, drag: Drag, sorted: boolean, covered: Property | undefined): HTMLElement {
+function columnElement(host: ViewHost, by: Property, column: ItemGroup, drag: Drag, sorted: boolean): HTMLElement {
   const doc = host.document;
-  const cards = el(doc, "div", "swd-board-cards", ...column.items.map((item) => card(host, by, item, column, drag, covered)));
+  const cards = el(doc, "div", "swd-board-cards", ...column.items.map((item) => card(host, by, item, column, drag)));
   // An item added here gets the column's value, where the property is changed by hand
   const values = column.value === undefined || by.readonly ? {} : { [by.key]: column.value };
   const box = el(
@@ -224,14 +173,12 @@ function columnElement(host: ViewHost, by: Property, column: ItemGroup, drag: Dr
   return box;
 }
 
-function card(host: ViewHost, by: Property, item: Item, column: ItemGroup, drag: Drag, covered: Property | undefined): HTMLElement {
+function card(host: ViewHost, by: Property, item: Item, column: ItemGroup, drag: Drag): HTMLElement {
   const doc = host.document;
-  const top = covered ? cover(host, item, covered) : undefined;
   const box = el(
     doc,
     "article",
     { class: "swd-board-card", attrs: { draggable: "true", "data-item": item.key } },
-    ...(top ? [top] : []),
     el(doc, "button", { class: "swd-board-name", title: `Open ${item.name}`, run: () => void host.open(item) }, host.look.icon(item), item.name),
     ...host.look.shownProperties.flatMap((property) => {
       if (property.key === by.key) return [];
@@ -241,14 +188,14 @@ function card(host: ViewHost, by: Property, item: Item, column: ItemGroup, drag:
     }),
   );
   host.look.item(item, box);
-  // Files dropped on it (it takes no focus: no paste) added to a value of files: the one whose line they fell on, else its
-  // cover's (Card preview), else the first the view shows, else the database's first
+  // Files dropped on it (it takes no focus: no paste) added to a value of files: the one whose line they fell on, else the
+  // first the view shows, else the database's first
   const files = host.database.properties.filter((one) => !one.readonly && host.type(one).look === "media");
   if (files.length)
     takeFiles(box, (given, at) => {
       const line = at.closest<HTMLElement>(".swd-board-value")?.dataset.key;
       const shown = host.look.shownProperties.map((one) => one.key);
-      const property = files.find((one) => one.key === line) ?? files.find((one) => one.key === covered?.key) ?? files.find((one) => shown.includes(one.key)) ?? files[0]!;
+      const property = files.find((one) => one.key === line) ?? files.find((one) => shown.includes(one.key)) ?? files[0]!;
       uploadInto(host, item, property.key, property.label, given);
     });
   box.addEventListener("dragstart", (event) => {
@@ -272,9 +219,6 @@ export const BOARD_VIEW: ViewDefinition = {
   icon: ICON,
   // A column per group: always grouped, by any property, the first select where none is picked
   groupBy: { required: true, draws: true, prefer: ["select"] },
-  // (Card preview names a property: a key renamed follows into it)
-  propertyMeta: [COVER_KEY],
-  menu: (host, menu) => coverMenu(host, menu),
   render(host, element) {
     const drag: Drag = {};
     draw(host, element, drag);

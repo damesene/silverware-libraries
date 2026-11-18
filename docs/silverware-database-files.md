@@ -16,8 +16,9 @@ on the branch `feat/database-files`; each step's note says what it became where 
 - **An image of an extreme aspect ratio is cropped**, centred (CSS `object-fit: cover`), never stretched: fitted into
   its box (a max width and a max height), and where its shorter side would fall under the box's minimum it is cropped
   instead of shrunk further. The whole image shows in the popup and the side panel.
-- **A board's card cover is in the first version**: the board's setting *Card preview* names a Files & media property,
-  the first image of an item's value drawn over its card.
+- **No card cover** (*Card preview*, a Files & media property's first image over each board card): built in step 9 and
+  taken out on 2026-11-18, before its release, at the user's wish (not wanted at all). A card shows its files as its other
+  lines do, small.
 - **A click on a file always opens it in Silverware Assets' side panel** in the first version, whatever Assets' setting
   for a click on a file in a page says (the user's choice: to be seen in use, then decided).
 - **Ctrl+V on a cell too**, not only in the popup and the peek: the cell of a files property focused takes a paste
@@ -35,7 +36,7 @@ on the branch `feat/database-files`; each step's note says what it became where 
   fixed number (a CSS variable, 3 by default) the rest summed up as `+N`. An image as itself; a PDF, DOCX or XLSX as its
   preview where its plugin is installed and a preview is kept in the space (none drawn anew in a list of many: its
   icon then); any other file its type's icon and name.
-- **A click on a file** (a button: in the cell, the popup, the peek, a card's cover): opened in Silverware Assets' side
+- **A click on a file** (a button: in the cell, the popup, the peek, a card): opened in Silverware Assets' side
   panel. Without Silverware Assets: a file of the space opened as SilverBullet opens it, an address in a new tab.
 - **A click in the cell beside the files**: a popup with larger previews of every file. In it: × on each, its grip to
   reorder (by the pointer, Alt+↑ ↓ from the keys), **+ Add** (a file of the space, searched by name, or an address of
@@ -47,9 +48,8 @@ on the branch `feat/database-files`; each step's note says what it became where 
   files added at the end of the value as it is once they are written.
 - **The peek**: the property's row draws the previews larger, its pencil to edit as a link's row has; the same click,
   popup, paste and drop.
-- **A board's card**: with *Card preview* set (the board's menu, as the calendar's *Dates by*), the first image of that
-  property over the card at the card's width. Other views' lines (calendar, timeline) show a files value as its
-  files' names.
+- **A board's card**: its files on their line, small, as a list's. Other views' lines (calendar, timeline) show a files
+  value as its files' names.
 - **Without Silverware Assets**: files picked and addresses typed work, images drawn by Database itself, other files
   as icon and name; no upload (its button says Silverware Assets is needed), no side panel.
 
@@ -91,7 +91,6 @@ not taken from the row.
 | Where | Box (max) | Shorter side at least, else cropped |
 | --- | --- | --- |
 | A table's cell, a list's row | 28 px high × 84 px | 14 px |
-| A board's card (cover) | the card's width × 160 px | 60 px |
 | The popup, the peek | 240 × 180 px | 90 px |
 
 An image is Database's own `<img>` (its URL from the binding, as `shared/silverbullet/embedimage.ts` makes it;
@@ -170,10 +169,7 @@ from what was first planned, the built one is written here.
   Assets' dialog is the editor's companion (`COMPANION_ATTRIBUTE`, opened with `companion: true`), so the popup does not
   finish on the focus going to it; what comes back is added to the item as it is then (read again by its key), not as
   it was as the popup opened.
-- **views/builtin/board.ts**: the cover; *Card preview* as the calendar's *Dates by*: `propertyMeta: ["cardPreview"]` on
-  the board's definition (a key renamed is followed by `placestate.ts`), `host.getMeta` / `setMeta`, offered in the
-  board's `menu` (`menu.slot.view([menu.submenu(…)])`, as `views/spans.ts`' `spanMenu`), among the Files & media
-  properties. A card is not focusable: a drop on it, no paste.
+- **views/builtin/board.ts**: a card is not focusable: files dropped on it, no paste.
 - **A paste on a cell**: a table's cell is focused by Tab (a `td` with a tabindex; a click opens its editor at once, the
   popup, which takes the paste itself). The cell of a files property listens for `paste` while focused, the browser's
   clipboard read in the event (`{ files, html, uriList }`), and hands it to `media.upload`; a paste with no file and no
@@ -201,7 +197,7 @@ Files zoom with the content as Silverware Assets' do (Silverware Layout's font z
 `shared/contentscale.ts`): `media.draw` sets its box on the element as variables (`--swd-media-width`,
 `--swd-media-height`, each `scaledPx`) and an image's fitted size as `scaledPx` too, so the browser sizes them anew as
 the zoom changes, nothing drawn again; the style page reads the box from those variables alone (no size of its own: a
-small line's height, a file's pill, the popup's rows, a card's cover). A preview of Assets' is given its room at the
+small line's height, a file's pill, the popup's rows). A preview of Assets' is given its room at the
 scale of 1, as the contract has it. The same variables hold an image in its box before it has loaded: a large one in
 the popup was drawn at its own size until its `load` sized it (reported by the user).
 
@@ -297,10 +293,8 @@ new tab, *Download*, *Remove* from the value; `Media.url`).
    dropped on just after showed the value before it and the write was refused (the file uploaded, its link lost):
    `ViewHost.current(item)`, the item as the store has it now, is what the files are added to. Without Silverware Assets
    a drop is still taken there and said (nothing put in the page).
-9. **The board's cover** (*Card preview*). Done 2026-11-18: `views/builtin/board.ts` (`coverMenu` in ⋯'s view slot, the meta
-   `cardPreview` in `propertyMeta`; a cover the first image of the value, a button opening it, drawn in a box of 320 × 160
-   with 60 its least side and cropped by the style page to the card's width). Files dropped on a card with a cover go to
-   its property. Its user docs with step 11.
+9. **The board's cover** (*Card preview*). Done 2026-11-18, taken out the same day before its release (the user's wish:
+   no cover at all; its rules had also slipped into the list's names' selector, giving a list's name a cover's margins).
 10. **Files offered for deletion**: deleting a database (`core/deletedatabase.ts`) and an item ask about their files;
     the files an item alone names found by the store (every item's values of a files type read), deleted by
     `media.remove` (Silverware Assets' `deleteFiles`, its kept previews with them); Undo of the deletion does not bring

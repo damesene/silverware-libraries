@@ -1545,27 +1545,6 @@ tr:focus-within .swd-open {
   max-width: calc(100% - 2.5em);
 }
 .swd-list-name,
-/* A card's cover (Card preview): its first image over the card, from edge to edge, as high as the script sized it; one wider
-   than the card cropped to its middle */
-.swd-board-cover {
-  display: flex;
-  justify-content: center;
-  margin: -6px -8px 2px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px 6px 0 0;
-  background: var(--swd-surface);
-  cursor: pointer;
-  overflow: hidden;
-}
-.swd-board-cover .swd-media {
-  max-width: 100%;
-}
-.swd-board-cover .swd-media img {
-  max-width: 100%;
-  object-fit: cover;
-  border-radius: 0;
-}
 .swd-board-name {
   padding: 0;
   border: 0;

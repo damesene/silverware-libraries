@@ -210,51 +210,6 @@ test("files dropped on the files' popup: added to its list, written as it is lef
   await expect.poll(() => space.saved("Page/db-files/Holiday")).toContain(`  - "[[${space.folder}/Page/db-files/files/dropped.png]]"`);
 });
 
-test("a board's Card preview: the first image of the property picked over each card, opened by a press, files dropped there added to it; None takes it off", async ({ page, space }) => {
-  const root = ROOT.replace("    photos: { type: files, label: Photos }", "    status: { type: select, label: Status, options: [Todo] }\n    docs: { type: files, label: Docs }\n    photos: { type: files, label: Photos }");
-  const card = `---\ntags: [db]\nstatus: Todo\ndocs: ["[[${space.folder}/files/a.png]]"]\nphotos: ["[[${space.folder}/files/report.pdf]]", "[[${space.folder}/files/b.png]]"]\n_database:\n  rank: a0\n---\n`;
-  await space.open(
-    { Page: "# Page\n\n```silverware-database\nid: files\nview: board\n```\n", "Page/db-files": root, "Page/db-files/Holiday": card },
-    "Page",
-    { "files/a.png": PNG, "files/b.png": PNG, "files/report.pdf": "%PDF-1.4\n" },
-  );
-  const holiday = page.locator(".swd-board-card", { hasText: "Holiday" });
-  await expect(holiday).toBeVisible();
-  await expect(holiday.locator(".swd-board-cover")).toHaveCount(0);
-  // Card preview in ⋯: None and the properties of files, Photos picked
-  await page.locator(".swd-more").click();
-  await page.locator(".swd-menu .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: /^Card preview/ }) }).click();
-  await expect(page.locator(".swd-menu:not([hidden]) .swd-menu-item .swd-label")).toContainText(["None", "Docs", "Photos"]);
-  await page.locator(".swd-menu:not([hidden]) .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: /^Photos$/ }) }).click();
-  // (Kept in the block; its first image, the PDF before it passed over)
-  await expect.poll(() => space.saved("Page")).toContain("board.cardPreview: photos");
-  const cover = holiday.locator(".swd-board-cover");
-  await expect(cover).toHaveAttribute("aria-label", "Open b.png");
-  await expect(cover.locator("img")).toHaveAttribute("src", /files\/b\.png$/);
-  // (As wide as the card at most)
-  const [coverBox, cardBox] = [(await cover.boundingBox())!, (await holiday.boundingBox())!];
-  expect(coverBox.width).toBeLessThanOrEqual(cardBox.width + 0.5);
-  await cover.click();
-  await expect(page.locator(".swa-side-panel .swa-panel-title")).toHaveText("b.png");
-  await page.keyboard.press("Escape");
-  // Files dropped on the cover: added to its property, not the first of the card
-  await give(cover, ["beach.png"], "drop");
-  const dialog = page.locator(".swa-dialog.swa-insert-window");
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: /^(Add|Insert)/ }).click();
-  await expect.poll(() => space.saved("Page/db-files/Holiday")).toContain("beach.png");
-  const saved = (await space.saved("Page/db-files/Holiday"))!;
-  expect(saved).toContain(`docs: ["[[${space.folder}/files/a.png]]"]`);
-  // (In the order kept, the new one last, in the list's own form: a list on one line kept so)
-  expect(saved).toMatch(/photos: \["\[\[[^\n"]*report\.pdf\]\]", "\[\[[^\n"]*b\.png\]\]", "\[\[[^\n"]*beach\.png\]\]"\]/);
-  // None: no cover
-  await page.locator(".swd-more").click();
-  await page.locator(".swd-menu .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: /^Card preview/ }) }).click();
-  await page.locator(".swd-menu:not([hidden]) .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: /^None$/ }) }).click();
-  await expect(holiday.locator(".swd-board-cover")).toHaveCount(0);
-  await expect.poll(() => space.saved("Page")).not.toContain("cardPreview");
-});
-
 /** SilverBullet's question answered (its modal's Ok or Cancel), once it says what is given */
 async function answer(page: import("@playwright/test").Page, says: string, ok: boolean): Promise<void> {
   const prompt = page.locator("dialog.sb-modal-box .sb-prompt");
@@ -302,31 +257,26 @@ test("a database deleted with its files where ticked in its dialog", async ({ pa
   expect(space.hasFile("files/a.png")).toBe(true);
 });
 
-test("files zoom with the content (Silverware Layout's font zoom with files): a cell's line, its images and a card's cover twice as large at twice the zoom", async ({ page, space }) => {
-  const root = ROOT.replace("    photos:", "    status: { type: select, label: Status, options: [Todo] }\n    photos:");
-  const card = withFiles(space.folder, "a0", ["a.png", "report.pdf"]).replace("photos:", "status: Todo\nphotos:");
+test("files zoom with the content (Silverware Layout's font zoom with files): a cell's line and its images twice as large at twice the zoom", async ({ page, space }) => {
   await space.open(
-    { Page: "# Page\n\n```silverware-database\nid: files\nview: table\n```\n\n```silverware-database\nid: files\nview: board\nboard.cardPreview: photos\n```\n", "Page/db-files": root, "Page/db-files/Holiday": card },
+    { Page: "# Page\n\n```silverware-database\nid: files\nview: table\n```\n", "Page/db-files": ROOT, "Page/db-files/Holiday": withFiles(space.folder, "a0", ["a.png", "report.pdf"]) },
     "Page",
     { "files/a.png": PNG, "files/report.pdf": "%PDF-1.4\n" },
   );
   const cell = page.locator(".swd-table tbody tr", { hasText: "Holiday" }).locator('td[data-key="photos"]');
   const image = cell.locator(".swd-media-button img");
-  const cover = page.locator(".swd-board-cover img");
   await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && !!img.style.height)).toBe(true);
-  await expect.poll(() => cover.evaluate((img: HTMLImageElement) => img.complete && !!img.style.height)).toBe(true);
   const sizes = async () => ({
     strip: Math.round((await cell.locator(".swd-media-strip").boundingBox())!.height),
     image: Math.round((await image.boundingBox())!.height),
     file: Math.round((await cell.locator('[data-swd-media="file"]').boundingBox())!.height),
-    cover: Math.round((await cover.boundingBox())!.height),
   });
   const before = await sizes();
-  expect([before.strip, before.image, before.cover]).toEqual([28, 28, 160]);
+  expect([before.strip, before.image]).toEqual([28, 28]);
   // (The scale Silverware Layout sets on the root as the font is zoomed, files following it: nothing drawn again)
   await page.evaluate(() => document.documentElement.style.setProperty("--sw-content-scale", "2"));
   expect(before.file).toBe(24);
-  await expect.poll(sizes).toEqual({ strip: 56, image: 56, file: 48, cover: 320 });
+  await expect.poll(sizes).toEqual({ strip: 56, image: 56, file: 48 });
   await page.evaluate(() => document.documentElement.style.removeProperty("--sw-content-scale"));
   await expect.poll(sizes).toEqual(before);
 });

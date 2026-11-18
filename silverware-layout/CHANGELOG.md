@@ -1,5 +1,10 @@
 # Silverware Layout: changelog
 
+## 2.0.1 (2026-11-18)
+
+- A grid's cell draws quotes, headings, bold text, code and `---` as the page does: their colours, font, sizes and spacing.
+- Code in a cell highlighted in its language, with Silverware Editor installed.
+
 ## 2.0.0 (2026-11-17)
 
 - **Breaking:** the command **Silverware Layout: Page layout** is now **Silverware Layout: Settings**: a keyboard shortcut or a toolbar button that runs it by its old name needs the new one. Your settings and the widths kept in your pages stay as they are.

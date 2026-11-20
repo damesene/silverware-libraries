@@ -621,7 +621,7 @@ export class Controller implements TableHost {
     return this.platform.editor.documentName();
   }
 
-  async replaceTables(document: string, changes: readonly TableChange[], options?: { readonly formatted?: boolean }): Promise<WriteResult> {
+  async replaceTables(document: string, changes: readonly TableChange[]): Promise<WriteResult> {
     const { editor, space } = this.platform;
     const open = (await editor.documentName()) === document;
     let text: string;
@@ -636,7 +636,7 @@ export class Controller implements TableHost {
     const keys = this.register.keysOf(document, text);
     const changed = new Map(changes.map((c) => [c.key, c.change]));
     if (changes.some((c) => !keys.includes(c.key))) return "failed";
-    const serialize = options?.formatted ? await this.serializer() : (table: Table) => serializeTable(table);
+    const serialize = await this.serializer();
     // From the last table up, so the earlier ones keep their places
     let written = text;
     for (let i = ranges.length - 1; i >= 0; i--) {

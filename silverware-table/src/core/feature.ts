@@ -627,11 +627,11 @@ export interface ModelHost {
   tables(document: string): Promise<readonly StoredTable[] | null>;
   /**
    * A document's tables changed in one edit, by their keys (the open page's: one step of its undo; another's written
-   * whole), each change given the table as it is now; as they are, no module's write step taking part (a page
-   * command over every table, edits held for a page left). `formatted`: as the autoFormat setting writes tables.
-   * "failed" where one of the tables is not in the document (or it is not there)
+   * whole), each change given the table as it is now, written as every write writes tables (autoFormat); no module's
+   * write step taking part (a page command over every table, edits held for a page left). "failed" where one of the
+   * tables is not in the document (or it is not there)
    */
-  replaceTables(document: string, changes: readonly TableChange[], options?: { readonly formatted?: boolean }): Promise<WriteResult>;
+  replaceTables(document: string, changes: readonly TableChange[]): Promise<WriteResult>;
   /**
    * The open page's tables in order, as last read (pageText): the same list while that text is (a module's state kept
    * for the page compares it), a table of the page found in it by its key

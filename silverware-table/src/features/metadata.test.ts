@@ -197,6 +197,26 @@ describe("Table metadata", () => {
     expect(flashes).toEqual(["Silverware Table: removed the metadata of 2 table(s)"]);
   });
 
+  it("writes the tables the command removes metadata from as any edit writes them: aligned with auto-format on", async () => {
+    // (One table's Remove metadata is a write as any other: the page's command writes alike)
+    const written = async (all: boolean) => {
+      controller.stop();
+      document.body.replaceChildren();
+      await setup(META_PAGE, { "silverware.table.autoFormat": true });
+      bridge.confirm = () => true;
+      if (all) await controller.removeAllMetadata();
+      else {
+        tableMenuItem(/^Remove metadata$/)!.click();
+        await flush();
+      }
+      return text;
+    };
+    const one = await written(false);
+    expect(one).not.toContain("<meta");
+    expect(one).not.toBe("| Name | Qty |\n|---|---|\n| Pear | 3 |\n| apple | 10 |\n");
+    expect(await written(true)).toBe(one);
+  });
+
   it("shows the rows as written once the metadata with their sorting is removed", async () => {
     await setup(META_PAGE);
     expect(bodyTexts()).toEqual(["apple", "Pear"]); // stored: Qty descending

@@ -414,8 +414,11 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    takes a page's tables, not its text (the Lua API's text made into tables
    by the entry, `tablesOfText`; an error's place given as table, row and
    column, its offset the entry's). `host.replaceTables(document, changes)`:
-   a document's tables changed in one edit by key, no module's write step
-   (Remove metadata, lazy saving into a page left). `host.tableData(info)`:
+   a document's tables changed in one edit by key, written as every write
+   writes tables (autoFormat), no module's write step (Remove metadata, lazy
+   saving into a page left; decided 2026-11-20 with the user: the page's
+   Remove metadata aligned as one table's always was, no option of the
+   markdown's form in the interface). `host.tableData(info)`:
    a table as `silverware.table.tables` gives it, made by the core, so the
    custom menus' context is unchanged (the check below is for when the core
    no longer has offsets, step 4 or 6). Modules read no markdown, no page

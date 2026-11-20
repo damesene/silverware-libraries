@@ -201,8 +201,8 @@ class LazyTable {
         skipped = applied.skipped;
         return applied.table;
       };
-      // Its table there by its key, written as tables are (autoFormat)
-      if ((await this.host.replaceTables(held.page, [{ key: held.key, change }], { formatted: true })) === "failed") return lost();
+      // Its table there by its key
+      if ((await this.host.replaceTables(held.page, [{ key: held.key, change }])) === "failed") return lost();
       this.held = undefined;
       const saved = count - skipped;
       if (saved) this.host.notify(`Silverware Table: saved ${saved} ${saved === 1 ? "cell" : "cells"} edited on ${held.page}`, "info");

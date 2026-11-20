@@ -18,7 +18,7 @@
 // This is the formulas' API for the rest of Silverware Table; the parts are the
 // files beside it, the functions in builtin/ (only functions: what a formula
 // can call), custom functions in custom.ts, which exist in registry.ts.
-import type { KeyedModel } from "../model/model.ts";
+import type { KeyedModel, TableModel } from "../model/model.ts";
 export { type CalculatedBy, type CalculatedRead, type HeldFormulas, type CellNameAt, cellResult, resultContent, PLAIN_CELLS, withEquals, cellsByName, errorCodeIn, type FormulaCells, formulaCount, forFormulas, hasFormulas, isErrorText, isFormulaInput, type RowName, rowsByName, type StoredFormula } from "./cell.ts";
 
 /**
@@ -36,18 +36,18 @@ export type FormulasOffer = {
    * choices; `table`, the table the formula is of (as a cell's formula is): its columns in [ ] and [@ ], its named
    * rows and cells, its own name's prefix, as a cell's formula has them
    */
-  readonly complete: (formula: string, caret: number, tables: readonly KeyedModel[], table?: import("../model/model.ts").TableModel) => import("./help.ts").FormulaChoices | undefined;
+  readonly complete: (formula: string, caret: number, tables: readonly KeyedModel[], table?: TableModel) => import("./help.ts").FormulaChoices | undefined;
   /** The function the caret is in, its syntax with the argument at the caret; undefined out of any */
   readonly help: (formula: string, caret: number) => import("./help.ts").FormulaHelp | undefined;
   /** Why a formula does not read (a ")" missing); undefined: it does */
   readonly validate: (formula: string) => string | undefined;
   /** A formula of one row (`[@due] < TODAY()`) calculated for each body row of a table of the page shown (values[0]: row 1), as a cell of none */
-  readonly rowValues: (table: import("../model/model.ts").TableModel, formula: string) => readonly import("./values.ts").Scalar[];
+  readonly rowValues: (table: TableModel, formula: string) => readonly import("./values.ts").Scalar[];
   /**
    * A formula of `table`'s calculated in none of its cells, on the page shown (a choice list's): its values as cells
    * show them, in the result's order, or why there are none; undefined where it reads a page or source not read
    */
-  readonly list: (table: import("../model/model.ts").TableModel, formula: string) => readonly string[] | import("./values.ts").FormulaError | undefined;
+  readonly list: (table: TableModel, formula: string) => readonly string[] | import("./values.ts").FormulaError | undefined;
   /**
    * A view's formula calculated on the page shown, as a write would (its result a grid, or why there is none;
    * undefined where it reads a page not read): `table` the view's own (none: a view to be inserted), `replace` a
@@ -55,8 +55,8 @@ export type FormulasOffer = {
    */
   readonly view: (
     formula: string,
-    table?: import("../model/model.ts").TableModel,
-    replace?: { readonly key: string; readonly table: import("../model/model.ts").TableModel },
+    table?: TableModel,
+    replace?: { readonly key: string; readonly table: TableModel },
   ) => import("./values.ts").Grid | import("./values.ts").FormulaError | undefined;
   /**
    * The Functions dialog for a formula typed outside a cell (a view's dialog: the Functions dialog opens over it), its
@@ -74,8 +74,8 @@ export type FormulasOffer = {
    * its module writes it (what its Out of date compares with), or why it cannot be; undefined where it is none or
    * reads a page not read
    */
-  readonly calculated: (table: import("../model/model.ts").TableModel) => import("../model/model.ts").TableModel | import("./values.ts").FormulaError | undefined;
-  readonly fieldHelpers: (table?: () => import("../model/model.ts").TableModel, outside?: import("./help.ts").FormulaHelp) => import("../formulafield.ts").FormulaHelpers;
+  readonly calculated: (table: TableModel) => TableModel | import("./values.ts").FormulaError | undefined;
+  readonly fieldHelpers: (table?: () => TableModel, outside?: import("./help.ts").FormulaHelp) => import("../formulafield.ts").FormulaHelpers;
 };
 
 /**
@@ -95,7 +95,7 @@ export type FormulaErrorAt = {
 
 /** What the pageLinks module offers: the other pages these formulas and tables refer to (and theirs, in turn) read anew; which they are */
 export type PageLinksOffer = {
-  readonly readFor: (formulas: readonly string[], tables: readonly import("../model/model.ts").TableModel[]) => Promise<readonly string[]>;
+  readonly readFor: (formulas: readonly string[], tables: readonly TableModel[]) => Promise<readonly string[]>;
   // Pages read for another module (a pivot's source), as `otherPages` then gives them; `fresh`: read again those read before
   readonly readPages: (pages: readonly string[], fresh: boolean) => Promise<void>;
 };
@@ -107,7 +107,7 @@ export type PageLinksOffer = {
  */
 export type CalculatedOffer = {
   /** How a table is calculated, undefined for one the module does not calculate */
-  readonly calculated: (table: import("../model/model.ts").TableModel) => import("./cell.ts").CalculatedBy | undefined;
+  readonly calculated: (table: TableModel) => import("./cell.ts").CalculatedBy | undefined;
 };
 
 /**
@@ -117,7 +117,7 @@ export type CalculatedOffer = {
  */
 export type HeldFormulasOffer = {
   /** The formulas a table holds so, and how they are written back; undefined where it holds none */
-  readonly held: (table: import("../model/model.ts").TableModel) => import("./cell.ts").HeldFormulas | undefined;
+  readonly held: (table: TableModel) => import("./cell.ts").HeldFormulas | undefined;
 };
 export { type Area, areaText, callsCustomFunctions, callsPureFunctionsOnly, columnIdText, formulaPages, formulaTableNames, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, formulaSources, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredSources, referredTableNames, type SourceRef, type TableRef, withColumnKeys } from "./references.ts";
 export { autofixFormula, type FormulaFix, qualifyCellNames } from "./autofix.ts";

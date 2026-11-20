@@ -82,7 +82,7 @@ export function rowNameIn(cells: readonly string[]): { readonly name: string; re
   return undefined;
 }
 
-/** A named row: its name as written, its row (the header 0, the body from 1) */
+/** A named row: its name as written, its row (of the body: the first 1) */
 export type RowName = { readonly name: string; readonly row: number };
 
 /** A named body cell: its name as written, its row (the body from 1) and column */

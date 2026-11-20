@@ -748,6 +748,24 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
 4. **Outside tables.** Places through the store, `reveal`, `InsertPlace`;
    `TextPosition`, `TextWritten`, `WritePage` gone from the interfaces, the
    offsets left only in the markdown store.
+   **Done (2026-11-20)**: a new table's place is an `InsertPlace` (after a
+   table, or the cursor, read by the core as the table is written: no offset,
+   `cursorNow` gone from the modules' host); the formulas written in a page's
+   text are `PageFormulaStore`'s (*Decided (2026-11-20)* 7: keys that hold
+   from a read to a write, a text the place cannot hold refused and said;
+   `pageFormulasWritten` in place of `otherTextWritten`, `TextWritten` and
+   `WritePage.text` gone; the finder's registry the markdown store's,
+   `store/markdown/pageformulas.ts`); the core's own writes on the model
+   (a sorting stored or sorted into the rows, pins, Silverware Layout's
+   entries: `writeTable`), the markdown written only where no model expresses
+   it (Format table's padding, Remove metadata: `writeMarkdown`,
+   `replaceMarkdown`), the widget's `write` gone. `revealCell` takes a cell
+   by its table, no offset; the links of `errorsText` (`[[page@pos]]`) are
+   the Lua API's (step 6). `WritePage` keeps its name, its text gone: "page"
+   or "document" is weighed for the whole host at once (step 8). Left in the
+   core on the markdown: the write pipeline itself (the metadata setting's
+   step, `withoutNewTagValues` the one user of ops.ts left), which goes into
+   the markdown store with the page writer (4b).
 4b. **Through the page writer.** The markdown store writes through the page
     writer (`shared/pages/`, built for Silverware Database): its codec
     registered as the writer's part `tables`, a transaction a batch of the
@@ -807,7 +825,9 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    by change to the user, each a breaking change (`!`, a major version, the
    changelog saying what to change), stored attributes read in their old names
    too where tables hold them. Names known to be wrong are fixed in the step
-   that touches them, not left for this one.
+   that touches them, not left for this one. Known already: "page" and
+   "document" for one thing (the store's `tables(document)`, the host's
+   `currentPage`, `pageTables`, `WritePage`, `pageNameNow`).
 
 Rough size, not measured, **as estimated on 2026-11-06**: step 1 a day or
 two; step 2 the largest by files (about 25), a week or more; step 3 the

@@ -17,7 +17,7 @@ import type { Rect } from "./geometry.ts";
 
 export type { Dialog, DialogOptions } from "./dialog.ts";
 export type { Rect } from "./geometry.ts";
-import type { IndexMap } from "../ops.ts";
+import type { IndexMap } from "../model/ops.ts";
 import type { Table } from "../markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "../menu.ts";
 import type { MenuBuilder, MenuGroup, MenuSection } from "../../../shared/menuslots.ts";

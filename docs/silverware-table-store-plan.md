@@ -791,6 +791,29 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
       (lazy saving, another page's table) keep the writer's check. The
       contract tests have a write meeting a change of the page between its
       read and its write.
+    **How (decided 2026-11-21, with the user)**: in two parts, the first
+    `shared/`'s alone. (1) The writer: its registry opened (`PageChange` a map
+    of kinds plugins add to, as `PageSections` is now, and parts registered
+    from outside), its option to plan the open page anew where it changed,
+    every plugin writing through it (Database, Tags, Layout, Assets) built
+    and tested with it, nothing of the table yet. (2) The markdown store on
+    it: its parts (a table found by its text and its order among the page's
+    tables, as the writer finds a code block; a page formula), other
+    plugins' edits of a write (`onWrite`) as `editText`, lazy saving's own
+    path gone. Weighed against writing the table through `editText` alone (no
+    change of `shared/`, but the codec no part of the writer, other plugins
+    unable to write a table through it, and a retry of the table's around
+    the writer) and against the table keeping a writer of its own (two
+    writers of pages, no report nor undo for a page not open): chosen as one
+    writer of pages for every plugin, and for the MCP server to come (writes
+    to pages not open, with a report). **The table's transactions take the
+    database's shape** (`plan`, `apply`, `planUndo`, parts left with their
+    cause, `changed`, `missing`, `refused`, a revision checked as written)
+    without a module of their own in `shared/` yet: weighed against a
+    skeleton shared now (the database's released API changed, an abstraction
+    made of two stores whose needs differ: batches with a preview, quick
+    writes of one step), the common part is drawn out in step 8, from both
+    done.
 5. **The other stores.** The memory store and the views plan's sources on the
    store interface, both passing the contract tests; a few module tests over
    the memory store as the proof that modules need no text (the rest keep the
@@ -827,7 +850,10 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    too where tables hold them. Names known to be wrong are fixed in the step
    that touches them, not left for this one. Known already: "page" and
    "document" for one thing (the store's `tables(document)`, the host's
-   `currentPage`, `pageTables`, `WritePage`, `pageNameNow`).
+   `currentPage`, `pageTables`, `WritePage`, `pageNameNow`). The stores' common part
+   drawn out into `shared/` where the table's and the database's are alike
+   (revisions, plans and reports by parts, the causes a part is left for, the
+   contract tests' harness), decided 2026-11-21 (step 4b).
 
 Rough size, not measured, **as estimated on 2026-11-06**: step 1 a day or
 two; step 2 the largest by files (about 25), a week or more; step 3 the

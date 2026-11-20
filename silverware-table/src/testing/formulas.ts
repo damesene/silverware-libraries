@@ -11,7 +11,8 @@ import * as page from "../formulas/page.ts";
 import { type ExcelTable, excelFormula as excelFormulaOf } from "../excel/formulas.ts";
 import type { ExcelTemplates } from "../excel/functions.ts";
 import type { PageTable, Table } from "../markdown.ts";
-import { metaName, metaPins, metaValue, withMetaPins } from "../meta.ts";
+import { metaName, metaPins, withMetaPins } from "../meta.ts";
+import { ownMeta } from "../core/metaaccess.ts";
 import { attributeIn, type TableModel, withAttributeIn } from "../model/model.ts";
 import { calculatedTable, viewCalculated } from "../calculated/index.ts";
 import { modelCellNames, modelRowNames, withCellName } from "../names.ts";
@@ -31,11 +32,14 @@ export const CELLS: domain.FormulaCells = formulaCellsOf(
   { rowNames: modelRowNames, cellNames: modelCellNames },
 );
 
-// The cells with views as the view module keeps them (view.formula in the metadata row), written with no header renamed
+// What the view module's host gives it of what tables keep: its own attributes
+const VIEW_META = ownMeta("view", () => true);
+
+// The cells with views as the view module keeps them (its attribute formula, view.formula in the metadata row), written with no header renamed
 export const VIEW_CELLS: domain.FormulaCells = {
   ...CELLS,
   calculated: (table) => {
-    const formula = metaValue(table, "view", "formula");
+    const formula = VIEW_META.attribute(table, "formula");
     if (!formula) return undefined;
     return {
       formulas: [formula],

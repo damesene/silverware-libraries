@@ -2740,8 +2740,10 @@ export class Controller implements TableHost {
       // After the table, at the position, else at the page's end; an empty line around it
       const { at, before, after: trail } = tablePlace(text, range ? { after: range } : after && "position" in after ? after : undefined);
       const serialize = await this.serializer();
-      // Written as a new table, indented as the table it goes after (the codec's form of the new one: none read)
-      const table = encode(model, { indent: range ? parseTable(range.text).indent : "", align: [], rows: [], padded: false });
+      // Written as a new table, indented as the table it goes after (the codec's form of the new one: none read), each
+      // row anew: a line read elsewhere (a table made from markdown) is not its line, nor indented as it
+      const encoded = encode(model, { indent: range ? parseTable(range.text).indent : "", align: [], rows: [], padded: false });
+      const table = { ...encoded, rows: encoded.rows.map((row) => ({ cells: row.cells })) };
       // The new table's text: its key's once it is in the page
       if (key) this.register.writing(key, serialize(table).trimEnd());
       const insert = `${before}${serialize(table)}${trail}`;

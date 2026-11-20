@@ -66,7 +66,7 @@ export class ChoicesDialog {
     const table = (this.host.tableFor(info.key) ?? info).model;
     const header = table.rows[0]?.cells[column] ?? "";
     const columnName = unescapeCell(withoutTags(withColumnType(header, undefined)));
-    const stored = this.host.metaOf(table);
+    const stored = this.host.attributes(table);
     const formulas = this.host.offered<FormulasOffer>("formulas");
     const was = choiceListOf(unescapeCell(header));
     // The list the column names, kept in the table (one that does not read is replaced: its values start from the column's)
@@ -83,7 +83,7 @@ export class ChoicesDialog {
     const nameField = el(doc, "input", { class: "swt-choices-name", attrs: { spellcheck: "false", "aria-label": "Name of the list" } });
     nameField.value = was ?? listNameFor(columnName, taken);
     // A list needs the metadata setting, but where the column's is kept already
-    const storable = kept || this.host.canStoreMeta(table, listKey(nameField.value));
+    const storable = kept || this.host.canStore(table, listKey(nameField.value));
     // A column of a list (or one becoming a choice column, where a list can be kept) starts on its list, `#choice` on the column's values
     const plainChoice = was === undefined && isChoice(columnTypeOf(unescapeCell(header)));
     let way: Way = keptFormula !== undefined ? "formula" : storable && !plainChoice ? "list" : "column";
@@ -303,7 +303,7 @@ export class ChoicesDialog {
   private validateName(table: Table, name: string, taken: readonly string[]): string | undefined {
     if (!LIST_NAME_RE.test(name)) return "A list's name is lower case letters (a to z) and digits, words joined by dashes, starting with a letter.";
     if (taken.includes(name)) return `The table has a list named ${name} already.`;
-    if (!this.host.canStoreMeta(table, listKey(name))) return "Lists are kept in the table's metadata: turn on Store table metadata in the settings to save one.";
+    if (!this.host.canStore(table, listKey(name))) return "Lists are kept in the table's metadata: turn on Store table metadata in the settings to save one.";
     return undefined;
   }
 
@@ -334,8 +334,8 @@ export class ChoicesDialog {
    */
   private written(t: Table, column: number, was: string | undefined, kept: boolean, name: string, value: string, renamed: ReadonlyMap<string, string>): Table {
     let table = t;
-    if (was !== undefined && kept && was !== name) table = this.host.setMeta(table, listKey(was), undefined);
-    table = this.host.setMeta(table, listKey(name), value);
+    if (was !== undefined && kept && was !== name) table = this.host.withAttribute(table, listKey(was), undefined);
+    table = this.host.withAttribute(table, listKey(name), value);
     const columns = (table.rows[0]?.cells ?? []).flatMap((header, c) => (c === column || (was !== undefined && choiceListOf(unescapeCell(header)) === was) ? [c] : []));
     for (const c of columns) {
       table = setCell(table, 0, c, withColumnType(table.rows[0]?.cells[c] ?? "", `choice-${name}`));

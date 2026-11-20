@@ -538,7 +538,7 @@ export class Controller implements TableHost {
    * on, or a sorting is stored already (it may change, its column too, or go)
    */
   private sortStorable(table: Table): boolean {
-    return this.metadataOn || this.coreMeta.columnsMeta(table, "sort").size > 0;
+    return this.metadataOn || this.coreMeta.columnAttributes(table, "sort").size > 0;
   }
 
   /** Asks before a destructive change (in SilverBullet its dialog, else the browser's) */
@@ -731,32 +731,32 @@ export class Controller implements TableHost {
 
   // ---- what tables keep: the core's own, and the names every part reads --------------
 
-  getMeta(table: Table, key: string, at?: { readonly column: number }): string | undefined {
-    return this.coreMeta.getMeta(table, key, at);
+  attribute(table: Table, key: string, at?: { readonly column: number }): string | undefined {
+    return this.coreMeta.attribute(table, key, at);
   }
 
-  setMeta(table: Table, key: string, value: string | undefined, at?: { readonly column: number }): Table {
-    return this.coreMeta.setMeta(table, key, value, at);
+  withAttribute(table: Table, key: string, value: string | undefined, at?: { readonly column: number }): Table {
+    return this.coreMeta.withAttribute(table, key, value, at);
   }
 
-  metaOf(table: Table): ReadonlyMap<string, string> {
-    return this.coreMeta.metaOf(table);
+  attributes(table: Table): ReadonlyMap<string, string> {
+    return this.coreMeta.attributes(table);
   }
 
-  columnsMeta(table: Table, key: string): Map<number, string> {
-    return this.coreMeta.columnsMeta(table, key);
+  columnAttributes(table: Table, key: string): Map<number, string> {
+    return this.coreMeta.columnAttributes(table, key);
   }
 
-  setColumnsMeta(table: Table, key: string, values: ReadonlyMap<number, string>): Table {
-    return this.coreMeta.setColumnsMeta(table, key, values);
+  withColumnAttributes(table: Table, key: string, values: ReadonlyMap<number, string>): Table {
+    return this.coreMeta.withColumnAttributes(table, key, values);
   }
 
   getCellTag(cell: string, key: string): string | undefined {
     return this.coreMeta.getCellTag(cell, key);
   }
 
-  canStoreMeta(table: Table, key: string, at?: { readonly column: number }): boolean {
-    return this.coreMeta.canStoreMeta(table, key, at);
+  canStore(table: Table, key: string, at?: { readonly column: number }): boolean {
+    return this.coreMeta.canStore(table, key, at);
   }
 
   canStoreCellTag(cell: string, key: string): boolean {
@@ -778,7 +778,7 @@ export class Controller implements TableHost {
   }
 
   canPin(table: Table, edge: "top" | "bottom" | "left" | "right"): boolean {
-    return this.coreMeta.canStoreMeta(table, `pin-${edge}`);
+    return this.coreMeta.canStore(table, `pin-${edge}`);
   }
 
   pinsOf(table: Table): Pins {
@@ -827,7 +827,7 @@ export class Controller implements TableHost {
   }
 
   withTableName(table: Table, name: string | undefined): Table {
-    return this.coreMeta.setMeta(table, "name", name);
+    return this.coreMeta.withAttribute(table, "name", name);
   }
 
   columnName(table: Table, column: number): string | undefined {

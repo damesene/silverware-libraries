@@ -136,8 +136,8 @@ export class Conditions implements Feature {
 
   /** A table's rules in the order they apply: the table's and named rows', each column's */
   private rulesIn(table: Table): StoredRule[] {
-    const own = rulesOf(this.host.getMeta(table, RULES), { kind: "table" });
-    const columns = [...this.host.columnsMeta(table, RULES)].flatMap(([column, text]) => rulesOf(text, { kind: "column", column }));
+    const own = rulesOf(this.host.attribute(table, RULES), { kind: "table" });
+    const columns = [...this.host.columnAttributes(table, RULES)].flatMap(([column, text]) => rulesOf(text, { kind: "column", column }));
     return inOrder([...own, ...columns]);
   }
 
@@ -149,11 +149,11 @@ export class Conditions implements Feature {
     for (const rule of ordered) if (rule.scope.kind === "column") columns.set(rule.scope.column, [...(columns.get(rule.scope.column) ?? []), rule]);
     const texts = new Map<number, string>();
     for (const [column, list] of columns) texts.set(column, rulesText(list)!);
-    return this.host.setColumnsMeta(this.host.setMeta(table, RULES, rulesText(own)), RULES, texts);
+    return this.host.withColumnAttributes(this.host.withAttribute(table, RULES, rulesText(own)), RULES, texts);
   }
 
   private canStore(table: Table): boolean {
-    return this.host.canStoreMeta(table, RULES);
+    return this.host.canStore(table, RULES);
   }
 
   // ---- looks ------------------------------------------------------------------------------------

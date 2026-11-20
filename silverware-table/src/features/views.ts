@@ -41,11 +41,11 @@ export class Views implements Feature {
       },
       follow: (before, after, following) => {
         const followed = followFormula(formula, before, after, following);
-        const named = followed === formula ? table : this.host.setMeta(table, "formula", followed);
+        const named = followed === formula ? table : this.host.withAttribute(table, "formula", followed);
         // A header the user named after a source column renamed: kept by the column's new id
-        const renames = readRenames(this.host.getMeta(named, "headers"));
+        const renames = readRenames(this.host.attribute(named, "headers"));
         const moved = renamedViewIds(renames, renamedColumns(before, after, following.columnMap));
-        return moved === renames ? named : this.host.setMeta(named, "headers", Object.keys(moved).length ? JSON.stringify(moved) : undefined);
+        return moved === renames ? named : this.host.withAttribute(named, "headers", Object.keys(moved).length ? JSON.stringify(moved) : undefined);
       },
     };
   }
@@ -56,7 +56,7 @@ export class Views implements Feature {
 
   /** A view's formula, with its "=" (it may be written without) */
   private formulaOf(table: Table): string | undefined {
-    const formula = this.host.getMeta(table, "formula")?.trim();
+    const formula = this.host.attribute(table, "formula")?.trim();
     if (!formula) return undefined;
     return formula.startsWith("=") ? formula : `=${formula}`;
   }
@@ -64,11 +64,11 @@ export class Views implements Feature {
   /** The view with its result written over its body (src/calculated/), its renamed headers kept by their columns' ids */
   private written(table: Table, result: Grid, before?: Table): Table {
     const calculated = viewCalculated(result);
-    let renames = readRenames(this.host.getMeta(table, "headers"));
+    let renames = readRenames(this.host.attribute(table, "headers"));
     // A header renamed in this edit: the user's name for its column from now on
     if (before) renames = renamedIn(before, table, calculated, renames);
     const made = calculatedTable(table, calculated, renames, { pinsOf: this.host.pinsOf, withPins: this.host.withPins });
-    return this.host.setMeta(made, "headers", storedRenames(renames, calculated));
+    return this.host.withAttribute(made, "headers", storedRenames(renames, calculated));
   }
 
   // ---- what a view is, and whether it is up to date ------------------------------------
@@ -165,7 +165,7 @@ export class Views implements Feature {
   /** The table to insert: the formula and the name in its metadata row, its body the result */
   private made(formula: string, name: string, indent: string, result: Grid): Table {
     const empty: Table = { indent, align: [], rows: [{ cells: [""] }], padded: false };
-    const named = this.host.withTableName(this.host.setMeta(empty, "formula", formula), name || undefined);
+    const named = this.host.withTableName(this.host.withAttribute(empty, "formula", formula), name || undefined);
     return this.written(named, result);
   }
 
@@ -199,7 +199,7 @@ export class Views implements Feature {
   /** Why no view can be inserted or saved (its metadata not stored, the formulas off), if so */
   private blocked(table: Table): string | undefined {
     if (!this.formulas()) return FORMULAS_OFF;
-    return this.host.canStoreMeta(table, "formula") ? undefined : "A view is kept in its table's metadata: turn on Store table metadata in the settings";
+    return this.host.canStore(table, "formula") ? undefined : "A view is kept in its table's metadata: turn on Store table metadata in the settings";
   }
 
   /** The dialog, its preview calculated as a write would calculate the view */
@@ -269,7 +269,7 @@ export class Views implements Feature {
     const formula = this.formulaOf(table);
     if (formula === undefined) return;
     this.dialog(formula, this.host.tableName(table) ?? "", "Save", (f) => this.result(f, table), (changed, name) => {
-      void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.host.withTableName(this.host.setMeta(t, "formula", withEquals(changed).formula), name || undefined));
+      void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.host.withTableName(this.host.withAttribute(t, "formula", withEquals(changed).formula), name || undefined));
     }, this.blocked(table), table);
   }
 }

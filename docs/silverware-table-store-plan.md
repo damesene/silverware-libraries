@@ -450,6 +450,16 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      metadata and names it reads (about 6,100 lines tied to the table) go onto
      the model so that a database's items can be such a source without a
      second interface.
+   - **The attribute API, first part (2026-11-20)**: a table's and its
+     columns' attributes by one set of names, `attribute`, `withAttribute`,
+     `canStore` (each with `at`: a column), `attributes(table)` (the owner's
+     of the table, by key), `columnAttributes(table, key)` and
+     `withColumnAttributes` (one key over the columns), in place of
+     `getMeta`, `setMeta`, `canStoreMeta`, `metaOf`, `columnsMeta`,
+     `setColumnsMeta`. The plan's `attributes(table, key)` was split so a
+     name says one thing: the owner's attributes of a table, and one key's
+     over its columns. A cell's (`getCellTag`, `withCellTag`,
+     `canStoreCellTag`) join with the cells' part, `at` a cell.
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

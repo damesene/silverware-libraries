@@ -12,7 +12,7 @@ import type { ModelHost } from "./feature.ts";
 
 export type OwnMeta = Pick<
   ModelHost,
-  "getMeta" | "setMeta" | "metaOf" | "columnsMeta" | "setColumnsMeta" | "canStoreMeta" | "getCellTag" | "withCellTag" | "canStoreCellTag"
+  "attribute" | "withAttribute" | "attributes" | "columnAttributes" | "withColumnAttributes" | "canStore" | "getCellTag" | "withCellTag" | "canStoreCellTag"
 >;
 
 export function ownMeta(owner: Owner, enabled: () => boolean): OwnMeta {
@@ -20,8 +20,8 @@ export function ownMeta(owner: Owner, enabled: () => boolean): OwnMeta {
   const storable = (table: Table, name: string | undefined) => name !== undefined && (enabled() || name in (table.meta ?? {}));
   const nameOf = (table: Table, key: string, at?: { readonly column: number }) => (at ? columnAttributeOf(table, owner, key, at.column) : attributeName(owner, key));
   return {
-    getMeta: (table, key, at) => (at ? columnValues(table, owner, key).get(at.column) : metaValue(table, owner, key)),
-    setMeta: (table, key, value, at) => {
+    attribute: (table, key, at) => (at ? columnValues(table, owner, key).get(at.column) : metaValue(table, owner, key)),
+    withAttribute: (table, key, value, at) => {
       if (value !== undefined && !storable(table, nameOf(table, key, at))) return table;
       if (!at) return withMetaValue(table, owner, key, value);
       const values = columnValues(table, owner, key);
@@ -29,13 +29,13 @@ export function ownMeta(owner: Owner, enabled: () => boolean): OwnMeta {
       else values.set(at.column, value);
       return withColumnValues(table, owner, key, values);
     },
-    metaOf: (table) => metaValuesOf(table, owner),
-    columnsMeta: (table, key) => columnValues(table, owner, key),
-    setColumnsMeta: (table, key, values) => {
+    attributes: (table) => metaValuesOf(table, owner),
+    columnAttributes: (table, key) => columnValues(table, owner, key),
+    withColumnAttributes: (table, key, values) => {
       const kept = new Map([...values].filter(([column]) => storable(table, columnAttributeOf(table, owner, key, column))));
       return withColumnValues(table, owner, key, kept);
     },
-    canStoreMeta: (table, key, at) => storable(table, nameOf(table, key, at)),
+    canStore: (table, key, at) => storable(table, nameOf(table, key, at)),
     getCellTag: (cell, key) => tagValue(cell, attributeName(owner, key)),
     withCellTag: (cell, key, value) => withTagValue(cell, attributeName(owner, key), value),
     canStoreCellTag: (cell, key) => enabled() || tagValue(cell, attributeName(owner, key)) !== undefined,

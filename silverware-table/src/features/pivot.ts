@@ -51,11 +51,11 @@ export class Pivot implements Feature {
   }
 
   private definitionOf(table: Table): PivotDefinition | { readonly problem: string } | undefined {
-    return readDefinition((key: Key) => this.host.getMeta(table, key));
+    return readDefinition((key: Key) => this.host.attribute(table, key));
   }
 
   private renamesOf(table: Table): Renames {
-    return readRenames(this.host.getMeta(table, "headers"));
+    return readRenames(this.host.attribute(table, "headers"));
   }
 
   /** The source the definition names among the page's tables: the first of that name, not the pivot itself */
@@ -112,7 +112,7 @@ export class Pivot implements Feature {
   /** The pivot table written as calculated (src/calculated/: its headers, the user's names kept, its totals pinned); its metadata as it was */
   private written(table: Table, pivot: Calculated, renames: Renames): Table {
     const made = calculatedTable(table, pivot, renames, { pinsOf: this.host.pinsOf, withPins: this.host.withPins });
-    return this.host.setMeta(made, "headers", storedRenames(renames, pivot));
+    return this.host.withAttribute(made, "headers", storedRenames(renames, pivot));
   }
 
   /** The pivot calculated from a source, or why it cannot be */
@@ -163,7 +163,7 @@ export class Pivot implements Feature {
         const named = this.withDefinition(table, followed);
         // The headers the user named, by what their columns stand for now
         const renames = movedRenames(this.renamesOf(table), (id) => movedId(id, moved));
-        return this.host.setMeta(named, "headers", Object.keys(renames).length ? JSON.stringify(renames) : undefined);
+        return this.host.withAttribute(named, "headers", Object.keys(renames).length ? JSON.stringify(renames) : undefined);
       },
     };
   }
@@ -239,7 +239,7 @@ export class Pivot implements Feature {
   /** The table with a definition's attributes (those it leaves out taken off) */
   private withDefinition(table: Table, definition: PivotDefinition): Table {
     const written = new Map(definitionAttributes(definition));
-    return KEYS.reduce((t, key) => (this.host.getMeta(t, key) === written.get(key) ? t : this.host.setMeta(t, key, written.get(key))), table);
+    return KEYS.reduce((t, key) => (this.host.attribute(t, key) === written.get(key) ? t : this.host.withAttribute(t, key, written.get(key))), table);
   }
 
   /** A pivot shown: whether it is as its source makes it now (its source edited by hand, on this page: not) */
@@ -296,7 +296,7 @@ export class Pivot implements Feature {
     if (!definition) return void this.stale.delete(info);
     if ("problem" in definition) return void this.stale.set(info, `This pivot cannot be calculated: ${definition.problem}`);
     const tables = this.pageModels();
-    const own = tables.find((t) => t.rows[0]?.cells.join("|") === table.rows[0]?.cells.join("|") && this.host.getMeta(t, "source") === definition.source);
+    const own = tables.find((t) => t.rows[0]?.cells.join("|") === table.rows[0]?.cells.join("|") && this.host.attribute(t, "source") === definition.source);
     const found = this.find(definition, tables, own);
     const page = this.pageOf(definition);
     if (page !== undefined) {
@@ -332,7 +332,7 @@ export class Pivot implements Feature {
   tableBadges(info: TableInfo): TableBadge[] {
     const table = info.model;
     if (!this.definitionOf(table)) return [];
-    const what = { icon: ICONS.pivot, text: `Pivot of ${this.host.getMeta(table, "source")?.trim() ?? ""}` };
+    const what = { icon: ICONS.pivot, text: `Pivot of ${this.host.attribute(table, "source")?.trim() ?? ""}` };
     // Out of date, or not calculated at all: said without its toolbar's Refresh shown
     const state = this.stale.get(info);
     if (!state) return [what];
@@ -353,7 +353,7 @@ export class Pivot implements Feature {
   /** A pivot's cells are calculated: its header alone is the user's (its names) */
   readOnly(table: Table, cell: { readonly row: number }): string | undefined {
     if (cell.row === 0 || !this.definitionOf(table)) return undefined;
-    return `this table is a pivot of ${this.host.getMeta(table, "source")}: its values are calculated. Edit ${this.host.getMeta(table, "source")}, or what the pivot shows in its definition`;
+    return `this table is a pivot of ${this.host.attribute(table, "source")}: its values are calculated. Edit ${this.host.attribute(table, "source")}, or what the pivot shows in its definition`;
   }
 
   /** A cell of a pivot edited: what it shows is changed in its settings, opened instead */
@@ -363,7 +363,7 @@ export class Pivot implements Feature {
 
   /** A pivot's rows and columns are its calculation's */
   fixedShape(table: Table): string | undefined {
-    return this.definitionOf(table) ? `this table is a pivot of ${this.host.getMeta(table, "source")}: its rows and columns come from it` : undefined;
+    return this.definitionOf(table) ? `this table is a pivot of ${this.host.attribute(table, "source")}: its rows and columns come from it` : undefined;
   }
 
   /** The page's tables a pivot can summarize (named ones, not pivots), `also` one more first (a table to be named so, another page's source) */
@@ -469,7 +469,7 @@ export class Pivot implements Feature {
 
   /** Why no pivot can be inserted (a table's metadata not stored), if so */
   private blocked(table: Table): string | undefined {
-    return this.host.canStoreMeta(table, "source") ? undefined : "A pivot is kept in its table's metadata: turn on Store table metadata in the settings";
+    return this.host.canStore(table, "source") ? undefined : "A pivot is kept in its table's metadata: turn on Store table metadata in the settings";
   }
 
   /** Insert pivot table, the command (and /pivot): the dialog for a pivot of the page's first named table (none: of another page), inserted at the cursor */
@@ -508,7 +508,7 @@ export class Pivot implements Feature {
     const read = this.definitionOf(table);
     if (!read) return;
     // One with a problem (no values, wrong totals): as far as it reads, for the dialog to fix
-    const definition = "problem" in read ? looseDefinition((key) => this.host.getMeta(table, key)) : read;
+    const definition = "problem" in read ? looseDefinition((key) => this.host.attribute(table, key)) : read;
     this.dialog(this.sources(), fieldsOf(definition), "Save", (changed) => {
       // A source moved to another page: that page read anew before the write (pageLinks reads the pages of the pivot as it was)
       const page = this.pageOf(changed);

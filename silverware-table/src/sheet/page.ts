@@ -11,7 +11,7 @@ import { columnLetters } from "../formulas/index.ts";
 import { findTables, pageTablesOf, parseTable, type Table, type TableRange } from "../markdown.ts";
 
 /** How the sheet modules read what tables keep for the sheet (their host) */
-export type SheetMeta = Pick<ModelHost, "getMeta" | "metaOf" | "canStoreMeta" | "tableName" | "canName">;
+export type SheetMeta = Pick<ModelHost, "attribute" | "attributes" | "canStore" | "tableName" | "canName">;
 
 /** A cell of a sheet, from 0: row 0 is the sheet's first row (1), column 0 its column A */
 export type SheetCell = { readonly row: number; readonly column: number };
@@ -70,7 +70,7 @@ export function validateSheetName(name: string): string | undefined {
  * a table on a sheet already, named)
  */
 export function canPlace(meta: SheetMeta, table: Table): boolean {
-  return meta.canStoreMeta(table, SHEET_KEY) && meta.canStoreMeta(table, AT_KEY) && (meta.tableName(table) !== undefined || meta.canName(table, { kind: "table" }));
+  return meta.canStore(table, SHEET_KEY) && meta.canStore(table, AT_KEY) && (meta.tableName(table) !== undefined || meta.canName(table, { kind: "table" }));
 }
 
 /** The tables of a page that are on a sheet (with a sheet's name and a place), in the page's order */
@@ -80,8 +80,8 @@ export function sheetTables(meta: SheetMeta, text: string): SheetTable[] {
 
 /** The sheet a table is on: its sheet's name, with a place on it; none: it is on no sheet */
 export function sheetOfTable(meta: SheetMeta, table: Table): string | undefined {
-  const sheet = meta.getMeta(table, SHEET_KEY)?.trim();
-  return sheet && parseAt(meta.getMeta(table, AT_KEY)) ? sheet : undefined;
+  const sheet = meta.attribute(table, SHEET_KEY)?.trim();
+  return sheet && parseAt(meta.attribute(table, AT_KEY)) ? sheet : undefined;
 }
 
 /** As sheetTables, of tables given, each with what tells it apart (its place in the page, its key), kept */
@@ -89,8 +89,8 @@ export function sheetTablesOf<T extends { readonly table: Table }>(meta: SheetMe
   const result: (T & SheetPlace)[] = [];
   for (const given of tables) {
     const { table } = given;
-    const sheet = meta.getMeta(table, SHEET_KEY)?.trim();
-    const at = parseAt(meta.getMeta(table, AT_KEY));
+    const sheet = meta.attribute(table, SHEET_KEY)?.trim();
+    const at = parseAt(meta.attribute(table, AT_KEY));
     if (!sheet || !at) continue;
     result.push({ ...given, sheet, at, name: meta.tableName(table), rows: table.rows.length, columns: table.align.length });
   }
@@ -110,7 +110,7 @@ export function sheetsOf<T extends SheetPlace>(tables: readonly T[]): { readonly
 
 /** The sheet's own data a table keeps in its metadata row (as the sheet's first table), by key: its columns' widths */
 export function sheetData(meta: SheetMeta, table: Table): [string, string][] {
-  return [...meta.metaOf(table)].filter(([key]) => key.startsWith(WIDTH_PREFIX));
+  return [...meta.attributes(table)].filter(([key]) => key.startsWith(WIDTH_PREFIX));
 }
 
 /**

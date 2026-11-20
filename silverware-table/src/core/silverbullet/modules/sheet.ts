@@ -538,7 +538,7 @@ export class Sheet implements AdapterFeature {
     const needs = "A sheet is kept in its tables' metadata: turn on Store table metadata in the settings";
     // Its tables have it: a name they have may change (none made new: the sheet's tables only)
     const tables = sheetsOf(sheetTables(this.host, this.host.pageText)).find((s) => sameSheet(s.name, sheet))?.tables ?? [];
-    const disabled = tables.every((t) => this.host.canStoreMeta(t.table, SHEET_KEY)) ? undefined : needs;
+    const disabled = tables.every((t) => this.host.canStore(t.table, SHEET_KEY)) ? undefined : needs;
     const fresh = board.fresh && !!board.sheet && sameSheet(board.sheet, sheet);
     const naming = namingThatCloses(
       { name: sheet, label: "Rename this sheet", ...(disabled ? { disabled } : {}), save: (name) => this.renameSheet(sheet, name) },
@@ -607,7 +607,7 @@ export class Sheet implements AdapterFeature {
     const tables = this.tablesOfSheet(text, sheet);
     const last = tables[tables.length - 1];
     if (!last) return undefined;
-    const renamed = (t: Table) => this.host.setMeta(t, SHEET_KEY, name);
+    const renamed = (t: Table) => this.host.withAttribute(t, SHEET_KEY, name);
     const result = await this.host.writeTable(last.target, renamed, { also: tables.slice(0, -1).map((t) => ({ key: t.target.key, change: renamed })) });
     if (result === "written" && shown && this.board === board) board.sheet = name;
     return undefined;
@@ -635,8 +635,8 @@ export class Sheet implements AdapterFeature {
       const tables = this.tablesOfSheet(text, sheet);
       const last = tables[tables.length - 1];
       if (!last) return;
-      const off = (t: Table) => this.host.setMeta(this.host.setMeta(t, SHEET_KEY, undefined), AT_KEY, undefined);
-      const bare = (t: Table) => [...this.host.metaOf(t).keys()].filter((k) => k.startsWith(WIDTH_PREFIX)).reduce((out, k) => this.host.setMeta(out, k, undefined), off(t));
+      const off = (t: Table) => this.host.withAttribute(this.host.withAttribute(t, SHEET_KEY, undefined), AT_KEY, undefined);
+      const bare = (t: Table) => [...this.host.attributes(t).keys()].filter((k) => k.startsWith(WIDTH_PREFIX)).reduce((out, k) => this.host.withAttribute(out, k, undefined), off(t));
       await this.host.writeTable(last.target, off, { also: tables.slice(0, -1).map((t) => ({ key: t.target.key, change: bare })) });
     }
     if (ends && this.board === board) this.end();
@@ -665,7 +665,7 @@ export class Sheet implements AdapterFeature {
     const widget = this.host.widgetOf(info);
     if (!widget.classList.contains(DRAWN_CLASS)) {
       // SilverBullet's table rendered anew (an edit, by another client too): the board follows the page
-      if (board.tables.has(info.key) || (board.sheet && this.host.getMeta(parseTable(info.source), SHEET_KEY))) this.queueRefresh();
+      if (board.tables.has(info.key) || (board.sheet && this.host.attribute(parseTable(info.source), SHEET_KEY))) this.queueRefresh();
       return;
     }
     const placed = board.tables.get(info.key);
@@ -1047,7 +1047,7 @@ export class Sheet implements AdapterFeature {
       this.host.notify(`Silverware Table: the table cannot go to ${formatAt(at)}: ${problem}`, "info");
       return "failed";
     }
-    return this.host.writeTable(info, (t) => this.host.setMeta(t, AT_KEY, formatAt(at)));
+    return this.host.writeTable(info, (t) => this.host.withAttribute(t, AT_KEY, formatAt(at)));
   }
 
   /** The board scrolls what is on it, its tables and empty cells (middle-button autoscroll) */
@@ -1180,7 +1180,7 @@ export class Sheet implements AdapterFeature {
       const key = keys[i]!;
       if (board.tables.has(key) || key === board.alone) return [];
       const model = parseTable(range.text);
-      const sheet = this.host.getMeta(model, SHEET_KEY);
+      const sheet = this.host.attribute(model, SHEET_KEY);
       if (board.sheet && sheet && sameSheet(sheet, board.sheet)) return [];
       const header = (model.rows[0]?.cells ?? []).map((cell) => withoutTags(cell).trim()).filter(Boolean).join(", ");
       const label = this.host.tableName(model) ?? (header.length > 40 ? `${header.slice(0, 39)}…` : header || "Table");
@@ -1221,7 +1221,7 @@ export class Sheet implements AdapterFeature {
       this.host.notify(`Silverware Table: the table cannot go to ${formatAt(at)}: it would cover ${problem}`, "info");
       return;
     }
-    const from = this.host.getMeta(model, SHEET_KEY);
+    const from = this.host.attribute(model, SHEET_KEY);
     if (from && sheetTables(this.host, text).filter((t) => sameSheet(t.sheet, from)).length === 1) {
       if (!(await this.host.ask(`Move this table here from the sheet ${from}? It is that sheet's only table: the sheet goes with it.`))) return;
     }
@@ -1229,7 +1229,7 @@ export class Sheet implements AdapterFeature {
     const name = this.host.tableName(model) ?? freeName(this.host, text, taken);
     const result = await this.host.writeTable(
       { key, source: range.text, hint: range.from },
-      (t) => this.host.setMeta(this.host.setMeta(this.host.withTableName(t, name), SHEET_KEY, sheet), AT_KEY, formatAt(at)),
+      (t) => this.host.withAttribute(this.host.withAttribute(this.host.withTableName(t, name), SHEET_KEY, sheet), AT_KEY, formatAt(at)),
       also ? { also: [also] } : {},
     );
     if (result !== "written" || this.board !== board) return;
@@ -1413,13 +1413,13 @@ export class Sheet implements AdapterFeature {
         : findTables(text)[keys.indexOf(board.alone)];
       // Where the table cannot take it (the setting off, no width of that column stored): for the view only, as the widths module keeps them
       const key = `${WIDTH_PREFIX}${columnLetters(column)}`;
-      if (range && width !== undefined && !this.host.canStoreMeta(parseTable(range.text), key)) {
+      if (range && width !== undefined && !this.host.canStore(parseTable(range.text), key)) {
         board.preview.set(column, width);
         this.queuePlace();
         return;
       }
       const target = range && { key: keys[range.ordinal]!, source: range.text, hint: range.from };
-      const result = target && (await this.host.writeTable(target, (t) => this.host.setMeta(t, key, width === undefined ? undefined : String(width))));
+      const result = target && (await this.host.writeTable(target, (t) => this.host.withAttribute(t, key, width === undefined ? undefined : String(width))));
       if (result === "written") return;
     } catch (e) {
       console.error("Silverware Table: could not store the column's width", e);
@@ -1705,7 +1705,7 @@ export class Sheet implements AdapterFeature {
     const last = ranges[ranges.length - 1];
     if (!last) return "failed";
     const { sheet, taken, also } = this.sheetFor(board, text);
-    const table = this.host.setMeta(this.host.setMeta(this.host.withTableName(made, freeName(this.host, text, taken)), SHEET_KEY, sheet), AT_KEY, formatAt(at));
+    const table = this.host.withAttribute(this.host.withAttribute(this.host.withTableName(made, freeName(this.host, text, taken)), SHEET_KEY, sheet), AT_KEY, formatAt(at));
     const result = await this.host.insertTable(table, { key: keys[last.ordinal]!, source: last.text, hint: last.from }, also, key);
     if (result === "written") this.becameSheet(board, sheet, also, "the new one");
     return result;
@@ -1729,7 +1729,7 @@ export class Sheet implements AdapterFeature {
       taken: [name],
       also: {
         key: board.alone,
-        change: (t: Table) => this.host.setMeta(this.host.setMeta(this.host.withTableName(t, name), SHEET_KEY, sheet), AT_KEY, "A1"),
+        change: (t: Table) => this.host.withAttribute(this.host.withAttribute(this.host.withTableName(t, name), SHEET_KEY, sheet), AT_KEY, "A1"),
       },
     };
   }

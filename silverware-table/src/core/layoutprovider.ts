@@ -34,7 +34,7 @@ export function tablesLayoutProvider(tables: LayoutTables): LayoutProvider {
     read: (element): LayoutEntries => {
       const table = renderedTable(element);
       const rendered = table && renderedMeta(tables.renderedRows(table));
-      return rendered ? Object.fromEntries(meta.metaOf({ meta: rendered } as Table)) : {};
+      return rendered ? Object.fromEntries(meta.attributes({ meta: rendered } as Table)) : {};
     },
     // A table holding its header in view (the sticky module) hides the rows that scrolled under it: what is seen of it
     // starts at its header, where the header is held lower than the table's top
@@ -52,8 +52,8 @@ export function tablesLayoutProvider(tables: LayoutTables): LayoutProvider {
       const result = await tables.write(widget, (table) => {
         let changed = table;
         for (const [key, value] of Object.entries(changes)) {
-          if (value !== null && !meta.canStoreMeta(changed, key)) refused = true;
-          else changed = meta.setMeta(changed, key, value ?? undefined);
+          if (value !== null && !meta.canStore(changed, key)) refused = true;
+          else changed = meta.withAttribute(changed, key, value ?? undefined);
         }
         return changed;
       });

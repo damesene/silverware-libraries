@@ -52,8 +52,8 @@ writing every module again.
   settings in code (as CLAUDE.md asks of the core already).
 - **What tables keep is read and written through the host, each module its
   own** (CLAUDE.md, *Modules and their data*): every module gets a host made
-  for it (`core/modulehost.ts`), whose metadata functions (`getMeta`,
-  `setMeta`, `columnsMeta`, `getCellTag`, `withCellTag`, `canStoreMeta`…) make
+  for it (`core/modulehost.ts`), whose metadata functions (`attribute`,
+  `withAttribute`, `columnAttributes`, `getCellTag`, `withCellTag`, `canStore`…) make
   each attribute's name from the module's and its key (`metanames.ts`), so a
   module names no attribute whole and cannot write another's; the names of
   tables, columns, rows and cells are the core's, read and written by host
@@ -61,7 +61,7 @@ writing every module again.
   module hands it what it needs (`FormulaCells`, `SheetMeta`, a table's name).
   A module uses another's data through what that one offers (`offer`,
   `offered`). The metadata setting off, the core stores nothing new
-  (`setMeta`, and a write step for cells' tags).
+  (`withAttribute`, and a write step for cells' tags).
 - A test fails when a module refers to the rendered table (its element types,
   its selectors and classes, the host's methods that hand out its elements),
   or imports the core's functions for what tables keep (a guard against

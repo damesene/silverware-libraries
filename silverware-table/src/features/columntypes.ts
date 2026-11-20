@@ -133,7 +133,7 @@ export class ColumnTypes implements Feature {
     const host = this.host;
     // Read only by a type that asks (a choice's list): most types never do
     return {
-      list: (name) => this.listOf(table, name, (stored ??= host.metaOf(table))).values,
+      list: (name) => this.listOf(table, name, (stored ??= host.attributes(table))).values,
       values: () =>
         (values ??= table.rows
           .slice(1)
@@ -146,7 +146,7 @@ export class ColumnTypes implements Feature {
    * A choice list of the table, read once per table and page text: kept as a list of texts, or made by a formula
    * (its leading "="), calculated by the formulas module on the page shown; undefined values where it gives none, with why
    */
-  private listOf(table: Table, name: string, stored = this.host.metaOf(table)): ListRead {
+  private listOf(table: Table, name: string, stored = this.host.attributes(table)): ListRead {
     const page = this.host.pageTables();
     if (this.lists?.page !== page) this.lists = { page, byTable: new WeakMap() };
     let read = this.lists.byTable.get(table);
@@ -183,7 +183,7 @@ export class ColumnTypes implements Feature {
    * the tables they read (a column renamed, a table renamed) and written back in the same write
    */
   private held(table: Table): HeldFormulas | undefined {
-    const stored = this.host.metaOf(table);
+    const stored = this.host.attributes(table);
     const lists = listNames(stored).flatMap((name) => {
       const formula = listFormula(stored.get(listKey(name)));
       return formula === undefined ? [] : [{ name, formula }];
@@ -194,7 +194,7 @@ export class ColumnTypes implements Feature {
       follow: (follow) =>
         lists.reduce((t, { name, formula }) => {
           const followed = follow(formula);
-          return followed === formula ? t : this.host.setMeta(t, listKey(name), followed);
+          return followed === formula ? t : this.host.withAttribute(t, listKey(name), followed);
         }, table),
     };
   }
@@ -299,7 +299,7 @@ export class ColumnTypes implements Feature {
     const write = (change: (t: Table) => Table) => void this.host.writeTable(this.host.tableFor(info.key) ?? info, change);
     // The list taken for the column: its header naming it
     const take = (name: string) => () => write((t) => setCell(t, 0, column, withColumnType(t.rows[0]?.cells[column] ?? "", `choice-${name}`)));
-    const stored = this.host.metaOf(table);
+    const stored = this.host.attributes(table);
     return listNames(stored).map((name): MenuEntry => {
       const used = users.get(name);
       // A list made by a formula: its formula first, as where its values come from
@@ -336,7 +336,7 @@ export class ColumnTypes implements Feature {
       if (!(await this.host.ask(`Delete the list ${name}? ${columns[0]!.toUpperCase()}${columns.slice(1)} take${used.length === 1 ? "s" : ""} it and will have no type; the cells stay as written.`))) return;
     }
     void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => {
-      let table = this.host.setMeta(t, listKey(name), undefined);
+      let table = this.host.withAttribute(t, listKey(name), undefined);
       table.rows[0]?.cells.forEach((cell, c) => {
         if (choiceListOf(unescapeCell(cell)) === name) table = setCell(table, 0, c, withColumnType(cell, undefined));
       });

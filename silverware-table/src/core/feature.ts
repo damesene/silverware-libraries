@@ -859,22 +859,22 @@ export interface ModelHost {
   // when `column` is given (it follows its column through edits). A module's
   // own host has them for that module; the core's for the core.
   /** The module's attribute of the table (of one column: `column`) */
-  getMeta(table: Table, key: string, at?: { readonly column: number }): string | undefined;
+  attribute(table: Table, key: string, at?: { readonly column: number }): string | undefined;
   /** The table with the module's attribute set (undefined: removed) */
-  setMeta(table: Table, key: string, value: string | undefined, at?: { readonly column: number }): Table;
+  withAttribute(table: Table, key: string, value: string | undefined, at?: { readonly column: number }): Table;
   /** The module's attributes of the table (not of its columns), by key */
-  metaOf(table: Table): ReadonlyMap<string, string>;
+  attributes(table: Table): ReadonlyMap<string, string>;
   /** The module's attribute of the key for each column that has it, by column */
-  columnsMeta(table: Table, key: string): Map<number, string>;
+  columnAttributes(table: Table, key: string): Map<number, string>;
   /** The table with the module's attribute of the key on these columns (by column), and on no other */
-  setColumnsMeta(table: Table, key: string, values: ReadonlyMap<number, string>): Table;
+  withColumnAttributes(table: Table, key: string, values: ReadonlyMap<number, string>): Table;
   /**
    * Whether the module may store this attribute in the table: the metadata
-   * setting is on, or the table has it already (it may change or go; with
-   * the setting off nothing new is stored: setMeta and setColumnsMeta leave
-   * it out)
+   * setting is on, or the table has it already (it may change or go; with the
+   * setting off nothing new is stored: withAttribute and withColumnAttributes
+   * leave it out)
    */
-  canStoreMeta(table: Table, key: string, at?: { readonly column: number }): boolean;
+  canStore(table: Table, key: string, at?: { readonly column: number }): boolean;
   /**
    * Whether the module may write its attribute of the key into this cell's
    * hidden tags: the setting on, or the cell has it (with the setting off, a

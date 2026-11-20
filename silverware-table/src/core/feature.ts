@@ -643,6 +643,12 @@ export interface ModelHost {
    * text as last read): what a user's script is handed (custom menu entries)
    */
   tableData(info: TableInfo): TableData;
+  /**
+   * A table as the model (its columns, rows and cells: a cell's content
+   * unescaped, its attributes apart), for a module moved onto the model before
+   * the hooks give it (docs/silverware-table-store-plan.md, step 3)
+   */
+  asModel(table: Table): TableModel;
   /** A table's header and `rows` (its rows, the first 1, in that order) as plain markdown, as any renderer shows them: no hidden data, no metadata row (Copy as Markdown) */
   plainMarkdown(table: Table, rows: readonly number[]): string;
   /** Whether other pages are read (none where the platform reads no page but the open one): formulas and pivots referring to one */

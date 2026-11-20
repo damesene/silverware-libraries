@@ -18,7 +18,7 @@ import { type Calculated, calculatedTable, movedRenames, readRenames, renamedIn,
 import { type CalculatedBy, type CalculatedOffer, followOwnFormula, type Following, callsPureFunctionsOnly, FormulaError, type FormulaCells, type FormulasOffer, type PageLinksOffer, PLAIN_CELLS } from "../formulas/index.ts";
 import { columnName } from "../columns.ts";
 import { ICONS } from "../icons.ts";
-import { type Table, unescapeCell } from "../markdown.ts";
+import type { Table } from "../markdown.ts";
 import { definitionAttributes, groupFormula, KEYS, type Key, looseDefinition, type PivotDefinition, readDefinition, sourceRef, sourceText, valueItem, valueParts } from "../pivot/definition.ts";
 import { type Fields, fieldsOf } from "../pivot/fields.ts";
 import { pivotOf } from "../pivot/pivot.ts";
@@ -452,7 +452,8 @@ export class Pivot implements Feature {
   /** A pivot of a table to start from: its text column by its numbers' sum (else a count of its rows) */
   private firstFields(name: string, table: Table): Fields {
     const columns = (table.rows[0]?.cells ?? []).map(columnName);
-    const numeric = (c: number) => table.rows.slice(1).filter((r) => asNumber(unescapeCell(r.cells[c] ?? "").trim()) !== undefined).length * 2 > table.rows.length - 1;
+    const { rows } = this.host.asModel(table);
+    const numeric = (c: number) => rows.filter((r) => asNumber(r.cells[c]?.content.trim() ?? "") !== undefined).length * 2 > rows.length;
     const label = columns.findIndex((_, c) => !numeric(c));
     const value = columns.findIndex((_, c) => c !== label && numeric(c));
     return {

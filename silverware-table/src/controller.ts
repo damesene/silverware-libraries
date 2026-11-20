@@ -23,7 +23,8 @@ import { writingClipboard } from "../../shared/clipboard.ts";
 import { markTable, renderedMeta, SilverBulletAdapter } from "./core/silverbullet/adapter.ts";
 import type { TablePlatform } from "./core/platform.ts";
 import type { StoredTable } from "./core/store.ts";
-import type { AttributePlace, ModelCell, TableModel } from "./model/model.ts";
+import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, type TableModel } from "./model/model.ts";
+import { HASHTAGS_KEY } from "./columns.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
 import { decode, decodeCell, encode, encodeCell, plainMarkdown } from "./store/markdown/codec.ts";
@@ -880,6 +881,10 @@ export class Controller implements TableHost {
   rowNames(table: TableModel): readonly { readonly name: string; readonly row: number }[];
   rowNames(table: Table | TableModel): readonly { readonly name: string; readonly row: number }[] {
     return "columns" in table ? modelRowNames(table) : rowNamesIn(table);
+  }
+
+  columnHashtags(table: TableModel, column: number): string | undefined {
+    return attributeIn(table.columns[column]?.attributes ?? NO_ATTRIBUTES, CORE, HASHTAGS_KEY);
   }
 
   cellNames(table: Table | TableModel): readonly CellNameAt[] {

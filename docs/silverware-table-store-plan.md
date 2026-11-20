@@ -555,6 +555,17 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      column of the model comes from (by the attributes' lineage) is kept as
      written, for the write's step to say whether it went (a view's column
      whose source column went, kept for it to come back).
+   - **A column's type from its attribute (2026-11-20)**: the column types
+     read a column's type from its hashtags on the model
+     (`host.columnHashtags(table, column)`: the core's attribute, no
+     metadata), so a hidden tag's text is never taken for a hashtag; the
+     offer `valueOf(table, column, text)` (the conditions'). One reader of
+     hashtags (`headerHashtags`, `withoutHashtagsWhere` in columns.ts), the
+     registry's own regular expression gone; `columnTypeOf` and
+     `withColumnType` take a column's hashtags or a header's text alike.
+     Writing a type stays on the header's text, as the header editor's
+     hooks do, until `writeTable` and the hooks take the model (its setter,
+     `withColumnHashtags`, comes then, with its first user).
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

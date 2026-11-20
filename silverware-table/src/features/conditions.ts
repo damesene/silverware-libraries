@@ -209,13 +209,14 @@ export class Conditions implements Feature {
     const bodyColumns = header.map((_, c) => c).filter((c) => c >= pins.left && c < header.length - pins.right);
     const keys = header.map((h) => columnKey(columnName(unescapeCell(h))));
     const types = this.host.offered<ColumnTypesOffer>("columnTypes");
+    const model = types && this.host.asModel(table);
     // Each cell read once, as asked
     const cells = new Map<string, Placed>();
     const rowCells = new Map<number, Record<string, ReturnType<typeof cellOf>>>();
     const cellAt = (row: number, column: number) => {
       const raw = table.rows[row]?.cells[column] ?? "";
       const text = this.host.shownText(info, { row, column }) ?? unescapeCell(withoutTags(raw)).trim();
-      const value = types ? types.valueOf(header[column] ?? "", text) : text;
+      const value = types && model ? types.valueOf(model, column, text) : text;
       return cellOf(text, value, keys[column] ?? "");
     };
     const rowOf = (row: number) => {

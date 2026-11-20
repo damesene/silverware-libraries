@@ -62,7 +62,12 @@ export function headerHashtags(header: string): string[] {
 
 /** A header without its hashtags, its spaces between words one */
 export function withoutHashtags(header: string): string {
-  return header.replace(HASHTAG_RE, "$1").replace(/\s+/g, " ").trim();
+  return withoutHashtagsWhere(header, () => true);
+}
+
+/** A header (or a column's hashtags) without the hashtags `drop` takes (given as written, with its #), its spaces between words one */
+export function withoutHashtagsWhere(header: string, drop: (tag: string) => boolean): string {
+  return header.replace(HASHTAG_RE, (whole, space: string) => (drop(whole.trim()) ? space : whole)).replace(/\s+/g, " ").trim();
 }
 
 /**

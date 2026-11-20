@@ -96,7 +96,7 @@ export class ColumnTypes implements Feature {
   private readonly choicesDialog: ChoicesDialog;
   // The lists read, by table and name, as of the page's text (a formula's reads the page's other tables); emptied
   // as what formulas read outside the page changes (tablesChanged)
-  private lists: { readonly page: readonly StoredTable[]; readonly byTable: WeakMap<Table, Map<string, ListRead>> } | undefined;
+  private lists: { readonly page: readonly StoredTable[]; readonly byTable: WeakMap<TableModel, Map<string, ListRead>> } | undefined;
 
   constructor(private readonly host: ModelHost) {
     this.choicesDialog = new ChoicesDialog(host, (table, formula) => this.formulaList(table, formula));
@@ -104,12 +104,17 @@ export class ColumnTypes implements Feature {
     host.hideHeaderTags("types", typeTagPatterns());
     this.picker = host.panel("swt-choices");
     this.picker.element.setAttribute("role", "listbox");
-    host.offer({ valueOf: (header, text) => this.valueOf(header, text), held: (table) => this.held(table) } satisfies ColumnTypesOffer & HeldFormulasOffer);
+    host.offer({ valueOf: (table, column, text) => this.valueOf(table, column, text), held: (table) => this.held(table) } satisfies ColumnTypesOffer & HeldFormulasOffer);
+  }
+
+  /** A column's type, of its hashtags */
+  private typeOf(table: TableModel, column: number): TypedColumn | undefined {
+    return columnTypeOf(this.host.columnHashtags(table, column));
   }
 
   /** A cell's value as its column's type compares it, as its looks give it (`value`): the text where it is none of the type's */
-  private valueOf(header: string, text: string): string {
-    const typed = columnTypeOf(unescapeCell(header));
+  private valueOf(table: TableModel, column: number, text: string): string {
+    const typed = this.typeOf(table, column);
     if (!typed || text === "") return text;
     // A custom type's method that throws: the text, as its cell shows marked
     try {
@@ -128,18 +133,14 @@ export class ColumnTypes implements Feature {
   }
 
   /** What a column's type reads of its table: the column types' data there, the column's values */
-  private typeTable(table: Table, column: number): TypeTable {
+  private typeTable(table: TableModel, column: number): TypeTable {
     let values: string[] | undefined;
     let stored: ReadonlyMap<string, string> | undefined;
     const host = this.host;
     // Read only by a type that asks (a choice's list): most types never do
     return {
       list: (name) => this.listOf(table, name, (stored ??= host.attributes(table))).values,
-      values: () =>
-        (values ??= table.rows
-          .slice(1)
-          .map((r) => unescapeCell(withoutTags(r.cells[column] ?? "")).trim())
-          .filter((text) => text !== "")),
+      values: () => (values ??= table.rows.map((r) => r.cells[column]?.content.trim() ?? "").filter((text) => text !== "")),
     };
   }
 
@@ -147,7 +148,7 @@ export class ColumnTypes implements Feature {
    * A choice list of the table, read once per table and page text: kept as a list of texts, or made by a formula
    * (its leading "="), calculated by the formulas module on the page shown; undefined values where it gives none, with why
    */
-  private listOf(table: Table, name: string, stored = this.host.attributes(table)): ListRead {
+  private listOf(table: TableModel, name: string, stored = this.host.attributes(table)): ListRead {
     const page = this.host.pageTables();
     if (this.lists?.page !== page) this.lists = { page, byTable: new WeakMap() };
     let read = this.lists.byTable.get(table);
@@ -157,7 +158,7 @@ export class ColumnTypes implements Feature {
     return list;
   }
 
-  private readList(table: Table, stored: string | undefined): ListRead {
+  private readList(table: TableModel, stored: string | undefined): ListRead {
     const formula = listFormula(stored);
     if (formula === undefined) return { values: readChoiceList(stored) };
     const read = this.formulaList(table, formula);
@@ -165,12 +166,12 @@ export class ColumnTypes implements Feature {
   }
 
   /** The values a list's formula gives a table now (the formulas module's), as the column checks them; or why none (also the Choices dialog's) */
-  private formulaList(table: Table, formula: string): ListRead {
+  private formulaList(table: TableModel, formula: string): ListRead {
     const formulas = this.host.offered<FormulasOffer>("formulas");
     if (!formulas) return { problem: "is calculated by the formulas module, which is off" };
     const problem = formulas.validate(formula);
     if (problem) return { problem: `does not read: ${problem}` };
-    const result = formulas.list(this.host.asModel(table), formula);
+    const result = formulas.list(table, formula);
     if (result === undefined) {
       const off = !this.host.offered("sources") && formulaSources(formula).length;
       return { problem: off ? "reads a source of the space, and the sources module is off" : "reads a page or a source not read yet" };
@@ -231,9 +232,8 @@ export class ColumnTypes implements Feature {
   /** "Type: …" in a column's menu (what the column is): picks the column's type, written as a hashtag in its header */
   lineMenu(info: TableInfo, { axis, at: column }: LineMenuTarget, menu: LineMenuBuilder): LineMenuGroup[] {
     if (axis !== "column") return [];
-    const table = info.model;
-    const header = table.rows[0]?.cells[column] ?? "";
-    const current = columnTypeOf(unescapeCell(header));
+    const table = this.host.asModel(info.model);
+    const current = this.typeOf(table, column);
     const setType = (tag: string | undefined) => () =>
       void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => setCell(t, 0, column, withColumnType(t.rows[0]?.cells[column] ?? "", tag)));
     const choices: MenuEntry[] = [
@@ -290,13 +290,13 @@ export class ColumnTypes implements Feature {
    * deleted where no column takes it (a list no column takes stays until
    * deleted so)
    */
-  private listEntries(info: TableInfo, table: Table, column: number, choice: ColumnType): MenuEntry[] {
+  private listEntries(info: TableInfo, table: TableModel, column: number, choice: ColumnType): MenuEntry[] {
     const users = new Map<string, string[]>();
-    table.rows[0]?.cells.forEach((cell) => {
-      const name = choiceListOf(unescapeCell(cell));
-      if (name !== undefined) users.set(name, [...(users.get(name) ?? []), unescapeCell(withoutTags(withColumnType(cell, undefined))) || "(no name)"]);
+    table.columns.forEach((each, c) => {
+      const name = choiceListOf(this.host.columnHashtags(table, c));
+      if (name !== undefined) users.set(name, [...(users.get(name) ?? []), each.header || "(no name)"]);
     });
-    const taken = choiceListOf(unescapeCell(table.rows[0]?.cells[column] ?? ""));
+    const taken = choiceListOf(this.host.columnHashtags(table, column));
     const write = (change: (t: Table) => Table) => void this.host.writeTable(this.host.tableFor(info.key) ?? info, change);
     // The list taken for the column: its header naming it
     const take = (name: string) => () => write((t) => setCell(t, 0, column, withColumnType(t.rows[0]?.cells[column] ?? "", `choice-${name}`)));
@@ -356,9 +356,9 @@ export class ColumnTypes implements Feature {
   /** The type of the edited cell's column, if any (header cells have none), and what it reads of its table */
   private typeOfEdited(editor: CellEditor): (TypedColumn & { readonly table: TypeTable }) | undefined {
     if (editor.row === 0) return undefined;
-    const table = this.host.tableFor(editor.key)?.model;
-    const header = table?.rows[0]?.cells[editor.column];
-    const typed = header === undefined ? undefined : columnTypeOf(unescapeCell(header));
+    const shown = this.host.tableFor(editor.key);
+    const table = shown && this.host.asModel(shown.model);
+    const typed = table && this.typeOf(table, editor.column);
     return typed && table && { ...typed, table: this.typeTable(table, editor.column) };
   }
 
@@ -483,11 +483,12 @@ export class ColumnTypes implements Feature {
    * after its name; its cells shown as the type formats them (their value for
    * sorting the type's), those that are not values of the type marked with why
    */
-  looks(info: TableInfo, table: Table): TableLooks | undefined {
+  looks(info: TableInfo, markdown: Table): TableLooks | undefined {
+    const table = this.host.asModel(markdown);
     const headers: ({ column: number } & HeaderLook)[] = [];
     const cells: (CellRef & CellLook)[] = [];
-    table.rows[0]?.cells.forEach((name, column) => {
-      const typed = columnTypeOf(unescapeCell(name));
+    table.columns.forEach((_, column) => {
+      const typed = this.typeOf(table, column);
       if (!typed) return;
       const typeTable = this.typeTable(table, column);
       // A choice list that gives no values (its formula's error): the column checks nothing, its icon says why
@@ -499,11 +500,13 @@ The list ${String(typed.params.name).toLowerCase()} checks nothing: ${list.probl
         hidesTag: (tag) => !!typeOfTag(tag),
         icons: [{ svg: columnIcon(typed), title: `${typeLabel(typed.type.name)} (#${typed.tag}): ${typed.type.description}${why}`, className: "swt-type-icon", order: HEADER_ICON_ORDER.kind }],
       });
-      table.rows.forEach((r, row) => {
-        const raw = r.cells[column];
-        if (row === 0 || raw === undefined) return;
-        // The cell's text: a formula's result, without the hidden tags
-        const text = unescapeCell(withoutTags(raw)).trim();
+      table.rows.forEach((r, index) => {
+        const cell = r.cells[column];
+        if (cell === undefined) return;
+        // (Rows as the markdown's: the header 0)
+        const row = index + 1;
+        // The cell's text: a formula's result
+        const text = cell.content.trim();
         // Only plain values: a cell with markup (a link, emphasis) is left as it is
         if (text === "" || this.host.shownText(info, { row, column }) !== text) return;
         const { type, params } = typed;

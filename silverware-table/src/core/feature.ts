@@ -939,6 +939,8 @@ export interface ModelHost {
   rowNames(table: TableModel): readonly { readonly name: string; readonly row: number }[];
   /** A table's named body cells, in their order */
   cellNames(table: Table | TableModel): readonly CellNameAt[];
+  /** A column's hashtags (its header's, its type among them), as text: the core's attribute; undefined: none */
+  columnHashtags(table: TableModel, column: number): string | undefined;
   /** Tables changed outside the page (another page read anew): features check them again */
   tablesChanged(): void;
   /** What deleting a column also removes, by the features (names of rows and cells in it) */

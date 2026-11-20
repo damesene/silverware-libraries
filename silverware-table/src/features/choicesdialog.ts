@@ -29,6 +29,7 @@ import { formulaField } from "../formulafield.ts";
 import { type FormulasOffer, withEquals } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import { escapeCell, type Table, unescapeCell } from "../markdown.ts";
+import type { TableModel } from "../model/model.ts";
 import { setCell } from "../ops.ts";
 import { withoutTags } from "../tags.ts";
 
@@ -53,7 +54,7 @@ export class ChoicesDialog {
   constructor(
     private readonly host: ModelHost,
     // A list's formula read for a table as the column checks it (the column types module's)
-    private readonly read: (table: Table, formula: string) => ListRead,
+    private readonly read: (table: TableModel, formula: string) => ListRead,
   ) {}
 
   close(): void {
@@ -295,7 +296,7 @@ export class ChoicesDialog {
   private preview(table: Table, formula: string, formulas: FormulasOffer | undefined): readonly string[] | string {
     if (!formulas) return `No values: ${FORMULAS_OFF}`;
     if (formula.trim() === "=" || formula.trim() === "=@") return "Type a formula";
-    const read = this.read(table, formula);
+    const read = this.read(this.host.asModel(table), formula);
     return read.values ?? `The column checks nothing: its formula ${read.problem ?? "gives no values"}`;
   }
 

@@ -60,6 +60,8 @@ import {
   serializeTable,
   type Table,
   type TableMeta,
+  tableMetaOf,
+  writesMetaRow,
   type TableRange,
 } from "./markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "./menu.ts";
@@ -119,7 +121,7 @@ const NAVIGATING_CLASS = "swt-navigating-here";
 
 /** A table of its metadata only (read from a rendering, before the table is): what features read of it as a whole */
 function metadataOnly(meta: TableMeta | undefined): Table {
-  return { indent: "", align: [], rows: [], padded: false, ...(meta ? { meta } : {}) };
+  return { indent: "", align: [], rows: [], padded: false, ...(meta ? tableMetaOf(meta) : {}) };
 }
 
 /** What sorting compares of body rows' cells, by row and column: a look's key of its own (data-swt-sort), else the value */
@@ -1147,7 +1149,7 @@ export class Controller implements TableHost {
         hint: range.from,
         key: this.register.keysOf(page, text)[range.ordinal]!,
         columns: shape.columns,
-        metaRow: model.meta !== undefined,
+        metaRow: writesMetaRow(model),
         rows: model.rows.length,
         pins: metaPins(model),
       };

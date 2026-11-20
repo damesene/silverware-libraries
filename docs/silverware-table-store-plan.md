@@ -460,6 +460,16 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      name says one thing: the owner's attributes of a table, and one key's
      over its columns. A cell's (`getCellTag`, `withCellTag`,
      `canStoreCellTag`) join with the cells' part, `at` a cell.
+   - **Table attributes (2026-11-20)**: `model/model.ts` (the model's
+     types, `Attributes` by owner and key, ahead of the rest); a table's own
+     attributes are `Table.attributes` (optional while `Table` becomes the
+     model), its columns' still the metadata row's names in `meta` (the
+     next part). The markdown codec splits the metadata row as it reads it
+     (`tableMetaOf`) and writes it back (`writtenMeta`): a row unchanged as
+     it was read, a row changed in the order it was read, attributes set
+     since after them (a new row: the table's own, then its columns'). An
+     attribute's name is split and made in one place (`metanames.ts`,
+     `splitAttributeName`, `attributeName`, no owner's a key alone).
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

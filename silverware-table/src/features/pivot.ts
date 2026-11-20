@@ -438,7 +438,7 @@ export class Pivot implements Feature {
     const own = this.host.tableName(table)?.trim();
     const name = own ?? freeTableName("table", this.pageModels().map((t) => this.host.tableName(t)));
     const fields = this.firstFields(name, table);
-    const blocked = this.blocked({ ...table, meta: undefined });
+    const blocked = this.blocked({ ...table, meta: undefined, attributes: undefined });
     this.dialog(this.sources(own ? undefined : { name, table }), fields, "Insert", (definition) => {
       const sources = this.sources(own ? undefined : { name, table });
       const pivot = this.calculate(definition, this.sourceFor(definition, sources));

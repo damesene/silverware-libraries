@@ -8,7 +8,8 @@
 // every edit follows here whatever the attribute is for.
 import { type ColumnId, columnIdOf, findColumn } from "./columns.ts";
 import type { Row, Table } from "./markdown.ts";
-import { attributeName, COLUMN_MARK, CORE, type Owner } from "./metanames.ts";
+import { attributeName, COLUMN_ATTRIBUTE_RE, COLUMN_MARK, CORE, type Owner, splitAttributeName } from "./metanames.ts";
+import { attributeIn, NO_ATTRIBUTES, withAttributeIn } from "./model/model.ts";
 import { validateTableName } from "./namerules.ts";
 import type { SortDirection } from "../../shared/compare.ts";
 import { NO_PINS, type Pins } from "./view.ts";
@@ -18,8 +19,12 @@ export { attributeName, CORE, type Owner } from "./metanames.ts";
 export type MetaSort = { readonly column: number; readonly direction: SortDirection };
 
 
-/** Sets or (with undefined) removes a metadata attribute by its whole name; unchanged: the same table */
+/** Sets or (with undefined) removes an attribute by its whole name, a table's or a column's; unchanged: the same table */
 export function withMeta(table: Table, name: string, value: string | undefined): Table {
+  if (!parseColumnAttribute(name)) {
+    const { owner, key } = splitAttributeName(name);
+    return withMetaValue(table, owner, key, value);
+  }
   const current = table.meta ?? {};
   if (current[name] === value) return table;
   const meta: Record<string, string> = { ...current };
@@ -30,29 +35,30 @@ export function withMeta(table: Table, name: string, value: string | undefined):
 
 /** An owner's attribute of the table */
 export function metaValue(table: Table, owner: Owner, key: string): string | undefined {
-  return table.meta?.[attributeName(owner, key)];
+  return attributeIn(table.attributes ?? NO_ATTRIBUTES, owner, key);
 }
 
-/** The table with an owner's attribute set (undefined: removed) */
+/** The table with an owner's attribute set (undefined: removed); unchanged: the same table */
 export function withMetaValue(table: Table, owner: Owner, key: string, value: string | undefined): Table {
-  return withMeta(table, attributeName(owner, key), value);
+  const current = table.attributes ?? NO_ATTRIBUTES;
+  const attributes = withAttributeIn(current, owner, key, value);
+  return attributes === current ? table : { ...table, attributes };
+}
+
+/** Whether the table has the attribute of this whole name (of the table's, or of a column's as the metadata row names it) */
+export function hasMetaNamed(table: Table, name: string): boolean {
+  if (parseColumnAttribute(name)) return name in (table.meta ?? {});
+  const { owner, key } = splitAttributeName(name);
+  return metaValue(table, owner, key) !== undefined;
 }
 
 /** An owner's attributes of the table (not of its columns), by key */
 export function metaValuesOf(table: Table, owner: Owner): Map<string, string> {
-  const values = new Map<string, string>();
-  for (const [name, value] of Object.entries(table.meta ?? {})) {
-    if (name.startsWith(`${owner}.`) && !parseColumnAttribute(name)) values.set(name.slice(owner.length + 1), value);
-  }
-  return values;
+  return new Map(table.attributes?.get(owner));
 }
 
 // ---- attributes of columns ------------------------------------------------------
 
-// `<owner>.-c-<column>.<key>` and `<owner>.-c-<column>:<occurrence>.<key>`: a
-// column's key or fixed name has no "." or ":"; it is empty for a header with
-// only hashtags (`#stars`). `what` is its owner and key, `<owner>.<key>`
-const COLUMN_ATTRIBUTE_RE = new RegExp(String.raw`^([^.]+)\.${COLUMN_MARK}([^.:]*)(?::(\d+))?\.(.+)$`);
 
 function parseColumnAttribute(name: string): { readonly what: string; readonly id: ColumnId } | undefined {
   const match = COLUMN_ATTRIBUTE_RE.exec(name);

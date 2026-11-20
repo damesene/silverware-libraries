@@ -5,7 +5,7 @@
 //
 // With the metadata setting off, nothing new is stored: an attribute the table
 // has may change or go, none is added (`enabled`: whether the setting is on).
-import { attributeName, columnAttributeOf, columnValues, metaValue, metaValuesOf, type Owner, withColumnValues, withMetaValue } from "../meta.ts";
+import { attributeName, columnAttributeOf, columnValues, hasMetaNamed, metaValue, metaValuesOf, type Owner, withColumnValues, withMetaValue } from "../meta.ts";
 import type { Table } from "../markdown.ts";
 import { tagValue, withTagValue } from "../tagvalues.ts";
 import type { ModelHost } from "./feature.ts";
@@ -17,7 +17,7 @@ export type OwnMeta = Pick<
 
 export function ownMeta(owner: Owner, enabled: () => boolean): OwnMeta {
   // Whether the table may have this attribute: the setting on, or it has it already
-  const storable = (table: Table, name: string | undefined) => name !== undefined && (enabled() || name in (table.meta ?? {}));
+  const storable = (table: Table, name: string | undefined) => name !== undefined && (enabled() || hasMetaNamed(table, name));
   const nameOf = (table: Table, key: string, at?: { readonly column: number }) => (at ? columnAttributeOf(table, owner, key, at.column) : attributeName(owner, key));
   return {
     attribute: (table, key, at) => (at ? columnValues(table, owner, key).get(at.column) : metaValue(table, owner, key)),

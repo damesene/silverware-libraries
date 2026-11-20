@@ -8,7 +8,7 @@
 // nothing is filled in later under what the core and the modules put into it.
 import { alignClass, DRAWN_CLASS, WIDGET_CLASS } from "../../dom.ts";
 import { TABLE_MARKER } from "../../metanames.ts";
-import { parseTable } from "../../markdown.ts";
+import { parseTable, writesMetaRow, writtenMeta } from "../../markdown.ts";
 import type { CellRenderer } from "./cells.ts";
 
 /** Draws the table of `source`, which starts at `hint` in the page, with its cells rendered */
@@ -54,14 +54,14 @@ export async function drawTable(doc: Document, source: string, hint: number, ren
     row.cells.forEach((_, column) => tr.append(cell(content(index++), column)));
     tbody.append(tr);
   });
-  if (model.meta) {
+  if (writesMetaRow(model)) {
     // As SilverBullet shows it: one cell holding the <meta>, whose attributes are the metadata
     const tr = doc.createElement("tr");
     // Its line after the header's, the delimiter's and the body rows'
     tr.dataset.pos = String(lineStarts[model.rows.length + 1]);
     const meta = doc.createElement("meta");
     meta.setAttribute(TABLE_MARKER, "");
-    for (const [name, value] of Object.entries(model.meta)) meta.setAttribute(name, value);
+    for (const [name, value] of Object.entries(writtenMeta(model))) meta.setAttribute(name, value);
     const td = doc.createElement("td");
     td.append(meta);
     tr.append(td);

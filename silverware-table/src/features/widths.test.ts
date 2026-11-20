@@ -183,7 +183,7 @@ describe("Column widths", () => {
     Object.defineProperty(widget, "clientWidth", { configurable: true, value: 300 });
     drag(2, [100, 100, 400], [-1000]);
     await flush();
-    expect(text).toBe(`${PAGE}| <meta core.table widths.-c-name.size='100' widths.-c-qty.size='100' widths.-c-note.size='100' widths.box='300'> |\n`);
+    expect(text).toBe(`${PAGE}| <meta core.table widths.box='300' widths.-c-name.size='100' widths.-c-qty.size='100' widths.-c-note.size='100'> |\n`);
   });
 
   it("keeps the box the widths were set in, and shows the table as that share of the box it has", async () => {
@@ -192,7 +192,7 @@ describe("Column widths", () => {
     Object.defineProperty(widget, "clientWidth", { configurable: true, value: 400 });
     drag(0, [100, 100, 100], [20]);
     await flush();
-    expect(text).toBe(`${PAGE}| <meta core.table widths.-c-name.size='120' widths.-c-qty.size='80' widths.-c-note.size='100' widths.box='400'> |\n`);
+    expect(text).toBe(`${PAGE}| <meta core.table widths.box='400' widths.-c-name.size='120' widths.-c-qty.size='80' widths.-c-note.size='100'> |\n`);
     await controller.scan();
     expect(editor.querySelector("table")!.style.width).toBe("75%");
   });

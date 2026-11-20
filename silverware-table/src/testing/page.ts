@@ -8,7 +8,7 @@ import type { Bridge } from "../bridge.ts";
 import { tablePlatform } from "../host/silverbullet/platform.ts";
 import { Controller } from "../controller.ts";
 import type { InsertControls, InsertTarget } from "../core/insert.ts";
-import { findTables, parseTable } from "../markdown.ts";
+import { findTables, parseTable, writesMetaRow, writtenMeta } from "../markdown.ts";
 import { metaTagPattern } from "../tags.ts";
 import type { TableKey } from "../core/tables.ts";
 
@@ -76,12 +76,12 @@ export function renderPage(page: string, into: HTMLElement, moves: number[]): vo
       (r === 0 ? thead : tbody).append(tr);
     });
     // The metadata row renders too, its <meta> unseen
-    if (model.meta) {
+    if (writesMetaRow(model)) {
       const tr = document.createElement("tr");
       const td = document.createElement("td");
       // With its attributes, as SilverBullet renders it (verified)
       const meta = document.createElement("meta");
-      for (const [name, value] of Object.entries(model.meta)) meta.setAttribute(name, value);
+      for (const [name, value] of Object.entries(writtenMeta(model))) meta.setAttribute(name, value);
       td.append(meta);
       tr.append(td);
       tbody.append(tr);

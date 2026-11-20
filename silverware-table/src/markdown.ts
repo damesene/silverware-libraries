@@ -1,6 +1,7 @@
 // Markdown table model: parse a GFM table from page text and write it back.
 // Rows that were not changed are written back byte for byte.
-import { escapedForRegExp, TABLE_MARKER } from "./metanames.ts";
+import { attributeName, escapedForRegExp, isColumnAttributeName, splitAttributeName, TABLE_MARKER } from "./metanames.ts";
+import type { Attributes } from "./model/model.ts";
 import { metaTagPattern, TAG_BODY } from "./tags.ts";
 
 export type Align = "" | "left" | "center" | "right";
@@ -26,10 +27,14 @@ export type Table = {
   readonly padded: boolean;
   readonly delimiterSource?: string;
   readonly alignSource?: readonly Align[];
-  // Undefined: the table has no metadata row
+  // The table's own attributes, by owner and key (docs/silverware-table-store-plan.md, *The model*); none: it has none
+  readonly attributes?: Attributes;
+  // Its columns' attributes as the metadata row names them (`core.-c-qty.sort`, meta.ts), until they move onto the
+  // columns; undefined: the table has no metadata row
   readonly meta?: TableMeta;
-  // The metadata row as read, written back as is while `meta` is that same object
-  readonly metaSource?: { readonly line: string; readonly meta: TableMeta };
+  // The metadata row as read, written back as is while `meta` and `attributes` are those same objects; `names` its
+  // attributes' names in its order, kept when it is written anew
+  readonly metaSource?: { readonly line: string; readonly meta: TableMeta; readonly attributes: Attributes; readonly names: readonly string[] };
 };
 
 export type TableRange = {
@@ -248,8 +253,56 @@ function parseTableText(text: string): Table {
     padded,
     delimiterSource: delimiter,
     alignSource: align,
-    ...(meta && last !== undefined ? { meta, metaSource: { line: last, meta } } : {}),
+    ...(meta && last !== undefined ? readMeta(meta, last) : {}),
   };
+}
+
+/** A metadata row's attributes as written (whole names) into the table's own, by owner and key, and its columns' */
+export function tableMetaOf(written: TableMeta): { readonly attributes: Attributes; readonly meta: TableMeta } {
+  const attributes = new Map<string, Map<string, string>>();
+  const columns: Record<string, string> = {};
+  for (const [name, value] of Object.entries(written)) {
+    if (isColumnAttributeName(name)) {
+      columns[name] = value;
+      continue;
+    }
+    const { owner, key } = splitAttributeName(name);
+    let own = attributes.get(owner);
+    if (!own) attributes.set(owner, (own = new Map()));
+    own.set(key, value);
+  }
+  return { attributes, meta: columns };
+}
+
+/** The table as its metadata row read: the table's attributes and its columns', the row kept as written */
+function readMeta(written: TableMeta, line: string): Pick<Table, "attributes" | "meta" | "metaSource"> {
+  const { attributes, meta } = tableMetaOf(written);
+  return { attributes, meta, metaSource: { line, meta, attributes, names: Object.keys(written) } };
+}
+
+/**
+ * A table's metadata as its metadata row writes it, by whole names: the
+ * names it was read with in their order, then those set since (the table's
+ * own, then its columns')
+ */
+export function writtenMeta(table: Table): TableMeta {
+  const all = new Map<string, string>();
+  for (const [owner, own] of table.attributes ?? []) for (const [key, value] of own) all.set(attributeName(owner, key), value);
+  for (const [name, value] of Object.entries(table.meta ?? {})) all.set(name, value);
+  const written: Record<string, string> = {};
+  for (const name of table.metaSource?.names ?? []) if (all.has(name)) written[name] = all.get(name)!;
+  for (const [name, value] of all) if (!(name in written)) written[name] = value;
+  return written;
+}
+
+/** Whether the table is written with a metadata row: the one it was read with unchanged, or one with an attribute */
+export function writesMetaRow(table: Table): boolean {
+  return metaRowAsRead(table) || Object.keys(writtenMeta(table)).length > 0;
+}
+
+/** Whether its metadata row is the one it was read with: its attributes the same objects */
+function metaRowAsRead(table: Table): boolean {
+  return !!table.metaSource && table.metaSource.meta === table.meta && table.metaSource.attributes === table.attributes;
 }
 
 const META_TAG_RE = new RegExp(String.raw`^<meta\b(${TAG_BODY}?)\/?>$`, "i");
@@ -367,8 +420,11 @@ export function serializeTable(table: Table, rule: FormatRule = {}): string {
     lines = tableLines({ ...rest, padded: false, rows }, 0);
   }
   // An unchanged metadata row is kept as it was; one without attributes is dropped
-  if (table.meta && table.metaSource?.meta === table.meta) lines.push(table.metaSource.line);
-  else if (table.meta && Object.keys(table.meta).length > 0) lines.push(metaRow(table.indent, table.meta));
+  if (metaRowAsRead(table)) lines.push(table.metaSource!.line);
+  else {
+    const meta = writtenMeta(table);
+    if (Object.keys(meta).length > 0) lines.push(metaRow(table.indent, meta));
+  }
   return lines.join("\n");
 }
 
@@ -421,6 +477,7 @@ export function sameTable(a: Table, b: Table): boolean {
   if (a === b) return true;
   return (
     a.meta === b.meta &&
+    a.attributes === b.attributes &&
     a.align.length === b.align.length &&
     a.align.every((align, i) => align === b.align[i]) &&
     a.rows.length === b.rows.length &&
@@ -464,7 +521,7 @@ function shapeOf(range: TableRange): { rows: number; columns: number; headers: s
   const table = parseTable(range.text);
   return {
     // SilverBullet renders the metadata row too
-    rows: table.rows.length + (table.meta ? 1 : 0),
+    rows: table.rows.length + (writesMetaRow(table) ? 1 : 0),
     columns: table.align.length,
     headers: (table.rows[0]?.cells ?? []).map(plainText),
   };
@@ -521,7 +578,7 @@ export function locateWithEmptyHeaders(
     findTables(text).filter((range) => {
       const table = parseTable(range.text);
       const named = (table.rows[0]?.cells ?? []).filter((cell) => cell !== "").length;
-      const rendered = table.rows.length + (table.meta ? 1 : 0);
+      const rendered = table.rows.length + (writesMetaRow(table) ? 1 : 0);
       return rendered === shape.rows && named === shape.columns && named < table.align.length;
     }),
     hint,

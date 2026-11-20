@@ -2,8 +2,8 @@
 // moved rows and columns, renamed columns and tables; calculated columns
 // filling new rows; formulas removed.
 import { followColumn, modelHeads, sameColumnId } from "../columns.ts";
-import { type ModelCell, type TableModel, withCellAt } from "../model/model.ts";
-import type { IndexMap } from "../ops.ts";
+import type { ModelCell, TableModel } from "../model/model.ts";
+import { type IndexMap, withCellAt } from "../model/ops.ts";
 import { type FormulaCells, hasFormulas } from "./cell.ts";
 import { recalculate, type TableSource } from "./evaluate.ts";
 import { parse, wholeColumnNames } from "./parser.ts";

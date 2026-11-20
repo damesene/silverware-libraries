@@ -101,6 +101,7 @@ import { ICONS } from "../icons.ts";
 import type { SourcesOffer } from "../sources.ts";
 import { escapeCell, sameTable, type Table } from "../markdown.ts";
 import { type ModelCell, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
+import { EMPTY_CELL } from "../model/ops.ts";
 import { sameTableName } from "../namerules.ts";
 import { insertColumn, setCell } from "../ops.ts";
 import { insertColumnAt } from "../pins.ts";
@@ -1670,9 +1671,6 @@ export type CellAttributeAccess = {
   readonly get: (cell: ModelCell, key: string) => string | undefined;
   readonly with: (cell: ModelCell, key: string, value: string | undefined) => ModelCell;
 };
-
-/** A cell holding nothing: what a new cell is judged and made by */
-const EMPTY_CELL: ModelCell = { content: "", attributes: NO_ATTRIBUTES };
 
 /** The cells as the formulas read and write them: a formula in the attribute `f`, the names of rows and cells as given */
 export function formulaCellsOf(attributes: CellAttributeAccess, names: Pick<FormulaCells, "rowNames" | "cellNames">): FormulaCells {

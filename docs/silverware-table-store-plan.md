@@ -566,6 +566,29 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      Writing a type stays on the header's text, as the header editor's
      hooks do, until `writeTable` and the hooks take the model (its setter,
      `withColumnHashtags`, comes then, with its first user).
+   - **What is left, in the order the code needs it (2026-11-20)**: the
+     cell rules (`boundToContent`, `unique`) need writes on the model (an
+     edit "set" an attribute is the model's record of changes, which a write
+     through the markdown loses), and the domains left (the sheet's, the
+     conditions', autofill's) each move with their module. So: 4a the
+     model's operations; 4b the host in model terms; 4c `writeTable` and
+     `insertTable` on the model; 4d `TableInfo.model` and the hooks on the
+     model (`KeyedTable` one with `PageTableModel`), the modules and domains
+     left with them; 4e the `Table` overloads gone (the isolation test: no
+     module imports markdown.ts); then the cell rules, autofill's domain
+     with them.
+   - **4a, the model's operations (2026-11-20)**: `model/ops.ts` (a cell's
+     content set keeping its attributes, a header, an alignment; rows
+     inserted, deleted, duplicated, moved, reordered; columns inserted,
+     deleted, moved; empty headers named), rows counted as the markdown's;
+     each written back by the codec as the markdown's operation writes it
+     (`model/ops.test.ts`). `ops.ts` stays for the markdown until no module
+     uses it; the index helpers (`IndexMap`, `lineAfterBlockMove`,
+     `columnAfterMove`) are the model's. A column deleted on the model keeps
+     its attributes through `encode` (the codec cannot tell it from a view's
+     column gone, kept to come back): whether it went is the write's to say
+     by its column map, as now (`followColumnMeta` in the core's write step),
+     which 4c keeps.
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

@@ -1,5 +1,8 @@
-// Structural edits of a table model. Each returns a new table.
+// Structural edits of a markdown table (its rows the header's and the body's,
+// its cells markdown). Each returns a new table. The model's are model/ops.ts,
+// which the modules move onto (docs/silverware-table-store-plan.md, step 3).
 import type { Align, Row, Table } from "./markdown.ts";
+export { columnAfterMove, type IndexMap, lineAfterBlockMove } from "./model/ops.ts";
 
 function withRows(table: Table, rows: readonly Row[]): Table {
   return { ...table, rows };
@@ -31,9 +34,6 @@ function movedBlock<T>(items: readonly T[], first: number, last: number, to: num
   result.splice(to, 0, ...block);
   return result;
 }
-
-// Where a row or column of the table before an edit is after it; undefined: deleted
-export type IndexMap = (index: number) => number | undefined;
 
 export function setCell(table: Table, row: number, column: number, value: string): Table {
   return withRows(
@@ -181,21 +181,4 @@ export function setAlign(table: Table, column: number, align: Align): Table {
     ...table,
     align: table.align.map((a, i) => (i === column ? align : a)),
   };
-}
-
-/** Where line (row or column) `i` ends up after moving lines `first`..`last` so that the first is at `to` */
-export function lineAfterBlockMove(i: number, first: number, last: number, to: number): number {
-  const size = last - first + 1;
-  if (i >= first && i <= last) return to + i - first;
-  // The others close up, then make room for the block
-  const closed = i > last ? i - size : i;
-  return closed >= to ? closed + size : closed;
-}
-
-/** Where column `c` ends up after moving column `from` to `to` */
-export function columnAfterMove(c: number, from: number, to: number): number {
-  if (c === from) return to;
-  if (from < to && c > from && c <= to) return c - 1;
-  if (from > to && c >= to && c < from) return c + 1;
-  return c;
 }

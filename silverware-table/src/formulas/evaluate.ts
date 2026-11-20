@@ -1,7 +1,8 @@
 // Calculating formulas: a table's cells as a sheet, the other tables they
 // refer to as a book, results and the reasons of errors.
 import { columnName, type ColumnHead, modelHeads } from "../columns.ts";
-import { type ModelCell, NO_ATTRIBUTES, type TableModel, withCellAt } from "../model/model.ts";
+import { type ModelCell, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
+import { withCellAt } from "../model/ops.ts";
 import { asNumber } from "../../../shared/filter.ts";
 import { type CalculatedBy, cellResult, cellsByName, errorCodeIn, type FormulaCells, hasFormulas, PLAIN_CELLS, rowsByName, withEquals } from "./cell.ts";
 import { dateArithmetic, parseDate } from "./dates.ts";

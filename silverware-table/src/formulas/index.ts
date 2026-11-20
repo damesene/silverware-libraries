@@ -134,4 +134,4 @@ export { calculatedFormula, filledFormula, followFormula, followOwnFormula, foll
 export { argumentSpan, type ColumnChoice, columnChoicesOf, type FormulaChoice, type FormulaChoices, choiceText, cycleFixed, findFunctions, type FormulaHelp, formulaChoices, formulaHelp, functionHelp, nameTyped, needsOperator, type PointedSpan, REFERENCE_HELP, referenceSlot, sourceChoices } from "./help.ts";
 export { FUNCTION_CATEGORIES, type AnyFunction, type FormulaFunction, type FunctionCategory } from "./function.ts";
 export { functionNamed, isCustomFunction } from "./registry.ts";
-export type { IndexMap } from "../ops.ts";
+export type { IndexMap } from "../model/ops.ts";

@@ -9,7 +9,8 @@ import { customTypes } from "./columntypes/custom.ts";
 import { customTypesAnew, defineCustomTypes } from "./columntypes/registry.ts";
 import { checkedConditions, checkedFormats, customDefinitionsAnew, defineCustomConditions, defineCustomFormats } from "./conditions/index.ts";
 import { customFunctions } from "./formulas/custom.ts";
-import { cellResult, choiceText, type FormulasOffer, functionNamed, givesList, type PageTableModel, scalarText, withEquals } from "./formulas/index.ts";
+import { cellResult, choiceText, type FormulasOffer, functionNamed, givesList, scalarText, withEquals } from "./formulas/index.ts";
+import type { KeyedModel } from "./model/model.ts";
 import { defineFormulaPlaces as defineFormulaPlacesIn, type FormulaPlaces } from "./formulas/places.ts";
 import { isError, isRange, type Scalar, single, TimeValue, type Value } from "./formulas/values.ts";
 import { customFunctionsAnew, defineCustomFunctions } from "./formulas/registry.ts";
@@ -87,7 +88,7 @@ const FORMULAS_OFF: EvaluatedError = { code: "#N/A", detail: "formulas are off" 
  * `page` its name (else the page shown).
  */
 /** A text's tables as the formulas take them: each told apart by its key */
-function modelsOfText(controller: Controller, text: string, page?: string): readonly PageTableModel[] {
+function modelsOfText(controller: Controller, text: string, page?: string): readonly KeyedModel[] {
   return controller.tablesOfText(text, page);
 }
 

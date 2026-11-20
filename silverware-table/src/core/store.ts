@@ -4,7 +4,7 @@
 // store/markdown/). Modules never see a store: they get tables through the
 // host (TableInfo.model and .revision; host.tables). Step 2 of the plan has
 // the read side; transactions, places and the rest come with steps 2 to 4.
-import type { TableModel } from "../model/model.ts";
+import type { KeyedModel } from "../model/model.ts";
 import type { TableKey } from "./tables.ts";
 
 /**
@@ -14,11 +14,7 @@ import type { TableKey } from "./tables.ts";
 export type TableRevision = string & { readonly __tableRevision: unique symbol };
 
 /** A table as a store keeps it: its key, its model, the model's revision */
-export type StoredTable = {
-  readonly key: TableKey;
-  readonly revision: TableRevision;
-  readonly model: TableModel;
-};
+export type StoredTable = KeyedModel<TableKey> & { readonly revision: TableRevision };
 
 export interface TableStore {
   /** A document's tables in its order (a page's name in SilverBullet); none where it has none; null where it is not there (or not read) */

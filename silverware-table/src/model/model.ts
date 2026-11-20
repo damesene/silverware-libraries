@@ -43,6 +43,13 @@ export type TableModel = {
   readonly attributes: Attributes;
 };
 
+/**
+ * A table told apart from the others of its document by its key (a store's:
+ * the core's TableKey), with its model: what the domains and the core hand
+ * each other a page's tables as
+ */
+export type KeyedModel<Key extends string = string> = { readonly key: Key; readonly model: TableModel };
+
 /** An attribute set on attributes: what they were made from, and the change */
 export type AttributeChange = { readonly from: Attributes; readonly owner: Owner; readonly key: string; readonly value: string | undefined };
 

@@ -9,7 +9,7 @@ export type { PartTable, TablePart, TableParts } from "./parts.ts";
 export { tablePartsOf } from "./parts.ts";
 import type { FeatureName, SETTINGS, SettingValue } from "../bridge.ts";
 import type { TablePlatform } from "./platform.ts";
-import type { AttributePlace, ModelCell, TableModel } from "../model/model.ts";
+import type { AttributePlace, KeyedModel, ModelCell, TableModel } from "../model/model.ts";
 import type { StoredTable, TableRevision } from "./store.ts";
 import type { Dialog, DialogOptions } from "./dialog.ts";
 import type { Rect } from "./geometry.ts";
@@ -499,7 +499,7 @@ export type WritePage = { readonly text: string; readonly tables: readonly Keyed
 export type TableChange = { readonly key: TableKey; readonly change: (model: TableModel) => TableModel };
 
 /** A table of the page by its key, with its model: one a write reads, or another it changes in the same edit (otherTablesWritten) */
-export type KeyedTable = { readonly key: TableKey; readonly model: TableModel };
+export type KeyedTable = KeyedModel<TableKey>;
 
 /**
  * The other pages formulas can read (the pageLinks module reads them): the tables of each as read (null: no such

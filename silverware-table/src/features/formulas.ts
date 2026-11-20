@@ -89,7 +89,7 @@ import {
   withColumnKeys,
   writtenArea,
 } from "../formulas/index.ts";
-import { cellName, columnChoicesOf, columnIdText, FormulaError, type FormulaErrorAt, functionHelp, type Grid, type PageTableModel, parseFormula, withEquals } from "../formulas/index.ts";
+import { cellName, columnChoicesOf, columnIdText, FormulaError, type FormulaErrorAt, functionHelp, type Grid, parseFormula, withEquals } from "../formulas/index.ts";
 import { addAffected, affectedBy, type Elsewhere, isAffected, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../formulas/page.ts";
 import { formulaPlacesIn } from "../formulas/places.ts";
 import { functionNamed } from "../formulas/registry.ts";
@@ -99,7 +99,7 @@ import { ResultView } from "./resultview.ts";
 import { el } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
 import type { SourcesOffer } from "../sources.ts";
-import { type ModelCell, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
+import { type KeyedModel, type ModelCell, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
 import { EMPTY_CELL, insertColumn, withCellAt, withHeader } from "../model/ops.ts";
 import { sameTableName } from "../namerules.ts";
 import { insertColumnAt } from "../pins.ts";
@@ -219,7 +219,7 @@ export class Formulas implements Feature {
   // typed where (`key`), and the name Esc closed the list for (it opens again once the name changes)
   private choosing: { readonly key: string; index: number } | undefined;
   // The page's names offered while a name is typed (its tables and cells), as of the page's text
-  private pageNames: { readonly tables: readonly PageTableModel[]; readonly choices: readonly FormulaChoice[] } | undefined;
+  private pageNames: { readonly tables: readonly KeyedModel[]; readonly choices: readonly FormulaChoice[] } | undefined;
   private dismissed: string | undefined;
   // Where the editor's text was last typed (its text, the caret after it): a name typed there, not one the caret moved into
   private typedAt: { readonly editor: CellEditor; readonly text: string; readonly at: number } | undefined;
@@ -313,7 +313,7 @@ export class Formulas implements Feature {
    * pageLinks module's, when on), then the page's tables by name, as a cell's
    * formula finds them; the other pages read, which the caller may watch
    */
-  private async evaluate(formula: string, tables: readonly PageTableModel[], page = this.host.currentPage): Promise<{ readonly value: Value; readonly pages: readonly string[] }> {
+  private async evaluate(formula: string, tables: readonly KeyedModel[], page = this.host.currentPage): Promise<{ readonly value: Value; readonly pages: readonly string[] }> {
     const pages = (await this.host.offered<PageLinksOffer>("pageLinks")?.readFor([formula], tables.map((t) => t.model))) ?? [];
     const source = pageTables(this.cells, () => this.named(tables), page, undefined, this.elsewhere());
     const value = evaluateFormula(formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`, { cells: this.cells, tables: source });
@@ -326,7 +326,7 @@ export class Formulas implements Feature {
    * name, its cell, its column's key and its place; the other pages read, which
    * the caller may watch
    */
-  private async errors(tables: readonly PageTableModel[], page = this.host.currentPage): Promise<{ readonly errors: readonly FormulaErrorAt[]; readonly pages: readonly string[] }> {
+  private async errors(tables: readonly KeyedModel[], page = this.host.currentPage): Promise<{ readonly errors: readonly FormulaErrorAt[]; readonly pages: readonly string[] }> {
     const pages = (await this.host.offered<PageLinksOffer>("pageLinks")?.readFor([], tables.map((t) => t.model))) ?? [];
     const source = pageTables(this.cells, () => this.named(tables), page, undefined, this.elsewhere());
     const errors = tables.flatMap(({ model: table }, index) => {
@@ -417,7 +417,7 @@ export class Formulas implements Feature {
   }
 
   /** The page's tables with their names, as the domain takes them (told apart by their keys) */
-  private named(tables: readonly PageTableModel[]): NamedPageTable[] {
+  private named(tables: readonly KeyedModel[]): NamedPageTable[] {
     return tables.map((t) => ({ key: t.key, table: t.model, name: this.nameOf(t.model) }));
   }
 
@@ -1300,7 +1300,7 @@ export class Formulas implements Feature {
   }
 
   /** The names a formula of `table` is offered among the page's `tables`: the other tables' and the page's, the table's own */
-  private namesOf(table: TableModel, tables: readonly PageTableModel[]): readonly FormulaChoice[] {
+  private namesOf(table: TableModel, tables: readonly KeyedModel[]): readonly FormulaChoice[] {
     if (this.pageNames?.tables !== tables) this.pageNames = { tables, choices: pageNameChoices(this.cells, this.named(tables)) };
     const own = this.nameOf(table)?.toLowerCase();
     const others = this.pageNames.choices.filter((choice) => !(choice.table && choice.table.toLowerCase() === own));

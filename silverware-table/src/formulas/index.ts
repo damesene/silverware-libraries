@@ -18,10 +18,8 @@
 // This is the formulas' API for the rest of Silverware Table; the parts are the
 // files beside it, the functions in builtin/ (only functions: what a formula
 // can call), custom functions in custom.ts, which exist in registry.ts.
+import type { KeyedModel } from "../model/model.ts";
 export { type CalculatedBy, type CalculatedRead, type HeldFormulas, type CellNameAt, cellResult, resultContent, PLAIN_CELLS, withEquals, cellsByName, errorCodeIn, type FormulaCells, formulaCount, forFormulas, hasFormulas, isErrorText, isFormulaInput, type RowName, rowsByName, type StoredFormula } from "./cell.ts";
-
-/** A table of a page as the formulas module is given one: what tells it apart (its key), and its model */
-export type PageTableModel = { readonly key: string; readonly model: import("../model/model.ts").TableModel };
 
 /**
  * What the formulas module offers other modules (ModelHost.offered("formulas")): its cells as the formulas read them;
@@ -30,15 +28,15 @@ export type PageTableModel = { readonly key: string; readonly model: import("../
  */
 export type FormulasOffer = {
   readonly cells: import("./cell.ts").FormulaCells;
-  readonly evaluate: (formula: string, tables: readonly PageTableModel[], page?: string) => Promise<{ readonly value: import("./values.ts").Value; readonly pages: readonly string[] }>;
+  readonly evaluate: (formula: string, tables: readonly KeyedModel[], page?: string) => Promise<{ readonly value: import("./values.ts").Value; readonly pages: readonly string[] }>;
   /** The errors the formula cells of a page's tables show, calculated now on them (the Space Lua API's errors), and the other pages read */
-  readonly errors: (tables: readonly PageTableModel[], page?: string) => Promise<{ readonly errors: readonly FormulaErrorAt[]; readonly pages: readonly string[] }>;
+  readonly errors: (tables: readonly KeyedModel[], page?: string) => Promise<{ readonly errors: readonly FormulaErrorAt[]; readonly pages: readonly string[] }>;
   /**
    * What the name typed before `caret` in `formula` may be, among a page's `tables`: its place in `formula` and the
    * choices; `table`, the table the formula is of (as a cell's formula is): its columns in [ ] and [@ ], its named
    * rows and cells, its own name's prefix, as a cell's formula has them
    */
-  readonly complete: (formula: string, caret: number, tables: readonly PageTableModel[], table?: import("../model/model.ts").TableModel) => import("./help.ts").FormulaChoices | undefined;
+  readonly complete: (formula: string, caret: number, tables: readonly KeyedModel[], table?: import("../model/model.ts").TableModel) => import("./help.ts").FormulaChoices | undefined;
   /** The function the caret is in, its syntax with the argument at the caret; undefined out of any */
   readonly help: (formula: string, caret: number) => import("./help.ts").FormulaHelp | undefined;
   /** Why a formula does not read (a ")" missing); undefined: it does */

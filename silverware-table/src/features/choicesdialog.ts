@@ -21,7 +21,6 @@ import {
   listNames,
   type ListRead,
   readChoiceList,
-  withColumnType,
   writeChoiceList,
 } from "../columntypes/index.ts";
 import type { Dialog, ModelHost, TableInfo } from "../core/feature.ts";
@@ -40,11 +39,6 @@ type ValueRow = { readonly original: string | undefined; readonly field: HTMLInp
 /** How many of the values a formula gives the dialog shows */
 const SHOWN = 200;
 
-/** The table with a column's type set to `tag` (none: no type), its other hashtags kept */
-export function withTypeOf(host: Pick<ModelHost, "columnHashtags" | "withColumnHashtags">, table: TableModel, column: number, tag: string | undefined): TableModel {
-  return host.withColumnHashtags(table, column, withColumnType(host.columnHashtags(table, column) ?? "", tag));
-}
-
 // Why the ways that need formulas cannot be picked while the formulas module is off
 const FORMULAS_OFF = "it is calculated by the formulas module, which is off: turn it on in the settings";
 
@@ -55,6 +49,8 @@ export class ChoicesDialog {
     private readonly host: ModelHost,
     // A list's formula read for a table as the column checks it (the column types module's)
     private readonly read: (table: TableModel, formula: string) => ListRead,
+    // The table with a column's type set (none: no type), its other hashtags kept (the column types module's)
+    private readonly withType: (table: TableModel, column: number, tag: string | undefined) => TableModel,
   ) {}
 
   close(): void {
@@ -208,7 +204,7 @@ export class ChoicesDialog {
     const save = () => {
       if (way === "column") {
         this.dialog?.close();
-        void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => withTypeOf(this.host, t, column, "choice"));
+        void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.withType(t, column, "choice"));
         return;
       }
       const name = nameField.value.trim().toLowerCase();
@@ -339,7 +335,7 @@ export class ChoicesDialog {
     table = this.host.withAttribute(table, listKey(name), value);
     const columns = table.columns.flatMap((_, c) => (c === column || (was !== undefined && choiceListOf(this.host.columnHashtags(table, c)) === was) ? [c] : []));
     for (const c of columns) {
-      table = withTypeOf(this.host, table, c, `choice-${name}`);
+      table = this.withType(table, c, `choice-${name}`);
       if (!renamed.size) continue;
       for (let r = 1; r <= table.rows.length; r++) {
         const cell = table.rows[r - 1]!.cells[c];

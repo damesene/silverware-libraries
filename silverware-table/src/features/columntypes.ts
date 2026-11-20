@@ -32,7 +32,7 @@ import {
 } from "../columntypes/index.ts";
 import { FormulaError, formulaSources, formulaTableNames, type FormulasOffer, type HeldFormulas, type HeldFormulasOffer } from "../formulas/index.ts";
 import { sameTableName } from "../namerules.ts";
-import { ChoicesDialog, withTypeOf } from "./choicesdialog.ts";
+import { ChoicesDialog } from "./choicesdialog.ts";
 
 /** A type's icon, or a tag for a type without one */
 function iconOf(type: ColumnType): string {
@@ -96,7 +96,11 @@ export class ColumnTypes implements Feature {
   private lists: { readonly page: readonly StoredTable[]; readonly byTable: WeakMap<TableModel, Map<string, ListRead>> } | undefined;
 
   constructor(private readonly host: ModelHost) {
-    this.choicesDialog = new ChoicesDialog(host, (table, formula) => this.formulaList(table, formula));
+    this.choicesDialog = new ChoicesDialog(
+      host,
+      (table, formula) => this.formulaList(table, formula),
+      (table, column, tag) => this.withType(table, column, tag),
+    );
     // The type hashtags of headers hidden from the start (a table shows before its looks apply)
     host.hideHeaderTags("types", typeTagPatterns());
     this.picker = host.panel("swt-choices");
@@ -160,6 +164,11 @@ export class ColumnTypes implements Feature {
     if (formula === undefined) return { values: readChoiceList(stored) };
     const read = this.formulaList(table, formula);
     return read.problem ? { problem: `its formula (${formula}) ${read.problem}` } : read;
+  }
+
+  /** The table with a column's type set to `tag` (none: no type), its other hashtags kept (also the Choices dialog's) */
+  private withType(table: TableModel, column: number, tag: string | undefined): TableModel {
+    return this.host.withColumnHashtags(table, column, withColumnType(this.host.columnHashtags(table, column) ?? "", tag));
   }
 
   /** The values a list's formula gives a table now (the formulas module's), as the column checks them; or why none (also the Choices dialog's) */
@@ -231,7 +240,7 @@ export class ColumnTypes implements Feature {
     if (axis !== "column") return [];
     const table = info.model;
     const current = this.typeOf(table, column);
-    const setType = (tag: string | undefined) => () => void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => withTypeOf(this.host, t, column, tag));
+    const setType = (tag: string | undefined) => () => void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.withType(t, column, tag));
     const choices: MenuEntry[] = [
       { kind: "item", label: "No type", icon: ICONS.clear, checked: !current, run: setType(undefined) },
       { kind: "separator" },
@@ -294,7 +303,7 @@ export class ColumnTypes implements Feature {
     });
     const taken = choiceListOf(this.host.columnHashtags(table, column));
     // The list taken for the column: its header naming it
-    const take = (name: string) => () => void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => withTypeOf(this.host, t, column, `choice-${name}`));
+    const take = (name: string) => () => void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.withType(t, column, `choice-${name}`));
     const stored = this.host.attributes(table);
     return listNames(stored).map((name): MenuEntry => {
       const used = users.get(name);
@@ -334,7 +343,7 @@ export class ColumnTypes implements Feature {
     void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => {
       let table = this.host.withAttribute(t, listKey(name), undefined);
       table.columns.forEach((_, c) => {
-        if (choiceListOf(this.host.columnHashtags(table, c)) === name) table = withTypeOf(this.host, table, c, undefined);
+        if (choiceListOf(this.host.columnHashtags(table, c)) === name) table = this.withType(table, c, undefined);
       });
       return table;
     });

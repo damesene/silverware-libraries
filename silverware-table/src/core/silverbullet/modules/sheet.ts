@@ -1047,7 +1047,7 @@ export class Sheet implements AdapterFeature {
       this.host.notify(`Silverware Table: the table cannot go to ${formatAt(at)}: ${problem}`, "info");
       return "failed";
     }
-    return this.host.writeTable(info, (t) => this.host.withAttribute(t, AT_KEY, formatAt(at)));
+    return this.host.writeModel(info, (t) => this.host.withAttribute(t, AT_KEY, formatAt(at)));
   }
 
   /** The board scrolls what is on it, its tables and empty cells (middle-button autoscroll) */
@@ -1419,7 +1419,7 @@ export class Sheet implements AdapterFeature {
         return;
       }
       const target = range && { key: keys[range.ordinal]!, source: range.text, hint: range.from };
-      const result = target && (await this.host.writeTable(target, (t) => this.host.withAttribute(t, key, width === undefined ? undefined : String(width))));
+      const result = target && (await this.host.writeModel(target, (t) => this.host.withAttribute(t, key, width === undefined ? undefined : String(width))));
       if (result === "written") return;
     } catch (e) {
       console.error("Silverware Table: could not store the column's width", e);

@@ -101,9 +101,8 @@ import { ICONS } from "../icons.ts";
 import type { SourcesOffer } from "../sources.ts";
 import { sameTable, type Table } from "../markdown.ts";
 import { type ModelCell, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
-import { EMPTY_CELL } from "../model/ops.ts";
+import { EMPTY_CELL, insertColumn, withCellAt, withHeader } from "../model/ops.ts";
 import { sameTableName } from "../namerules.ts";
-import { insertColumn, setCell } from "../ops.ts";
 import { insertColumnAt } from "../pins.ts";
 import type { TableKey } from "../core/feature.ts";
 
@@ -619,13 +618,12 @@ export class Formulas implements Feature {
 
   private insertNumbered(info: TableInfo, column: number): Promise<unknown> {
     const insert = insertColumnAt(info.pins, info.columns, column);
-    return this.host.writeTable(
+    return this.host.writeModel(
       this.host.tableFor(info.key) ?? info,
       (t) => {
-        let table = setCell(insertColumn(t, insert.at), 0, insert.at, "#");
+        let table = withHeader(insertColumn(t, insert.at), insert.at, "#");
         // The write step calculates them
-        const numbered = this.host.fromModel(this.cells.formulaCell("", "=ROW()"));
-        for (let row = 1; row < table.rows.length; row++) table = setCell(table, row, insert.at, numbered);
+        for (let row = 1; row <= table.rows.length; row++) table = withCellAt(table, row, insert.at, this.cells.formulaCell("", "=ROW()"));
         return table;
       },
       { columnMap: (c) => (c >= insert.at ? c + 1 : c), pins: insert.pins },

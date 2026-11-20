@@ -662,6 +662,13 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      `keepTags` and `uniqueTags` are gone, and with them tags.ts'
      `keepTags` and `withoutTagsWith`: no write of cells goes through the
      markdown's tags any more.
+     Then the formulas' numbered column and the sheet's attribute writes.
+     What still writes through the markdown, and why: Remove metadata and
+     the toolbar's padding are operations on the store's form (the
+     metadata row and every hidden tag, orphans included; `padded`), which
+     no model expresses: they become the markdown store's in step 4;
+     `insertTable` and `TableChange` (`also`, `replaceTables`) move with the
+     hooks in 4d, where `writeTable` takes `writeModel`'s place.
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

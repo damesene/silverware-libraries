@@ -533,6 +533,28 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      row r being `rows[r - 1]`. The formulas module converts where it
      meets the core (`asModel` of the tables a hook gives, `encode` of
      what it gives back) until the hooks take the model.
+     **Done (2026-11-20)**: the domain (formulas/, calculated/, pivot/,
+     excel/formulas.ts) takes `TableModel` and `ModelCell` only; the
+     offers between modules (`FormulasOffer`, `CalculatedOffer`,
+     `HeldFormulasOffer`, `PageLinksOffer`, `SourcesOffer`) give and take
+     models. The host converts for what still meets the core in markdown:
+     `asModel(table)` and `fromModel(model, base)`, and a cell a hook gives
+     alone (`keepsCell`, `editorValue`, `fillCell`) by `asModel(cell)` and
+     `fromModel(cell)` (the codec's `decodeCell`, `encodeCell`). A cell's
+     attribute set on the model is unchecked (the metadata setting is the
+     write step's, which sees the table: a calculated column's formula
+     copied into a new row passes); `getCellTag`, `withCellTag`,
+     `canStoreCellTag` are gone. A column of a model is made from a header
+     as written by `columnOfHeader` (its hashtags its `core.hashtags`) and
+     given another's header by `withHeaderOf` (columns.ts, with
+     `HASHTAGS_KEY`, `headerText`, `modelHeads`); pins are read and set on
+     the model too. Two things the writers before did that the codec now
+     does: a cell written anew carries its tags in today's form (one
+     written in double quotes before 2026-10-22 in apostrophes:
+     `currentTag`), and the metadata of a column of the table read that no
+     column of the model comes from (by the attributes' lineage) is kept as
+     written, for the write's step to say whether it went (a view's column
+     whose source column went, kept for it to come back).
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

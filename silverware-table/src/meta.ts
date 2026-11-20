@@ -34,12 +34,12 @@ export function withMeta(table: Table, name: string, value: string | undefined):
 }
 
 /** An owner's attribute of the table */
-export function metaValue(table: Table, owner: Owner, key: string): string | undefined {
+export function metaValue(table: Table | TableModel, owner: Owner, key: string): string | undefined {
   return attributeIn(table.attributes ?? NO_ATTRIBUTES, owner, key);
 }
 
 /** The table with an owner's attribute set (undefined: removed); unchanged: the same table */
-export function withMetaValue(table: Table, owner: Owner, key: string, value: string | undefined): Table {
+export function withMetaValue<T extends Table | TableModel>(table: T, owner: Owner, key: string, value: string | undefined): T {
   const current = table.attributes ?? NO_ATTRIBUTES;
   const attributes = withAttributeIn(current, owner, key, value);
   return attributes === current ? table : { ...table, attributes };
@@ -216,13 +216,14 @@ export function withMetaSort(table: Table, sort: MetaSort | undefined): Table {
 const PIN_KEYS = { top: "pin-top", bottom: "pin-bottom", left: "pin-left", right: "pin-right" } as const;
 
 /** The pins stored in the table, limited to what it has room for */
-export function metaPins(table: Table): Pins {
+export function metaPins(table: Table | TableModel): Pins {
   const count = (key: string) => {
     const n = Number(metaValue(table, CORE, key));
     return Number.isInteger(n) && n > 0 ? n : 0;
   };
-  const bodyRows = Math.max(0, table.rows.length - 1);
-  const columns = table.align.length;
+  // (The model's rows are its body's, a markdown table's its header's too)
+  const bodyRows = "columns" in table ? table.rows.length : Math.max(0, table.rows.length - 1);
+  const columns = "columns" in table ? table.columns.length : table.align.length;
   const top = Math.min(count(PIN_KEYS.top), bodyRows);
   const left = Math.min(count(PIN_KEYS.left), columns);
   return {
@@ -234,7 +235,7 @@ export function metaPins(table: Table): Pins {
 }
 
 /** Stores the pins; a count of 0 removes its attribute */
-export function withMetaPins(table: Table, pins: Pins): Table {
+export function withMetaPins<T extends Table | TableModel>(table: T, pins: Pins): T {
   let result = table;
   for (const edge of ["top", "bottom", "left", "right"] as const) {
     result = withMetaValue(result, CORE, PIN_KEYS[edge], pins[edge] > 0 ? String(pins[edge]) : undefined);

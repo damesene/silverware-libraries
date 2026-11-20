@@ -5,8 +5,9 @@
 // by what a calculated column is), its totals pinned, and whether the table
 // shown is as calculated now. Pure: the module that calculates the table reads
 // and writes its attributes through its host, and hands in the pins'.
+import { columnOfHeader, headerText, matchColumns, modelHeads, withHeaderOf } from "../columns.ts";
 import { cellResult } from "../formulas/index.ts";
-import { escapeCell, type Table, unescapeCell } from "../markdown.ts";
+import { type ModelColumn, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
 import type { Pins } from "../view.ts";
 
 /** A column of the result: what it stands for (kept through a refresh, its header named by the user), its header as made, its alignment */
@@ -27,8 +28,8 @@ export type Renames = Readonly<Record<string, string>>;
 
 /** How a table's pins are read and set: the module's host's */
 export type PinsAccess = {
-  readonly pinsOf: (table: Table) => Pins;
-  readonly withPins: (table: Table, pins: Pins) => Table;
+  readonly pinsOf: (table: TableModel) => Pins;
+  readonly withPins: (table: TableModel, pins: Pins) => TableModel;
 };
 
 /** The renamed headers as stored (JSON by id); anything else none */
@@ -52,15 +53,15 @@ export function storedRenames(renames: Renames, calculated: Calculated): string 
  * header changed in it named so for the column it is (the table as shown is
  * as calculated now), one given its made name back or emptied no more renamed
  */
-export function renamedIn(before: Table, after: Table, calculated: Calculated, renames: Renames): Renames {
+export function renamedIn(before: TableModel, after: TableModel, calculated: Calculated, renames: Renames): Renames {
   const out: Record<string, string> = { ...renames };
-  const was = before.rows[0]?.cells ?? [];
-  const now = after.rows[0]?.cells ?? [];
+  const was = before.columns.map(headerText);
+  const now = after.columns.map(headerText);
   if (now.length !== calculated.columns.length) return out;
-  now.forEach((cell, i) => {
-    if (cell === was[i]) return;
+  now.forEach((header, i) => {
+    if (header === was[i]) return;
     const column = calculated.columns[i]!;
-    const name = unescapeCell(cell).trim();
+    const name = header.trim();
     if (!name || name === column.header) delete out[column.id];
     else out[column.id] = name;
   });
@@ -76,21 +77,34 @@ export function movedRenames(renames: Renames, idNow: (id: string) => string): R
  * The table written as calculated: its headers (the user's names kept), its
  * cells (an error so that it is no hashtag, as a formula's result is), numbers
  * right-aligned, its totals pinned (the row at the bottom, the columns at the
- * right: in view, out of a sort; other pins as they were); its metadata
- * otherwise as it was
+ * right: in view, out of a sort; other pins as they were); its attributes
+ * otherwise as they were, a column's kept by the column of its name (as the
+ * core follows them through an edit: matchColumns)
  */
-export function calculatedTable(table: Table, calculated: Calculated, renames: Renames, pins: PinsAccess): Table {
-  const header = calculated.columns.map((column) => escapeCell(renames[column.id] ?? column.header));
-  const rows = [{ cells: header }, ...calculated.body.map((cells) => ({ cells: cells.map((cell) => escapeCell(cellResult(cell))) }))];
-  const align = calculated.columns.map((column): Table["align"][number] => (column.numeric ? "right" : ""));
+export function calculatedTable(table: TableModel, calculated: Calculated, renames: Renames, pins: PinsAccess): TableModel {
+  const made = calculated.columns.map((column) => columnOfHeader(renames[column.id] ?? column.header, column.numeric ? "right" : ""));
+  const from = matchColumns(modelHeads(table), modelHeads({ ...table, columns: made }));
+  const kept = new Map<number, ModelColumn>();
+  table.columns.forEach((column, c) => {
+    const to = from(c);
+    if (to !== undefined) kept.set(to, column);
+  });
+  const columns = made.map((column, c): ModelColumn => {
+    const was = kept.get(c);
+    return was ? withHeaderOf(was, column) : column;
+  });
+  const rows = calculated.body.map((cells) => ({ cells: cells.map((cell) => ({ content: cellResult(cell), attributes: NO_ATTRIBUTES })), attributes: NO_ATTRIBUTES }));
   const totals = { bottom: calculated.totalRow ? 1 : 0, right: calculated.totalColumns };
-  // (Its delimiter row as written where its columns are aligned as before)
-  const same = align.length === table.align.length && align.every((a, i) => a === table.align[i]);
-  const made: Table = same ? { ...table, rows } : { ...table, rows, align, delimiterSource: undefined, alignSource: undefined };
-  return pins.withPins(made, { ...pins.pinsOf(made), ...totals });
+  const result: TableModel = { ...table, columns, rows };
+  return pins.withPins(result, { ...pins.pinsOf(result), ...totals });
 }
 
-/** Whether two tables' cells are the same (a table shown against it as calculated now: out of date where not) */
-export function sameCells(a: Table, b: Table): boolean {
-  return a.rows.length === b.rows.length && a.rows.every((row, r) => row.cells.length === b.rows[r]!.cells.length && row.cells.every((cell, c) => cell === b.rows[r]!.cells[c]));
+/** Whether two tables' cells are the same, headers too (a table shown against it as calculated now: out of date where not) */
+export function sameCells(a: TableModel, b: TableModel): boolean {
+  const sameRow = (x: readonly string[], y: readonly string[]) => x.length === y.length && x.every((text, i) => text === y[i]);
+  return (
+    a.rows.length === b.rows.length &&
+    sameRow(a.columns.map(headerText), b.columns.map(headerText)) &&
+    a.rows.every((row, r) => sameRow(row.cells.map((cell) => cell.content), b.rows[r]!.cells.map((cell) => cell.content)))
+  );
 }

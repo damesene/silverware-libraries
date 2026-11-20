@@ -11,6 +11,7 @@ import { ICONS } from "../icons.ts";
 import type { MenuDetail, MenuEntry } from "../menu.ts";
 import { setCell } from "../ops.ts";
 import { escapeCell, type Table, unescapeCell } from "../markdown.ts";
+import type { TableModel } from "../model/model.ts";
 import { withoutTags } from "../tags.ts";
 import {
   type Choice,
@@ -169,7 +170,7 @@ export class ColumnTypes implements Feature {
     if (!formulas) return { problem: "is calculated by the formulas module, which is off" };
     const problem = formulas.validate(formula);
     if (problem) return { problem: `does not read: ${problem}` };
-    const result = formulas.list(table, formula);
+    const result = formulas.list(this.host.asModel(table), formula);
     if (result === undefined) {
       const off = !this.host.offered("sources") && formulaSources(formula).length;
       return { problem: off ? "reads a source of the space, and the sources module is off" : "reads a page or a source not read yet" };
@@ -182,7 +183,7 @@ export class ColumnTypes implements Feature {
    * A table's lists made by formulas, for the formulas module: what the table reads, followed through the edits of
    * the tables they read (a column renamed, a table renamed) and written back in the same write
    */
-  private held(table: Table): HeldFormulas | undefined {
+  private held(table: TableModel): HeldFormulas | undefined {
     const stored = this.host.attributes(table);
     const lists = listNames(stored).flatMap((name) => {
       const formula = listFormula(stored.get(listKey(name)));
@@ -201,7 +202,7 @@ export class ColumnTypes implements Feature {
 
   /** The formulas of a table's choice lists (none where it has no list made by one) */
   private listFormulas(table: Table): readonly string[] {
-    return this.held(table)?.formulas ?? [];
+    return this.held(this.host.asModel(table))?.formulas ?? [];
   }
 
   /**

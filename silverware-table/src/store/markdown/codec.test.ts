@@ -10,7 +10,8 @@ import { withCellNameIn, withColumnNameIn, withRowNameIn } from "../../names.ts"
 import { reorderRows, setCell } from "../../ops.ts";
 import { keepTags } from "../../tags.ts";
 import { withTagValue } from "../../tagvalues.ts";
-import { decode, encode, HASHTAGS_KEY } from "./codec.ts";
+import { HASHTAGS_KEY } from "../../columns.ts";
+import { decode, decodeCell, encode, encodeCell } from "./codec.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SAMPLE = readFileSync(join(here, "../../../../playground/sample.md"), "utf8");
@@ -142,6 +143,35 @@ describe("the markdown codec", () => {
       const model2 = decode(meta);
       const renamed = { ...model2, columns: model2.columns.map((c, i) => (i === 1 ? { ...c, header: "Total" } : c)) };
       expect(md(encode(renamed, meta))).toBe(md(followColumnMeta(meta, setCell(meta, 0, 1, "Total"))));
+    });
+
+    it("a column of the table read that no column of the model comes from: its metadata kept as written, for the write's step to say whether it went", () => {
+      const meta = parseTable(FORMS[2]!);
+      const read = decode(meta);
+      // (A calculated table written anew without B, A made whole: the metadata of B kept, A's own written by its name)
+      const without = { ...read, columns: [read.columns[0]!] };
+      expect(encode(without, meta).meta).toMatchObject({ "core.-c-b.sort": "desc", "widths.-c-gone.size": "9" });
+      // A column renamed comes from the one read: its metadata by its name now, none kept by the old
+      const renamed = { ...read, columns: read.columns.map((c, i) => (i === 1 ? { ...c, header: "Total" } : c)) };
+      expect(Object.keys(encode(renamed, meta).meta ?? {})).not.toContain("core.-c-b.sort");
+    });
+  });
+
+  describe("a cell read and written alone (a cell a hook gives)", () => {
+    it("reads its content and every attribute, its row's name among them; written back as read where unchanged", () => {
+      const raw = "Pear \\| x <meta core.n='pear' core.cn='p'> <meta formulas.f='=1+1'>";
+      const cell = decodeCell(raw);
+      expect(cell.content).toBe("Pear | x");
+      expect(attributeIn(cell.attributes, "core", "n")).toBe("pear");
+      expect(attributeIn(cell.attributes, "formulas", "f")).toBe("=1+1");
+      expect(encodeCell(cell)).toBe(raw);
+      expect(encodeCell({ ...cell, attributes: withAttributeIn(cell.attributes, "formulas", "f", "=2+2") })).toBe(withTagValue(raw, "formulas.f", "=2+2"));
+      expect(encodeCell({ content: "a | b", attributes: withAttributeIn(new Map(), "formulas", "f", "=1") })).toBe("a \\| b <meta formulas.f='=1'>");
+    });
+
+    it("writes a cell written anew with its tags in today's form: one in double quotes in apostrophes", () => {
+      const cell = decodeCell(`2 <meta formulas.f="=IF(A1&gt;1,&quot;big&quot;,&quot;&quot;)"> <meta core.cn='x'>`);
+      expect(encodeCell({ ...cell, content: "big" })).toBe(`big <meta formulas.f='=IF(A1&gt;1,"big","")'> <meta core.cn='x'>`);
     });
   });
 });

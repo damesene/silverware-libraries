@@ -26,7 +26,7 @@ import type { StoredTable } from "./core/store.ts";
 import type { AttributePlace, ModelCell, TableModel } from "./model/model.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
-import { decode, plainMarkdown } from "./store/markdown/codec.ts";
+import { decode, decodeCell, encode, encodeCell, plainMarkdown } from "./store/markdown/codec.ts";
 import { SettingsDialog } from "./settings.ts";
 import { Metadata } from "./features/metadata.ts";
 import { featureEntries } from "./modules.ts";
@@ -565,8 +565,16 @@ export class Controller implements TableHost {
     return this.store.tables(document);
   }
 
-  asModel(table: Table): TableModel {
-    return decode(table);
+  asModel(table: Table): TableModel;
+  asModel(cell: string): ModelCell;
+  asModel(table: Table | string): TableModel | ModelCell {
+    return typeof table === "string" ? decodeCell(table) : decode(table);
+  }
+
+  fromModel(model: TableModel, base: Table): Table;
+  fromModel(cell: ModelCell): string;
+  fromModel(model: TableModel | ModelCell, base?: Table): Table | string {
+    return "content" in model ? encodeCell(model) : encode(model, base!);
   }
 
   plainMarkdown(table: Table, rows: readonly number[]): string {
@@ -772,19 +780,11 @@ export class Controller implements TableHost {
     return this.coreMeta.withColumnAttributes(table as TableModel, key, values);
   }
 
-  getCellTag(cell: string, key: string): string | undefined {
-    return this.coreMeta.getCellTag(cell, key);
-  }
-
   canStore(table: Table, key: string, at?: { readonly column: number }): boolean;
   canStore(table: TableModel, key: string, at?: AttributePlace): boolean;
   canStore(cell: ModelCell, key: string): boolean;
   canStore(table: Table | TableModel | ModelCell, key: string, at?: AttributePlace): boolean {
     return this.coreMeta.canStore(table as TableModel, key, at);
-  }
-
-  canStoreCellTag(cell: string, key: string): boolean {
-    return this.coreMeta.canStoreCellTag(cell, key);
   }
 
   canName(table: Table, target: NamingTarget): boolean {
@@ -801,15 +801,17 @@ export class Controller implements TableHost {
     }
   }
 
-  canPin(table: Table, edge: "top" | "bottom" | "left" | "right"): boolean {
-    return this.coreMeta.canStore(table, `pin-${edge}`);
+  canPin(table: Table | TableModel, edge: "top" | "bottom" | "left" | "right"): boolean {
+    return "columns" in table ? this.coreMeta.canStore(table, `pin-${edge}`) : this.coreMeta.canStore(table, `pin-${edge}`);
   }
 
-  pinsOf(table: Table): Pins {
+  pinsOf(table: Table | TableModel): Pins {
     return metaPins(table);
   }
 
-  withPins(table: Table, pins: Pins): Table {
+  withPins(table: Table, pins: Pins): Table;
+  withPins(table: TableModel, pins: Pins): TableModel;
+  withPins<T extends Table | TableModel>(table: T, pins: Pins): T {
     const was = metaPins(table);
     const edge = (side: keyof Pins) => (pins[side] === was[side] || this.canPin(table, side) ? pins[side] : was[side]);
     return withMetaPins(table, { top: edge("top"), bottom: edge("bottom"), left: edge("left"), right: edge("right") });
@@ -832,10 +834,6 @@ export class Controller implements TableHost {
   private sayTaken(taken: { n: number }): void {
     const { n } = taken;
     if (n) this.notify(`Silverware Table: ${n} new hidden value${n === 1 ? " (a formula, a name) was" : "s (formulas, names) were"} not stored: the Store table metadata setting is off`, "info");
-  }
-
-  withCellTag(cell: string, key: string, value: string | undefined): string {
-    return this.coreMeta.withCellTag(cell, key, value);
   }
 
   tableName(table: Table | TableModel): string | undefined {

@@ -281,7 +281,7 @@ export class Conditions implements Feature {
       if (!formulas) return undefined;
       let list = values.get(formula);
       if (!list) {
-        list = formulas.rowValues(table, formula);
+        list = formulas.rowValues(this.host.asModel(table), formula);
         values.set(formula, list);
       }
       const value = list[row - 1];
@@ -332,7 +332,7 @@ export class Conditions implements Feature {
     const formulas = this.host.offered<FormulasOffer>("formulas");
     if (!formulas) return undefined;
     // The table as it is now (the dialog put aside, its columns may have been renamed meanwhile)
-    const table = () => this.host.tableOf(this.host.tableFor(shownInfo.key) ?? shownInfo);
+    const table = () => this.host.asModel(this.host.tableOf(this.host.tableFor(shownInfo.key) ?? shownInfo));
     // Out of a function, how a condition refers to cells, in a line (the cell editor's longer help is of pointing in the table)
     return formulas.fieldHelpers(table, CONDITION_REFERENCES);
   }

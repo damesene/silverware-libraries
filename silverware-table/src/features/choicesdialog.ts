@@ -178,7 +178,7 @@ export class ChoicesDialog {
     // A formula of one's own: a source of the space read as one (=@projects), as any other
     let formula = keptFormula ?? "";
     const formulaPart = formulas
-      ? formulaField(doc, formulas.fieldHelpers(() => table), formula, (v) => {
+      ? formulaField(doc, formulas.fieldHelpers(() => this.host.asModel(table)), formula, (v) => {
           formula = v;
           showPreview();
         }, { label: "Formula", focus: "formula", placeholder: "=@projects" })

@@ -15,6 +15,7 @@ import { type Calculated, calculatedTable, readRenames, renamedColumns, renamedI
 import { type CalculatedBy, type CalculatedOffer, followFormula, FormulaError, type FormulasOffer, type Grid, referredTableNames, tokenize, viewGrid, withEquals } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import type { Table } from "../markdown.ts";
+import type { TableModel } from "../model/model.ts";
 import { freeTableName, sameTableName, validateTableName } from "../namerules.ts";
 import { openViewDialog } from "./viewdialog.ts";
 
@@ -30,7 +31,7 @@ export class Views implements Feature {
   }
 
   /** How a view is calculated, for the formulas: its formula's result over its body; its formula following its sources */
-  private calculatedBy(table: Table): CalculatedBy | undefined {
+  private calculatedBy(table: TableModel): CalculatedBy | undefined {
     const formula = this.formulaOf(table);
     if (formula === undefined) return undefined;
     return {
@@ -55,14 +56,14 @@ export class Views implements Feature {
   }
 
   /** A view's formula, with its "=" (it may be written without) */
-  private formulaOf(table: Table): string | undefined {
+  private formulaOf(table: TableModel): string | undefined {
     const formula = this.host.attribute(table, "formula")?.trim();
     if (!formula) return undefined;
     return formula.startsWith("=") ? formula : `=${formula}`;
   }
 
   /** The view with its result written over its body (src/calculated/), its renamed headers kept by their columns' ids */
-  private written(table: Table, result: Grid, before?: Table): Table {
+  private written(table: TableModel, result: Grid, before?: TableModel): TableModel {
     const calculated = viewCalculated(result);
     let renames = readRenames(this.host.attribute(table, "headers"));
     // A header renamed in this edit: the user's name for its column from now on
@@ -76,24 +77,24 @@ export class Views implements Feature {
   /** A view's cells are its formula's: its header alone is the user's (its names) */
   readOnly(table: Table, cell: { readonly row: number }): string | undefined {
     if (cell.row === 0) return undefined;
-    const formula = this.formulaOf(table);
+    const formula = this.formulaOf(this.host.asModel(table));
     return formula === undefined ? undefined : `this table is a view: its values are its formula's result (${formula}). Change what it reads, or its formula`;
   }
 
   /** A cell of a view edited: its formula is changed in its settings, opened instead */
   editRefused(info: TableInfo, cell: { readonly row: number }): void {
-    if (cell.row > 0 && this.formulaOf(info.model) !== undefined) this.settings(info);
+    if (cell.row > 0 && this.formulaOf(this.host.asModel(info.model)) !== undefined) this.settings(info);
   }
 
   /** A view's rows and columns are its formula's */
   fixedShape(table: Table): string | undefined {
-    const formula = this.formulaOf(table);
+    const formula = this.formulaOf(this.host.asModel(table));
     return formula === undefined ? undefined : `this table is a view: its rows and columns are its formula's result (${formula})`;
   }
 
   /** A view shown: whether it is as its formula makes it now; another table shown anew (edited by hand): the views reading it */
   enhanced(info: TableInfo): void {
-    const table = info.model;
+    const table = this.host.asModel(info.model);
     if (this.formulaOf(table) !== undefined) this.check(info);
     else {
       this.stale.delete(info);
@@ -101,7 +102,7 @@ export class Views implements Feature {
       const cells = this.formulas()?.cells;
       if (!name || !cells) return;
       for (const other of this.host.shownTables()) {
-        if (other.key !== info.key && referredTableNames(cells, other.model).has(name)) this.check(other);
+        if (other.key !== info.key && referredTableNames(cells, this.host.asModel(other.model)).has(name)) this.check(other);
       }
     }
     this.host.toolbarChanged();
@@ -115,7 +116,7 @@ export class Views implements Feature {
 
   /** Whether a view shown is as its formula makes it now (nothing written), or why it cannot be calculated */
   private check(info: TableInfo): void {
-    const table = info.model;
+    const table = this.host.asModel(info.model);
     const formula = this.formulaOf(table);
     if (formula === undefined) return void this.stale.delete(info);
     const now = this.formulas()?.calculated(table);
@@ -127,7 +128,7 @@ export class Views implements Feature {
 
   /** What a view is, at a glance; out of date, or not calculated at all, said so */
   tableBadges(info: TableInfo): TableBadge[] {
-    if (this.formulaOf(info.model) === undefined) return [];
+    if (this.formulaOf(this.host.asModel(info.model)) === undefined) return [];
     const what = { icon: ICONS.view, text: "View" };
     const state = this.stale.get(info);
     if (!state) return [what];
@@ -136,7 +137,7 @@ export class Views implements Feature {
 
   /** Insert view… in any table's ⋯ menu; a view's settings and Refresh view in its toolbar, highlighted where it is out of date */
   toolbarButtons(info: TableInfo): ToolbarButton[] {
-    const table = info.model;
+    const table = this.host.asModel(info.model);
     const insert: ToolbarButton = { label: "Insert view…", place: "menu", icon: ICONS.view, title: "A table made by a formula under this one: its rows filtered, sorted, picked…", run: () => this.insert(info) };
     if (this.formulaOf(table) === undefined) return [insert];
     const state = this.stale.get(info);
@@ -166,11 +167,11 @@ export class Views implements Feature {
   private made(formula: string, name: string, indent: string, result: Grid): Table {
     const empty: Table = { indent, align: [], rows: [{ cells: [""] }], padded: false };
     const named = this.host.withTableName(this.host.withAttribute(empty, "formula", formula), name || undefined);
-    return this.written(named, result);
+    return this.host.fromModel(this.written(this.host.asModel(named), result), named);
   }
 
   /** The result of a formula in the dialog, or why there is none (the formulas off, a page not read yet) */
-  private result(formula: string, table?: Table, replace?: { readonly key: string; readonly table: Table }): Grid | string {
+  private result(formula: string, table?: TableModel, replace?: { readonly key: string; readonly table: TableModel }): Grid | string {
     const formulas = this.formulas();
     if (!formulas) return "It needs the formulas module, which is off";
     const problem = formulas.validate(withEquals(formula).formula.trim());
@@ -230,7 +231,7 @@ export class Views implements Feature {
     const own = this.host.tableName(table)?.trim();
     const source = own ?? this.freeName("table");
     // A table to be named so: the view's formula reads it as it will be written
-    const replace = own ? undefined : { key: info.key, table: this.host.withTableName(table, source) };
+    const replace = own ? undefined : { key: info.key, table: this.host.asModel(this.host.withTableName(table, source)) };
     const naming = (formula: string) => !own && tokenize(formula).tokens.some((t) => t.kind === "table" && t.page === undefined && sameTableName(t.name, source));
     const preview = (formula: string) => this.result(formula, undefined, naming(formula) ? replace : undefined);
     const empty: Table = { indent: table.indent, align: [], rows: [{ cells: [""] }], padded: false };
@@ -266,9 +267,10 @@ export class Views implements Feature {
   /** View settings…: the view's formula and name in the dialog, saved into its metadata row (the write calculates it) */
   private settings(info: TableInfo): void {
     const table = info.model;
-    const formula = this.formulaOf(table);
+    const model = this.host.asModel(table);
+    const formula = this.formulaOf(model);
     if (formula === undefined) return;
-    this.dialog(formula, this.host.tableName(table) ?? "", "Save", (f) => this.result(f, table), (changed, name) => {
+    this.dialog(formula, this.host.tableName(table) ?? "", "Save", (f) => this.result(f, model), (changed, name) => {
       void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.host.withTableName(this.host.withAttribute(t, "formula", withEquals(changed).formula), name || undefined));
     }, this.blocked(table), table);
   }

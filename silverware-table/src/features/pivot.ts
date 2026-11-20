@@ -16,9 +16,10 @@
 import type { Feature, ModelHost, PageCommand, StoredTable, TableBadge, TableInfo, ToolbarButton } from "../core/feature.ts";
 import { type Calculated, calculatedTable, movedRenames, readRenames, renamedIn, type Renames, sameCells, storedRenames } from "../calculated/index.ts";
 import { type CalculatedBy, type CalculatedOffer, followOwnFormula, type Following, callsPureFunctionsOnly, FormulaError, type FormulaCells, type FormulasOffer, type PageLinksOffer, PLAIN_CELLS } from "../formulas/index.ts";
-import { columnName } from "../columns.ts";
+import { columnName, headerText, modelHeads } from "../columns.ts";
 import { ICONS } from "../icons.ts";
 import type { Table } from "../markdown.ts";
+import type { TableModel } from "../model/model.ts";
 import { definitionAttributes, groupFormula, KEYS, type Key, looseDefinition, type PivotDefinition, readDefinition, sourceRef, sourceText, valueItem, valueParts } from "../pivot/definition.ts";
 import { type Fields, fieldsOf } from "../pivot/fields.ts";
 import { pivotOf } from "../pivot/pivot.ts";
@@ -50,16 +51,16 @@ export class Pivot implements Feature {
     return this.host.offered<FormulasOffer>("formulas")?.cells;
   }
 
-  private definitionOf(table: Table): PivotDefinition | { readonly problem: string } | undefined {
+  private definitionOf(table: TableModel): PivotDefinition | { readonly problem: string } | undefined {
     return readDefinition((key: Key) => this.host.attribute(table, key));
   }
 
-  private renamesOf(table: Table): Renames {
+  private renamesOf(table: TableModel): Renames {
     return readRenames(this.host.attribute(table, "headers"));
   }
 
   /** The source the definition names among the page's tables: the first of that name, not the pivot itself */
-  private sourceIn(tables: readonly Table[], name: string, except?: Table): Table | undefined {
+  private sourceIn(tables: readonly TableModel[], name: string, except?: TableModel): TableModel | undefined {
     const wanted = name.trim().toLowerCase();
     return tables.find((t) => t !== except && this.host.tableName(t)?.trim().toLowerCase() === wanted);
   }
@@ -81,7 +82,7 @@ export class Pivot implements Feature {
    * at `except`), or among another page's as pageLinks read it (`unread`
    * until it has: the pivot then stays as written)
    */
-  private find(definition: PivotDefinition, tables: readonly Table[], except?: Table): Found {
+  private find(definition: PivotDefinition, tables: readonly TableModel[], except?: TableModel): Found {
     const { name, space } = sourceRef(definition.source);
     if (space) {
       // A source of the space, as the sources module offers it (off: not read, the pivot kept as written)
@@ -99,7 +100,7 @@ export class Pivot implements Feature {
     const read = this.host.otherPages()?.tables(page);
     if (read === undefined) return { unread: page };
     if (read === null) return { problem: `no page ${page}` };
-    const table = this.sourceIn(read.map((t) => t.model), name);
+    const table = this.sourceIn(this.modelsOf(read), name);
     return table ? { table } : { problem: `no table named ${name} on ${page}` };
   }
 
@@ -110,7 +111,7 @@ export class Pivot implements Feature {
   }
 
   /** The pivot table written as calculated (src/calculated/: its headers, the user's names kept, its totals pinned); its metadata as it was */
-  private written(table: Table, pivot: Calculated, renames: Renames): Table {
+  private written(table: TableModel, pivot: Calculated, renames: Renames): TableModel {
     const made = calculatedTable(table, pivot, renames, { pinsOf: this.host.pinsOf, withPins: this.host.withPins });
     return this.host.withAttribute(made, "headers", storedRenames(renames, pivot));
   }
@@ -129,7 +130,7 @@ export class Pivot implements Feature {
    * How a pivot is calculated, for the formulas (CalculatedOffer): from its source as the formulas have it now, so a
    * table reading the pivot follows the source in the same edit; its definition following its source's edits
    */
-  private calculatedBy(table: Table): CalculatedBy | undefined {
+  private calculatedBy(table: TableModel): CalculatedBy | undefined {
     const definition = this.definitionOf(table);
     if (!definition) return undefined;
     if ("problem" in definition) return { formulas: [], calculate: () => new FormulaError("#VALUE!", definition.problem), follow: () => table };
@@ -172,10 +173,11 @@ export class Pivot implements Feature {
    * A pivot of a source as calculated, the last ones kept (a table reading a pivot calculates it each time it is
    * calculated); not one calling a custom function (defined anew as Space Lua loads) or one of the time (TODAY())
    */
-  private pivotOf(source: Table, definition: PivotDefinition, cells: FormulaCells): Calculated {
+  private pivotOf(source: TableModel, definition: PivotDefinition, cells: FormulaCells): Calculated {
     const name = this.ownName(definition);
     if (!keptOf(definition)) return pivotOf(source, definition, { cells, name });
-    const key = JSON.stringify([definition, source.rows.map((row) => row.cells)]);
+    // (By what it shows: its headers and its cells' content; a formula's cell by its result, as the pivot reads it)
+    const key = JSON.stringify([definition, source.columns.map(headerText), source.rows.map((row) => row.cells.map((cell) => cell.content))]);
     let pivot = this.made.get(key);
     if (pivot) {
       // (Last used, last out)
@@ -198,9 +200,9 @@ export class Pivot implements Feature {
    * table's own formulas follow its edits), a column named alone (`region`)
    * still named alone, the sort's keys the items they were
    */
-  private followed(definition: PivotDefinition, before: Table, after: Table, edit: Pick<Following, "rowMap" | "columnMap">): { definition: PivotDefinition; moved: ReadonlyMap<string, string> } {
+  private followed(definition: PivotDefinition, before: TableModel, after: TableModel, edit: Pick<Following, "rowMap" | "columnMap">): { definition: PivotDefinition; moved: ReadonlyMap<string, string> } {
     const cells = this.cells();
-    if (!cells || (!edit.columnMap && before.rows[0]?.cells.join("|") === after.rows[0]?.cells.join("|"))) return { definition, moved: new Map() };
+    if (!cells || (!edit.columnMap && JSON.stringify(modelHeads(before)) === JSON.stringify(modelHeads(after)))) return { definition, moved: new Map() };
     const following = { cells, ...(edit.rowMap ? { rowMap: edit.rowMap } : {}), ...(edit.columnMap ? { columnMap: edit.columnMap } : {}) };
     const formula = (text: string) => followOwnFormula(`=${text}`, before, after, following).slice(1);
     const group = (item: string) => {
@@ -237,14 +239,14 @@ export class Pivot implements Feature {
   }
 
   /** The table with a definition's attributes (those it leaves out taken off) */
-  private withDefinition(table: Table, definition: PivotDefinition): Table {
+  private withDefinition(table: TableModel, definition: PivotDefinition): TableModel {
     const written = new Map(definitionAttributes(definition));
     return KEYS.reduce((t, key) => (this.host.attribute(t, key) === written.get(key) ? t : this.host.withAttribute(t, key, written.get(key))), table);
   }
 
   /** A pivot shown: whether it is as its source makes it now (its source edited by hand, on this page: not) */
   enhanced(info: TableInfo): void {
-    const table = info.model;
+    const table = this.host.asModel(info.model);
     const definition = this.definitionOf(table);
     if (!definition) {
       this.stale.delete(info);
@@ -252,7 +254,7 @@ export class Pivot implements Feature {
       const name = this.host.tableName(table)?.trim().toLowerCase();
       if (!name) return;
       for (const other of this.host.shownTables()) {
-        const of = other.key !== info.key && this.definitionOf(other.model);
+        const of = other.key !== info.key && this.definitionOf(this.host.asModel(other.model));
         if (of && !("problem" in of) && this.nameHere(of) === name) this.check(other);
       }
       this.host.toolbarChanged();
@@ -266,7 +268,7 @@ export class Pivot implements Feature {
   tablesChanged(): void {
     let checked = false;
     for (const info of this.host.shownTables()) {
-      const definition = this.definitionOf(info.model);
+      const definition = this.definitionOf(this.host.asModel(info.model));
       if (!definition || "problem" in definition) continue;
       // A source of the space read anew (or definitions changed): checked again (the last pivots are kept by their source's cells)
       if (sourceRef(definition.source).space) {
@@ -291,12 +293,13 @@ export class Pivot implements Feature {
    * (`read`), then is checked again
    */
   private check(info: TableInfo, read = true): void {
-    const table = info.model;
+    const table = this.host.asModel(info.model);
     const definition = this.definitionOf(table);
     if (!definition) return void this.stale.delete(info);
     if ("problem" in definition) return void this.stale.set(info, `This pivot cannot be calculated: ${definition.problem}`);
     const tables = this.pageModels();
-    const own = tables.find((t) => t.rows[0]?.cells.join("|") === table.rows[0]?.cells.join("|") && this.host.attribute(t, "source") === definition.source);
+    const headers = table.columns.map(headerText).join("|");
+    const own = tables.find((t) => t.columns.map(headerText).join("|") === headers && this.host.attribute(t, "source") === definition.source);
     const found = this.find(definition, tables, own);
     const page = this.pageOf(definition);
     if (page !== undefined) {
@@ -330,7 +333,7 @@ export class Pivot implements Feature {
 
   /** What a pivot is, at a glance: Pivot of its source as the definition writes it (another page's: Pivot of [[Orders]]orders), one with a problem too; out of date, said so */
   tableBadges(info: TableInfo): TableBadge[] {
-    const table = info.model;
+    const table = this.host.asModel(info.model);
     if (!this.definitionOf(table)) return [];
     const what = { icon: ICONS.pivot, text: `Pivot of ${this.host.attribute(table, "source")?.trim() ?? ""}` };
     // Out of date, or not calculated at all: said without its toolbar's Refresh shown
@@ -351,24 +354,26 @@ export class Pivot implements Feature {
   }
 
   /** A pivot's cells are calculated: its header alone is the user's (its names) */
-  readOnly(table: Table, cell: { readonly row: number }): string | undefined {
+  readOnly(markdown: Table, cell: { readonly row: number }): string | undefined {
+    const table = this.host.asModel(markdown);
     if (cell.row === 0 || !this.definitionOf(table)) return undefined;
     return `this table is a pivot of ${this.host.attribute(table, "source")}: its values are calculated. Edit ${this.host.attribute(table, "source")}, or what the pivot shows in its definition`;
   }
 
   /** A cell of a pivot edited: what it shows is changed in its settings, opened instead */
   editRefused(info: TableInfo, cell: { readonly row: number }): void {
-    if (cell.row > 0 && this.definitionOf(info.model)) this.settings(info);
+    if (cell.row > 0 && this.definitionOf(this.host.asModel(info.model))) this.settings(info);
   }
 
   /** A pivot's rows and columns are its calculation's */
-  fixedShape(table: Table): string | undefined {
+  fixedShape(markdown: Table): string | undefined {
+    const table = this.host.asModel(markdown);
     return this.definitionOf(table) ? `this table is a pivot of ${this.host.attribute(table, "source")}: its rows and columns come from it` : undefined;
   }
 
   /** The page's tables a pivot can summarize (named ones, not pivots), `also` one more first (a table to be named so, another page's source) */
-  private sources(also?: { readonly name: string; readonly table: Table }): { name: string; columns: string[]; table: Table }[] {
-    return [...(also ? [also] : []), ...this.namedIn(this.pageModels())].map(({ name, table }) => ({ name, table, columns: (table.rows[0]?.cells ?? []).map(columnName) }));
+  private sources(also?: { readonly name: string; readonly table: TableModel }): { name: string; columns: string[]; table: TableModel }[] {
+    return [...(also ? [also] : []), ...this.namedIn(this.pageModels())].map(({ name, table }) => ({ name, table, columns: columnNames(table) }));
   }
 
   /** The sources of the space a pivot can summarize (the sources module's), by their names and their columns' */
@@ -377,13 +382,18 @@ export class Pivot implements Feature {
     return (offer?.names() ?? []).map((name) => ({ name, columns: offer?.columns(name) ?? [] }));
   }
 
-  /** The open page's tables as last read */
-  private pageModels(): readonly Table[] {
-    return this.host.pageTables().map((t) => t.model);
+  /** The open page's tables as last read, as models */
+  private pageModels(): readonly TableModel[] {
+    return this.modelsOf(this.host.pageTables());
+  }
+
+  /** Tables the host gave (a page's) as models */
+  private modelsOf(tables: readonly StoredTable[]): TableModel[] {
+    return tables.map((t) => this.host.asModel(t.model));
   }
 
   /** The tables of a page a pivot can summarize: named ones, not pivots */
-  private namedIn(tables: readonly Table[]): { name: string; table: Table }[] {
+  private namedIn(tables: readonly TableModel[]): { name: string; table: TableModel }[] {
     return tables.flatMap((table) => {
       const name = this.host.tableName(table)?.trim();
       return name && !this.definitionOf(table) ? [{ name, table }] : [];
@@ -399,7 +409,7 @@ export class Pivot implements Feature {
     const tables = this.host.otherPages()?.tables(page);
     if (tables === null) return `There is no page ${page}`;
     if (!tables) return `${page} could not be read`;
-    const named = this.namedIn(tables.map((t) => t.model)).map(({ name, table }) => ({ name, columns: (table.rows[0]?.cells ?? []).map(columnName) }));
+    const named = this.namedIn(this.modelsOf(tables)).map(({ name, table }) => ({ name, columns: columnNames(table) }));
     return named.length ? named : `No table of ${page} has a name: a pivot names the table it summarizes`;
   }
 
@@ -434,25 +444,26 @@ export class Pivot implements Feature {
    * it has no name (a pivot names its source)
    */
   private insert(info: TableInfo): void {
-    const table = info.model;
+    const table = this.host.asModel(info.model);
     const own = this.host.tableName(table)?.trim();
     const name = own ?? freeTableName("table", this.pageModels().map((t) => this.host.tableName(t)));
     const fields = this.firstFields(name, table);
-    const blocked = this.blocked({ ...table, meta: undefined, attributes: undefined });
+    const empty: Table = { indent: info.model.indent, align: [], rows: [{ cells: [""] }], padded: false };
+    const blocked = this.blocked(empty);
     this.dialog(this.sources(own ? undefined : { name, table }), fields, "Insert", (definition) => {
       const sources = this.sources(own ? undefined : { name, table });
       const pivot = this.calculate(definition, this.sourceFor(definition, sources));
       if (typeof pivot === "string") return this.host.notify(`Silverware Table: ${pivot}`, "error");
-      const made = this.written(this.withDefinition({ indent: table.indent, align: [], rows: [{ cells: [""] }], padded: false }, definition), pivot, {});
+      const made = this.toInsert(empty, definition, pivot);
       const names = !own && definition.source.trim().toLowerCase() === name.toLowerCase();
       void this.host.insertTable(made, info, names ? { key: info.key, change: (t) => this.host.withTableName(t, name) } : undefined);
     }, blocked);
   }
 
   /** A pivot of a table to start from: its text column by its numbers' sum (else a count of its rows) */
-  private firstFields(name: string, table: Table): Fields {
-    const columns = (table.rows[0]?.cells ?? []).map(columnName);
-    const { rows } = this.host.asModel(table);
+  private firstFields(name: string, table: TableModel): Fields {
+    const columns = columnNames(table);
+    const { rows } = table;
     const numeric = (c: number) => rows.filter((r) => asNumber(r.cells[c]?.content.trim() ?? "") !== undefined).length * 2 > rows.length;
     const label = columns.findIndex((_, c) => !numeric(c));
     const value = columns.findIndex((_, c) => c !== label && numeric(c));
@@ -466,6 +477,11 @@ export class Pivot implements Feature {
       sort: [],
       totals: "both",
     };
+  }
+
+  /** A pivot to insert: `empty` (where it goes: its indent) with the definition and the pivot calculated */
+  private toInsert(empty: Table, definition: PivotDefinition, pivot: Calculated): Table {
+    return this.host.fromModel(this.written(this.withDefinition(this.host.asModel(empty), definition), pivot, {}), empty);
   }
 
   /** Why no pivot can be inserted (a table's metadata not stored), if so */
@@ -493,7 +509,7 @@ export class Pivot implements Feature {
     this.dialog(sources, fields, "Insert", (definition) => {
       const pivot = this.calculate(definition, this.sourceFor(definition, this.sources()));
       if (typeof pivot === "string") return this.host.notify(`Silverware Table: ${pivot}`, "error");
-      const made = this.written(this.withDefinition(empty, definition), pivot, {});
+      const made = this.toInsert(empty, definition, pivot);
       // The cursor as it is now: the editor moved it with any edit made while the dialog was open
       void (async () => {
         const position = await this.host.cursorNow();
@@ -505,7 +521,7 @@ export class Pivot implements Feature {
 
   /** Pivot settings…: the pivot's definition in the dialog, saved into its metadata row (the write calculates it: writeStep) */
   private settings(info: TableInfo): void {
-    const table = info.model;
+    const table = this.host.asModel(info.model);
     const read = this.definitionOf(table);
     if (!read) return;
     // One with a problem (no values, wrong totals): as far as it reads, for the dialog to fix
@@ -514,13 +530,13 @@ export class Pivot implements Feature {
       // A source moved to another page: that page read anew before the write (pageLinks reads the pages of the pivot as it was)
       const page = this.pageOf(changed);
       const read = page === undefined ? undefined : this.host.offered<PageLinksOffer>("pageLinks")?.readPages([page], true);
-      void Promise.resolve(read).then(() => this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.withDefinition(t, changed)));
+      void Promise.resolve(read).then(() => this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.host.fromModel(this.withDefinition(this.host.asModel(t), changed), t)));
     });
   }
 
   /** Where a pivot's source was changed so that it is out of date */
   private changedWhere(info: TableInfo): string {
-    const definition = this.definitionOf(info.model);
+    const definition = this.definitionOf(this.host.asModel(info.model));
     const page = definition && !("problem" in definition) ? this.pageOf(definition) : undefined;
     return page === undefined ? "its source was changed outside Silverware Table" : `its source on ${page} was changed`;
   }
@@ -530,9 +546,9 @@ export class Pivot implements Feature {
     const state = this.stale.get(info);
     if (state === undefined) {
       // Any other table with rows: a pivot of it, made in the dialog
-      const table = info.model;
+      const table = this.host.asModel(info.model);
       // (Also with the formulas module off: its dialog says it is needed)
-      if (table.rows.length < 2 || this.definitionOf(table)) return [];
+      if (table.rows.length < 1 || this.definitionOf(table)) return [];
       return [{ label: "Insert pivot table…", place: "menu", icon: ICONS.pivot, title: "A summary of this table under it, calculated anew as it changes", run: () => this.insert(info) }];
     }
     const problem = typeof state === "string" ? state : undefined;
@@ -556,7 +572,10 @@ export class Pivot implements Feature {
  * then it is checked again), or why a source of the space is not read (nothing to have read: the pivot kept as it is, as
  * formulas reading one keep their results)
  */
-type Found = { readonly table: Table } | { readonly problem: string } | { readonly unread: string } | { readonly notRead: string };
+type Found = { readonly table: TableModel } | { readonly problem: string } | { readonly unread: string } | { readonly notRead: string };
+
+/** A table's columns by their names (headers without their hashtags and emphasis), as a pivot's fields name them */
+const columnNames = (table: TableModel) => table.columns.map((column) => columnName(column.header));
 
 /** A column's id (its column's id in pivotOf: row:<group>, value:<value>, column:<key>|<value>, total:<value>) with its items as they are written now */
 function movedId(id: string, moved: ReadonlyMap<string, string>): string {

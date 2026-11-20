@@ -53,7 +53,7 @@ writing every module again.
 - **What tables keep is read and written through the host, each module its
   own** (CLAUDE.md, *Modules and their data*): every module gets a host made
   for it (`core/modulehost.ts`), whose metadata functions (`attribute`,
-  `withAttribute`, `columnAttributes`, `getCellTag`, `withCellTag`, `canStore`…) make
+  `withAttribute`, `columnAttributes`, `canStore`…, a cell's on the model too) make
   each attribute's name from the module's and its key (`metanames.ts`), so a
   module names no attribute whole and cannot write another's; the names of
   tables, columns, rows and cells are the core's, read and written by host

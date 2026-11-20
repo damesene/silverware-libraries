@@ -1,9 +1,9 @@
 // Formulas through table edits: references following inserted, deleted and
 // moved rows and columns, renamed columns and tables; calculated columns
 // filling new rows; formulas removed.
-import { followColumn, sameColumnId, headsOf } from "../columns.ts";
-import type { Table } from "../markdown.ts";
-import { type IndexMap, setCell } from "../ops.ts";
+import { followColumn, modelHeads, sameColumnId } from "../columns.ts";
+import { type ModelCell, type TableModel, withCellAt } from "../model/model.ts";
+import type { IndexMap } from "../ops.ts";
 import { type FormulaCells, hasFormulas } from "./cell.ts";
 import { recalculate, type TableSource } from "./evaluate.ts";
 import { parse, wholeColumnNames } from "./parser.ts";
@@ -18,11 +18,13 @@ import { isError } from "./values.ts";
  * formula that refers to a whole column) do not count. Undefined when the
  * column holds anything else.
  */
-export function calculatedFormula(cells: FormulaCells, table: Table, column: number, except: ReadonlySet<number> = new Set()): string | undefined {
+export function calculatedFormula(cells: FormulaCells, table: TableModel, column: number, except: ReadonlySet<number> = new Set()): string | undefined {
   let formula: string | undefined;
-  for (let r = 1; r < table.rows.length; r++) {
-    if (except.has(r) || isTotalRow(cells, table.rows[r]!.cells)) continue;
-    const stored = cells.formulaOf(table.rows[r]!.cells[column] ?? "");
+  for (let r = 1; r <= table.rows.length; r++) {
+    const row = table.rows[r - 1]!.cells;
+    if (except.has(r) || isTotalRow(cells, row)) continue;
+    const cell = row[column];
+    const stored = cell && cells.formulaOf(cell);
     if (!stored || (formula !== undefined && formula !== stored.formula)) return undefined;
     formula = stored.formula;
   }
@@ -30,7 +32,7 @@ export function calculatedFormula(cells: FormulaCells, table: Table, column: num
 }
 
 /** Whether a row holds a formula that refers to a whole column, such as =SUM([Qty]) */
-function isTotalRow(cells: FormulaCells, row: readonly string[]): boolean {
+function isTotalRow(cells: FormulaCells, row: readonly ModelCell[]): boolean {
   return row.some((cell) => {
     const stored = cells.formulaOf(cell);
     const tree = stored && parse(stored.formula);
@@ -43,23 +45,22 @@ function isTotalRow(cells: FormulaCells, row: readonly string[]): boolean {
  * their columns' calculated formulas, as the rows but `added` (new ones, `row`
  * among them) have them
  */
-export function withCalculatedCells(cells: FormulaCells, table: Table, row: number, added: ReadonlySet<number> = new Set([row])): Table {
+export function withCalculatedCells(cells: FormulaCells, table: TableModel, row: number, added: ReadonlySet<number> = new Set([row])): TableModel {
   let result = table;
-  table.rows[row]?.cells.forEach((cell, column) => {
-    if (cell.trim() !== "") return;
+  table.rows[row - 1]?.cells.forEach((cell, column) => {
+    if (cell.content.trim() !== "") return;
     const formula = calculatedFormula(cells, table, column, added);
-    if (formula) result = setCell(result, row, column, cells.formulaCell("", formula));
+    if (formula) result = withCellAt(result, row, column, cells.formulaCell("", formula, cell));
   });
   return result;
 }
 
 /** The table with every formula removed: its cells keep their results as plain values */
-export function withoutFormulas(cells: FormulaCells, table: Table): Table {
+export function withoutFormulas(cells: FormulaCells, table: TableModel): TableModel {
   let result = table;
   table.rows.forEach((row, r) => {
-    if (r === 0) return;
     row.cells.forEach((cell, c) => {
-      if (cells.formulaOf(cell)) result = setCell(result, r, c, cells.withoutFormula(cell));
+      if (cells.formulaOf(cell)) result = withCellAt(result, r + 1, c, cells.withoutFormula(cell));
     });
   });
   return result;
@@ -73,20 +74,20 @@ export function withoutFormulas(cells: FormulaCells, table: Table): Table {
  * as edited
  */
 export function formulasAfterEdit(
-  before: Table,
-  after: Table,
+  before: TableModel,
+  after: TableModel,
   edit: Following & { readonly tables?: TableSource },
-): Table {
+): TableModel {
   const { cells } = edit;
   let table = after;
   if (edit.rowMap) {
     const kept = new Set<number>();
-    for (let r = 0; r < before.rows.length; r++) {
+    for (let r = 0; r <= before.rows.length; r++) {
       const moved = edit.rowMap(r);
       if (moved !== undefined) kept.add(moved);
     }
     const added = new Set<number>();
-    for (let r = 1; r < after.rows.length; r++) if (!kept.has(r)) added.add(r);
+    for (let r = 1; r <= after.rows.length; r++) if (!kept.has(r)) added.add(r);
     for (const r of added) table = withCalculatedCells(cells, table, r, added);
   }
   return recalculate(shiftReferences(before, table, edit), { cells, tables: edit.tables, name: edit.names?.after });
@@ -136,7 +137,7 @@ export type Following = {
   readonly names?: { readonly before?: string; readonly after?: string };
 };
 
-type TableEdit = Following & { readonly before: Table; readonly after: Table };
+type TableEdit = Following & { readonly before: TableModel; readonly after: TableModel };
 
 /**
  * What a reference to an edited table is written as after the edit: undefined
@@ -161,10 +162,10 @@ function followedReference(formula: string, ref: Reference, edit: TableEdit): st
     const text = start && end ? (written.includes(":") ? `${start}:${end}` : start) : REF_ERROR;
     return text === written.toUpperCase() ? undefined : text;
   }
-  const headersBefore = headsOf(edit.before.rows[0]?.cells ?? []);
+  const headersBefore = modelHeads(edit.before);
   const follow = (written: string) => {
     const id = referencedColumnId(headersBefore, written);
-    return { id, followed: followColumn(headersBefore, headsOf(edit.after.rows[0]?.cells ?? []), id, columnMap ?? ((c) => c)) };
+    return { id, followed: followColumn(headersBefore, modelHeads(edit.after), id, columnMap ?? ((c) => c)) };
   };
   const first = follow(ref.name);
   if (ref.last !== undefined) {
@@ -186,15 +187,14 @@ function followedReference(formula: string, ref: Reference, edit: TableEdit): st
  * The table with each formula rewritten by `rewrite`, which gives the
  * formula's new text (or the same text when it stays)
  */
-function withFormulas(cells: FormulaCells, table: Table, rewrite: (formula: string) => string): Table {
+function withFormulas(cells: FormulaCells, table: TableModel, rewrite: (formula: string) => string): TableModel {
   let result = table;
   table.rows.forEach((row, r) => {
-    if (r === 0) return;
     row.cells.forEach((cell, c) => {
       const stored = cells.formulaOf(cell);
       if (!stored) return;
       const formula = rewrite(stored.formula);
-      if (formula !== stored.formula) result = setCell(result, r, c, cells.formulaCell(stored.value, formula, cell));
+      if (formula !== stored.formula) result = withCellAt(result, r + 1, c, cells.formulaCell(stored.value, formula, cell));
     });
   });
   return result;
@@ -230,7 +230,7 @@ function isTo(ref: Reference, name: string | undefined): boolean {
  * `rowMap` maps the rows of the markdown (header 0), `columnMap` the columns;
  * both default to "unchanged". References to other tables stay as they are.
  */
-export function shiftReferences(before: Table, after: Table, following: Following): Table {
+export function shiftReferences(before: TableModel, after: TableModel, following: Following): TableModel {
   if (!hasFormulas(following.cells, after)) return after;
   const edit: TableEdit = { ...following, before, after };
   const own = following.names?.before?.trim();
@@ -258,7 +258,7 @@ function renameIn(formula: string, own: string | undefined, renamed: string | un
  * so before the edit) following the edit: where they point, and the table's
  * new name if it was renamed. Other references stay as they are.
  */
-export function followTable(table: Table, before: Table, after: Table, following: Following): Table {
+export function followTable(table: TableModel, before: TableModel, after: TableModel, following: Following): TableModel {
   const name = following.names?.before?.trim();
   if (!name || !hasFormulas(following.cells, table)) return table;
   return withFormulas(following.cells, table, (formula) => followFormula(formula, before, after, following));
@@ -269,7 +269,7 @@ export function followTable(table: Table, before: Table, after: Table, following
  * edit) following the edit, as followTable's: a formula of another table, or
  * one written in the page's text outside its tables
  */
-export function followFormula(formula: string, before: Table, after: Table, following: Following): string {
+export function followFormula(formula: string, before: TableModel, after: TableModel, following: Following): string {
   const name = following.names?.before?.trim();
   if (!name) return formula;
   const edit: TableEdit = { ...following, before, after };
@@ -281,7 +281,7 @@ export function followFormula(formula: string, before: Table, after: Table, foll
  * references named by no table: a pivot's definition over its source), its
  * references following the edit as shiftReferences' do
  */
-export function followOwnFormula(formula: string, before: Table, after: Table, following: Following): string {
+export function followOwnFormula(formula: string, before: TableModel, after: TableModel, following: Following): string {
   const edit: TableEdit = { ...following, before, after };
   const own = following.names?.before?.trim();
   return renameIn(rewriteReferences(formula, (ref) => !ref.table || isTo(ref, own), edit), own, newName(edit));

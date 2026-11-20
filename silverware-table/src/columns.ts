@@ -7,8 +7,10 @@
 // which one (the second qty is qty:2). A column with a fixed name in its
 // header (`<meta core.n='price'>`, names.ts) is named by it instead, so renaming
 // the header changes nothing.
-import { unescapeCell } from "./markdown.ts";
-import { nameOf } from "./names.ts";
+import { type Align, unescapeCell } from "./markdown.ts";
+import { type Attributes, attributeIn, type ModelColumn, NO_ATTRIBUTES, type TableModel, withAttributeIn } from "./model/model.ts";
+import { CORE } from "./metanames.ts";
+import { LINE_NAME_KEY, nameOf } from "./names.ts";
 import { metaTagPattern } from "./tags.ts";
 
 export type ColumnId = { readonly name: string; readonly nth: number };
@@ -23,6 +25,31 @@ export type ColumnHead = { readonly text: string; readonly fixed: string | undef
 /** Markdown header cells as their columns' heads: a fixed name read from the cell's tag (names.ts) */
 export function headsOf(headers: readonly string[]): ColumnHead[] {
   return headers.map((text) => ({ text, fixed: nameOf(text) }));
+}
+
+/** A column's hashtags (its header's), as text: its type among them (the core's attribute; the column types' module reads it) */
+export const HASHTAGS_KEY = "hashtags";
+
+/** A column's header as it is written: its text with its hashtags */
+export function headerText(column: ModelColumn): string {
+  const hashtags = attributeIn(column.attributes, CORE, HASHTAGS_KEY);
+  return hashtags ? `${column.header} ${hashtags}` : column.header;
+}
+
+/** A column of a header as written (its hashtags its attribute), with these attributes besides */
+export function columnOfHeader(text: string, align: Align, attributes: Attributes = NO_ATTRIBUTES): ModelColumn {
+  const hashtags = headerHashtags(text);
+  return { header: withoutHashtags(text), align, attributes: withAttributeIn(attributes, CORE, HASHTAGS_KEY, hashtags.length ? hashtags.join(" ") : undefined) };
+}
+
+/** A column with the header of `header` (its text, its hashtags) and its alignment, its other attributes its own */
+export function withHeaderOf(column: ModelColumn, header: ModelColumn): ModelColumn {
+  return { header: header.header, align: header.align, attributes: withAttributeIn(column.attributes, CORE, HASHTAGS_KEY, attributeIn(header.attributes, CORE, HASHTAGS_KEY)) };
+}
+
+/** A model's columns as their heads: each header, and the column's own name */
+export function modelHeads(model: TableModel): ColumnHead[] {
+  return model.columns.map((column) => ({ text: column.header, fixed: attributeIn(column.attributes, CORE, LINE_NAME_KEY) }));
 }
 
 // A hashtag in a header (`Price #euro`): SilverBullet leaves it out of the column's key

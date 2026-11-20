@@ -8,12 +8,11 @@
 import { attributeName, columnAttributeOf, columnValues, hasMetaNamed, metaValue, metaValuesOf, type Owner, withColumnValues, withMetaValue } from "../meta.ts";
 import type { Table } from "../markdown.ts";
 import { attributeIn, type AttributePlace, attributesAt, type ModelCell, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt } from "../model/model.ts";
-import { tagValue, withTagValue } from "../tagvalues.ts";
 import type { ModelHost } from "./feature.ts";
 
 export type OwnMeta = Pick<
   ModelHost,
-  "attribute" | "withAttribute" | "attributes" | "columnAttributes" | "withColumnAttributes" | "canStore" | "getCellTag" | "withCellTag" | "canStoreCellTag"
+  "attribute" | "withAttribute" | "attributes" | "columnAttributes" | "withColumnAttributes" | "canStore"
 >;
 
 /** Whether a table is the model (else markdown's `Table`) */
@@ -30,7 +29,9 @@ export function ownMeta(owner: Owner, enabled: () => boolean): OwnMeta {
   const storableInModel = (model: TableModel, key: string, at?: AttributePlace) => !!attributesAt(model, at) && (enabled() || inModel(model, key, at) !== undefined);
   const withInModel = (model: TableModel, key: string, value: string | undefined, at?: AttributePlace) =>
     value !== undefined && !storableInModel(model, key, at) ? model : withAttributesAt(model, at, (attributes) => withAttributeIn(attributes, owner, key, value));
-  // A cell given alone: its attribute; may it hold one (the setting on, or it has it)
+  // A cell given alone: may it hold one (the setting on, or it has it). Set on it unchecked: whether a cell may take
+  // one it had not is the write step's, which sees the table before the change (withoutNewTagValues: a calculated
+  // column's formula copied into a new row passes, a new formula does not)
   const storableInCell = (cell: ModelCell, key: string) => enabled() || attributeIn(cell.attributes, owner, key) !== undefined;
   function attribute(table: Table, key: string, at?: { readonly column: number }): string | undefined;
   function attribute(table: TableModel, key: string, at?: AttributePlace): string | undefined;
@@ -45,7 +46,6 @@ export function ownMeta(owner: Owner, enabled: () => boolean): OwnMeta {
   function withAttribute(cell: ModelCell, key: string, value: string | undefined): ModelCell;
   function withAttribute(table: Table | TableModel | ModelCell, key: string, value: string | undefined, at?: AttributePlace): Table | TableModel | ModelCell {
     if (isCell(table)) {
-      if (value !== undefined && !storableInCell(table, key)) return table;
       const attributes = withAttributeIn(table.attributes, owner, key, value);
       return attributes === table.attributes ? table : { ...table, attributes };
     }
@@ -87,8 +87,5 @@ export function ownMeta(owner: Owner, enabled: () => boolean): OwnMeta {
     },
     withColumnAttributes,
     canStore,
-    getCellTag: (cell, key) => tagValue(cell, attributeName(owner, key)),
-    withCellTag: (cell, key, value) => withTagValue(cell, attributeName(owner, key), value),
-    canStoreCellTag: (cell, key) => enabled() || tagValue(cell, attributeName(owner, key)) !== undefined,
   };
 }

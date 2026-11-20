@@ -84,6 +84,14 @@ export function attributesAt(model: TableModel, at?: AttributePlace): Attributes
   return at.column === undefined ? row?.attributes : row?.cells[at.column]?.attributes;
 }
 
+/** The table with a body cell (`row` from 1) replaced (no such cell: as it was); the same cell: the same table */
+export function withCellAt(model: TableModel, row: number, column: number, cell: ModelCell): TableModel {
+  const current = model.rows[row - 1]?.cells[column];
+  if (!current || current === cell) return model;
+  const rows = model.rows.map((r, i) => (i === row - 1 ? { ...r, cells: r.cells.map((c, at) => (at === column ? cell : c)) } : r));
+  return { ...model, rows };
+}
+
 /** The table with the attributes at a place made by `change` (no such place: as it was); unchanged: the same table */
 export function withAttributesAt(model: TableModel, at: AttributePlace | undefined, change: (attributes: Attributes) => Attributes): TableModel {
   const current = attributesAt(model, at);

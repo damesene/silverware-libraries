@@ -3,14 +3,14 @@
 // the pageLinks module read; and which tables a write recalculates (those
 // referring by name to the table written, in turn). The tables' names come with
 // them, from the formulas module (its host): the domain reads no metadata.
-import type { Table } from "../markdown.ts";
+import type { TableModel } from "../model/model.ts";
 import { cellsByName, type FormulaCells } from "./cell.ts";
 import type { NamedCell, TableSource } from "./evaluate.ts";
 import type { FormulaChoice } from "./help.ts";
 import { referredTableNames } from "./references.ts";
 
 /** A table of a page with its name (undefined: none), as the formulas module gives it: `key` tells it apart */
-export type NamedPageTable = { readonly key: string; readonly table: Table; readonly name: string | undefined };
+export type NamedPageTable = { readonly key: string; readonly table: TableModel; readonly name: string | undefined };
 
 /** The other pages read, their tables with their names (null: no such page; undefined: not read) */
 export type NamedOtherPages = { readonly tables: (page: string) => readonly NamedPageTable[] | null | undefined };
@@ -20,10 +20,10 @@ export type NamedOtherPages = { readonly tables: (page: string) => readonly Name
  * read), and the sources of the space by their names (`@tasks`: null where
  * there is none so, undefined where it is not read; none: no source is read)
  */
-export type Elsewhere = { readonly pages?: NamedOtherPages; readonly spaceSource?: (name: string) => Table | null | undefined };
+export type Elsewhere = { readonly pages?: NamedOtherPages; readonly spaceSource?: (name: string) => TableModel | null | undefined };
 
 /** A page's tables by their names, and its named cells by their names (lowercase), of every table (a name is unique in its table only) */
-type PageNames = { readonly tables: Map<string, Table>; readonly cells: Map<string, NamedCell[]> };
+type PageNames = { readonly tables: Map<string, TableModel>; readonly cells: Map<string, NamedCell[]> };
 
 /**
  * The tables of a page by their names, and its named cells, for formulas that
@@ -35,7 +35,7 @@ export function pageTables(
   cells: FormulaCells,
   tables: () => readonly NamedPageTable[],
   here: string,
-  replace?: { readonly key: string; readonly table: Table; readonly name: string | undefined },
+  replace?: { readonly key: string; readonly table: TableModel; readonly name: string | undefined },
   elsewhere?: Elsewhere,
 ): TableSource {
   const others = elsewhere?.pages;
@@ -99,7 +99,7 @@ export function pageNameChoices(cells: FormulaCells, tables: readonly NamedPageT
 }
 
 /** The names a table's own formulas refer to bare, as written: its named cells (vat) and rows (`pear[price]`) */
-export function ownNameChoices(cells: FormulaCells, table: Table): FormulaChoice[] {
+export function ownNameChoices(cells: FormulaCells, table: TableModel): FormulaChoice[] {
   const rows = cells.rowNames(table).map(({ name }): FormulaChoice => ({ kind: "row", name }));
   return once([...cells.cellNames(table).map(({ name }): FormulaChoice => ({ kind: "cell", name })), ...rows]);
 }
@@ -123,7 +123,7 @@ export function addAffected(affected: Affected, name: string | undefined): void 
 }
 
 /** What a table's formulas refer to on the page: tables by name */
-export function referredBy(cells: FormulaCells, table: Table): Affected {
+export function referredBy(cells: FormulaCells, table: TableModel): Affected {
   return { tables: referredTableNames(cells, table) };
 }
 
@@ -136,7 +136,7 @@ export function isAffected(referred: Affected, affected: Affected): boolean {
  * tables that refer to it by name, or in turn to those. All of the page's when
  * the table is not found.
  */
-export function tablesWritten(cells: FormulaCells, all: readonly NamedPageTable[], key: string): Table[] {
+export function tablesWritten(cells: FormulaCells, all: readonly NamedPageTable[], key: string): TableModel[] {
   const found = all.find((t) => t.key === key);
   if (!found) return all.map((t) => t.table);
   const own = found.table;

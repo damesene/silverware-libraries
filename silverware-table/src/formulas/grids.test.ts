@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseTable } from "../markdown.ts";
 import { metaName } from "../meta.ts";
-import { formulaCell, formulaOf, recalculate } from "../testing/formulas.ts";
+import { formulaCell, formulaOf, model, recalculate } from "../testing/formulas.ts";
 import { BUILT_IN_FUNCTIONS } from "./builtin/index.ts";
 import { errorCodeIn } from "./cell.ts";
 import type { TableSource } from "./evaluate.ts";
@@ -47,7 +47,7 @@ const TASKS = [
   "| <meta core.table core.name='tasks'> |",
 ].join("\n");
 
-const tasks: TableSource = (name, page) => (page === undefined && name.toLowerCase() === "tasks" ? parseTable(TASKS) : undefined);
+const tasks: TableSource = (name, page) => (page === undefined && name.toLowerCase() === "tasks" ? model(parseTable(TASKS)) : undefined);
 const OWN = "| A |\n|---|\n| |";
 
 describe("a cell's result", () => {
@@ -282,7 +282,7 @@ describe("arrays in formulas", () => {
 
   it("operators work on a column or row of them, not on several rows and columns; on none, none", () => {
     // A table without rows: an operator on its body is on no values
-    const empty: TableSource = (name) => (name === "empty" ? parseTable(["| A | B |", "|---|---|"].join("\n")) : undefined);
+    const empty: TableSource = (name) => (name === "empty" ? model(parseTable(["| A | B |", "|---|---|"].join("\n"))) : undefined);
     expect(shown(OWN, "=SUM(empty![#Data] * 1)", empty)).toBe("0");
     expect(shown(OWN, "=SUM(FILTER(tasks![hours], tasks![done] = FALSE) * 2)", tasks)).toBe("18");
     expect(shown(OWN, "=SUM(tasks![#Data] * 1)", tasks)).toBe("#VALUE!");

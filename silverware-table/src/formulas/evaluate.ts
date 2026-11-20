@@ -1,9 +1,7 @@
 // Calculating formulas: a table's cells as a sheet, the other tables they
 // refer to as a book, results and the reasons of errors.
-import { columnName, type ColumnHead, headsOf } from "../columns.ts";
-import { escapeCell, type Table, unescapeCell } from "../markdown.ts";
-import { setCell } from "../ops.ts";
-import { withoutTags } from "../tags.ts";
+import { columnName, type ColumnHead, modelHeads } from "../columns.ts";
+import { type ModelCell, NO_ATTRIBUTES, type TableModel, withCellAt } from "../model/model.ts";
 import { asNumber } from "../../../shared/filter.ts";
 import { type CalculatedBy, cellResult, cellsByName, errorCodeIn, type FormulaCells, hasFormulas, PLAIN_CELLS, rowsByName, withEquals } from "./cell.ts";
 import { dateArithmetic, parseDate } from "./dates.ts";
@@ -40,7 +38,7 @@ const DECIMAL_COMMA_RE = /\d,\d/;
  * (compared ignoring case) on the formula's page, or with `page` on another;
  * undefined when there is none
  */
-export type TableSource = ((name: string, page?: string) => Table | undefined) & {
+export type TableSource = ((name: string, page?: string) => TableModel | undefined) & {
   /** The first cell named so (compared ignoring case) on the page or on `page`, its row of the markdown (header 0); a source without cellsNamed gives this one */
   readonly cell?: (name: string, page?: string) => NamedCell | undefined;
   /** Every cell named so on the page or on `page` (a name is unique in a table only), in the order of the tables */
@@ -51,18 +49,18 @@ export type TableSource = ((name: string, page?: string) => Table | undefined) &
    * A source of the space by its name (@tasks, compared ignoring case): null where there is none so, undefined
    * where it is not read yet; none (sources not offered): every source unread, formulas reading one keep their results
    */
-  readonly spaceSource?: (name: string) => Table | null | undefined;
+  readonly spaceSource?: (name: string) => TableModel | null | undefined;
 };
 
 /** Where a named cell is: its table (and the table's name, if it has one), and its row (of the markdown, header 0) and column */
-export type NamedCell = { readonly table: Table; readonly tableName?: string; readonly row: number; readonly column: number };
+export type NamedCell = { readonly table: TableModel; readonly tableName?: string; readonly row: number; readonly column: number };
 
 /**
  * A calculated table as the formulas reach it: by its page and name (whichever
  * object of its table a caller holds: as written, as an edit follows it), else
  * (one without a name, which only its own formula reaches) by its table
  */
-function calculatedKey(table: Table, page: string | undefined, name: string | undefined): string | Table {
+function calculatedKey(table: TableModel, page: string | undefined, name: string | undefined): string | TableModel {
   const named = name?.trim().toLowerCase();
   return named ? `${page ?? ""}\u0000${named}` : table;
 }
@@ -89,9 +87,9 @@ const called = (name: string | undefined) => (name ? `the table ${name}` : "the 
 class Book {
   private readonly sheets = new Map<string, Sheet | FormulaError>();
   // The sheets by table, whether reached by the table's name or a named cell's
-  private readonly tableSheets = new Map<Table, Sheet | FormulaError>();
+  private readonly tableSheets = new Map<TableModel, Sheet | FormulaError>();
   // The calculated tables being calculated, by calculatedKey: one reached again depends on its own result
-  private readonly calculating = new Set<string | Table>();
+  private readonly calculating = new Set<string | TableModel>();
   constructor(
     readonly cells: FormulaCells,
     private readonly source: TableSource | undefined,
@@ -110,7 +108,7 @@ class Book {
   }
 
   /** A source of the space as a table; null: there is none so; undefined: not read (or no sources offered) */
-  private spaceSource(name: string): Table | null | undefined {
+  private spaceSource(name: string): TableModel | null | undefined {
     return this.source?.spaceSource?.(name);
   }
 
@@ -123,7 +121,7 @@ class Book {
   }
 
   /** The table's sheet, made on its first use (by its name or by a named cell's); a calculated one's as calculated now, or its error */
-  private sheetOf(table: Table, page: string | undefined, name: string): Sheet | FormulaError {
+  private sheetOf(table: TableModel, page: string | undefined, name: string): Sheet | FormulaError {
     let sheet = this.tableSheets.get(table);
     if (!sheet) {
       const by = this.cells.calculated?.(table);
@@ -147,7 +145,7 @@ class Book {
    * formulas may not read: it keeps what it shows. One reached again while it
    * is calculated (it reads itself, two read each other) is #CYCLE!.
    */
-  calculated(table: Table, page: string | undefined, name: string | undefined, by: CalculatedBy, before?: Table): Table | FormulaError | undefined {
+  calculated(table: TableModel, page: string | undefined, name: string | undefined, by: CalculatedBy, before?: TableModel): TableModel | FormulaError | undefined {
     if (by.formulas.some((formula) => this.notRead(withEqualsOf(formula)))) return undefined;
     return this.asCalculated(table, page, name, (own) =>
       by.calculate(
@@ -165,14 +163,14 @@ class Book {
    * A formula calculated as a view of `table` (its own cells #CYCLE!): its result as a grid (one value a cell, a
    * list a column), or why it cannot be; undefined where it reads a page formulas may not read
    */
-  viewResult(table: Table, page: string | undefined, name: string | undefined, formula: string): Grid | FormulaError | undefined {
+  viewResult(table: TableModel, page: string | undefined, name: string | undefined, formula: string): Grid | FormulaError | undefined {
     const written = withEqualsOf(formula);
     if (this.notRead(written)) return undefined;
     return this.asCalculated(table, page, name, (own) => viewGrid(own.whole(written)));
   }
 
   /** `calculate` with the table as being calculated: its own sheet reading its own cells as #CYCLE!, the table reached again #CYCLE! */
-  private asCalculated<T>(table: Table, page: string | undefined, name: string | undefined, calculate: (own: Sheet) => T): T | FormulaError {
+  private asCalculated<T>(table: TableModel, page: string | undefined, name: string | undefined, calculate: (own: Sheet) => T): T | FormulaError {
     const key = calculatedKey(table, page, name);
     if (this.calculating.has(key)) return new FormulaError("#CYCLE!", `${called(name)} depends on its own result`);
     this.calculating.add(key);
@@ -218,10 +216,10 @@ class Book {
  * another column ([@qty] / SUM([qty]) in a Share column) does not make its row
  * one. [qty] leaves them out.
  */
-export function totalRows(cells: FormulaCells, table: Table): ReadonlySet<number> {
-  const headers = headsOf(table.rows[0]?.cells ?? []);
+export function totalRows(cells: FormulaCells, table: TableModel): ReadonlySet<number> {
+  const headers = modelHeads(table);
   const totals = new Set<number>();
-  table.rows.slice(1).forEach((row, r) => {
+  table.rows.forEach((row, r) => {
     row.cells.forEach((cell, column) => {
       const stored = cells.formulaOf(cell);
       const tree = stored && parse(stored.formula);
@@ -236,7 +234,7 @@ export function totalRows(cells: FormulaCells, table: Table): ReadonlySet<number
 /** A table's cells as a sheet: values of plain cells, results of formula cells */
 class Sheet {
   private readonly headers: readonly ColumnHead[];
-  private readonly body: readonly (readonly string[])[];
+  private readonly body: readonly (readonly ModelCell[])[];
   private readonly results = new Map<string, Scalar>();
   private readonly evaluating = new Set<string>();
   // Numbers in the table are written with a decimal comma: results are too
@@ -253,7 +251,7 @@ class Sheet {
    * its own formulas may refer to it too
    */
   constructor(
-    private readonly table: Table,
+    private readonly table: TableModel,
     private readonly book: Book,
     readonly page?: string,
     name?: string,
@@ -263,14 +261,14 @@ class Sheet {
     private readonly cells: FormulaCells = book.cells,
   ) {
     this.name = name?.trim() || undefined;
-    this.headers = headsOf(table.rows[0]?.cells ?? []);
-    this.body = table.rows.slice(1).map((r) => r.cells);
+    this.headers = modelHeads(table);
+    this.body = table.rows.map((r) => r.cells);
     let comma = 0;
     let point = 0;
     for (const cells of this.body) {
       for (const cell of cells) {
         if (this.cells.formulaOf(cell)) continue;
-        const text = unescapeCell(cell).trim();
+        const text = cell.content.trim();
         if (asNumber(text) === undefined) continue;
         if (DECIMAL_COMMA_RE.test(text)) comma++;
         else if (/\d\.\d/.test(text)) point++;
@@ -313,7 +311,7 @@ class Sheet {
     }
     const stored = this.cells.formulaOf(cell);
     if (!stored) {
-      const text = unescapeCell(withoutTags(cell)).trim();
+      const text = cell.content.trim();
       if (text === "") return null;
       // A number, a time (14:30, 40:00), or text (an error's code as it shows, `\#REF!` written: a pivot's cell)
       const number = asNumber(text);
@@ -335,7 +333,8 @@ class Sheet {
     // the formulas using the cell use too
     const notRead = this.book.notRead(formula);
     if (notRead) {
-      const shown = unescapeCell(this.cells.formulaOf(this.body[row]?.[column] ?? "")?.value ?? "").trim();
+      const cell = this.body[row]?.[column];
+      const shown = ((cell && this.cells.formulaOf(cell)?.value) ?? "").trim();
       // None yet, or an error code written: an error, saying why it is not calculated
       const code = shown === "" ? "#REF!" : errorCodeIn(shown);
       const kept: Scalar = code ? new FormulaError(code, notRead) : (asNumber(shown) ?? parseClock(shown) ?? shown);
@@ -375,15 +374,14 @@ class Sheet {
   }
 
   /** The table as the formulas have it now: its formula cells showing their results as calculated in this book */
-  withResults(): Table {
+  withResults(): TableModel {
     if (!hasFormulas(this.cells, this.table)) return this.table;
     // (In one pass: a source of thousands of rows is read so for each table reading a pivot of it)
     const { cells } = this.book;
     const rows = this.table.rows.map((row, r) => {
-      if (r === 0) return row;
       const written = row.cells.map((cell, c) => {
         const stored = cells.formulaOf(cell);
-        return stored ? cells.formulaCell(cellResult(this.text(r - 1, c, stored.formula)), stored.formula, cell) : cell;
+        return stored ? cells.formulaCell(cellResult(this.text(r, c, stored.formula)), stored.formula, cell) : cell;
       });
       return written.every((cell, c) => cell === row.cells[c]) ? row : { ...row, cells: written };
     });
@@ -391,7 +389,7 @@ class Sheet {
   }
 
   /** Another table (by its name, on its page or this sheet's) as the formulas have it now, or why there is none: what a calculated table reads */
-  tableNow(ref: TableRef | SourceRef): Table | FormulaError {
+  tableNow(ref: TableRef | SourceRef): TableModel | FormulaError {
     const sheet = this.sheetOf(ref);
     return isError(sheet) ? sheet : sheet.withResults();
   }
@@ -753,30 +751,28 @@ function compare(a: Scalar, b: Scalar): number {
 /** What a table's formulas are calculated with: its cells as the formulas read them, the other tables, its own name */
 export type Calculation = { readonly cells: FormulaCells; readonly tables?: TableSource; readonly name?: string };
 
-export function recalculate(table: Table, { cells, tables, name }: Calculation): Table {
+export function recalculate(table: TableModel, { cells, tables, name }: Calculation): TableModel {
   if (!hasFormulas(cells, table)) return table;
   const book = new Book(cells, tables);
   const sheet = new Sheet(table, book, undefined, name);
   let result = table;
   table.rows.forEach((row, r) => {
-    if (r === 0) return;
     row.cells.forEach((cell, c) => {
       const stored = cells.formulaOf(cell);
       // A result kept as it is written (a link to a page not read)
       if (!stored || (book.notRead(stored.formula) && stored.value.trim() !== "")) return;
-      // Up to date when the result written is the one calculated: the cell's tag as
-      // written stays (a table written before tags' values went into apostrophes too)
+      // Up to date when the result written is the one calculated: the cell stays as it is
       // (An error written so that it is no hashtag: one written before as `#REF!` is out of date)
-      const text = cellResult(sheet.text(r - 1, c, stored.formula));
-      if (escapeCell(text) === stored.value) return;
-      result = setCell(result, r, c, cells.formulaCell(text, stored.formula, cell));
+      const text = cellResult(sheet.text(r, c, stored.formula));
+      if (text === stored.value) return;
+      result = withCellAt(result, r + 1, c, cells.formulaCell(text, stored.formula, cell));
     });
   });
   return result;
 }
 
 // The table a formula calculated in none is in: no rows, no columns
-const NO_TABLE: Table = { indent: "", align: [], rows: [{ cells: [] }], padded: false };
+const NO_TABLE: TableModel = { columns: [], rows: [], attributes: NO_ATTRIBUTES };
 
 /**
  * A formula calculated in no table (the Space Lua API's): its value, a range
@@ -826,14 +822,14 @@ function listNode(node: Node): boolean {
  * none of its cells (`[@column]` that row's): a pivot's groups and its
  * condition, read row by row
  */
-export function rowValues(table: Table, formula: string, { cells, tables, name }: Calculation): Scalar[] {
+export function rowValues(table: TableModel, formula: string, { cells, tables, name }: Calculation): Scalar[] {
   const tree = parse(formula);
   const sheet = new Sheet(table, new Book(cells, tables), undefined, name);
-  return table.rows.slice(1).map((_, row) => (isError(tree) ? tree : sheet.atRow(tree, row)));
+  return table.rows.map((_, row) => (isError(tree) ? tree : sheet.atRow(tree, row)));
 }
 
 /** A formula calculated over a table as a whole, one value (`[qty]` all its rows): a pivot's value of a group's rows */
-export function tableValue(table: Table, formula: string, { cells, tables, name }: Calculation): Scalar {
+export function tableValue(table: TableModel, formula: string, { cells, tables, name }: Calculation): Scalar {
   const tree = parse(formula);
   return isError(tree) ? tree : new Sheet(table, new Book(cells, tables), undefined, name).atRow(tree, 0);
 }
@@ -843,8 +839,9 @@ export function tableValue(table: Table, formula: string, { cells, tables, name 
  * a grid as it is: what a cell showing #SPILL! holds (Show result); a cell
  * without a formula is undefined
  */
-export function cellWholeResult(table: Table, row: number, column: number, { cells, tables, name }: Calculation): Result | undefined {
-  const stored = row > 0 ? cells.formulaOf(table.rows[row]?.cells[column] ?? "") : undefined;
+export function cellWholeResult(table: TableModel, row: number, column: number, { cells, tables, name }: Calculation): Result | undefined {
+  const cell = row > 0 ? table.rows[row - 1]?.cells[column] : undefined;
+  const stored = cell && cells.formulaOf(cell);
   if (!stored) return undefined;
   return new Sheet(table, new Book(cells, tables), undefined, name).wholeResult(row - 1, column, stored.formula);
 }
@@ -855,7 +852,7 @@ export function cellWholeResult(table: Table, row: number, column: number, { cel
  * be (its own cells read: #CYCLE!). Undefined where it reads a page formulas
  * may not read.
  */
-export function viewResult(table: Table, { cells, tables, name }: Calculation, formula: string): Grid | FormulaError | undefined {
+export function viewResult(table: TableModel, { cells, tables, name }: Calculation, formula: string): Grid | FormulaError | undefined {
   return new Book(cells, tables).viewResult(table, undefined, name, formula);
 }
 
@@ -870,7 +867,7 @@ export function viewResult(table: Table, { cells, tables, name }: Calculation, f
  * too). Undefined where it reads a page or a source not read: no values to
  * give yet.
  */
-export function listResult(table: Table, { cells, tables, name }: Calculation, formula: string): readonly string[] | FormulaError | undefined {
+export function listResult(table: TableModel, { cells, tables, name }: Calculation, formula: string): readonly string[] | FormulaError | undefined {
   const written = withEqualsOf(formula);
   const book = new Book(cells, tables, true);
   if (book.notRead(written)) return undefined;
@@ -901,7 +898,7 @@ export function viewGrid(result: Result): Grid | FormulaError {
  * Undefined where it is no calculated table, or reads a page formulas may not
  * read (it keeps what it shows).
  */
-export function calculatedNow(table: Table, { cells, tables, name }: Calculation, before?: Table): Table | FormulaError | undefined {
+export function calculatedNow(table: TableModel, { cells, tables, name }: Calculation, before?: TableModel): TableModel | FormulaError | undefined {
   const by = cells.calculated?.(table);
   return by && new Book(cells, tables).calculated(table, undefined, name, by, before);
 }
@@ -913,16 +910,15 @@ export function scalarText(value: Scalar): string {
 }
 
 /** The errors formula cells show: "row,column" (rows of the markdown, header 0) → the error, its code and why */
-export function formulaErrors(table: Table, { cells, tables, name }: Calculation): Map<string, FormulaError> {
+export function formulaErrors(table: TableModel, { cells, tables, name }: Calculation): Map<string, FormulaError> {
   const errors = new Map<string, FormulaError>();
   if (!hasFormulas(cells, table)) return errors;
   const sheet = new Sheet(table, new Book(cells, tables), undefined, name);
   table.rows.forEach((row, r) => {
-    if (r === 0) return;
     row.cells.forEach((cell, c) => {
       const stored = cells.formulaOf(cell);
-      const result = stored && sheet.result(r - 1, c, stored.formula);
-      if (isError(result)) errors.set(`${r},${c}`, result);
+      const result = stored && sheet.result(r, c, stored.formula);
+      if (isError(result)) errors.set(`${r + 1},${c}`, result);
     });
   });
   return errors;

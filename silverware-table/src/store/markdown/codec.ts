@@ -16,9 +16,9 @@
 // from, as the writers before the model wrote it (withTagValue; a name as
 // names.ts writes it), so a changed table reads as before. What the metadata
 // row has of no column found (a header renamed by hand) is kept as written.
-import { headerHashtags, withoutHashtags, headsOf } from "../../columns.ts";
+import { HASHTAGS_KEY, headerHashtags, headerText, headsOf, withoutHashtags } from "../../columns.ts";
 import { escapeCell, type Row, serializeTable, type Table, unescapeCell } from "../../markdown.ts";
-import { columnsMetaNamed, columnsMetaOf } from "../../meta.ts";
+import { columnsAttributes, columnsMetaNamed, columnsMetaOf } from "../../meta.ts";
 import { attributeName, CORE, escapedForRegExp, splitAttributeName } from "../../metanames.ts";
 import {
   attributeChangeOf,
@@ -33,10 +33,7 @@ import {
 } from "../../model/model.ts";
 import { CELL_NAME_KEY, LINE_NAME, LINE_NAME_KEY, rowNameIn, withCellName, withName } from "../../names.ts";
 import { cellTags, withoutTags } from "../../tags.ts";
-import { tagAttributes, withTagValue } from "../../tagvalues.ts";
-
-/** A column's hashtags (its header's), as text: its type among them (the column types' module reads it) */
-export const HASHTAGS_KEY = "hashtags";
+import { currentTag, tagAttributes, withTagValue } from "../../tagvalues.ts";
 
 // What the codec read each part of the model from, so what is unchanged is
 // written as it was: a table's model; a row's markdown; a cell's markdown; a
@@ -162,9 +159,10 @@ function cellMarkdown(
 ): string {
   const { read: asRead, changes } = changesSinceRead(attributes);
   const read = asRead && { ...asRead, cell: edited(asRead.cell) };
-  // Its content as read: the cell as read, whole; else its content with the tags read after it
+  // Its content as read: the cell as read, whole; else its content with the tags read after it, in today's form (a
+  // cell written anew: tags written in double quotes before 2026-10-22 written in apostrophes, as the writers did)
   const asWritten = read !== undefined && unescapeCell(withoutTags(read.cell)) === content;
-  let cell = asWritten ? read.cell : [escapeCell(content), ...(read ? cellTags(read.cell) : [])].filter((part) => part !== "").join(" ");
+  let cell = asWritten ? read.cell : [escapeCell(content), ...(read ? cellTags(read.cell).map(currentTag) : [])].filter((part) => part !== "").join(" ");
   for (const { owner, key, value } of changes) if (inTags(owner, key, read?.inTags)) cell = withTagged(cell, owner, key, value);
   return cell;
 }
@@ -182,10 +180,49 @@ function withHashtags(cell: string, hashtags: readonly string[]): string {
   return [kept.replace(/\s+/g, " ").trim(), ...added].join(" ");
 }
 
+/**
+ * A body cell read alone (a cell a hook gives, apart from its table): its
+ * content, and every attribute its tags hold, its row's name among them (no
+ * row to hold it)
+ */
+export function decodeCell(raw: string): ModelCell {
+  const tags = tagAttributes(raw);
+  const attributes = attributesOf(tags);
+  if (tags.size) tagsRead.set(attributes, { cell: raw, inTags: new Set(tags.keys()) });
+  return { content: unescapeCell(withoutTags(raw)), attributes };
+}
+
+/** A cell read alone (decodeCell) written back as a cell of encode's: as read where unchanged */
+export function encodeCell(cell: ModelCell): string {
+  return cellMarkdown(cell.content, cell.attributes, () => true);
+}
+
 /** The table's header and `rows` (its rows, the first 1, in that order) as plain markdown: no hidden tags, no metadata row */
 export function plainMarkdown(table: Table, rows: readonly number[]): string {
   const plain = (row: number) => ({ cells: (table.rows[row]?.cells ?? []).map(withoutTags) });
   return serializeTable({ indent: "", align: table.align, padded: table.padded, rows: [plain(0), ...rows.map(plain)] });
+}
+
+/**
+ * The metadata row's attributes of the columns of `base` none of the model's
+ * columns comes from (their attributes made from those read: renamed, moved,
+ * written over as a calculated table's are): kept as written, for a write's
+ * step to say whether the column went (a column map) or may come back (a
+ * calculated table's column, matched by its name)
+ */
+function metaOfColumnsGone(model: TableModel, base: Table): Record<string, string> {
+  const read = models.get(base);
+  if (!read || !base.meta) return {};
+  const reached = new Set<Attributes>();
+  for (const column of model.columns) {
+    for (let at: Attributes | undefined = column.attributes; at; at = attributeChangeOf(at)?.from) {
+      if (!tagsRead.has(at)) continue;
+      reached.add(at);
+      break;
+    }
+  }
+  const gone = new Set(read.columns.flatMap((column, c) => (column.attributes === NO_ATTRIBUTES || reached.has(column.attributes) ? [] : [c])));
+  return Object.fromEntries(columnsAttributes(base, gone).map((name) => [name, base.meta![name]!]));
 }
 
 /** A model written back as a markdown table, `base` the table it was read from (its form: indent, padding, its rows as written) */
@@ -197,8 +234,7 @@ export function encode(model: TableModel, base: Table): Table {
     const read = headers.get(column);
     if (read !== undefined) return read;
     const hashtags = attributeIn(column.attributes, CORE, HASHTAGS_KEY);
-    const content = [column.header, ...(hashtags ? [hashtags] : [])].join(" ");
-    return cellMarkdown(content, column.attributes, inHeader, (cell) => withHashtags(cell, hashtags ? hashtags.split(" ") : []));
+    return cellMarkdown(headerText(column), column.attributes, inHeader, (cell) => withHashtags(cell, hashtags ? hashtags.split(" ") : []));
   });
   // The rest of a column's attributes: the metadata row's (its own name and its hashtags are its header's)
   const byColumn = model.columns.map((column): Attributes => {
@@ -231,7 +267,7 @@ export function encode(model: TableModel, base: Table): Table {
   });
   const baseHeader = base.rows[0];
   const headerRow: Row = !baseHeader ? { cells: headerCells } : headerCells.length === baseHeader.cells.length && headerCells.every((cell, c) => cell === baseHeader.cells[c]) ? baseHeader : { ...baseHeader, cells: headerCells };
-  const meta = columnsMetaNamed(headsOf(headerCells), byColumn, columnsMetaOf(base).orphans);
+  const meta = columnsMetaNamed(headsOf(headerCells), byColumn, { ...columnsMetaOf(base).orphans, ...metaOfColumnsGone(model, base) });
   const same = (a: Readonly<Record<string, string>>, b: Readonly<Record<string, string>> | undefined) =>
     !!b && Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([k, v]) => b[k] === v);
   return {

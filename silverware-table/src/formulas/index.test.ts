@@ -24,7 +24,7 @@ import {
   referenceSlot,
   withColumnKeys,
 } from "./index.ts";
-import { CELLS, calculatedFormula, cellNamesOf, followTable, formulaCell, formulaErrors, formulaOf, qualifyCellNames, recalculate, referredTableNames, shiftReferences, withCalculatedCells } from "../testing/formulas.ts";
+import { CELLS, model, calculatedFormula, cellNamesOf, followTable, formulaCell, formulaErrors, formulaOf, qualifyCellNames, recalculate, referredTableNames, shiftReferences, withCalculatedCells } from "../testing/formulas.ts";
 import { formulaErrors as domainFormulaErrors } from "./evaluate.ts";
 import { FormulaError } from "./values.ts";
 import { parseMetaRow, parseTable, serializeTable, splitRow } from "../markdown.ts";
@@ -327,7 +327,7 @@ describe("evaluation", () => {
     const rows = table.rows.map((r, i) => (i === 4 ? { cells: [r.cells[0]!, r.cells[1]!, formulaCell("", "=Q1")] } : r));
     expect(formulaErrors({ ...table, rows })).toEqual(new Map([["4,2", "#REF! Q1 is outside the table"]]));
     // The domain gives the error itself, its code and why apart (Space Lua's errors read them so)
-    const [error] = domainFormulaErrors({ ...table, rows }, { cells: CELLS }).values();
+    const [error] = domainFormulaErrors(model({ ...table, rows }), { cells: CELLS }).values();
     expect(error).toBeInstanceOf(FormulaError);
     expect(error).toMatchObject({ code: "#REF!", detail: "Q1 is outside the table" });
   });
@@ -785,7 +785,10 @@ describe("other tables", () => {
   // The tables of a page by their names, as the controller hands them to formulas
   const tablesOf = (...markdown: string[]): TableSource => {
     const tables = markdown.map((m) => parseTable(m));
-    return (name, page) => (page === undefined ? tables.find((t) => metaName(t)?.toLowerCase() === name.toLowerCase()) : undefined);
+    return (name, page) => {
+      const table = page === undefined ? tables.find((t) => metaName(t)?.toLowerCase() === name.toLowerCase()) : undefined;
+      return table && model(table);
+    };
   };
   const PRICES = `| Name | Price |\n|---|---|\n| Pear | 12 |\n| Fig | 2,5 |\n| Total | 14,5 <meta formulas.f='=SUM([price])'> |\n| <meta core.table core.name='prices'> |`;
   // What `formula` shows in the last cell of a one-cell table, with `tables` around it
@@ -922,7 +925,7 @@ describe("references to another table follow its edits", () => {
 
   it("evaluates a reference to deleted cells of another table as #REF!", () => {
     const table = referring("=prices!#REF!");
-    const tables: TableSource = (name) => (name === "prices" ? prices : undefined);
+    const tables: TableSource = (name) => (name === "prices" ? model(prices) : undefined);
     expect(formulaErrors(table, tables).get("1,0")).toBe("#REF! a reference to deleted cells of prices");
   });
 });
@@ -938,10 +941,13 @@ describe("named cells", () => {
       list(page).flatMap((table) =>
         table.rows.flatMap((row, r) => {
           const column = row.cells.findIndex((cell) => cellNameOf(cell)?.toLowerCase() === name.toLowerCase());
-          return r > 0 && column >= 0 ? [{ table, tableName: metaName(table), row: r, column }] : [];
+          return r > 0 && column >= 0 ? [{ table: model(table), tableName: metaName(table), row: r, column }] : [];
         }),
       );
-    return Object.assign((name: string, page?: string) => list(page).find((table) => metaName(table)?.toLowerCase() === name.toLowerCase()), {
+    return Object.assign((name: string, page?: string) => {
+      const table = list(page).find((t) => metaName(t)?.toLowerCase() === name.toLowerCase());
+      return table && model(table);
+    }, {
       cell: (name: string, page?: string) => cells(name, page)[0],
       cellsNamed: cells,
     });
@@ -1034,7 +1040,7 @@ describe("the formula's row from one column to another, [@[a]:[b]]", () => {
 
 describe("named rows", () => {
   const PRICES = parseTable(`| Name | Price |\n|---|---|\n| Pear <meta core.n='pear'> | 12 |\n| Fig <meta core.n='fig'> | 3 |\n| <meta core.table core.name='prices'> |`);
-  const source: TableSource = (name, page) => (name.toLowerCase() === "prices" && (page === undefined || page === "Shop") ? PRICES : undefined);
+  const source: TableSource = (name, page) => (name.toLowerCase() === "prices" && (page === undefined || page === "Shop") ? model(PRICES) : undefined);
   const result = (formula: string, own = "| A |\n|---|\n| |") => {
     const table = parseTable(own);
     const rows = table.rows.map((r, i) => (i === table.rows.length - 1 ? { cells: [formulaCell("", formula)] } : r));

@@ -17,7 +17,6 @@ describe("a module's own metadata", () => {
       "filters.-c-qty.condition": ">1",
     });
     expect(writtenMeta(ownMeta("themes", () => true).withAttribute(table, "name", "slate"))["themes.name"]).toBe("slate");
-    expect(filters.getCellTag("6 <meta filters.x='1'> <meta formulas.x='2'>", "x")).toBe("1");
   });
 
   it("with the metadata setting off: what the table has may change or go, nothing new is added", () => {
@@ -28,8 +27,6 @@ describe("a module's own metadata", () => {
     expect(writtenMeta(filters.withAttribute(table, "condition", undefined, { column: 0 }))).toEqual({ "core.name": "fruit" });
     expect(filters.canStore(table, "condition", { column: 0 })).toBe(true);
     expect(filters.canStore(table, "condition", { column: 1 })).toBe(false);
-    expect(filters.canStoreCellTag("6 <meta filters.x='1'>", "x")).toBe(true);
-    expect(filters.canStoreCellTag("6", "x")).toBe(false);
   });
 
   describe("on the model: the table's, a column's, a row's and a cell's, written where the markdown keeps them", () => {
@@ -53,7 +50,7 @@ describe("a module's own metadata", () => {
       expect(filters.withAttribute(model, "x", "1", { row: 9, column: 0 })).toBe(model);
     });
 
-    it("a cell given alone: its attribute, the cell with it set (the setting off, only where it has one)", () => {
+    it("a cell given alone: its attribute, the cell with it set, whether it may hold one (the setting off, where it has one)", () => {
       const formulas = ownMeta("formulas", () => true);
       const cell = decode(parseTable("| A |\n|---|\n| 3 <meta formulas.f='=1+2'> |")).rows[0]!.cells[0]!;
       expect(formulas.attribute(cell, "f")).toBe("=1+2");
@@ -63,7 +60,8 @@ describe("a module's own metadata", () => {
       const off = ownMeta("formulas", () => false);
       expect(off.canStore(cell, "f")).toBe(true);
       expect(off.canStore({ content: "1", attributes: new Map() }, "f")).toBe(false);
-      expect(off.withAttribute({ content: "1", attributes: new Map() }, "f", "=1").attributes.size).toBe(0);
+      // (Set unchecked: the write step judges it against the table)
+      expect(off.attribute(off.withAttribute({ content: "1", attributes: new Map() }, "f", "=1"), "f")).toBe("=1");
     });
 
     it("with the metadata setting off: what it has may change or go, nothing new is added", () => {

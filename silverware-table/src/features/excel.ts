@@ -310,7 +310,8 @@ export class Excel implements Feature {
   private async workbook(info: TableInfo): Promise<Workbook> {
     const exported = exportedTable(this.host, info, "all");
     // The markdown, edits held (lazy saving) included: the formulas
-    const model = this.host.tableOf(info);
+    const markdown = this.host.tableOf(info);
+    const model = this.host.asModel(markdown);
     const templates = excelTemplates(await this.host.configured(FUNCTIONS_PATH, {}));
     const skipped: Skipped[] = [];
     let formulas = 0;
@@ -318,7 +319,7 @@ export class Excel implements Feature {
     // An Excel table: its name, its columns named as its header shows them (unique), its last row its totals row
     // where that is the table's only total row (a total of its own column: what [qty] leaves out)
     const columns = excelColumnNames(exported.header);
-    const bodyRows = Math.max(0, model.rows.length - 1);
+    const bodyRows = model.rows.length;
     const totals = cells ? totalRows(cells, model) : new Set<number>();
     const totalsRow = bodyRows >= 2 && totals.size === 1 && totals.has(bodyRows - 1);
     const tableName = excelTableName(this.host.tableName(model));
@@ -329,7 +330,8 @@ export class Excel implements Feature {
       rows[row - 1] = values.map((text, column) => {
         const value = excelValue(text);
         // (Without the formulas module, no formulas: the cells' values)
-        const stored = cells?.formulaOf(model.rows[row]?.cells[column] ?? "");
+        const cell = model.rows[row - 1]?.cells[column];
+        const stored = cell && cells?.formulaOf(cell);
         if (!stored) return { value };
         formulas++;
         const formula = excelFormula(stored.formula, own!, row - 1, column, templates);
@@ -352,7 +354,7 @@ export class Excel implements Feature {
     // (An Excel table needs a row under its header)
     const table = bodyRows > 0 ? { table: { name: tableName, totalsRow, calculated } } : {};
     // Conditional formatting as Excel's, where the conditions module is on
-    const ranges = this.host.offered<ConditionsOffer>("conditions")?.ranges(model) ?? [];
+    const ranges = this.host.offered<ConditionsOffer>("conditions")?.ranges(markdown) ?? [];
     const { conditional, skipped: skippedRules, notes: ruleNotes } = excelConditional(ranges);
     const formatted = conditional.xml ? { conditional } : {};
     return { name, make: () => xlsxFile({ name, header: columns, rows, widths, ...table, ...formatted }), formulas, skipped, rules: new Set(ranges.map((r) => r.rule)).size, skippedRules, ruleNotes };

@@ -649,6 +649,15 @@ export interface ModelHost {
    * the hooks give it (docs/silverware-table-store-plan.md, step 3)
    */
   asModel(table: Table): TableModel;
+  // A body cell given alone (a cell hook's: keepsCell, fillCell, editorText's): its content and its attributes
+  asModel(cell: string): ModelCell;
+  /**
+   * A model written back as the table it was read from (`base`: asModel's), or
+   * a cell read alone written back: what a hook gives back until the hooks take
+   * the model
+   */
+  fromModel(model: TableModel, base: Table): Table;
+  fromModel(cell: ModelCell): string;
   /** A table's header and `rows` (its rows, the first 1, in that order) as plain markdown, as any renderer shows them: no hidden data, no metadata row (Copy as Markdown) */
   plainMarkdown(table: Table, rows: readonly number[]): string;
   /** Whether other pages are read (none where the platform reads no page but the open one): formulas and pivots referring to one */
@@ -892,20 +901,11 @@ export interface ModelHost {
   canStore(table: Table, key: string, at?: { readonly column: number }): boolean;
   canStore(table: TableModel, key: string, at?: AttributePlace): boolean;
   // A cell of the model given alone (a formula's cell as the formulas read and make one): its attribute, the cell with
-  // it set, whether it may be stored there
+  // it set, whether it may be stored there. Set unchecked: whether the cell may take one it had not is the write
+  // step's, which sees the whole table (a calculated column's formula copied into a new row passes)
   attribute(cell: ModelCell, key: string): string | undefined;
   withAttribute(cell: ModelCell, key: string, value: string | undefined): ModelCell;
   canStore(cell: ModelCell, key: string): boolean;
-  /**
-   * Whether the module may write its attribute of the key into this cell's
-   * hidden tags: the setting on, or the cell has it (with the setting off, a
-   * write takes off the tags new to the table: the core's write step)
-   */
-  canStoreCellTag(cell: string, key: string): boolean;
-  /** The module's attribute of the key in a cell's hidden tags */
-  getCellTag(cell: string, key: string): string | undefined;
-  /** The cell with the module's attribute of the key set (undefined: removed), its text and other tags kept */
-  withCellTag(cell: string, key: string, value: string | undefined): string;
 
   // What every part reads and the core keeps: the names of tables, columns, rows and cells
   /** A table's name, if it has a valid one */
@@ -928,11 +928,12 @@ export interface ModelHost {
   /** Whether a name may be given there: the metadata setting on, or one is there already (renamed or removed) */
   canName(table: Table, target: NamingTarget): boolean;
   /** Whether rows (columns) may be pinned at that edge: the metadata setting on, or the table has pins there already */
-  canPin(table: Table, edge: "top" | "bottom" | "left" | "right"): boolean;
-  /** The rows and columns pinned at each edge of a table, as its metadata row has them */
-  pinsOf(table: Table): Pins;
+  canPin(table: Table | TableModel, edge: "top" | "bottom" | "left" | "right"): boolean;
+  /** The rows and columns pinned at each edge of a table, as its attributes have them */
+  pinsOf(table: Table | TableModel): Pins;
   /** The table with these pins (an edge that cannot be pinned, canPin, as it was): a module's table made whole (a pivot's totals) */
   withPins(table: Table, pins: Pins): Table;
+  withPins(table: TableModel, pins: Pins): TableModel;
   /** A table's named rows, in their order */
   rowNames(table: Table): readonly RowName[];
   rowNames(table: TableModel): readonly { readonly name: string; readonly row: number }[];

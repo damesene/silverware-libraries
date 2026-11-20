@@ -16,7 +16,7 @@
 // tables' places (`at`) as sheet/layout.ts has them (refusesWrite where it
 // cannot).
 import type { Feature, ModelHost, TableInfo, ToolbarButton, WriteEdit } from "../core/feature.ts";
-import { locateBySource, type PageTable, pageTablesOf, parseTable, type Table } from "../markdown.ts";
+import { locateBySource, type PageTable, pageTablesOf, type Table } from "../markdown.ts";
 import { type Room, roomFor } from "../sheet/layout.ts";
 import {
   AT_KEY,
@@ -42,12 +42,12 @@ export class Sheets implements Feature {
 
   /** Deleting the sheet's last table: the sheet goes with it */
   tableDeleteWarning(info: TableInfo): string | undefined {
-    const sheet = sheetOfTable(this.host, parseTable(info.source));
+    const sheet = sheetOfTable(this.host, info.model);
     if (!sheet) return undefined;
     const others = sheetTables(this.host, this.host.pageText).filter((t) => sameSheet(t.sheet, sheet) && t.range.text !== info.source);
     if (!others.length) return `the sheet ${sheet} goes with it, as it is its only table`;
     // The sheet's own data it holds goes to the next table, where that can take it (the metadata setting off: no)
-    const data = sheetData(this.host, parseTable(info.source));
+    const data = sheetData(this.host, info.model);
     const next = others[0]!;
     if (data.length && !data.every(([key]) => this.host.canStoreMeta(next.table, key))) {
       return `the sheet ${sheet}'s column widths, kept in it, go with it (the Store table metadata setting is off, so no other table takes them)`;
@@ -62,7 +62,7 @@ export class Sheets implements Feature {
    * empty, it comes off its sheet.
    */
   toolbarButtons(info: TableInfo): ToolbarButton[] {
-    const sheet = sheetOfTable(this.host, parseTable(info.source));
+    const sheet = sheetOfTable(this.host, info.model);
     // Shown as a sheet (laid out on a grid: the sheet view) but on none: said so, in the toolbar whatever its setting
     const missing = !sheet && !!this.host.addressFrame(info);
     const title = sheet
@@ -82,7 +82,7 @@ export class Sheets implements Feature {
           ...(sheet ? { name: sheet } : {}),
           label: sheet ? "Move this table to another sheet (empty: off the sheet)" : "Put this table on a sheet",
           clear: { label: "Remove from sheet", title: "The table off its sheet: its place in the page and its name stay" },
-          ...(this.host.canStoreMeta(parseTable(info.source), SHEET_KEY) ? {} : { disabled: "A sheet is kept in the table's metadata: turn on Store table metadata in the settings" }),
+          ...(this.host.canStoreMeta(info.model, SHEET_KEY) ? {} : { disabled: "A sheet is kept in the table's metadata: turn on Store table metadata in the settings" }),
           save: (name) => this.moveTo(info, name),
         },
         run: () => {},
@@ -99,7 +99,7 @@ export class Sheets implements Feature {
    */
   private async moveTo(shown: TableInfo, typed: string): Promise<string | undefined> {
     const info = this.host.tableFor(shown.key) ?? shown;
-    const current = sheetOfTable(this.host, parseTable(info.source));
+    const current = sheetOfTable(this.host, info.model);
     const name = typed.trim();
     if (name === "") {
       if (current) await this.remove(info);
@@ -113,14 +113,14 @@ export class Sheets implements Feature {
     const problem = validateSheetName(name);
     if (problem) return problem;
     // (Taken off it above: that removes, which the setting off allows)
-    if (!canPlace(this.host, parseTable(info.source))) return "a table's sheet, place and name are kept in its metadata: turn on Store table metadata in the settings";
+    if (!canPlace(this.host, info.model)) return "a table's sheet, place and name are kept in its metadata: turn on Store table metadata in the settings";
     const text = await this.host.pageTextNow();
     const self = locateBySource(text, info.hint, info.source);
     const tables = sheetTables(this.host, text);
     const target = sheetsOf(tables).find((s) => sameSheet(s.name, name));
     const others = (target?.tables ?? []).filter((t) => t.range.from !== self?.from);
     const mine = tables.find((t) => t.range.from === self?.from);
-    const table = parseTable(info.source);
+    const table = info.model;
     const rows = table.rows.length;
     const columns = table.align.length;
     const free = (at: { row: number; column: number }) =>

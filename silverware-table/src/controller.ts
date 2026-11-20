@@ -22,6 +22,8 @@ import { type DragContext, followDrag } from "./core/drag.ts";
 import { writingClipboard } from "../../shared/clipboard.ts";
 import { markTable, renderedMeta, SilverBulletAdapter } from "./core/silverbullet/adapter.ts";
 import type { TablePlatform } from "./core/platform.ts";
+import type { StoredTable } from "./core/store.ts";
+import { MarkdownStore, revisionOf } from "./store/markdown/store.ts";
 import { SettingsDialog } from "./settings.ts";
 import { Metadata } from "./features/metadata.ts";
 import { featureEntries } from "./modules.ts";
@@ -143,6 +145,8 @@ export class Controller implements TableHost {
   private readonly enhancing = new WeakMap<HTMLElement, Promise<void>>();
   // Which table is which (keys for the session; core/tables.ts)
   private readonly register = new TableRegister();
+  // The tables kept as markdown in pages, read through the platform as it is now (a new one comes with Space Lua loaded again)
+  private readonly store = new MarkdownStore(() => this.platform, this.register);
   // The modules' parts for each table (core/parts.ts)
   private readonly parts = new Parts((key) => this.tableFor(key));
   private readonly views = new Map<TableKey, ViewState>();
@@ -551,6 +555,10 @@ export class Controller implements TableHost {
   /** Opens a reference (a page, a hashtag's page) where the platform opens one */
   navigate(ref: string): void {
     void this.platform.editor.open?.(ref);
+  }
+
+  tables(document: string): Promise<readonly StoredTable[]> {
+    return this.store.tables(document);
   }
 
   async pageTextNow(): Promise<string> {
@@ -1061,6 +1069,8 @@ export class Controller implements TableHost {
       const info: WidgetInfo = {
         table,
         source: range.text,
+        model,
+        revision: revisionOf(range.text),
         hint: range.from,
         key: this.register.keysOf(page, text)[range.ordinal]!,
         columns: shape.columns,

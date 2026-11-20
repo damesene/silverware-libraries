@@ -10,7 +10,7 @@
 // results (formula/page.ts: pages not read are `unread`).
 import type { Feature, ModelHost, TableTarget, TableInfo, WritePage } from "../core/feature.ts";
 import { type FormulaCells, type FormulasOffer, formulaPages, type PageLinksOffer, referredPages, tablesWritten } from "../formulas/index.ts";
-import { type OtherPages, type PageTable, pageTablesOf, parseTable, type Table } from "../markdown.ts";
+import { type OtherPages, type PageTable, pageTablesOf, type Table } from "../markdown.ts";
 
 // At most this many other pages are read for one page's formulas (pages that refer on and on)
 const MAX_OTHER_PAGES = 20;
@@ -45,7 +45,7 @@ export class PageLinks implements Feature {
   }
 
   enhanced(info: TableInfo): void {
-    void this.load([parseTable(info.source)], false).then((read) => {
+    void this.load([info.model], false).then((read) => {
       if (read) this.host.tablesChanged();
     });
   }
@@ -81,7 +81,7 @@ export class PageLinks implements Feature {
 
   /** The tables shown, as last read */
   private tablesShown(): Table[] {
-    return this.host.shownTables().map((info) => parseTable(info.source));
+    return this.host.shownTables().map((info) => info.model);
   }
 
   /**

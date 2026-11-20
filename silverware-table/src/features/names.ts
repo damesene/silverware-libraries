@@ -52,7 +52,7 @@ export class Names implements Feature {
 
   /** The table's name, if another table of the page has it too */
   private sharedName(info: TableInfo): string | undefined {
-    const name = this.host.tableName(parseTable(info.source));
+    const name = this.host.tableName(info.model);
     return name && this.sharedNames().has(name.toLowerCase()) ? name : undefined;
   }
 
@@ -66,7 +66,7 @@ export class Names implements Feature {
     // (The page's text as last read without this table as rendered: read before it, nothing to tell by)
     if (!this.host.pageText.includes(info.source)) return;
     const shared = this.sharedNames();
-    const own = this.host.tableName(parseTable(info.source))?.toLowerCase();
+    const own = this.host.tableName(info.model)?.toLowerCase();
     // No longer shared (renamed): said again should it be shared again
     if (own && !shared.has(own)) this.told.delete(own);
     const name = this.sharedName(info);
@@ -83,7 +83,7 @@ export class Names implements Feature {
 
   /** Deleting a column removes the names of the rows and cells it holds, and the formulas using them break */
   columnDeleteWarning(info: TableInfo, column: number): string | undefined {
-    const table = parseTable(info.source);
+    const table = info.model;
     const rows = this.host.rowNames(table).flatMap((named) => (named.column === column ? [named.name] : []));
     const cells = this.host.cellNames(table).flatMap((named) => (named.column === column ? [named.name] : []));
     if (!rows.length && !cells.length) return undefined;
@@ -111,7 +111,7 @@ export class Names implements Feature {
 
   /** The table's name in the toolbar's row of names, Table (muted) without one: a click on it its field */
   toolbarButtons(info: TableInfo): ToolbarButton[] {
-    const name = this.host.tableName(parseTable(info.source));
+    const name = this.host.tableName(info.model);
     const shared = this.sharedName(info) !== undefined;
     const title = shared
       ? `Another table on this page is named ${name} too: formulas in other tables use the first of them (${name}!A1). Click to rename this one`
@@ -130,7 +130,7 @@ export class Names implements Feature {
    * the setting off only one already there can be changed or removed.
    */
   menuNaming(info: TableInfo, target: NamingTarget): MenuNaming | undefined {
-    const table = parseTable(info.source);
+    const table = info.model;
     const needs = "Needs the Store table metadata setting";
     if (target.kind === "table") {
       const name = this.host.tableName(table);
@@ -179,7 +179,7 @@ export class Names implements Feature {
    * why, when it is not a valid name or another table on the page has it
    */
   private async renameTable(shownInfo: TableInfo, name: string): Promise<string | undefined> {
-    const shown = parseTable(shownInfo.source);
+    const shown = shownInfo.model;
     // Against the name as stored, so an empty answer also clears a name that is not valid
     if (name === (this.host.writtenTableName(shown)?.trim() ?? "")) return this.unchanged();
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
@@ -203,7 +203,7 @@ export class Names implements Feature {
 
   /** Names a row (empty: unnames it); refused, with why, when not valid or another row of the table has it */
   private async nameRow(shownInfo: TableInfo, row: number, name: string): Promise<string | undefined> {
-    const table = parseTable(shownInfo.source);
+    const table = shownInfo.model;
     const current = this.host.rowName(table, row) ?? "";
     if (name === current) return this.unchanged();
     let problem = name === "" ? undefined : validateName(name, "row");
@@ -242,7 +242,7 @@ export class Names implements Feature {
 
   /** Names a column (empty: unnames it); refused, with why, when not valid or another column answers to it */
   private async rename(shownInfo: TableInfo, column: number, name: string): Promise<string | undefined> {
-    const table = parseTable(shownInfo.source);
+    const table = shownInfo.model;
     const headers = table.rows[0]?.cells ?? [];
     const current = this.host.columnName(table, column) ?? "";
     if (name === current) return this.unchanged();

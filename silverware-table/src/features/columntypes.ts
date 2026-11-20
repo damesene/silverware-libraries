@@ -10,7 +10,7 @@ import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/fea
 import { ICONS } from "../icons.ts";
 import type { MenuDetail, MenuEntry } from "../menu.ts";
 import { setCell } from "../ops.ts";
-import { escapeCell, parseTable, type Table, unescapeCell } from "../markdown.ts";
+import { escapeCell, type Table, unescapeCell } from "../markdown.ts";
 import { withoutTags } from "../tags.ts";
 import {
   type Choice,
@@ -211,16 +211,16 @@ export class ColumnTypes implements Feature {
   tablesChanged(): void {
     this.host.hideHeaderTags("types", typeTagPatterns());
     this.lists = undefined;
-    for (const info of this.host.shownTables()) if (this.listFormulas(parseTable(info.source)).length) this.host.looksChanged(info);
+    for (const info of this.host.shownTables()) if (this.listFormulas(info.model).length) this.host.looksChanged(info);
   }
 
   /** A table shown anew (edited): the tables whose lists' formulas read it look as their lists are now */
   enhanced(info: TableInfo): void {
-    const name = this.host.tableName(parseTable(info.source))?.trim();
+    const name = this.host.tableName(info.model)?.trim();
     if (!name) return;
     for (const other of this.host.shownTables()) {
       if (other.key === info.key) continue;
-      const reads = this.listFormulas(parseTable(other.source)).some((formula) => formulaTableNames(formula).some((read) => sameTableName(read, name)));
+      const reads = this.listFormulas(other.model).some((formula) => formulaTableNames(formula).some((read) => sameTableName(read, name)));
       if (reads) this.host.looksChanged(other);
     }
   }
@@ -230,7 +230,7 @@ export class ColumnTypes implements Feature {
   /** "Type: …" in a column's menu (what the column is): picks the column's type, written as a hashtag in its header */
   lineMenu(info: TableInfo, { axis, at: column }: LineMenuTarget, menu: LineMenuBuilder): LineMenuGroup[] {
     if (axis !== "column") return [];
-    const table = parseTable(info.source);
+    const table = info.model;
     const header = table.rows[0]?.cells[column] ?? "";
     const current = columnTypeOf(unescapeCell(header));
     const setType = (tag: string | undefined) => () =>
@@ -355,10 +355,10 @@ export class ColumnTypes implements Feature {
   /** The type of the edited cell's column, if any (header cells have none), and what it reads of its table */
   private typeOfEdited(editor: CellEditor): (TypedColumn & { readonly table: TypeTable }) | undefined {
     if (editor.row === 0) return undefined;
-    const table = parseTable(this.host.tableFor(editor.key)?.source ?? "");
-    const header = table.rows[0]?.cells[editor.column];
+    const table = this.host.tableFor(editor.key)?.model;
+    const header = table?.rows[0]?.cells[editor.column];
     const typed = header === undefined ? undefined : columnTypeOf(unescapeCell(header));
-    return typed && { ...typed, table: this.typeTable(table, editor.column) };
+    return typed && table && { ...typed, table: this.typeTable(table, editor.column) };
   }
 
   /** A type with values to offer: a list of them under the cell, picked with the mouse or the arrows and Enter */

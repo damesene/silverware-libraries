@@ -3,11 +3,13 @@
 // state and listeners and works through the host.
 import type { TableKey } from "./tables.ts";
 export type { TableKey } from "./tables.ts";
+export type { TableRevision } from "./store.ts";
 import type { TableParts } from "./parts.ts";
 export type { PartTable, TablePart, TableParts } from "./parts.ts";
 export { tablePartsOf } from "./parts.ts";
 import type { FeatureName, SETTINGS, SettingValue } from "../bridge.ts";
 import type { TablePlatform } from "./platform.ts";
+import type { StoredTable, TableRevision } from "./store.ts";
 import type { Dialog, DialogOptions } from "./dialog.ts";
 import type { Rect } from "./geometry.ts";
 
@@ -23,8 +25,13 @@ import type { Pins, ViewState } from "../view.ts";
 /** A table shown, in model terms (what modules get): where it is in the page, its shape, its pins */
 export type TableInfo = {
   // The table's markdown when it was rendered: the editor only reuses a
-  // rendered table while its markdown stays exactly the same
+  // rendered table while its markdown stays exactly the same (the core's and
+  // the store's: modules read `model` and compare `revision`)
   readonly source: string;
+  /** The table as rendered */
+  readonly model: Table;
+  /** Its model's revision: equal, the same model (a module's state kept for it compares it) */
+  readonly revision: TableRevision;
   readonly hint: number;
   readonly key: TableKey;
   readonly columns: number;
@@ -600,6 +607,8 @@ export interface ModelHost {
   cursorNow(): Promise<number | undefined>;
   /** The editor's own undo of its last edit; undefined: the platform has none */
   readonly undoEdit: (() => Promise<void>) | undefined;
+  /** A document's tables in order (a page's name), as it is now: the open page's in the editor, another's in the space */
+  tables(document: string): Promise<readonly StoredTable[]>;
   /** Other pages read, written and listed; undefined: none are read */
   readonly pages: PageAccess | undefined;
   /** A setting by its path, `fallback` where it has none: a module's own of an open form (Excel's functions), not in SETTINGS */

@@ -1,7 +1,8 @@
 # Silverware Table: tables apart from where they are kept
 
 Status (2026-11-20): step 1 done in branch `refactor/table-store`
-(*Decided*), the rest planned; the plan is in `main`. What it waited for is
+(*Decided*), step 2 begun (its first part below), the rest planned; the plan
+is in `main`. What it waited for is
 in `main`: the views plan
 (docs/silverware-table-views-plan.md), whose sources (`@tasks`) are the first
 tables kept nowhere in a page and this plan's second store; the platform
@@ -391,6 +392,18 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    choices dialog, sources, custom menus, Silverware Layout's provider). The
    contract tests start here. Test: `features/` import nothing of markdown.ts
    but types.
+   **First part done (2026-11-20)**: the store's read side (`core/store.ts`:
+   `TableStore`, `StoredTable`, `TableRevision`), the markdown store as a
+   façade over the register and `parseTable` (`store/markdown/store.ts`,
+   `MarkdownStore`, the controller's), the contract tests begun
+   (`store/contract.ts`, run by the markdown store's test); `host.tables`;
+   `TableInfo.model` and `.revision`, so no module parses a shown table's
+   markdown any more (`isolation.test.ts`) and the filters' and widths'
+   state is kept by revision. Left for the next parts: the modules reading a
+   page's tables with their places (`pageTablesOf`, `locateBySource`, `hint`,
+   `pageText`: formulas, pivot, names, views, sheets, pagelinks, metadata,
+   lazy, the choices' lists by formula), transactions in place of `also`,
+   and custom menus after the check below.
    **A check before custom menus move**: what `defineMenuEntries` hands a
    user's entry (`silverware.table.defineMenuEntries`, menus/custom.ts). Data
    of the table stays; a text or an offset in it would be gone after this

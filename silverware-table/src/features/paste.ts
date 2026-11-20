@@ -26,7 +26,6 @@ import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/fea
 import type { MenuEntry } from "../menu.ts";
 import { cellMoveRules, growTo, moveRowsTo } from "../core/structure.ts";
 import { ICONS } from "../icons.ts";
-import { parseTable } from "../markdown.ts";
 import { moveCells, parseClipboardCells, pasteCells, planPaste } from "../paste.ts";
 
 const PASTE_BLOCKED = "Clear sorting and filters to paste cells: the rows shown are not where they would go";
@@ -500,7 +499,7 @@ export class Paste implements Feature {
     }
     // A cell past the table (the sheet view's empty cell): the table grown to it first, in the same edit
     const growth = at.row >= info.rows || at.column >= info.columns ? growTo(info, at) : undefined;
-    const source = parseTable(info.source);
+    const source = info.model;
     const base = growth ? growth.grow(source) : source;
     if (!base) return;
     const plan = planPaste(base, info.pins, growth ? growth.cell : at, cut ? cut.held : data, insert);

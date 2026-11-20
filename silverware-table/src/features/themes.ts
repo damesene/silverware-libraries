@@ -15,7 +15,7 @@
 // look for a moment; once its markdown is read, again from it.
 import type { Feature, ModelHost, TableLook, TablePreview, ToolbarButton, TableInfo } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
-import { parseTable, type Table } from "../markdown.ts";
+import type { Table } from "../markdown.ts";
 import type { MenuDetail, MenuEntry } from "../menu.ts";
 
 type MenuItem = Extract<MenuEntry, { readonly kind: "item" }>;
@@ -78,7 +78,7 @@ export class Themes implements Feature {
    * settings become). As names are, only where the table can have metadata.
    */
   toolbarButtons(info: TableInfo): ToolbarButton[] {
-    const table = parseTable(info.source);
+    const table = info.model;
     if (!this.host.canStoreMeta(table, "name") && !this.host.canStoreMeta(table, "stripes")) return [];
     const own = this.ownTheme(table);
     const ownStripes = this.ownStripes(table);

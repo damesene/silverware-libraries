@@ -14,7 +14,7 @@ import type { Feature, ModelHost, PageCommand, TableBadge, TableInfo, ToolbarBut
 import { type Calculated, calculatedTable, readRenames, renamedColumns, renamedIn, renamedViewIds, sameCells, storedRenames, viewCalculated } from "../calculated/index.ts";
 import { type CalculatedBy, type CalculatedOffer, followFormula, FormulaError, type FormulasOffer, type Grid, referredTableNames, tokenize, viewGrid, withEquals } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
-import { locateBySource, pageTablesOf, parseTable, type Table } from "../markdown.ts";
+import { locateBySource, pageTablesOf, type Table } from "../markdown.ts";
 import { freeTableName, sameTableName, validateTableName } from "../namerules.ts";
 import { openViewDialog } from "./viewdialog.ts";
 
@@ -82,7 +82,7 @@ export class Views implements Feature {
 
   /** A cell of a view edited: its formula is changed in its settings, opened instead */
   editRefused(info: TableInfo, cell: { readonly row: number }): void {
-    if (cell.row > 0 && this.formulaOf(parseTable(info.source)) !== undefined) this.settings(info);
+    if (cell.row > 0 && this.formulaOf(info.model) !== undefined) this.settings(info);
   }
 
   /** A view's rows and columns are its formula's */
@@ -93,7 +93,7 @@ export class Views implements Feature {
 
   /** A view shown: whether it is as its formula makes it now; another table shown anew (edited by hand): the views reading it */
   enhanced(info: TableInfo): void {
-    const table = parseTable(info.source);
+    const table = info.model;
     if (this.formulaOf(table) !== undefined) this.check(info);
     else {
       this.stale.delete(info);
@@ -101,7 +101,7 @@ export class Views implements Feature {
       const cells = this.formulas()?.cells;
       if (!name || !cells) return;
       for (const other of this.host.shownTables()) {
-        if (other.key !== info.key && referredTableNames(cells, parseTable(other.source)).has(name)) this.check(other);
+        if (other.key !== info.key && referredTableNames(cells, other.model).has(name)) this.check(other);
       }
     }
     this.host.toolbarChanged();
@@ -115,7 +115,7 @@ export class Views implements Feature {
 
   /** Whether a view shown is as its formula makes it now (nothing written), or why it cannot be calculated */
   private check(info: TableInfo): void {
-    const table = parseTable(info.source);
+    const table = info.model;
     const formula = this.formulaOf(table);
     if (formula === undefined) return void this.stale.delete(info);
     const now = this.formulas()?.calculated(table);
@@ -127,7 +127,7 @@ export class Views implements Feature {
 
   /** What a view is, at a glance; out of date, or not calculated at all, said so */
   tableBadges(info: TableInfo): TableBadge[] {
-    if (this.formulaOf(parseTable(info.source)) === undefined) return [];
+    if (this.formulaOf(info.model) === undefined) return [];
     const what = { icon: ICONS.view, text: "View" };
     const state = this.stale.get(info);
     if (!state) return [what];
@@ -136,7 +136,7 @@ export class Views implements Feature {
 
   /** Insert view… in any table's ⋯ menu; a view's settings and Refresh view in its toolbar, highlighted where it is out of date */
   toolbarButtons(info: TableInfo): ToolbarButton[] {
-    const table = parseTable(info.source);
+    const table = info.model;
     const insert: ToolbarButton = { label: "Insert view…", place: "menu", icon: ICONS.view, title: "A table made by a formula under this one: its rows filtered, sorted, picked…", run: () => this.insert(info) };
     if (this.formulaOf(table) === undefined) return [insert];
     const state = this.stale.get(info);
@@ -226,7 +226,7 @@ export class Views implements Feature {
 
   /** Insert view… of a table: its whole body to start from, the table named in the same edit where it has none; inserted under it */
   private insert(info: TableInfo): void {
-    const table = parseTable(info.source);
+    const table = info.model;
     const own = this.host.tableName(table)?.trim();
     const source = own ?? this.freeName("table");
     // A table to be named so: the view's formula reads it as it will be written
@@ -264,7 +264,7 @@ export class Views implements Feature {
 
   /** View settings…: the view's formula and name in the dialog, saved into its metadata row (the write calculates it) */
   private settings(info: TableInfo): void {
-    const table = parseTable(info.source);
+    const table = info.model;
     const formula = this.formulaOf(table);
     if (formula === undefined) return;
     this.dialog(formula, this.host.tableName(table) ?? "", "Save", (f) => this.result(f, table), (changed, name) => {

@@ -97,7 +97,7 @@ import { ResultView } from "./resultview.ts";
 import { el } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
 import type { SourcesOffer } from "../sources.ts";
-import { cellSourceOffset, escapeCell, locateBySource, type PageTable, pageTablesOf, parseTable, sameTable, type Table, unescapeCell } from "../markdown.ts";
+import { cellSourceOffset, escapeCell, locateBySource, type PageTable, pageTablesOf, sameTable, type Table, unescapeCell } from "../markdown.ts";
 import { sameTableName } from "../namerules.ts";
 import { insertColumn, setCell } from "../ops.ts";
 import { insertColumnAt } from "../pins.ts";
@@ -538,7 +538,7 @@ export class Formulas implements Feature {
 
   /** Deleting a named table: the formulas of the page's tables that refer to it show #REF! */
   tableDeleteWarning(info: TableInfo): string | undefined {
-    const own = this.nameOf(parseTable(info.source));
+    const own = this.nameOf(info.model);
     const name = own?.toLowerCase();
     if (!name) return undefined;
     // The table itself by its place (a copy of it, the same text, is another table)
@@ -614,7 +614,7 @@ export class Formulas implements Feature {
   /** Whether a body cell's formula shows #SPILL! (its result as written: viewing calculates nothing) */
   private spills(info: TableInfo, ref: CellRef): boolean {
     if (ref.row === 0) return false;
-    const stored = this.cells.formulaOf(parseTable(info.source).rows[ref.row]?.cells[ref.column] ?? "");
+    const stored = this.cells.formulaOf(info.model.rows[ref.row]?.cells[ref.column] ?? "");
     return !!stored && errorCodeIn(unescapeCell(stored.value).trim()) === "#SPILL!";
   }
 
@@ -633,7 +633,7 @@ export class Formulas implements Feature {
   /** Show result: the cell's result over the window */
   private showResult(info: TableInfo, ref: CellRef): void {
     const grid = this.resultOf(info, ref);
-    const formula = this.cells.formulaOf(parseTable(info.source).rows[ref.row]?.cells[ref.column] ?? "")?.formula ?? "";
+    const formula = this.cells.formulaOf(info.model.rows[ref.row]?.cells[ref.column] ?? "")?.formula ?? "";
     if (grid) this.results.show(formula, grid);
   }
 
@@ -717,7 +717,7 @@ export class Formulas implements Feature {
     // Where a feature lays the table out on a grid of its own (the sheet view), in that grid's addresses
     const frame = stored && this.host.addressFrame(info);
     if (stored && frame) {
-      const shown = framedOut(stored.formula, frame, this.nameOf(parseTable(info.source)));
+      const shown = framedOut(stored.formula, frame, this.nameOf(info.model));
       if (shown === undefined) this.unframed = editKey(info.key, cell);
       return shown ?? stored.formula;
     }
@@ -819,7 +819,7 @@ export class Formulas implements Feature {
       // Typed in a frame's addresses (the sheet view): stored in the table's
       const frame = info && this.frameFor(info, editor);
       const refused: string[] = [];
-      const read = info && frame ? framedIn(slips.formula, frame, this.nameOf(parseTable(info.source)), refused) : slips.formula;
+      const read = info && frame ? framedIn(slips.formula, frame, this.nameOf(info.model), refused) : slips.formula;
       if (refused.length) {
         this.host.notify(`Silverware Table: ${refused.join(", ")} ${refused.length > 1 ? "are" : "is"} no table's cells here: written as #REF!`, "info");
       }
@@ -828,7 +828,7 @@ export class Formulas implements Feature {
       const formula = names.formula;
       const fixes = [...slips.fixes, ...names.fixes];
       if (fixes.length) this.host.notify(`Silverware Table: formula fixed: ${fixes.join(", ")}`, "info");
-      const headers = parseTable(info?.source ?? "").rows[0]?.cells ?? [];
+      const headers = info?.model.rows[0]?.cells ?? [];
       return this.cells.formulaCell("", withColumnKeys(formula, headers));
     }
     return typed.startsWith("'=") ? escapeCell(typed.slice(1)) : undefined;
@@ -866,7 +866,7 @@ export class Formulas implements Feature {
 
   /** Formula cells show that they hold one, and their formula (or error) on hover; a table whose results are out of date is noted */
   looks(info: TableInfo): TableLooks | undefined {
-    const model = parseTable(info.source);
+    const model = info.model;
     if (formulaCount(this.cells, model) === 0) return undefined;
     const tables = this.tableSource();
     // Checked for each rendering, not once per text: TODAY() and NOW() move on while the markdown stays
@@ -896,7 +896,7 @@ export class Formulas implements Feature {
   private frameTable(frame: AddressFrame, name: string): TableInfo | undefined {
     for (const key of frame.tables) {
       const info = this.host.tableFor(key);
-      const own = info && this.nameOf(parseTable(info.source));
+      const own = info && this.nameOf(info.model);
       if (info && own && sameTableName(own, name)) return info;
     }
     return undefined;
@@ -913,7 +913,7 @@ export class Formulas implements Feature {
     const own = this.host.tableFor(active.key);
     const frame = own && this.frameFor(own, active);
     const other = info.key !== active.key;
-    const out = frame?.outward(other ? this.nameOf(parseTable(info.source)) : undefined, area);
+    const out = frame?.outward(other ? this.nameOf(info.model) : undefined, area);
     return !frame || out ? areaText(out ?? area, fixed) : undefined;
   }
 
@@ -926,10 +926,10 @@ export class Formulas implements Feature {
   /** A range dragged over that has no address (areaWritten): the hint says why, and what to use instead */
   private noRanged(info: TableInfo, active: CellEditor, column: number): void {
     if (this.noRange?.editor === active) return;
-    const headers = parseTable(info.source).rows[0]?.cells ?? [];
+    const headers = info.model.rows[0]?.cells ?? [];
     const named = columnRefText(columnIdOf(headers, column), false);
     // Another table's (the frame's): by its name, as a click on its header inserts it
-    const other = info.key !== active.key ? this.nameOf(parseTable(info.source)) : undefined;
+    const other = info.key !== active.key ? this.nameOf(info.model) : undefined;
     const whole = named && (other ? `${other}!${named}` : named);
     const instead = whole ? `Use the whole column, ${whole} (a click on its header), or sort the rows in the markdown.` : "Sort the rows in the markdown first.";
     this.noRange = { editor: active, text: `A range cannot be pointed at in a sorted or filtered table here: its rows are not in the markdown's order. ${instead}` };
@@ -946,7 +946,7 @@ export class Formulas implements Feature {
     const stored = this.cells.formulaOf(cell);
     // (A formula moved elsewhere is a new one: with the setting off, the value is copied)
     if (!stored || from.row === 0 || to.row === 0 || !this.host.canStoreCellTag("", "f")) return undefined;
-    const table = parseTable(info.source);
+    const table = info.model;
     const size = { rows: table.rows.length - 1, columns: table.rows[0]?.cells.length ?? 0 };
     return this.cells.formulaCell("", filledFormula(stored.formula, to.row - from.row, to.column - from.column, size));
   }
@@ -959,7 +959,7 @@ export class Formulas implements Feature {
   cellMenuEntries(info: TableInfo, cells: readonly CellRef[]): CellMenuGroup[] | undefined {
     const [cell] = cells;
     if (cells.length !== 1 || !cell || cell.row === 0) return undefined;
-    const raw = parseTable(info.source).rows[cell.row]?.cells[cell.column] ?? "";
+    const raw = info.model.rows[cell.row]?.cells[cell.column] ?? "";
     const hasFormula = this.cells.formulaOf(raw) !== undefined;
     const allowed = this.host.canStoreCellTag(raw, "f");
     const results: CellMenuGroup[] = this.spills(info, cell)
@@ -1041,7 +1041,7 @@ export class Formulas implements Feature {
     const tables = this.tableSource();
     for (const info of this.host.shownTables()) {
       if (info.key === except) continue;
-      const model = parseTable(info.source);
+      const model = info.model;
       if (formulaCount(this.cells, model) === 0) continue;
       const refersElsewhere = referredTableNames(this.cells, model).size > 0 || referredPages(this.cells, model).size > 0 || referredSources(this.cells, model).size > 0;
       if (!refersElsewhere && !(withCustom && callsCustomFunctions(this.cells, model))) continue;
@@ -1061,7 +1061,7 @@ export class Formulas implements Feature {
 
   /** Recalculate, first in the toolbar of a table with formulas; highlighted when results are out of date */
   toolbarButtons(info: TableInfo): ToolbarButton[] {
-    if (formulaCount(this.cells, parseTable(info.source)) === 0) return [];
+    if (formulaCount(this.cells, info.model) === 0) return [];
     const stale = this.stale.get(info) ?? false;
     return [
       {
@@ -1106,11 +1106,11 @@ export class Formulas implements Feature {
     this.showFormulaHint(active, formula, refs);
     for (const mark of this.referenceMarks) mark.remove();
     this.referenceMarks = [];
-    const table = parseTable(info.source);
+    const table = info.model;
     refs.forEach((ref, index) => {
       const target = this.referenceTarget(info, active, ref);
       const ownTable = target?.info.key === info.key;
-      const area = target && this.referenceArea(target.info, ownTable ? table : parseTable(target.info.source), target.ref, active.row - 1);
+      const area = target && this.referenceArea(target.info, ownTable ? table : target.info.model, target.ref, active.row - 1);
       if (!target || !area) return;
       const color = REFERENCE_COLORS[index % REFERENCE_COLORS.length]!;
       const boxes = this.areaBoxes(target.info, area);
@@ -1174,7 +1174,7 @@ export class Formulas implements Feature {
     const slot = this.pointingSlot(active);
     if (!slot) return false;
     // Another table is referred to by its name (a table on a sheet has one: Add to sheet… names it)
-    const other = info.key !== active.key ? this.nameOf(parseTable(info.source)) : undefined;
+    const other = info.key !== active.key ? this.nameOf(info.model) : undefined;
     if (info.key !== active.key && !other) {
       this.host.notify("Silverware Table: name that table first (the pencil in its ⋯ menu's title): a formula refers to another table by its name", "info");
       return true;
@@ -1189,7 +1189,7 @@ export class Formulas implements Feature {
       this.updateFormulaUi();
     };
     if (cell.row === 0) {
-      const headers = parseTable(info.source).rows[0]?.cells ?? [];
+      const headers = info.model.rows[0]?.cells ?? [];
       const text = columnRefText(columnIdOf(headers, cell.column), false);
       // A header whose name cannot be a reference: the click is taken, but inserts nothing
       if (text) put(other ? `${other}!${text}` : text);
@@ -1545,7 +1545,7 @@ export class Formulas implements Feature {
     const written = references(originalFormula)[index];
     const target = written && this.referenceTarget(info, active, written);
     const ref = target?.info.key === info.key ? target.ref : undefined;
-    const table = parseTable(info.source);
+    const table = info.model;
     const headers = table.rows[0]?.cells ?? [];
     const start = this.bodyCellAt(info, e.clientX, e.clientY);
     const startArea = ref && this.referenceArea(info, table, ref, active.row - 1);

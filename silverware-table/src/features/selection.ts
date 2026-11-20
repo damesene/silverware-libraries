@@ -52,7 +52,6 @@ import {
 import { lineAfterBlockMove } from "../ops.ts";
 import { columnLetters } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
-import { parseTable } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
 import { withoutTags } from "../tags.ts";
 import type { Table } from "../markdown.ts";
@@ -219,7 +218,7 @@ export class Selection implements Feature {
   /** Edit mode, a switch in the toolbar (left of its menu): a click edits a cell; off, a click selects it */
   toolbarButtons(info: TableInfo): ToolbarButton[] {
     // A table none of whose cells is edited by hand (a pivot's): no mode of editing them
-    if (this.host.readOnlyBody(parseTable(info.source))) return [];
+    if (this.host.readOnlyBody(info.model)) return [];
     return [
       {
         label: "Edit mode",
@@ -812,7 +811,7 @@ export class Selection implements Feature {
     if (top < 1) return undefined;
     const width = area.right - area.left + 1;
     const cells = area.rows.map((row) => Array.from({ length: width }, (_, j) => ({ row, column: area.left + j })));
-    if (this.host.readOnly(parseTable(area.info.source), cells.flat())) return undefined;
+    if (this.host.readOnly(area.info.model, cells.flat())) return undefined;
     return { ...area, order, top, height: area.rows.length, width, cells };
   }
 
@@ -1050,7 +1049,7 @@ export class Selection implements Feature {
     if (!area) return;
     const { info } = area;
     const refs = this.refs();
-    const table = parseTable(info.source);
+    const table = info.model;
     const empty = (row: number, column: number) => withoutTags(table.rows[row]?.cells[column] ?? "") === "";
     const rows = [...new Set(refs.map((ref) => ref.row))];
     const columns = [...new Set(refs.map((ref) => ref.column))];

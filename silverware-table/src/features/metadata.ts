@@ -108,7 +108,7 @@ export class Metadata implements Feature {
   constructor(private readonly host: ModelHost) {}
 
   toolbarButtons(info: TableInfo): ToolbarButton[] {
-    if (!hasMetadata(parseTable(info.source))) return [];
+    if (!hasMetadata(info.model)) return [];
     return [
       {
         label: "Remove metadata",
@@ -137,7 +137,7 @@ export class Metadata implements Feature {
 
   /** Remove metadata for a part of the table, where it has some */
   private partEntry(info: TableInfo, part: MetadataPart, what: string): MenuEntry | undefined {
-    if (!hasMetadata(partOf(parseTable(info.source), part))) return undefined;
+    if (!hasMetadata(partOf(info.model, part))) return undefined;
     return {
       kind: "item",
       label: "Remove metadata",
@@ -150,12 +150,12 @@ export class Metadata implements Feature {
 
   /** Removes the metadata of a part of a table, once confirmed */
   private async removeFromPart(shownInfo: TableInfo, part: MetadataPart, what: string): Promise<void> {
-    const shown = partOf(parseTable(shownInfo.source), part);
+    const shown = partOf(shownInfo.model, part);
     const owners = metadataOwners([shown]);
     if (!(await this.host.ask(`Remove the metadata of ${what}${whose(owners, what.startsWith("this ") ? "it" : "them")}? ${KEPT} Ctrl+Z brings it back.`))) return;
     // The table as rendered now: the dialog may have outlived the rendering it was asked from
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
-    if (columnsAttributes(parseTable(info.source), part.columns).length) this.host.forgetStoredView(info.key);
+    if (columnsAttributes(info.model, part.columns).length) this.host.forgetStoredView(info.key);
     await this.host.writeTable(info, (table) => withoutMetadataOf(table, part));
     // The dialog took the focus: back to the editor, so Ctrl+Z works right away
     this.host.focusPage();
@@ -167,12 +167,12 @@ export class Metadata implements Feature {
    * its cells, which keep their results as plain values
    */
   private async removeFromTable(shownInfo: TableInfo): Promise<void> {
-    const shown = parseTable(shownInfo.source);
+    const shown = shownInfo.model;
     const owners = metadataOwners([shown]);
     if (!(await this.host.ask(`Remove this table's metadata${whose(owners, "it")}? ${KEPT} Ctrl+Z brings it back.`))) return;
     // The table as rendered now: the dialog may have outlived the rendering it was asked from
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
-    if (parseTable(info.source).meta) this.host.forgetStoredView(info.key);
+    if (info.model.meta) this.host.forgetStoredView(info.key);
     await this.host.writeTable(info, withoutMetadata);
     // The dialog took the focus: back to the editor, so Ctrl+Z works right away
     this.host.focusPage();

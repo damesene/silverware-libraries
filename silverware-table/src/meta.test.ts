@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findTables, locateByShape, parseMetaRow, parseTable, serializeTable, writtenMeta } from "./markdown.ts";
+import { findTables, locateByShape, parseMetaRow, parseTable, serializeTable, type Table, writtenMeta } from "./markdown.ts";
 import { columnValues, followColumnMeta, metaName, metaSort, withColumnValues, withMeta, withMetaName, withMetaSort } from "./meta.ts";
 import { sameTableName, validateTableName } from "./namerules.ts";
 import { columnAfterMove, deleteColumn, insertRow, moveColumn, setCell } from "./ops.ts";
@@ -134,6 +134,25 @@ describe("attributes of columns", () => {
     expect(metaSort(moved)).toEqual({ column: 0, direction: "desc" });
     const deleted = followColumnMeta(both, deleteColumn(both, 2), (c) => (c === 2 ? undefined : c));
     expect(deleted.meta).toEqual({ "filters.-c-name.condition": "=a|b" });
+  });
+
+  it("follow their columns' names where the edit does not say how columns moved: a column gone keeps them as written", () => {
+    // A calculated table made anew without its column Q2: the others' stay on theirs, Q2's wait for it
+    const quarters = withColumnValues(parseTable("| Q1 | Q2 | Q3 |\n|---|---|---|\n| 1 | 2 | 3 |"), "widths", "size", new Map([[0, "80"], [1, "90"], [2, "100"]]));
+    // (Made anew from the table, its metadata row with it, as a recalculation does)
+    const remade = (from: Table, text: string): Table => ({ ...parseTable(text), meta: from.meta });
+    const without = followColumnMeta(quarters, remade(quarters, "| Q1 | Q3 |\n|---|---|\n| 1 | 3 |"));
+    expect(columnValues(without, "widths", "size")).toEqual(new Map([[0, "80"], [1, "100"]]));
+    expect(writtenMeta(without)["widths.-c-q2.size"]).toBe("90");
+    // Back: its own again
+    const back = followColumnMeta(without, remade(without, "| Q1 | Q2 | Q3 |\n|---|---|---|\n| 1 | 2 | 3 |"));
+    expect(columnValues(back, "widths", "size")).toEqual(new Map([[0, "80"], [1, "90"], [2, "100"]]));
+    // A header renamed where it is: its column's still
+    const renamed = followColumnMeta(quarters, setCell(quarters, 0, 1, "Second"));
+    expect(columnValues(renamed, "widths", "size")).toEqual(new Map([[0, "80"], [1, "90"], [2, "100"]]));
+    // Renamed into another column's name: by place, not onto that column
+    const twice = followColumnMeta(quarters, setCell(quarters, 0, 0, "Q3"));
+    expect(writtenMeta(twice)).toEqual({ "widths.-c-q3:1.size": "80", "widths.-c-q2.size": "90", "widths.-c-q3:2.size": "100" });
   });
 
   it("leave tables alone that have none, and those the edit set", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { columnIdOf, columnKey, findColumn, followColumn, sameColumnId } from "./columns.ts";
+import { columnIdOf, columnKey, findColumn, followColumn, matchColumns, sameColumnId } from "./columns.ts";
 
 describe("columnKey", () => {
   it("keys a column as SilverBullet's index does", () => {
@@ -24,6 +24,32 @@ describe("columnKey", () => {
   it("drops markdown emphasis and escapes first", () => {
     expect(columnKey("**Qty**")).toBe("qty");
     expect(columnKey("A \\| B")).toBe("a_b");
+  });
+});
+
+describe("matchColumns: where columns went, an edit not saying", () => {
+  const moves = (before: readonly string[], after: readonly string[]) => before.map((_, column) => matchColumns(before, after)(column));
+
+  it("pairs a column with the one of its name, wherever it is now", () => {
+    expect(moves(["Q1", "Q2", "Q3"], ["Q1", "Q3"])).toEqual([0, undefined, 1]);
+    expect(moves(["A", "B"], ["X", "A", "B"])).toEqual([1, 2]);
+    expect(moves(["Name <meta core.n='n'>", "Qty"], ["Qty", "Label <meta core.n='n'>"])).toEqual([1, 0]);
+  });
+
+  it("pairs a renamed header by its place, where no other took it", () => {
+    expect(moves(["Name", "Qty"], ["Name", "Amount"])).toEqual([0, 1]);
+    expect(moves(["A", "B", "C"], ["A", "X", "C"])).toEqual([0, 1, 2]);
+  });
+
+  it("pairs headers sharing a name by their place: an edit renumbers their occurrences", () => {
+    // Renamed into a name another column has: the occurrences shift, the places do not
+    expect(moves(["Qty", "Price"], ["Price", "Price"])).toEqual([0, 1]);
+    expect(moves(["Qty", "Qty"], ["Qty", "Qty"])).toEqual([0, 1]);
+  });
+
+  it("finds no column for one gone where another took its place", () => {
+    expect(moves(["A", "B", "C"], ["A", "C"])).toEqual([0, undefined, 1]);
+    expect(moves(["A"], [])).toEqual([undefined]);
   });
 });
 

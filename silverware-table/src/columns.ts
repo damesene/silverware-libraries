@@ -86,6 +86,34 @@ export function columnIdOf(
 }
 
 /**
+ * Where each column of a header row went in another, for an edit that does
+ * not say (no column map: a table built anew, a calculated one): the column of
+ * the same name where that name is one column's on both sides (its fixed name,
+ * else its key), then, for the columns left, the one at the same place none
+ * took (a header renamed; headers sharing a name, whose occurrences an edit
+ * renumbers, go by place too); undefined: neither (a column gone, or another
+ * in its place)
+ */
+export function matchColumns(before: readonly string[], after: readonly string[]): (column: number) => number | undefined {
+  const moved = new Map<number, number>();
+  const taken = new Set<number>();
+  before.forEach((_, column) => {
+    const id = columnIdOf(before, column);
+    if (!id || id.shared) return;
+    const to = findColumn(after, id);
+    if (to === undefined || taken.has(to) || columnIdOf(after, to)?.shared) return;
+    moved.set(column, to);
+    taken.add(to);
+  });
+  before.forEach((_, column) => {
+    if (moved.has(column) || column >= after.length || taken.has(column)) return;
+    moved.set(column, column);
+    taken.add(column);
+  });
+  return (column) => moved.get(column);
+}
+
+/**
  * The name of a column after an edit: the column `id` named in `before`,
  * moved by `map`, named as in `after`, so a rename or a move is followed.
  * Null: the column was deleted; undefined: `before` had no such column.

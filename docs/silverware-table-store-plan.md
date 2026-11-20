@@ -470,6 +470,23 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      since after them (a new row: the table's own, then its columns'). An
      attribute's name is split and made in one place (`metanames.ts`,
      `splitAttributeName`, `attributeName`, no owner's a key alone).
+   - **Columns' attributes: how they follow (2026-11-20, with the user:
+     nothing lost, none put on another column)**. Found before moving
+     them onto the columns: a write with no column map followed them by
+     place, so a calculated table (a view, a pivot) written anew without a
+     column in its middle put that column's attributes on the next one and
+     lost the last one's. Now, with no column map, the columns are paired
+     by name where a name is one column's on both sides, the rest by place
+     (a header renamed; headers sharing a name, whose occurrences an edit
+     renumbers), and an attribute of a column found nowhere stays as
+     written, its column's to take back (`matchColumns` in columns.ts,
+     `followColumnMeta`); only a column the edit says it deleted takes its
+     attributes with it. Their storage stays the metadata row's names for
+     now: moved onto the columns inside `Table` they would be kept twice (the
+     names to write, the places to work with) and the codec's files would
+     import each other in a ring (markdown.ts, meta.ts, columns.ts); they go
+     onto the model's columns with `TableModel`, where the codec gives
+     places on reading and names on writing by this same pairing.
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

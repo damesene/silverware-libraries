@@ -161,8 +161,35 @@ export async function panelRow(page: Page, tag: string): Promise<Locator> {
   return row;
 }
 
-/** One of a panel row's actions run: its button (shown as the pointer is over the row), by its label */
-export async function panelAction(page: Page, row: Locator, label: string): Promise<void> {
+// A row's menu of actions: SilverBullet's edge (after 2.12.1) draws a row's actions as one ⋯ menu, a portal on the body;
+// 2.12.1 and the playground draw them as buttons of the row
+const ROW_MENU = ".sb-row-menu-trigger";
+
+/** A panel row's actions shown (the pointer over the row; on SilverBullet's edge its menu opened): where they are, and their role */
+async function rowActions(page: Page, row: Locator): Promise<{ readonly within: Locator; readonly role: "button" | "menuitem" }> {
   await row.hover();
-  await row.getByRole("button", { name: label }).click();
+  const trigger = row.locator(ROW_MENU);
+  await expect(trigger.or(row.getByRole("button")).first()).toBeVisible();
+  if (!(await trigger.isVisible())) return { within: row, role: "button" };
+  if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click();
+  const menu = page.locator(".sb-row-menu");
+  await expect(menu).toBeVisible();
+  return { within: menu, role: "menuitem" };
+}
+
+/** One of a panel row's actions run, by its label */
+export async function panelAction(page: Page, row: Locator, label: string): Promise<void> {
+  const { within, role } = await rowActions(page, row);
+  await within.getByRole(role, { name: label }).click();
+}
+
+/** Whether a panel row offers an action, by its label; its menu, where it has one, closed again */
+export async function panelOffers(page: Page, row: Locator, label: string): Promise<boolean> {
+  const { within, role } = await rowActions(page, row);
+  const offered = (await within.getByRole(role, { name: label }).count()) > 0;
+  if (role === "menuitem") {
+    await page.keyboard.press("Escape");
+    await expect(within).toHaveCount(0);
+  }
+  return offered;
 }

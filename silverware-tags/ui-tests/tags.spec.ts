@@ -1,4 +1,4 @@
-import { addPages, command, expect, onSilverBullet, openManager, openPage, pageName, pageText, panelAction, panelRow, test } from "./helpers.ts";
+import { addPages, command, expect, onSilverBullet, openManager, openPage, pageName, pageText, panelAction, panelOffers, panelRow, test } from "./helpers.ts";
 
 test("the window shows the tags as a tree and a tag's pages", async ({ page }) => {
   const window = await openManager(page, "todo");
@@ -234,8 +234,7 @@ test("the tags' panel: + adds the tag to the page open at once, − of one of it
   await expect(page.locator(".swg-workspace")).toHaveCount(0);
   // Its own now: − in place of +
   const idea = await panelRow(page, "idea");
-  await idea.hover();
-  await expect(idea.getByRole("button", { name: "Add to the page open" })).toHaveCount(0);
+  await expect.poll(() => panelOffers(page, idea, "Add to the page open")).toBe(false);
   await panelAction(page, idea, "Remove from the page open");
   await expect.poll(() => pageText(page, "Recipes/Soup")).toBe("---\ntitle: Soup\n---\nCarrots, onions, salt.\n");
 });

@@ -56,7 +56,7 @@ The model of layers, hosts and the write pipeline is in `silverware-table/CLAUDE
 
 Design, limits and decisions: docs/silverware-table-sheets.md. Not obvious from the code:
 
-- The board draws each table of the sheet itself from the page's text (`drawn.ts`, cells by `cells.ts`: plain cells as text, the rest in one `bridge.markdownToHtml` call per table), so tables SilverBullet keeps out of the DOM show too; links go to `bridge.navigate`.
+- The board draws each table of the sheet itself from the page's text (`drawn.ts`, cells by `cells.ts`: plain cells as text, the rest in one call of the platform's `renderer.markdownToHtml` per table), so tables SilverBullet keeps out of the DOM show too; links go to `host.navigate`.
 - The grid's reach only grows while the board shows (a column widened by a write would change how many empty columns follow, and the scrollbars jumped). Rows are one height; columns are the sheet's `sheet.width.*` (kept in the sheet's first table in the page, handed over in the same edit whenever that changes) else the widest table's, capped.
 - After every write and on any page change, changed tables are drawn anew at their place before insertion (else a far table scrolled the board), with a stand-in copy until enhanced (SilverBullet enhances a frame later, as settings are read through Lua). Not under a cell being edited (`putOff`).
 - Empty cells: a press selects or edits them; next to a table it grows that table (`editBeyond`), elsewhere it makes a new table (`writeNew` via `insertTable`, key reserved as the editor opens). A table alone becomes `Sheet1` in the same edit. Needs the metadata setting.

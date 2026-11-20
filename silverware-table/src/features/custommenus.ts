@@ -127,6 +127,6 @@ export class CustomMenus implements Feature {
     if (!ran && this.said.has(definition)) return;
     if (!ran) this.said.add(definition);
     console.error(`Silverware Table: menu entries ${definition.name}: ${problem}`);
-    void this.host.bridge.flash(`Silverware Table: the menu entries ${definition.name} ${ran ? "failed" : "are not shown"}: ${problem}`, "error");
+    this.host.notify(`Silverware Table: the menu entries ${definition.name} ${ran ? "failed" : "are not shown"}: ${problem}`, "error");
   }
 }

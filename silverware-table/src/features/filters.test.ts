@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { PAGE, bodyTexts, cell, clickOn, controller, editor, flush, key, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
+import { bridge, PAGE, bodyTexts, cell, clickOn, controller, editor, flush, key, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 
 describe("Filters", () => {
   useTablePage();
@@ -192,7 +192,6 @@ describe("Filters", () => {
 
     it("shows the stored filters again when the metadata comes back (Ctrl+Z)", async () => {
       await setup(STORED);
-      const bridge = (controller as unknown as { bridge: { confirm: unknown; replaceRange(from: number, to: number, text: string): Promise<void> } }).bridge;
       bridge.confirm = () => true;
       tableMenuItem(/^Remove metadata$/)!.click();
       await flush();
@@ -257,7 +256,7 @@ describe("Filters", () => {
 
     it("are removed with the metadata", async () => {
       await setup(STORED);
-      (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = () => true;
+      bridge.confirm = () => true;
       tableMenuItem(/^Remove metadata$/)!.click();
       await flush();
       await controller.scan();

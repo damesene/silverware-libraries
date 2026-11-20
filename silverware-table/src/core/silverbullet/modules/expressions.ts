@@ -25,9 +25,8 @@ export class Expressions implements AdapterFeature {
 
   /** SilverBullet's `page:index` event for a page */
   async pageIndexed(name: string): Promise<void> {
-    const { bridge } = this.host;
-    if (this.stopped || !bridge.evalExpression) return;
-    if (name !== (await bridge.getCurrentPage())) return;
+    if (this.stopped || !this.host.platform.renderer.evaluate) return;
+    if (name !== (await this.host.pageNameNow())) return;
     // The time the indexers get to write the index
     const delay = await this.host.setting("expressionsDelay");
     clearTimeout(this.timer);
@@ -35,7 +34,7 @@ export class Expressions implements AdapterFeature {
   }
 
   private async refresh(): Promise<void> {
-    const { bridge, doc } = this.host;
+    const { platform, doc } = this.host;
     for (const widget of Array.from(doc.querySelectorAll<HTMLElement>(`${WIDGET_SELECTOR}.swt-table`))) {
       const info = this.host.infoOf(widget);
       if (this.stopped || !info || !info.source.includes("${")) continue;
@@ -49,7 +48,7 @@ export class Expressions implements AdapterFeature {
           if (!expression) continue;
           let value: unknown;
           try {
-            value = await bridge.evalExpression!(expression.replaceAll("\\|", "|"));
+            value = await platform.renderer.evaluate!(expression.replaceAll("\\|", "|"));
           } catch {
             continue;
           }

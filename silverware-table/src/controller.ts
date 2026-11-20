@@ -1,8 +1,8 @@
 // Enhances SilverBullet's rendered markdown tables in place: sorting, filtering,
 // inline cell editing and row/column editing. Every change to the markdown is
 // one `editor.replaceRange`, so undo works as for any other edit.
-import { type Bridge, type FeatureName, formatRule, moduleOnByDefault, SETTINGS, type SettingValue } from "./bridge.ts";
-import { type AdapterFeature, type AddressFrame, type AlsoChanged, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, type ColumnsMeasure, type ColumnWidths, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type TextPosition, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget } from "./core/feature.ts";
+import { type FeatureName, formatRule, moduleOnByDefault, SETTINGS, type SettingValue } from "./bridge.ts";
+import { type AdapterFeature, type AddressFrame, type AlsoChanged, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, type ColumnsMeasure, type ColumnWidths, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type TextPosition, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget, type PageAccess } from "./core/feature.ts";
 import { type Dialog, type DialogOptions, Dialogs } from "./core/dialog.ts";
 import { ViewAnchor } from "./core/anchor.ts";
 import { mapPosition, type TextEdit, withWriteListeners } from "./core/writelisteners.ts";
@@ -21,7 +21,7 @@ import { Panels } from "./core/panel.ts";
 import { type DragContext, followDrag } from "./core/drag.ts";
 import { writingClipboard } from "../../shared/clipboard.ts";
 import { markTable, renderedMeta, SilverBulletAdapter } from "./core/silverbullet/adapter.ts";
-import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
+import type { TablePlatform } from "./core/platform.ts";
 import { SettingsDialog } from "./settings.ts";
 import { Metadata } from "./features/metadata.ts";
 import { featureEntries } from "./modules.ts";
@@ -243,7 +243,7 @@ export class Controller implements TableHost {
 
   constructor(
     readonly doc: Document,
-    public bridge: Bridge,
+    public platform: TablePlatform,
     // The sources of the space the host gives (the sources module offers them to formulas)
     private readonly sources: SourceProvider = NO_SOURCES,
   ) {
@@ -355,17 +355,18 @@ export class Controller implements TableHost {
     });
   }
 
-  setBridge(bridge: Bridge): void {
-    this.bridge = bridge;
+  /** The platform made anew (Space Lua loaded again hands over a new bridge) */
+  setPlatform(platform: TablePlatform): void {
+    this.platform = platform;
     this.registerLayout();
   }
 
   /**
    * The tables registered with Silverware Layout, where its API is handed over (else nothing): it lays them out at the
-   * width their metadata keeps. Again with each bridge (Space Lua loaded again): a provider of the same name replaces it
+   * width their metadata keeps. Again with each platform (Space Lua loaded again): a provider of the same name replaces it
    */
   private registerLayout(): void {
-    layoutOf(this.bridge.layout).register(
+    layoutOf(this.platform.layout).register(
       tablesLayoutProvider({
         renderedRows: (table) => this.rows.renderedRows(table),
         enhanced: (widget) => this.infos.has(widget),
@@ -439,7 +440,7 @@ export class Controller implements TableHost {
 
   private async featureEnabled(name: FeatureName): Promise<boolean> {
     try {
-      const value = await this.bridge.getConfig?.(`silverware.table.modules.${name}.enabled`, moduleOnByDefault(name));
+      const value = await this.platform.settings.get(`silverware.table.modules.${name}.enabled`, moduleOnByDefault(name));
       return typeof value === "boolean" ? value : moduleOnByDefault(name);
     } catch {
       return moduleOnByDefault(name);
@@ -536,11 +537,55 @@ export class Controller implements TableHost {
     return this.metadataOn || this.coreMeta.columnsMeta(table, "sort").size > 0;
   }
 
-  /** Asks before a destructive change, with SilverBullet's dialog (else the browser's) */
+  /** Asks before a destructive change (in SilverBullet its dialog, else the browser's) */
   async ask(question: string): Promise<boolean> {
-    return this.bridge.confirm
-      ? await this.bridge.confirm(question, { destructive: true })
-      : this.doc.defaultView!.confirm(question);
+    const { ui } = this.platform;
+    return ui.ask ? await ui.ask(question, { destructive: true }) : this.doc.defaultView!.confirm(question);
+  }
+
+  /** Tells the user (a notification); `timeout` 0: shown until closed */
+  notify(message: string, type: "info" | "error" = "info", options?: { readonly timeout?: number }): void {
+    this.platform.ui.notify(message, { type, ...options });
+  }
+
+  /** Opens a reference (a page, a hashtag's page) where the platform opens one */
+  navigate(ref: string): void {
+    void this.platform.editor.open?.(ref);
+  }
+
+  async pageTextNow(): Promise<string> {
+    return this.platform.editor.text();
+  }
+
+  async pageNameNow(): Promise<string> {
+    return this.platform.editor.documentName();
+  }
+
+  async replacePageText(from: number, to: number, insert: string): Promise<void> {
+    await this.platform.editor.replace(from, to, insert);
+  }
+
+  async cursorNow(): Promise<number | undefined> {
+    return this.platform.editor.cursor?.();
+  }
+
+  get undoEdit(): (() => Promise<void>) | undefined {
+    const { editor } = this.platform;
+    return editor.undo ? async () => void (await editor.undo!()) : undefined;
+  }
+
+  get pages(): PageAccess | undefined {
+    const { space } = this.platform;
+    if (!space) return undefined;
+    return {
+      read: async (name) => space.read(name),
+      write: async (name, text) => space.write(name, text),
+      list: async () => space.list(),
+    };
+  }
+
+  async configured(path: string, fallback: unknown): Promise<unknown> {
+    return this.platform.settings.get(path, fallback);
   }
 
   otherPages(): OtherPages | undefined {
@@ -673,7 +718,7 @@ export class Controller implements TableHost {
   /** Says how many hidden values a write left out (the metadata setting off) */
   private sayTaken(taken: { n: number }): void {
     const { n } = taken;
-    if (n) void this.bridge.flash(`Silverware Table: ${n} new hidden value${n === 1 ? " (a formula, a name) was" : "s (formulas, names) were"} not stored: the Store table metadata setting is off`, "info");
+    if (n) this.notify(`Silverware Table: ${n} new hidden value${n === 1 ? " (a formula, a name) was" : "s (formulas, names) were"} not stored: the Store table metadata setting is off`, "info");
   }
 
   withCellTag(cell: string, key: string, value: string | undefined): string {
@@ -752,12 +797,12 @@ export class Controller implements TableHost {
     if ((!options.unasked || lost.length) && !(await this.ask(question))) return "unchanged";
     try {
       for (const feature of this.features) await feature.prepareWrite?.(info);
-      const text = await this.bridge.getText();
+      const text = await this.platform.editor.text();
       this.pageText = text;
       // By its key (not its source as last shown: an edit saved just before may not be rendered yet)
       const range = findTables(text)[this.register.keysOf(this.currentPage, text).indexOf(info.key)];
       if (!range) {
-        void this.bridge.flash(NOT_SAVED.replace(", nothing was saved", ", nothing was deleted"), "error");
+        this.notify(NOT_SAVED.replace(", nothing was saved", ", nothing was deleted"), "error");
         return "failed";
       }
       const held = this.features.flatMap((f) => f.pendingEdits?.(info) ?? []);
@@ -804,14 +849,14 @@ export class Controller implements TableHost {
         if (then) after.push(then);
       }
       this.hideFloating(true);
-      await this.bridge.replaceRange(replace.from, replace.to, replace.insert);
+      await this.platform.editor.replace(replace.from, replace.to, replace.insert);
       this.pageText = written;
       for (const pending of held) pending.written();
       for (const then of after) then(replace.from, written.length - text.length, moved);
       return "written";
     } catch (e) {
       console.error("Silverware Table: could not delete the table", e);
-      void this.bridge.flash(`Silverware Table: could not delete the table (${String(e)})`, "error");
+      this.notify(`Silverware Table: could not delete the table (${String(e)})`, "error");
       return "failed";
     }
   }
@@ -998,7 +1043,7 @@ export class Controller implements TableHost {
         columns: header.cells.length,
         headers: Array.from(header.cells).map(cellText),
       };
-      const text = await this.bridge.getText();
+      const text = await this.platform.editor.text();
       if (this.stopped || renderedTable(widget) !== table) return;
       this.pageText = text;
       const range = locateByShape(text, hint, shape);
@@ -1009,7 +1054,7 @@ export class Controller implements TableHost {
         this.markUnsupported(widget, false);
         return;
       }
-      const page = await this.bridge.getCurrentPage();
+      const page = await this.platform.editor.documentName();
       if (this.stopped || renderedTable(widget) !== table) return;
       this.currentPage = page;
       const model = parseTable(range.text);
@@ -1118,7 +1163,7 @@ export class Controller implements TableHost {
     const message =
       "Silverware Table is inactive: this SilverBullet version renders tables differently than expected";
     console.warn(message);
-    void this.bridge.flash(message, "error");
+    this.notify(message, "error");
   }
 
   /**
@@ -1148,16 +1193,16 @@ export class Controller implements TableHost {
 
   private async fixHeaders(source: string, hint: number): Promise<void> {
     try {
-      const range = locateBySource(await this.bridge.getText(), hint, source);
+      const range = locateBySource(await this.platform.editor.text(), hint, source);
       if (!range) {
-        void this.bridge.flash(NOT_SAVED, "error");
+        this.notify(NOT_SAVED, "error");
         return;
       }
       const edit = minimalEdit(range.text, serializeTable(nameEmptyHeaders(parseTable(range.text))));
-      await this.bridge.replaceRange(range.from + edit.from, range.from + edit.to, edit.insert);
+      await this.platform.editor.replace(range.from + edit.from, range.from + edit.to, edit.insert);
     } catch (e) {
       console.error("Silverware Table: could not name the columns", e);
-      void this.bridge.flash(`Silverware Table: could not name the columns (${String(e)})`, "error");
+      this.notify(`Silverware Table: could not name the columns (${String(e)})`, "error");
     }
   }
 
@@ -1739,12 +1784,12 @@ export class Controller implements TableHost {
   async openSettings(): Promise<void> {
     if (this.settingsDialog?.isOpen || this.settingsOpening) return;
     this.settingsOpening = true;
-    // Made anew each time: with the bridge as it is now (SilverBullet hands a new one over when it loads the configuration again)
-    const bridge = this.bridge;
+    // Made anew each time: with the platform as it is now (SilverBullet hands a new bridge over when it loads the configuration again)
+    const { platform } = this;
     this.settingsDialog = new SettingsDialog({
       doc: this.doc,
-      bridge,
-      canSave: !!bridge.saveSettings || (!!bridge.saveConfigPage && !!bridge.readPage),
+      platform,
+      canSave: !!platform.settings.save,
       save: (values) => this.saveSettings(values),
       saved: () => {
         // Read at once, not after the usual second
@@ -1759,15 +1804,11 @@ export class Controller implements TableHost {
     }
   }
 
-  /** Settings saved where SilverBullet keeps them: the CONFIG page's managed block (configpage.ts), or the bridge's own store */
+  /** Settings saved where the platform keeps them (in SilverBullet the configuration page's managed block) */
   private async saveSettings(values: Readonly<Record<string, unknown>>): Promise<void> {
-    const bridge = this.bridge;
-    if (bridge.saveSettings) {
-      await bridge.saveSettings(values);
-      return;
-    }
-    if (!bridge.saveConfigPage || !bridge.readPage) throw new Error("no configuration page to save to");
-    await saveConfigPage({ configPage: bridge.configPage, readPage: (name) => bridge.readPage!(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values));
+    const { save } = this.platform.settings;
+    if (!save) throw new Error("no configuration page to save to");
+    await save(values);
   }
 
   /** The "Silverware Table: Remove table metadata" command */
@@ -1782,7 +1823,7 @@ export class Controller implements TableHost {
 
   /** SilverBullet's `editor:pageLoaded` event: another page is in the editor */
   async pageLoaded(): Promise<void> {
-    const name = await this.bridge.getCurrentPage();
+    const name = await this.platform.editor.documentName();
     for (const feature of this.features) await feature.pageLoaded?.(name);
   }
 
@@ -2465,7 +2506,7 @@ export class Controller implements TableHost {
     const fallback = SETTINGS[name].default as SettingValue<K>;
     try {
       const value = (parse as (v: unknown) => SettingValue<K> | undefined)(
-        await this.bridge.getConfig?.(path, fallback),
+        await this.platform.settings.get(path, fallback),
       );
       return value ?? fallback;
     } catch {
@@ -2526,11 +2567,11 @@ export class Controller implements TableHost {
 
   private async insertTableNow(table: Table, after: TableTarget | TextPosition | undefined, also: AlsoChanged | undefined, key: TableKey | undefined): Promise<WriteResult> {
     try {
-      const text = await this.bridge.getText();
+      const text = await this.platform.editor.text();
       const range = after && !("position" in after) ? locateBySource(text, after.hint, after.source) : undefined;
       const changed = also && locateBySource(text, also.target.hint, also.target.source);
       if (also && !changed) {
-        void this.bridge.flash(NOT_SAVED, "error");
+        this.notify(NOT_SAVED, "error");
         return "failed";
       }
       // After the table, at the position, else at the page's end; an empty line around it
@@ -2555,13 +2596,13 @@ export class Controller implements TableHost {
         const then = await feature.beforeWrite?.(text, spanFrom, spanTo, replace);
         if (then) thens.push(then);
       }
-      await this.bridge.replaceRange(replace.from, replace.to, replace.insert);
+      await this.platform.editor.replace(replace.from, replace.to, replace.insert);
       this.pageText = written;
       for (const then of thens) then(replace.from, written.length - text.length, moved);
       return "written";
     } catch (e) {
       console.error("Silverware Table: could not write the table", e);
-      void this.bridge.flash(`Silverware Table: could not write the table (${String(e)})`, "error");
+      this.notify(`Silverware Table: could not write the table (${String(e)})`, "error");
       return "failed";
     }
   }
@@ -2621,11 +2662,11 @@ export class Controller implements TableHost {
       // which take a while), so the text the edit is computed from is not stale
       // by the time it is written
       for (const feature of this.features) await feature.prepareWrite?.(given);
-      const text = await this.bridge.getText();
+      const text = await this.platform.editor.text();
       this.pageText = text;
       const target = this.writeTarget(text, given, asked);
       if (!target) {
-        void this.bridge.flash(NOT_SAVED, "error");
+        this.notify(NOT_SAVED, "error");
         return "failed";
       }
       const { info, range, options } = target;
@@ -2636,12 +2677,12 @@ export class Controller implements TableHost {
       const before = held.reduce((table, pending) => pending.apply(table), parseTable(range.text));
       const edited = change(before);
       if (!edited) {
-        void this.bridge.flash(NOT_SAVED, "error");
+        this.notify(NOT_SAVED, "error");
         return "failed";
       }
       const fixed = this.changesFixed(before, edited, options);
       if (fixed) {
-        void this.bridge.flash(`Silverware Table: ${fixed}`, "info");
+        this.notify(`Silverware Table: ${fixed}`, "info");
         return "failed";
       }
       const page: WritePage = { text, tables: pageTablesOf(text), from: range.from };
@@ -2663,7 +2704,7 @@ export class Controller implements TableHost {
       for (const feature of this.features) {
         const why = feature.refusesWrite?.(before, changed, edit);
         if (why) {
-          void this.bridge.flash(`Silverware Table: ${why}`, "info");
+          this.notify(`Silverware Table: ${why}`, "info");
           return "failed";
         }
       }
@@ -2683,7 +2724,7 @@ export class Controller implements TableHost {
       for (const changed of options.also ?? []) {
         const also = locateBySource(text, changed.target.hint, changed.target.source);
         if (!also || also.from === range.from) {
-          void this.bridge.flash(NOT_SAVED, "error");
+          this.notify(NOT_SAVED, "error");
           return "failed";
         }
         others.set(also.from, { range: also, table: changed.change(others.get(also.from)?.table ?? parseTable(also.text)) });
@@ -2741,7 +2782,7 @@ export class Controller implements TableHost {
       const last = this.writtenAs.get(info.key);
       const replaced = new Set(last?.source === range.text ? last.replaced : []).add(range.text);
       this.writtenAs.set(info.key, { source: markdown, hint: at, pins: metaPins(parseTable(markdown)), replaced });
-      await this.bridge.replaceRange(replace.from, replace.to, replace.insert);
+      await this.platform.editor.replace(replace.from, replace.to, replace.insert);
       this.pageText = written;
       for (const pending of held) pending.written();
       for (const then of after) then(replace.from, written.length - text.length, moved);
@@ -2750,21 +2791,21 @@ export class Controller implements TableHost {
     } catch (e) {
       this.cellEditor.dropPending();
       console.error("Silverware Table: could not save the table", e);
-      void this.bridge.flash(`Silverware Table: could not save the table (${String(e)})`, "error");
+      this.notify(`Silverware Table: could not save the table (${String(e)})`, "error");
       return "failed";
     }
   }
 
   /** Shows the table's markdown by moving the cursor into it: to its start, or into a cell */
   private async showMarkdown(info: WidgetInfo, at?: CellRef & { within: number }): Promise<void> {
-    const range = locateBySource(await this.bridge.getText(), info.hint, info.source);
+    const range = locateBySource(await this.platform.editor.text(), info.hint, info.source);
     if (!range) {
-      void this.bridge.flash(NOT_SAVED.replace(", nothing was saved", ""), "error");
+      this.notify(NOT_SAVED.replace(", nothing was saved", ""), "error");
       return;
     }
     this.hideFloating(true);
     const offset = at ? cellSourceOffset(range.text, at.row, at.column, at.within) : 0;
-    await this.bridge.moveCursor(range.from + offset);
+    await this.platform.editor.moveCursor?.(range.from + offset);
   }
 
   /** What holds the pointer, if anything (Feature.pointerBusy): a drag, a menu open */

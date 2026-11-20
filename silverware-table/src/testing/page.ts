@@ -5,6 +5,7 @@
 import type { SourceProvider } from "../sources.ts";
 import { afterEach, beforeEach, vi } from "vitest";
 import type { Bridge } from "../bridge.ts";
+import { tablePlatform } from "../host/silverbullet/platform.ts";
 import { Controller } from "../controller.ts";
 import type { InsertControls, InsertTarget } from "../core/insert.ts";
 import { findTables, parseTable } from "../markdown.ts";
@@ -18,6 +19,8 @@ export let flashes: string[];
 // The edits written (each one replaceRange, one undo step)
 export let edits: number;
 export let controller: Controller;
+/** The bridge the page's platform is made of: a test replaces a member to watch an edit or answer a question */
+export let bridge: { -readonly [K in keyof Bridge]: Bridge[K] };
 
 export const PAGE = "Intro\n\n| Name | Qty |\n|---|---|\n| Pear | 3 |\n| apple | 10 |\n| Fig | 2 |\n";
 
@@ -105,7 +108,7 @@ export async function setup(page: string, settings: Record<string, unknown> = {}
   flashes = [];
   edits = 0;
   renderPage(text, editor, cursorMoves);
-  const bridge: Bridge = {
+  bridge = {
     getText: () => text,
     replaceRange: (from, to, insert) => {
       text = text.slice(0, from) + insert + text.slice(to);
@@ -118,7 +121,8 @@ export async function setup(page: string, settings: Record<string, unknown> = {}
     getConfig: (path, defaultValue) => (path in config ? config[path] : defaultValue),
     ...bridgeExtras,
   };
-  controller = new Controller(document, bridge, sources);
+  // (Made of the bridge as SilverBullet's is: a test replaces a member of the bridge to watch or answer it)
+  controller = new Controller(document, tablePlatform(bridge, document), sources);
   controller.start();
   await controller.scan();
   // The settings are read asynchronously: tests start once they are

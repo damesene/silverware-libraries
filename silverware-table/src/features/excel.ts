@@ -134,7 +134,7 @@ export class Excel implements Feature {
       workbook = await this.workbook(info);
     } catch (e) {
       console.error("Silverware Table: the table could not be prepared for Excel", e);
-      void this.host.bridge.flash(`Silverware Table: could not prepare the table for Excel (${String(e)})`, "error");
+      this.host.notify(`Silverware Table: could not prepare the table for Excel (${String(e)})`, "error");
       return;
     } finally {
       this.opening = false;
@@ -311,7 +311,7 @@ export class Excel implements Feature {
     const exported = exportedTable(this.host, info, "all");
     // The markdown, edits held (lazy saving) included: the formulas
     const model = this.host.tableOf(info);
-    const templates = excelTemplates(await this.host.bridge.getConfig?.(FUNCTIONS_PATH, {}));
+    const templates = excelTemplates(await this.host.configured(FUNCTIONS_PATH, {}));
     const skipped: Skipped[] = [];
     let formulas = 0;
     const cells = this.host.offered<FormulasOffer>("formulas")?.cells;
@@ -340,7 +340,7 @@ export class Excel implements Feature {
         return { value, formula };
       });
     }
-    const page = await this.host.bridge.getCurrentPage();
+    const page = await this.host.pageNameNow();
     const name = this.host.tableName(model) ?? page.split("/").pop() ?? "Table";
     const widths = columns.map((h, c) => columnWidth([h, ...exported.rows.map((r) => r.values[c] ?? "")]));
     // A calculated column: the same formula in every row but the totals row, in Excel's form too

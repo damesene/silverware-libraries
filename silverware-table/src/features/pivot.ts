@@ -16,7 +16,6 @@
 import type { Feature, ModelHost, PageCommand, TableBadge, TableInfo, ToolbarButton } from "../core/feature.ts";
 import { type Calculated, calculatedTable, movedRenames, readRenames, renamedIn, type Renames, sameCells, storedRenames } from "../calculated/index.ts";
 import { type CalculatedBy, type CalculatedOffer, followOwnFormula, type Following, callsPureFunctionsOnly, FormulaError, type FormulaCells, type FormulasOffer, type PageLinksOffer, PLAIN_CELLS } from "../formulas/index.ts";
-import { listOf } from "../bridge.ts";
 import { columnName } from "../columns.ts";
 import { ICONS } from "../icons.ts";
 import { type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } from "../markdown.ts";
@@ -106,7 +105,7 @@ export class Pivot implements Feature {
 
   /** Why another page cannot be read for a pivot, if so */
   private unreadable(): string | undefined {
-    if (!this.host.offered<PageLinksOffer>("pageLinks") || !this.host.bridge.readPage) return "its source is on another page, which the pageLinks module reads: it is off";
+    if (!this.host.offered<PageLinksOffer>("pageLinks") || !this.host.pages) return "its source is on another page, which the pageLinks module reads: it is off";
     return undefined;
   }
 
@@ -390,7 +389,7 @@ export class Pivot implements Feature {
   private async pageSources(page: string): Promise<readonly { name: string; columns: string[] }[] | string> {
     if (page === this.host.currentPage) return this.sources();
     const offer = this.host.offered<PageLinksOffer>("pageLinks");
-    if (!offer || !this.host.bridge.readPage || !this.cells()) return "Other pages are read by the pageLinks module, which is off";
+    if (!offer || !this.host.pages || !this.cells()) return "Other pages are read by the pageLinks module, which is off";
     await offer.readPages([page], false);
     const tables = this.host.otherPages()?.tables(page);
     if (tables === null) return `There is no page ${page}`;
@@ -408,7 +407,7 @@ export class Pivot implements Feature {
 
   /** The dialog: a pivot's fields picked, its preview calculated from the source as the page has it */
   private dialog(sources: ReturnType<Pivot["sources"]>, fields: Fields, submitLabel: string, submit: (definition: PivotDefinition) => void, blocked?: string): void {
-    const { listPages } = this.host.bridge;
+    const { pages } = this.host;
     // Without the formulas module nothing is calculated: the dialog says so first, and inserts or saves nothing
     const off = this.cells() ? undefined : FORMULAS_OFF;
     openPivotDialog(this.host, {
@@ -421,7 +420,7 @@ export class Pivot implements Feature {
       ...(off || blocked ? { blocked: off ?? blocked } : {}),
       preview: (definition) => this.calculate(definition, this.sourceFor(definition, sources)),
       readPage: (page) => this.pageSources(page),
-      ...(listPages ? { pages: async () => listOf(await listPages()).filter((page): page is string => typeof page === "string" && page !== this.host.currentPage) } : {}),
+      ...(pages ? { pages: async () => (await pages.list()).filter((page) => page !== this.host.currentPage) } : {}),
     });
   }
 
@@ -439,7 +438,7 @@ export class Pivot implements Feature {
     this.dialog(this.sources(own ? undefined : { name, table }), fields, "Insert", (definition) => {
       const sources = this.sources(own ? undefined : { name, table });
       const pivot = this.calculate(definition, this.sourceFor(definition, sources));
-      if (typeof pivot === "string") return void this.host.bridge.flash(`Silverware Table: ${pivot}`, "error");
+      if (typeof pivot === "string") return this.host.notify(`Silverware Table: ${pivot}`, "error");
       const made = this.written(this.withDefinition({ indent: table.indent, align: [], rows: [{ cells: [""] }], padded: false }, definition), pivot, {});
       const names = !own && definition.source.trim().toLowerCase() === name.toLowerCase();
       void this.host.insertTable(made, info, names ? { target: info, change: (t) => this.host.withTableName(t, name) } : undefined);
@@ -488,11 +487,11 @@ export class Pivot implements Feature {
         : { source: "", rows: [], columns: [], values: [{ fn: "COUNTA", column: "", show: "" }], conditions: [], any: false, sort: [], totals: "both" };
     this.dialog(sources, fields, "Insert", (definition) => {
       const pivot = this.calculate(definition, this.sourceFor(definition, this.sources()));
-      if (typeof pivot === "string") return void this.host.bridge.flash(`Silverware Table: ${pivot}`, "error");
+      if (typeof pivot === "string") return this.host.notify(`Silverware Table: ${pivot}`, "error");
       const made = this.written(this.withDefinition(empty, definition), pivot, {});
       // The cursor as it is now: the editor moved it with any edit made while the dialog was open
       void (async () => {
-        const position = (await this.host.bridge.getCursor?.()) ?? (await this.host.bridge.getText()).length;
+        const position = (await this.host.cursorNow()) ?? (await this.host.pageTextNow()).length;
         await this.host.insertTable(made, { position });
       })();
     }, this.blocked(empty));

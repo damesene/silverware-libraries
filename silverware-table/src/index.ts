@@ -3,6 +3,7 @@
 import { applyLayers } from "../../shared/layers.ts";
 import { customSeries, customSeriesAnew, defineCustomSeries } from "./autofill/index.ts";
 import { type Bridge, listOf, missingBridgeFunctions } from "./bridge.ts";
+import { tablePlatform } from "./host/silverbullet/platform.ts";
 import { Controller } from "./controller.ts";
 import { customTypes } from "./columntypes/custom.ts";
 import { customTypesAnew, defineCustomTypes } from "./columntypes/registry.ts";
@@ -89,7 +90,7 @@ async function calculated(formula: string, text?: string, page?: string): Promis
   const formulas = controller?.offered<FormulasOffer>("formulas");
   if (!controller || !formulas) return undefined;
   const written = String(formula);
-  const { value, pages } = await formulas.evaluate(written, text ?? (await controller.bridge.getText()), page === undefined ? undefined : String(page));
+  const { value, pages } = await formulas.evaluate(written, text ?? (await controller.platform.editor.text()), page === undefined ? undefined : String(page));
   const list = isRange(value) && (value.length !== 1 || givesList(withEquals(written).formula.trim()));
   return { value: list ? value : single(value), pages };
 }
@@ -396,13 +397,15 @@ export function init(bridge: Bridge, sources: SourceProvider = spaceSources): vo
   }
   // A source that failed is said once until it changes (SilverBullet's sources: another host gives its own)
   if (sources === spaceSources) spaceSources.connect((message) => void bridge.flash(message, "error"));
+  // What the core asks of SilverBullet, made of the bridge (host/silverbullet/platform.ts)
+  const platform = tablePlatform(bridge, document);
   const global = globalThis as unknown as Record<string, Controller | undefined>;
   const existing = global[GLOBAL_KEY];
   if (existing) {
-    existing.setBridge(bridge);
+    existing.setPlatform(platform);
     return;
   }
-  const controller = new Controller(document, bridge, sources);
+  const controller = new Controller(document, platform, sources);
   global[GLOBAL_KEY] = controller;
   controller.start();
 }

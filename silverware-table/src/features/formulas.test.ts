@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buttonLabel, cell, cellMenuItem, clickOn, controller, cursorMoves, edits, editor, flashes, flush, key, menuButtons, nameInMenu, pointInsert, press, renderPage, setup as setupPage, tableMenuItem, text, toolbarName, useTablePage, tableKey } from "../testing/page.ts";
+import { bridge, buttonLabel, cell, cellMenuItem, clickOn, controller, cursorMoves, edits, editor, flashes, flush, key, menuButtons, nameInMenu, pointInsert, press, renderPage, setup as setupPage, tableMenuItem, text, toolbarName, useTablePage, tableKey } from "../testing/page.ts";
 import { FORMULAS_NEED_METADATA } from "./formulas.ts";
 import { insertRowWith } from "../core/structure.ts";
 import { clearCustomFunctions, defineCustomFunctions, functionNamed } from "../formulas/registry.ts";
@@ -539,11 +539,10 @@ describe("Formulas", () => {
     it("writes the results of the tables that refer to an edited one, in the same edit", async () => {
       await setup(PAGE2, { "silverware.table.editor.enterKey": "save" });
       let edits = 0;
-      const bridge = (controller as unknown as { bridge: { replaceRange: (...a: unknown[]) => unknown } }).bridge;
       const replace = bridge.replaceRange;
-      bridge.replaceRange = (...args: unknown[]) => {
+      bridge.replaceRange = (from, to, insert) => {
         edits++;
-        return replace(...args);
+        return replace(from, to, insert);
       };
       clickOn(cell(2, 1)); // Fig's price
       await type("4");
@@ -618,20 +617,21 @@ describe("Formulas", () => {
   describe("referring to tables on other pages", () => {
     const OTHER = `# Prices\n\n| Name | Price |\n|---|---|\n| Pear | 12 |\n| Fig | 3 |\n| <meta core.table core.name='fruit'> |\n`;
     const HERE = "| Item | Cost |\n|---|---|\n| Fig | |\n";
+    // The pages read from `pages` (the bridge's readPage, handed to setup), each name read listed
     const withPages = (pages: Record<string, string>) => {
       const read: string[] = [];
-      (controller as unknown as { bridge: Record<string, unknown> }).bridge.readPage = (name: string) => {
+      const readPage = (name: string) => {
         read.push(name);
         if (!(name in pages)) throw new Error(`no page ${name}`);
         return pages[name]!;
       };
-      return read;
+      return { read, readPage };
     };
 
     it("reads a table of another page, again for every edit", async () => {
-      await setup(HERE, { "silverware.table.editor.enterKey": "save" });
       const pages: Record<string, string> = { Prices: OTHER };
-      const read = withPages(pages);
+      const { read, readPage } = withPages(pages);
+      await setup(HERE, { "silverware.table.editor.enterKey": "save" }, { readPage });
       clickOn(cell(1, 1));
       await type("=XLOOKUP([@item], [[Prices]]fruit![name], [[Prices]]fruit![price])");
       expect(text).toBe(`| Item | Cost |\n|---|---|\n| Fig | 3 <meta formulas.f='=XLOOKUP([@item], [[Prices]]fruit![name], [[Prices]]fruit![price])'> |\n`);
@@ -724,8 +724,7 @@ describe("Formulas", () => {
     });
 
     it("says when the page or its table is not there", async () => {
-      await setup(HERE, { "silverware.table.editor.enterKey": "save" });
-      withPages({ Prices: OTHER });
+      await setup(HERE, { "silverware.table.editor.enterKey": "save" }, { readPage: withPages({ Prices: OTHER }).readPage });
       clickOn(cell(1, 1));
       await type("=[[Nowhere]]fruit!B1");
       expect(text).toContain("| Fig | \\#REF! <meta");
@@ -1190,7 +1189,7 @@ describe("Formulas when a table they refer to is deleted", () => {
     const prices = (price: number) => `| Item | Price |\n|---|---|\n| Pear | ${price} |\n| <meta core.table core.name='prices'> |\n`;
     await setupPage(`${prices(12)}\n${prices(5)}\n| Double |\n|---|\n| 24 <meta formulas.f='=prices!B1*2'> |\n| <meta core.table core.name='costs'> |\n`, { "silverware.table.metadata": true });
     const questions: string[] = [];
-    (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = (message: string) => {
+    bridge.confirm = (message: string) => {
       questions.push(message);
       return true;
     };
@@ -1206,7 +1205,7 @@ describe("Formulas when a table they refer to is deleted", () => {
   it("say so when asked, and show #REF! in the same edit", async () => {
     await setupPage("| Item | Price |\n|---|---|\n| Pear | 12 |\n| <meta core.table core.name='prices'> |\n\n| Double |\n|---|\n| 24 <meta formulas.f='=prices!B1*2'> |\n| <meta core.table core.name='costs'> |\n", { "silverware.table.metadata": true });
     const questions: string[] = [];
-    (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = (message: string) => {
+    bridge.confirm = (message: string) => {
       questions.push(message);
       return true;
     };

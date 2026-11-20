@@ -467,7 +467,7 @@ export class ColumnTypes implements Feature {
     const text = typed.trim();
     if (!column || text === "" || text.startsWith("=")) return undefined;
     const error = attempt(column, () => column.type.check(text, column.params, column.table));
-    if (error) void this.host.bridge.flash(`Silverware Table: ${error} (#${column.tag}); saved as typed`, "info");
+    if (error) this.host.notify(`Silverware Table: ${error} (#${column.tag}); saved as typed`, "info");
     return undefined;
   }
 

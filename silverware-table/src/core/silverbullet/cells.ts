@@ -31,7 +31,7 @@ export interface CellRenderer {
   refreshesAfterIndex(cell: string): boolean;
 }
 
-/** SilverBullet's markdown.markdownToHtml with expand, through the bridge */
+/** SilverBullet's markdown.markdownToHtml with expand, through the platform's renderer */
 export type MarkdownToHtml = (markdown: string) => string | Promise<string>;
 
 // What a cell may hold to be shown as its text: letters, digits, spaces and

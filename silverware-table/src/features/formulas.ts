@@ -624,7 +624,7 @@ export class Formulas implements Feature {
     const result = cellWholeResult(table, ref.row, ref.column, { cells: this.cells, tables: this.tableSource(), name: this.nameOf(table) });
     if (result === undefined) return undefined;
     if (result instanceof FormulaError) {
-      void this.host.bridge.flash(`Silverware Table: ${result.code} ${result.detail}`, "error");
+      this.host.notify(`Silverware Table: ${result.code} ${result.detail}`, "error");
       return undefined;
     }
     return asGrid(result);
@@ -809,7 +809,7 @@ export class Formulas implements Feature {
   editorValue(editor: CellEditor, typed: string): string | undefined {
     if (editor.row === 0) return undefined;
     if (isFormulaInput(typed) && !this.allowed(editor)) {
-      void this.host.bridge.flash(`Silverware Table: ${FORMULAS_NEED_METADATA}; saved as text`, "info");
+      this.host.notify(`Silverware Table: ${FORMULAS_NEED_METADATA}; saved as text`, "info");
       return escapeCell(typed);
     }
     if (isFormulaInput(typed)) {
@@ -821,13 +821,13 @@ export class Formulas implements Feature {
       const refused: string[] = [];
       const read = info && frame ? framedIn(slips.formula, frame, this.nameOf(parseTable(info.source)), refused) : slips.formula;
       if (refused.length) {
-        void this.host.bridge.flash(`Silverware Table: ${refused.join(", ")} ${refused.length > 1 ? "are" : "is"} no table's cells here: written as #REF!`, "info");
+        this.host.notify(`Silverware Table: ${refused.join(", ")} ${refused.length > 1 ? "are" : "is"} no table's cells here: written as #REF!`, "info");
       }
       const ownTable = info && this.host.tableOf(info);
       const names = ownTable ? qualifyCellNames(read, { table: ownTable, name: this.nameOf(ownTable) }, this.tableSource(), this.cells) : { formula: read, fixes: [] };
       const formula = names.formula;
       const fixes = [...slips.fixes, ...names.fixes];
-      if (fixes.length) void this.host.bridge.flash(`Silverware Table: formula fixed: ${fixes.join(", ")}`, "info");
+      if (fixes.length) this.host.notify(`Silverware Table: formula fixed: ${fixes.join(", ")}`, "info");
       const headers = parseTable(info?.source ?? "").rows[0]?.cells ?? [];
       return this.cells.formulaCell("", withColumnKeys(formula, headers));
     }
@@ -1176,7 +1176,7 @@ export class Formulas implements Feature {
     // Another table is referred to by its name (a table on a sheet has one: Add to sheet… names it)
     const other = info.key !== active.key ? this.nameOf(parseTable(info.source)) : undefined;
     if (info.key !== active.key && !other) {
-      void this.host.bridge.flash("Silverware Table: name that table first (the pencil in its ⋯ menu's title): a formula refers to another table by its name", "info");
+      this.host.notify("Silverware Table: name that table first (the pencil in its ⋯ menu's title): a formula refers to another table by its name", "info");
       return true;
     }
     this.stopPointing?.();

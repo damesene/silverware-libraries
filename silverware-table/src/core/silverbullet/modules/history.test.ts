@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { onWrite, resetDefinitions } from "../../../index.ts";
 import { findTables } from "../../../markdown.ts";
-import { cell, controller, flush, pointInsert, setup, setText, text, useTablePage, tableKey } from "../../../testing/page.ts";
+import { bridge, cell, controller, flush, pointInsert, setup, setText, text, useTablePage, tableKey } from "../../../testing/page.ts";
 
 describe("History markers", () => {
   useTablePage();
@@ -16,9 +16,9 @@ describe("History markers", () => {
     },
   };
   const following = () => {
-    const bridge = controller.bridge as { replaceRange: (from: number, to: number, insert: string) => unknown };
-    const replace = bridge.replaceRange.bind(bridge);
-    bridge.replaceRange = (from, to, insert) => {
+    const watched = bridge as unknown as { replaceRange: (from: number, to: number, insert: string) => unknown };
+    const replace = watched.replaceRange.bind(watched);
+    watched.replaceRange = (from, to, insert) => {
       if (cursor > from || (cursor === from && to > from)) cursor = Math.max(from, cursor + insert.length - (to - from));
       return replace(from, to, insert);
     };

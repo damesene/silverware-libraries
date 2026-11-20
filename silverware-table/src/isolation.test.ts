@@ -73,12 +73,18 @@ describe("isolation", () => {
     expect(matches(users, /from "[./]*formulas\/(?!index\.ts")/)).toEqual([]);
   });
 
-  it("SilverBullet's side of the sources of the space is the entry's only: no other file imports host/, no domain the sources", () => {
-    const all = import.meta.glob(["./**/*.ts", "!./**/*.test.ts", "!./index.ts", "!./host/**"], { query: "?raw", import: "default", eager: true });
+  it("SilverBullet's side (its platform, the sources of the space) is the entry's only: no other file imports host/, no domain the sources", () => {
+    // (The tests' page stands for the entry: it makes the platform of its bridge as the entry does)
+    const all = import.meta.glob(["./**/*.ts", "!./**/*.test.ts", "!./index.ts", "!./host/**", "!./testing/**"], { query: "?raw", import: "default", eager: true });
     expect(Object.keys(all)).toContain("./features/sources.ts");
     expect(matches(all, /from "[./]*host\//)).toEqual([]);
     // (The domains get tables, never the provider nor the offer)
     expect(matches({ ...domains, ...pivot }, /from "[./]*(sources|features\/sources)\.ts"/)).toEqual([]);
+  });
+
+  it("no module reaches the platform: what it needs is a host function (docs/silverware-table-store-plan.md, step 1)", () => {
+    // (bridge.ts' settings and module names are no part of the bridge: imported by name, the file's name allowed)
+    expect(matches(features, /\bbridge\b(?!\.ts")|\bBridge\b|core\/platform\.ts"|shared\/platform\.ts"/)).toEqual([]);
   });
 
   it("the core and the adapter name no module", () => {

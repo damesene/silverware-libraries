@@ -237,7 +237,7 @@ export class Views implements Feature {
     const empty: Table = { indent: table.indent, align: [], rows: [{ cells: [""] }], padded: false };
     this.dialog(`=${source}![#Data]`, this.freeName("view"), "Insert", preview, (formula, name) => {
       const result = preview(formula);
-      if (typeof result === "string") return void this.host.bridge.flash(`Silverware Table: ${result}`, "error");
+      if (typeof result === "string") return this.host.notify(`Silverware Table: ${result}`, "error");
       const made = this.made(withEquals(formula).formula, name, table.indent, result);
       void this.host.insertTable(made, info, naming(formula) ? { target: info, change: (t) => this.host.withTableName(t, source) } : undefined);
     }, this.blocked(empty), undefined, (formula) => (naming(formula) ? source : undefined));
@@ -252,11 +252,11 @@ export class Views implements Feature {
     const preview = (formula: string) => this.result(formula);
     this.dialog(first ? `=${first}![#Data]` : "", this.freeName("view"), "Insert", preview, (formula, name) => {
       const result = preview(formula);
-      if (typeof result === "string") return void this.host.bridge.flash(`Silverware Table: ${result}`, "error");
+      if (typeof result === "string") return this.host.notify(`Silverware Table: ${result}`, "error");
       const made = this.made(withEquals(formula).formula, name, "", result);
       // The cursor as it is now: the editor moved it with any edit made while the dialog was open
       void (async () => {
-        const position = (await this.host.bridge.getCursor?.()) ?? (await this.host.bridge.getText()).length;
+        const position = (await this.host.cursorNow()) ?? (await this.host.pageTextNow()).length;
         await this.host.insertTable(made, { position });
       })();
     }, this.blocked(empty));

@@ -269,7 +269,7 @@ export async function deleteColumnsAt(host: ModelHost, info: TableInfo, columns:
   const doomed = [...new Set(columns)].sort((a, b) => b - a);
   if (doomed.length === 0) return "unchanged";
   if (doomed.length >= info.columns) {
-    void host.bridge.flash("Silverware Table: a table keeps at least one column", "info");
+    host.notify("Silverware Table: a table keeps at least one column", "info");
     return "unchanged";
   }
   // Left to right, as the columns are shown

@@ -92,7 +92,7 @@ export class PageLinks implements Feature {
   private async load(tables: Iterable<Table>, fresh: boolean | ReadonlySet<string>, pages: readonly string[] = [], visited?: Set<string>): Promise<boolean> {
     // Read for formulas only (a pivot is calculated by them too)
     const cells = this.cells();
-    if (!this.host.bridge.readPage || !cells) return false;
+    if (!this.host.pages || !cells) return false;
     const queue = new Set<string>(pages);
     for (const table of tables) for (const page of referredPages(cells, table)) queue.add(page);
     const done = new Set<string>();
@@ -124,7 +124,7 @@ export class PageLinks implements Feature {
   private async readNow(page: string): Promise<void> {
     let tables: readonly PageTable[] | null;
     try {
-      tables = pageTablesOf(await this.host.bridge.readPage!(page));
+      tables = pageTablesOf(await this.host.pages!.read(page));
     } catch {
       tables = null;
     }

@@ -114,7 +114,7 @@ export class Sheets implements Feature {
     if (problem) return problem;
     // (Taken off it above: that removes, which the setting off allows)
     if (!canPlace(this.host, parseTable(info.source))) return "a table's sheet, place and name are kept in its metadata: turn on Store table metadata in the settings";
-    const text = await this.host.bridge.getText();
+    const text = await this.host.pageTextNow();
     const self = locateBySource(text, info.hint, info.source);
     const tables = sheetTables(this.host, text);
     const target = sheetsOf(tables).find((s) => sameSheet(s.name, name));
@@ -131,7 +131,7 @@ export class Sheets implements Feature {
     const result = await this.host.writeTable(info, (t: Table) =>
       this.host.setMeta(this.host.setMeta(this.host.withTableName(t, tableName), SHEET_KEY, target?.name ?? name), AT_KEY, formatAt(at)),
     );
-    if (result === "written" && !own) void this.host.bridge.flash(`Silverware Table: the table is named ${tableName}, as the sheet's other tables refer to its cells by it (${tableName}!B2)`, "info");
+    if (result === "written" && !own) this.host.notify(`Silverware Table: the table is named ${tableName}, as the sheet's other tables refer to its cells by it (${tableName}!B2)`, "info");
     return undefined;
   }
 

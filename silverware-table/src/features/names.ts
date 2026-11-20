@@ -73,7 +73,7 @@ export class Names implements Feature {
     if (!name || this.told.has(name.toLowerCase())) return;
     this.told.add(name.toLowerCase());
     const count = shared.get(name.toLowerCase())!;
-    void this.host.bridge.flash(
+    this.host.notify(
       `Silverware Table: ${count} tables on this page are named ${name}: formulas in other tables use the first of them. Rename the others (their name in the toolbar, in red)`,
       "error",
       // Until closed: what is wrong stays wrong until a table is renamed
@@ -186,7 +186,7 @@ export class Names implements Feature {
     const problem = name === "" ? undefined : validateTableName(name);
     if (problem) return problem;
     if (name !== "") {
-      const text = await this.host.bridge.getText();
+      const text = await this.host.pageTextNow();
       // This table where it is now: its position may have moved since it was rendered
       const self = locateBySource(text, info.hint, info.source);
       const taken = findTables(text).some((range) => {

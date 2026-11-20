@@ -301,16 +301,16 @@ export class Paste implements Feature {
     try {
       await writeClipboard(this.host.doc, text, clipboardHtml(values));
     } catch (e) {
-      void this.host.bridge.flash(`Silverware Table: could not copy (${String(e)})`, "error");
+      this.host.notify(`Silverware Table: could not copy (${String(e)})`, "error");
       return;
     }
     const size = `${values.length} × ${values[0]?.length ?? 0} cells`;
     if (cutting && this.host.rearranged(info)) {
-      void this.host.bridge.flash(`Silverware Table: copied ${size} (sorted or filtered, cells are not cut: the rows shown are not where they are)`, "info");
+      this.host.notify(`Silverware Table: copied ${size} (sorted or filtered, cells are not cut: the rows shown are not where they are)`, "info");
       return;
     }
     this.startCut(info, rows, text, cutting);
-    void this.host.bridge.flash(cutting ? `Silverware Table: cut ${size}: paste them where they go` : `Silverware Table: copied ${size}`, "info");
+    this.host.notify(cutting ? `Silverware Table: cut ${size}: paste them where they go` : `Silverware Table: copied ${size}`, "info");
   }
 
   /**
@@ -332,15 +332,15 @@ export class Paste implements Feature {
     this.endCut();
     const size = `${values.length} × ${values[0]?.length ?? 0} cells`;
     if (cells.some((ref) => ref.row === 0)) {
-      void this.host.bridge.flash(`Silverware Table: copied ${size} (a header keeps its name: cut the cells under it)`, "info");
+      this.host.notify(`Silverware Table: copied ${size} (a header keeps its name: cut the cells under it)`, "info");
       return;
     }
     if (this.host.rearranged(info)) {
-      void this.host.bridge.flash(`Silverware Table: copied ${size} (sorted or filtered, cells are not cut: the rows shown are not where they are)`, "info");
+      this.host.notify(`Silverware Table: copied ${size} (sorted or filtered, cells are not cut: the rows shown are not where they are)`, "info");
       return;
     }
     this.startCut(info, rows, text, true);
-    void this.host.bridge.flash(`Silverware Table: cut ${size}: paste them where they go`, "info");
+    this.host.notify(`Silverware Table: cut ${size}: paste them where they go`, "info");
   }
 
   /**
@@ -440,7 +440,7 @@ export class Paste implements Feature {
       } catch (e) {
         // Cells cut move without it
         if (!cutBefore) {
-          void this.host.bridge.flash(`Silverware Table: could not read the clipboard (${String(e)})`, "error");
+          this.host.notify(`Silverware Table: could not read the clipboard (${String(e)})`, "error");
           return;
         }
       }
@@ -464,7 +464,7 @@ export class Paste implements Feature {
     if (!text) {
       // Known to stay so only where it is read again without asking (else a copy later would find Paste disabled)
       if (text === "" && this.readable) this.clipboard = "empty";
-      void this.host.bridge.flash("Silverware Table: the clipboard holds no text to paste", "info");
+      this.host.notify("Silverware Table: the clipboard holds no text to paste", "info");
       return;
     }
     // A single value (a line break at its end, as a spreadsheet copies one cell, left out) is one cell
@@ -491,11 +491,11 @@ export class Paste implements Feature {
     cut?: Cut,
   ): Promise<void> {
     if (this.host.rearranged(info)) {
-      void this.host.bridge.flash(`Silverware Table: ${PASTE_BLOCKED.toLowerCase()}`, "info");
+      this.host.notify(`Silverware Table: ${PASTE_BLOCKED.toLowerCase()}`, "info");
       return;
     }
     if (cut && at.row === 0) {
-      void this.host.bridge.flash("Silverware Table: cells cut move into the rows under the header: paste them on a cell there", "info");
+      this.host.notify("Silverware Table: cells cut move into the rows under the header: paste them on a cell there", "info");
       return;
     }
     // A cell past the table (the sheet view's empty cell): the table grown to it first, in the same edit
@@ -505,7 +505,7 @@ export class Paste implements Feature {
     if (!base) return;
     const plan = planPaste(base, info.pins, growth ? growth.cell : at, cut ? cut.held : data, insert);
     if ("error" in plan) {
-      void this.host.bridge.flash(`Silverware Table: cannot paste here: ${plan.error}`, "error");
+      this.host.notify(`Silverware Table: cannot paste here: ${plan.error}`, "error");
       return;
     }
     const closed = fromEditor ? this.host.takeEditor() : undefined;
@@ -536,7 +536,7 @@ export class Paste implements Feature {
     );
     if (result !== "written") {
       // Nothing changed: every cell pasted onto kept its own (a formula's): said so
-      if (skipped.size) void this.host.bridge.flash(`Silverware Table: nothing pasted: ${Array.from(skipped, ([what, count]) => `kept ${plural(count, what)}`).join(", ")}`, "info");
+      if (skipped.size) this.host.notify(`Silverware Table: nothing pasted: ${Array.from(skipped, ([what, count]) => `kept ${plural(count, what)}`).join(", ")}`, "info");
       return;
     }
     const size = cut ? cut.held : data;
@@ -549,7 +549,7 @@ export class Paste implements Feature {
       ...Array.from(skipped, ([what, count]) => `kept ${plural(count, what)}`),
     ];
     const what = cut ? `moved ${size.length} × ${width} cells` : insert ? `pasted ${plural(data.length, "new row")}` : `pasted ${data.length} × ${width} cells`;
-    void this.host.bridge.flash(`Silverware Table: ${what}${added.length ? ` (${added.join(", ")})` : ""}`, "info");
+    this.host.notify(`Silverware Table: ${what}${added.length ? ` (${added.join(", ")})` : ""}`, "info");
     if (closed) this.host.focusPage();
   }
 }

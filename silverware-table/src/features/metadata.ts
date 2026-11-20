@@ -180,8 +180,8 @@ export class Metadata implements Feature {
 
   /** Removes the metadata of all tables on the current page, once confirmed */
   async removeFromPage(): Promise<void> {
-    const { bridge } = this.host;
-    const text = await bridge.getText();
+    const { host } = this;
+    const text = await host.pageTextNow();
     // From the last table up, so the earlier ones keep their positions
     const tables = findTables(text)
       .filter((range) => {
@@ -189,7 +189,7 @@ export class Metadata implements Feature {
       })
       .reverse();
     if (tables.length === 0) {
-      void bridge.flash("Silverware Table: no table on this page has metadata", "info");
+      host.notify("Silverware Table: no table on this page has metadata", "info");
       return;
     }
     const models = tables.map((range) => parseTable(range.text));
@@ -202,16 +202,16 @@ export class Metadata implements Feature {
     const from = tables[tables.length - 1]!.from;
     const to = tables[0]!.to;
     let span = text.slice(from, to);
-    const keys = this.host.tableKeys(await bridge.getCurrentPage(), text);
+    const keys = host.tableKeys(await host.pageNameNow(), text);
     for (const range of tables) {
       const table = parseTable(range.text);
       if (table.meta) this.host.forgetStoredView(keys[range.ordinal]!);
       span = span.slice(0, range.from - from) + serializeTable(withoutMetadata(table)) + span.slice(range.to - from);
     }
     const edit = minimalEdit(text.slice(from, to), span);
-    await bridge.replaceRange(from + edit.from, from + edit.to, edit.insert);
+    await host.replacePageText(from + edit.from, from + edit.to, edit.insert);
     // The dialog took the focus: back to the editor, so Ctrl+Z works right away
     this.host.focusPage();
-    void bridge.flash(`Silverware Table: removed the metadata of ${tables.length} table(s)`, "info");
+    host.notify(`Silverware Table: removed the metadata of ${tables.length} table(s)`, "info");
   }
 }

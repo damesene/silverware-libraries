@@ -177,7 +177,7 @@ export class Conditions implements Feature {
       const said = `${info.key}\u0000${problem}`;
       if (this.said.has(said)) continue;
       this.said.add(said);
-      void this.host.bridge.flash(`Silverware Table: conditional formatting: ${problem}`, "error");
+      this.host.notify(`Silverware Table: conditional formatting: ${problem}`, "error");
     }
     if (!styles.size) return undefined;
     const looks: (CellRef & CellLook)[] = [];

@@ -504,7 +504,7 @@ export class Selection implements Feature {
     if (vertical) {
       if (first === 0) return;
       if (this.host.rearranged(info)) {
-        void this.host.bridge.flash(`Silverware Table: ${MOVE_BLOCKED.toLowerCase()}`, "info");
+        this.host.notify(`Silverware Table: ${MOVE_BLOCKED.toLowerCase()}`, "info");
         return;
       }
     }
@@ -637,9 +637,9 @@ export class Selection implements Feature {
     const values = this.valuesOf(info, cells);
     try {
       await writeClipboard(this.host.doc, clipboardText(values), clipboardHtml(values));
-      void this.host.bridge.flash(`Silverware Table: copied ${values.length} × ${values[0]?.length ?? 0} cells`, "info");
+      this.host.notify(`Silverware Table: copied ${values.length} × ${values[0]?.length ?? 0} cells`, "info");
     } catch (e) {
-      void this.host.bridge.flash(`Silverware Table: could not copy (${String(e)})`, "error");
+      this.host.notify(`Silverware Table: could not copy (${String(e)})`, "error");
     }
   }
 
@@ -956,7 +956,7 @@ export class Selection implements Feature {
     // Where they would go outlined under the pointer, as while dragging them
     this.host.doc.defaultView!.addEventListener("mousemove", this.showMoveTarget, true);
     const press = this.host.pressedWith === "touch" ? "tap the cell where the first one goes (a tap outside the table cancels)" : "click the cell where the first one goes; Esc cancels";
-    void this.host.bridge.flash(`Silverware Table: ${press}`, "info");
+    this.host.notify(`Silverware Table: ${press}`, "info");
   }
 
   private endMoving(): void {
@@ -1110,7 +1110,7 @@ export class Selection implements Feature {
     const area = kind === "copy" ? this.area() : undefined;
     if (!area) return undefined;
     const values = this.valuesOf(area.info, this.refs());
-    void this.host.bridge.flash(`Silverware Table: copied ${values.length} × ${values[0]?.length ?? 0} cells`, "info");
+    this.host.notify(`Silverware Table: copied ${values.length} × ${values[0]?.length ?? 0} cells`, "info");
     return { text: clipboardText(values), html: clipboardHtml(values) };
   }
 }

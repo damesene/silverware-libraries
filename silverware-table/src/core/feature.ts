@@ -6,7 +6,8 @@ export type { TableKey } from "./tables.ts";
 import type { TableParts } from "./parts.ts";
 export type { PartTable, TablePart, TableParts } from "./parts.ts";
 export { tablePartsOf } from "./parts.ts";
-import type { Bridge, FeatureName, SETTINGS, SettingValue } from "../bridge.ts";
+import type { FeatureName, SETTINGS, SettingValue } from "../bridge.ts";
+import type { TablePlatform } from "./platform.ts";
 import type { Dialog, DialogOptions } from "./dialog.ts";
 import type { Rect } from "./geometry.ts";
 
@@ -582,7 +583,27 @@ export type NamingTarget =
  */
 export interface ModelHost {
   readonly doc: Document;
-  readonly bridge: Bridge;
+  /** Tells the user (a notification); `timeout` 0: shown until closed */
+  notify(message: string, type?: "info" | "error", options?: { readonly timeout?: number }): void;
+  /** Opens a reference where the platform opens one (a page, a hashtag's page: a link in a table drawn by a module) */
+  navigate(ref: string): void;
+
+  // The open page and other pages as text, until the store gives a module its tables (docs/silverware-table-store-plan.md,
+  // steps 2 and 4: `host.tables`, other documents through the store); nothing else of the platform reaches a module
+  /** The open page's text as the editor has it now */
+  pageTextNow(): Promise<string>;
+  /** The open page's name now */
+  pageNameNow(): Promise<string>;
+  /** `from` to `to` of the open page's text made `insert`, one edit (Remove metadata's, of every table at once) */
+  replacePageText(from: number, to: number, insert: string): Promise<void>;
+  /** Where the cursor is in the open page's text; undefined: the platform does not say */
+  cursorNow(): Promise<number | undefined>;
+  /** The editor's own undo of its last edit; undefined: the platform has none */
+  readonly undoEdit: (() => Promise<void>) | undefined;
+  /** Other pages read, written and listed; undefined: none are read */
+  readonly pages: PageAccess | undefined;
+  /** A setting by its path, `fallback` where it has none: a module's own of an open form (Excel's functions), not in SETTINGS */
+  configured(path: string, fallback: unknown): Promise<unknown>;
   /** Whether a node is in one of Silverware Table's floating controls (toolbar, grips, menus): one the core made */
   isFloating(node: Node): boolean;
   /**
@@ -616,7 +637,7 @@ export interface ModelHost {
   /** A table shown, by its key, as it is now (rendered anew after a write: its new info) */
   tableFor(key: TableKey): TableInfo | undefined;
   /**
-   * The keys of a page's tables in its text (as read now: bridge.getText), in
+   * The keys of a page's tables in its text (as read now: pageTextNow), in
    * the order findTables gives them: a table found in the text by its key. How
    * tables are told apart is the core's (core/tables.ts): a key is made by it
    * only, never from a table's place
@@ -753,7 +774,7 @@ export interface ModelHost {
   takeEditor(): { readonly key: TableKey; readonly row: number; readonly column: number; readonly save: (table: Table) => Table | undefined } | undefined;
   /** Closes the cell editor saving, as leaving it does (an edit a feature holds stays held), the focus left where it is */
   saveEditing(): Promise<void>;
-  /** Asks the user (SilverBullet's dialog, else the browser's) */
+  /** Asks the user before a destructive change (SilverBullet's dialog, else the browser's) */
   ask(question: string): Promise<boolean>;
   /** The table as edited: its markdown with the edits features hold (pendingEdits), what a cell's editor starts from */
   tableOf(info: TableInfo): Table;
@@ -909,8 +930,19 @@ export interface ModelHost {
   setSort(info: TableInfo, view: ViewState): void;
 }
 
+/** Other pages as text (ModelHost.pages), until the store reads other documents */
+export type PageAccess = {
+  read(name: string): Promise<string>;
+  /** A page's text written whole (failing where the platform writes no page) */
+  write(name: string, text: string): Promise<void>;
+  /** Every page's name (none where the platform lists none) */
+  list(): Promise<readonly string[]>;
+};
+
 /** What the core offers the adapter's modules (src/core/silverbullet/modules/): the model host and the rendering */
 export interface TableHost extends ModelHost {
+  /** The platform (core/platform.ts): the adapter is the host's side, which the modules' host functions stand for */
+  readonly platform: TablePlatform;
   infoOf(widget: HTMLElement): WidgetInfo | undefined;
   /** The rendered table a key belongs to, if it is enhanced and on screen */
   widgetForKey(key: TableKey): HTMLElement | undefined;

@@ -204,7 +204,7 @@ export class AutoFill implements Feature {
     // The crosshair on that table's cells
     this.host.tableMark(info.key, "fill-picking", true);
     const cancel = press === "tap" ? "a tap outside the table cancels" : "Esc cancels";
-    void this.host.bridge.flash(`Silverware Table: ${press} the last cell to fill to; ${cancel}`, "info");
+    this.host.notify(`Silverware Table: ${press} the last cell to fill to; ${cancel}`, "info");
   }
 
   private endPicking(): void {
@@ -265,7 +265,7 @@ export class AutoFill implements Feature {
     const selected = this.selection();
     const extent = selected && selected.info.key === key ? this.extentTo(selected, on) : undefined;
     if (selected && extent) void this.apply(selected, extent);
-    else void this.host.bridge.flash("Silverware Table: nothing to fill there: pick a cell below, above or beside the cells selected", "info");
+    else this.host.notify("Silverware Table: nothing to fill there: pick a cell below, above or beside the cells selected", "info");
     return true;
   }
 

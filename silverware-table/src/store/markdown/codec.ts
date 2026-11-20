@@ -40,6 +40,8 @@ import { currentTag, tagAttributes, withTagValue } from "../../tagvalues.ts";
 // header cell's markdown; the tags a set of attributes was read from (a cell's
 // or a header's: with the markdown's text before them)
 const models = new WeakMap<Table, TableModel>();
+// Each model decoded, the table it was read from (its form: padding, cells as written)
+const bases = new WeakMap<TableModel, Table>();
 const rows = new WeakMap<ModelRow, Row>();
 const cells = new WeakMap<ModelCell, { readonly cell: string; readonly row: Row }>();
 const headers = new WeakMap<ModelColumn, string>();
@@ -115,6 +117,7 @@ export function decode(table: Table): TableModel {
   });
   const model: TableModel = { columns, rows: modelRows, attributes: table.attributes ?? NO_ATTRIBUTES };
   models.set(table, model);
+  bases.set(model, table);
   return model;
 }
 
@@ -199,10 +202,14 @@ export function encodeCell(cell: ModelCell): string {
 
 /** A table's header and `rows` (its rows, the first 1, in that order) as plain markdown: no attribute, no metadata row */
 export function plainMarkdown(model: TableModel, rows: readonly number[]): string {
-  const header = { cells: model.columns.map((column) => escapeCell(headerText(column))) };
-  const body = rows.map((row) => ({ cells: (model.rows[row - 1]?.cells ?? []).map((cell) => escapeCell(cell.content)) }));
-  return serializeTable({ indent: "", align: model.columns.map((column) => column.align), padded: false, rows: [header, ...body] });
+  // Written as it is in the page (a header's hashtags where they are, padding), its tags then left out
+  const table = encode(model, bases.get(model) ?? NO_TABLE);
+  const plain = (row: number) => ({ cells: (table.rows[row]?.cells ?? []).map(withoutTags) });
+  return serializeTable({ indent: "", align: table.align, padded: table.padded, rows: [plain(0), ...rows.map(plain)] });
 }
+
+// What a model no table was read for is written against: no form of its own
+const NO_TABLE: Table = { indent: "", align: [], rows: [], padded: false };
 
 /**
  * The metadata row's attributes of the columns of `base` none of the model's

@@ -11,8 +11,9 @@
 // The metadata row carries `core.table`, by which it is told from a last row
 // whose one cell holds only a tag.
 
-/** Whose an attribute is: a module's name in lowercase, or the core's */
-export type Owner = string;
+import type { Owner } from "./model/model.ts";
+
+export type { Owner };
 export const CORE: Owner = "core";
 
 /** The mark of a table's metadata row (an attribute without a value) */

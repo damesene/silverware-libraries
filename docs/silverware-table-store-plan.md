@@ -460,8 +460,9 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      name says one thing: the owner's attributes of a table, and one key's
      over its columns. A cell's (`getCellTag`, `withCellTag`,
      `canStoreCellTag`) join with the cells' part, `at` a cell.
-   - **Table attributes (2026-11-20)**: `model/model.ts` (the model's
-     types, `Attributes` by owner and key, ahead of the rest); a table's own
+   - **Table attributes (2026-11-20)**: `model/model.ts` (`Attributes` by
+     owner and key, and `Owner`; the model's other types come with
+     `TableModel`, when something uses them); a table's own
      attributes are `Table.attributes` (optional while `Table` becomes the
      model), its columns' still the metadata row's names in `meta` (the
      next part). The markdown codec splits the metadata row as it reads it

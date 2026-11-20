@@ -16,7 +16,8 @@
 // The handle and the outline are the core's (handleLayer, outlineLayer): in
 // the cells, so they move with the table as it scrolls and go under its held
 // header; the drag is the core's too (drag), the cell nearest the pointer told.
-import { cellValue, type Cell, type FillLine, filled, fillLine } from "../autofill/index.ts";
+import { cellValue, type Cell, type FillCells, type FillLine, filled, fillLine } from "../autofill/index.ts";
+import type { TableModel } from "../model/model.ts";
 import {
   CELL_MENU_ORDER,
   type CellMenuGroup,
@@ -386,10 +387,10 @@ export class AutoFill implements Feature {
     }));
   }
 
-  private fillCells(info: TableInfo) {
+  private fillCells(info: TableInfo): FillCells {
     return {
-      claim: (cell: string, from: Cell, to: Cell) => this.host.fillCell(info, cell, from, to),
-      keepTags: (value: string, from: string) => this.host.keepTags(value, from),
+      claim: (cell, from, to) => this.host.fillCell(info, cell, from, to),
+      placed: (cell, over) => this.host.cellWrittenOver(cell, over),
     };
   }
 
@@ -397,7 +398,7 @@ export class AutoFill implements Feature {
   private drag(start: MouseEvent | PointerEvent): void {
     const selected = this.selection();
     if (!selected) return;
-    const table = this.host.tableOf(selected.info);
+    const table = this.host.asModel(this.host.tableOf(selected.info));
     let extent: Extent | undefined;
     this.tipFor = "";
     const finish = (apply: boolean) => {
@@ -433,7 +434,7 @@ export class AutoFill implements Feature {
   }
 
   /** By the pointer: the value the farthest cell filled gets (else how many cells are filled) */
-  private showTip(selected: Selected, extent: Extent | undefined, table: ReturnType<ModelHost["tableOf"]>, x: number, y: number): void {
+  private showTip(selected: Selected, extent: Extent | undefined, table: TableModel, x: number, y: number): void {
     if (!extent) {
       this.tip.hide();
       return;
@@ -455,12 +456,15 @@ export class AutoFill implements Feature {
   private fillDown(): void {
     const selected = this.selection();
     if (!selected) return;
-    const table = this.host.tableOf(selected.info);
-    const columns = table.rows[0]?.cells.length ?? 0;
+    const table = this.host.asModel(this.host.tableOf(selected.info));
+    const columns = table.columns.length;
     const beside = [selected.left - 1, selected.right + 1].filter((c) => c >= 0 && c < columns);
     const last = selected.rowZone[1];
-    const filledBeside = (column: number, shown: number) =>
-      shown <= last && cellValue(table.rows[selected.rows[shown]!]?.cells[column] ?? "") !== "";
+    // (Rows as the markdown's: the model's row r is rows[r - 1])
+    const filledBeside = (column: number, shown: number) => {
+      const cell = shown <= last ? table.rows[selected.rows[shown]! - 1]?.cells[column] : undefined;
+      return !!cell && cellValue(cell) !== "";
+    };
     let to = selected.bottom;
     for (const column of beside) {
       if (!filledBeside(column, selected.bottom + 1)) continue;
@@ -481,7 +485,7 @@ export class AutoFill implements Feature {
     const area = this.areaOf(selected, extent);
     const corner = (shown: number, column: number): CellRef => ({ row: selected.rows[shown]!, column });
     this.host.selectCells(info, corner(area.top, area.left), corner(area.bottom, area.right));
-    const result = await this.host.writeTable(info, (t) => filled(t, lines, this.fillCells(info)));
+    const result = await this.host.writeModel(info, (t) => filled(t, lines, this.fillCells(info)));
     if (result === "written") return;
     const now = this.host.tableFor(info.key);
     if (now) this.host.selectCells(now, corner(selected.top, selected.left), corner(selected.bottom, selected.right));

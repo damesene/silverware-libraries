@@ -54,8 +54,8 @@ import { columnLetters } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import type { MenuEntry } from "../menu.ts";
 import { withoutTags } from "../tags.ts";
-import type { Table } from "../markdown.ts";
-import { setCell } from "../ops.ts";
+import type { TableModel } from "../model/model.ts";
+import { EMPTY_CELL, withCellAt } from "../model/ops.ts";
 import type { TableKey } from "../core/feature.ts";
 
 // Ctrl+Alt + these keys move the rows (up, down, 10 rows) or columns (left, right, to the first or last) selected, as in the cell editor
@@ -1095,8 +1095,12 @@ export class Selection implements Feature {
    */
   private async empty(info: TableInfo, cells: readonly CellRef[]): Promise<void> {
     const refs = cells.filter((ref) => ref.row > 0);
-    const emptied = (table: Table, ref: CellRef) => setCell(table, ref.row, ref.column, this.host.keepTags("", table.rows[ref.row]?.cells[ref.column] ?? ""));
-    await this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => refs.reduce(emptied, t));
+    // (Nothing written over each: its attributes kept, its name; a formula goes, even one whose result is empty)
+    const emptied = (table: TableModel, ref: CellRef) => {
+      const cell = table.rows[ref.row - 1]?.cells[ref.column];
+      return cell ? withCellAt(table, ref.row, ref.column, this.host.cellWrittenOver(EMPTY_CELL, cell)) : table;
+    };
+    await this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => refs.reduce(emptied, t));
   }
 
   /**

@@ -735,8 +735,8 @@ export class Formulas implements Feature {
   }
 
   /** A formula cell's value is its formula's: pasting leaves it */
-  keepsCell(cell: string): string | undefined {
-    return this.cells.formulaOf(this.host.asModel(cell)) ? "formula cell" : undefined;
+  keepsCell(cell: ModelCell): string | undefined {
+    return this.cells.formulaOf(cell) ? "formula cell" : undefined;
   }
 
   /** A formula cell is edited as its formula; a text starting with "=" as '=…, so it stays text */
@@ -972,13 +972,13 @@ export class Formulas implements Feature {
    * written. A new formula is metadata: without the setting it is copied as
    * its value.
    */
-  fillCell(info: TableInfo, cell: string, from: CellRef, to: CellRef): string | undefined {
-    const stored = this.cells.formulaOf(this.host.asModel(cell));
+  fillCell(info: TableInfo, cell: ModelCell, from: CellRef, to: CellRef): ModelCell | undefined {
+    const stored = this.cells.formulaOf(cell);
     // (A formula moved elsewhere is a new one: with the setting off, the value is copied)
     if (!stored || from.row === 0 || to.row === 0 || !this.host.canStore(EMPTY_CELL, "f")) return undefined;
     const table = this.modelOf(info);
     const size = { rows: table.rows.length, columns: table.columns.length };
-    return this.host.fromModel(this.cells.formulaCell("", filledFormula(stored.formula, to.row - from.row, to.column - from.column, size)));
+    return this.cells.formulaCell("", filledFormula(stored.formula, to.row - from.row, to.column - from.column, size));
   }
 
   /**

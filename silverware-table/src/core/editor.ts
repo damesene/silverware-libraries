@@ -5,9 +5,8 @@
 // on in the popup. Features shape what it shows and saves (a formula) through
 // the editor hooks of core/feature.ts.
 import { headerCell, withHeaderText } from "../columns.ts";
-import { type ModelCell, sameCell, type TableModel } from "../model/model.ts";
+import { type ModelCell, NO_ATTRIBUTES, sameCell, type TableModel } from "../model/model.ts";
 import { columnAfterMove, EMPTY_CELL, moveColumn, moveRow, withCellAt } from "../model/ops.ts";
-import { setCell } from "../ops.ts";
 import { appendRowAt, clampColumnMove, clampRowMove } from "../pins.ts";
 import { OUT_OF_LINE_CLASS, UI_CLASS } from "../dom.ts";
 import { type AdapterFeature, type CellField, type CellRef, type FocusTarget, PAGE_ROWS, type RenderedEditor, type TableHost, type WidgetInfo, type WriteResult } from "./feature.ts";
@@ -398,16 +397,17 @@ export class CellEditing {
 
   /**
    * The cell for what the editor holds: the cell as it was when nothing was
-   * changed, what a feature makes of it (a formula), else the cell with its
-   * content the text, its attributes kept (those bound to the content go: the
-   * rule of an edit, as it is written)
+   * changed, what a feature makes of it (a formula), else the text written
+   * over the cell (its attributes kept, those bound to the content gone)
    */
   private cellValue(active: ActiveEditor): ModelCell {
     const typed = active.field.value;
     if (typed === active.initial) return active.original;
-    const value = this.context.features.reduce<ModelCell | undefined>((v, f) => v ?? f.editorValue?.(active, typed), undefined) ?? { ...active.original, content: typed };
-    // (As the edit leaves it: what a feature holds to write later, the lazy module's, is so too; a header's are its column's)
-    return active.row === 0 ? value : this.host.editedCell(active.original, value);
+    const made = this.context.features.reduce<ModelCell | undefined>((v, f) => v ?? f.editorValue?.(active, typed), undefined);
+    if (made) return made;
+    // A header: its text as written, the column's attributes kept; a body cell: the value written over it (a formula
+    // ends, even where the value is its result: what a feature holds to write later, the lazy module's, is so too)
+    return active.row === 0 ? { ...active.original, content: typed } : this.host.cellWrittenOver({ content: typed, attributes: NO_ATTRIBUTES }, active.original);
   }
 
   /**
@@ -435,13 +435,18 @@ export class CellEditing {
       const row = next && sameTable ? growth.rowMap(next.row) : undefined;
       const column = next && sameTable ? growth.columnMap(next.column) : undefined;
       let changedMeanwhile = false;
-      result = await this.host.write(
-        closed.widget,
+      const target = this.host.infoOf(closed.widget);
+      result = !target
+        ? "failed"
+        : await this.host.writeModel(
+        target,
         (t) => {
           const grown = growth.grow(t);
           changedMeanwhile = !grown;
-          // (A new cell: as the codec writes it; the table grown is the markdown's until paste writes on the model too)
-          return grown && setCell(grown, growth.cell.row, growth.cell.column, this.host.fromModel(closed.value));
+          // (In the header's line: the new column's name)
+          if (!grown) return undefined;
+          const at = growth.cell;
+          return at.row === 0 ? withHeaderText(grown, at.column, closed.value.content) : withCellAt(grown, at.row, at.column, closed.value);
         },
         {
           rowMap: growth.rowMap,

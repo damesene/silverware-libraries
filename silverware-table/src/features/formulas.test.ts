@@ -46,6 +46,13 @@ describe("Formulas", () => {
     expect(text).toBe("| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Total | 7 <meta core.cn='total'> |\n");
   });
 
+  it("ends a formula with a value typed over it that equals its result, as a spreadsheet does", async () => {
+    await setup("| A |\n|---|\n| 3 <meta formulas.f='=1+2'> |\n", { "silverware.table.editor.enterKey": "save" });
+    clickOn(cell(1, 0));
+    await type("3");
+    expect(text).toBe("| A |\n|---|\n| 3 |\n");
+  });
+
   it("inserts a numbered column (=ROW() in every row) from a column's menu; rows added or moved are numbered again", async () => {
     const openColumnMenu = (column: number) => {
       cell(1, column).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));

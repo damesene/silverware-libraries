@@ -13,7 +13,7 @@
 // - Unique in its table (a row's or a cell's name): a row or a cell the edit
 //   made (no row or column before is it: a row duplicated, inserted with
 //   cells) takes none that another row or cell of the table has.
-import { type Attributes, attributeIn, type ModelCell, type ModelRow, type Owner, type TableModel, withAttributeIn } from "./model.ts";
+import { type Attributes, attributeIn, type ModelCell, type ModelRow, type Owner, type TableModel, withAttributeIn, withAttributeSet } from "./model.ts";
 import type { IndexMap } from "./ops.ts";
 
 /** An attribute an owner declares a rule for */
@@ -25,12 +25,30 @@ export type AttributeRules = { readonly boundToContent: readonly RuledAttribute[
 /**
  * A cell as an edit leaves it (`before` the cell as it was, `after` as edited
  * there): its content changed and its attributes as they were, what is bound to
- * the content goes; else as edited
+ * the content goes; else as edited (an edit that set a cell's content only: a
+ * value written explicitly is cellWrittenOver's)
  */
-export function editedCell(before: ModelCell, after: ModelCell, rules: AttributeRules): ModelCell {
+function editedCell(before: ModelCell, after: ModelCell, rules: AttributeRules): ModelCell {
   if (before.content === after.content || before.attributes !== after.attributes) return after;
   const attributes = without(after.attributes, rules.boundToContent, () => false);
   return attributes === after.attributes ? after : { ...after, attributes };
+}
+
+/**
+ * A cell written over another (`over`): a value typed, cleared, copied or
+ * filled (a cell of no attributes), a cell moved. Its content and what is
+ * bound to it (a formula) are set explicitly, so the edit keeps them and a
+ * value ends a formula even where it equals the formula's result; the other
+ * attributes are the cell written over's (its name), so names stay at both
+ * ends of a move
+ */
+export function cellWrittenOver(cell: ModelCell, over: ModelCell, rules: AttributeRules): ModelCell {
+  let attributes = over.attributes;
+  for (const { owner, key } of rules.boundToContent) {
+    const value = attributeIn(cell.attributes, owner, key);
+    if (value !== undefined || attributeIn(attributes, owner, key) !== undefined) attributes = withAttributeSet(attributes, owner, key, value);
+  }
+  return { content: cell.content, attributes };
 }
 
 /** Where each row and column of the table as edited was before the edit (undefined: the edit made it), of the write's maps */

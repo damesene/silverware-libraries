@@ -25,7 +25,7 @@ import type { TablePlatform } from "./core/platform.ts";
 import type { StoredTable } from "./core/store.ts";
 import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt } from "./model/model.ts";
 import { HASHTAGS_KEY } from "./columns.ts";
-import { type AttributeRules, editedCell, withAttributeRules } from "./model/rules.ts";
+import { type AttributeRules, cellWrittenOver, withAttributeRules } from "./model/rules.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
 import { decode, decodeCell, encode, encodeCell, plainMarkdown } from "./store/markdown/codec.ts";
@@ -70,11 +70,10 @@ import {
 } from "./markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "./menu.ts";
 import { floatingMenu, focusMenu } from "./core/menu.ts";
-import { CORE, attributeName, metadataAfterEdit, metaName, modelTableName, metaPins, metaSort, withMetaPins, withMetaSort, writtenName } from "./meta.ts";
+import { CORE, metadataAfterEdit, metaName, modelTableName, metaPins, metaSort, withMetaPins, withMetaSort, writtenName } from "./meta.ts";
 import { CELL_NAME_KEY, type CellNameAt, cellNameOf, cellNamesIn, LINE_NAME_KEY, columnNameIn, modelCellName, modelCellNames, modelColumnName, modelRowName, modelRowNames, type RowName, rowNameIn, rowNamesIn, withCellNameIn, withColumnNameIn, withModelName, withRowNameIn } from "./names.ts";
 import { ownMeta } from "./core/metaaccess.ts";
 import { withoutNewTagValues } from "./tagvalues.ts";
-import { keepTags } from "./tags.ts";
 import { nameEmptyHeaders, reorderRows } from "./ops.ts";
 import {
   cycleSort,
@@ -990,11 +989,6 @@ export class Controller implements TableHost {
     return this.features.flatMap((f) => f.columnDeleteWarning?.(info, column) ?? []);
   }
 
-  /** Attributes of cells' hidden tags a copy of a row leaves out: the names of rows and cells, one row's, one cell's */
-  uniqueTags(): ReadonlySet<string> {
-    return new Set(this.attributeRules().unique.map(({ owner, key }) => attributeName(owner, key).toLowerCase()));
-  }
-
   /** The attributes their owners declare a rule for: the modules' bound to their cell's content, the core's names unique */
   private attributeRules(): AttributeRules {
     return {
@@ -1390,10 +1384,6 @@ export class Controller implements TableHost {
     return this.views.get(info.key) ?? DEFAULT_VIEW;
   }
 
-  keepTags(value: string, from: string): string {
-    return keepTags(value, from, new Set(this.attributeRules().boundToContent.map(({ owner, key }) => attributeName(owner, key).toLowerCase())));
-  }
-
   clickSelects(): boolean {
     return this.features.some((f) => f.clickSelects?.());
   }
@@ -1423,7 +1413,7 @@ export class Controller implements TableHost {
     return name;
   }
 
-  fillCell(info: WidgetInfo, cell: string, from: CellRef, to: CellRef): string | undefined {
+  fillCell(info: WidgetInfo, cell: ModelCell, from: CellRef, to: CellRef): ModelCell | undefined {
     for (const feature of this.features) {
       const copy = feature.fillCell?.(info, cell, from, to);
       if (copy !== undefined) return copy;
@@ -1431,7 +1421,11 @@ export class Controller implements TableHost {
     return undefined;
   }
 
-  cellKeptBy(cell: string): string | undefined {
+  cellWrittenOver(cell: ModelCell, over: ModelCell): ModelCell {
+    return cellWrittenOver(cell, over, this.attributeRules());
+  }
+
+  cellKeptBy(cell: ModelCell): string | undefined {
     for (const feature of this.features) {
       const reason = feature.keepsCell?.(cell);
       if (reason) return reason;
@@ -1910,10 +1904,6 @@ export class Controller implements TableHost {
 
   saveEditing(): Promise<void> {
     return this.cellEditor.finish(true, undefined, false);
-  }
-
-  editedCell(before: ModelCell, after: ModelCell): ModelCell {
-    return editedCell(before, after, this.attributeRules());
   }
 
   takeEditor(): { key: TableKey; row: number; column: number; save: (table: TableModel) => TableModel | undefined } | undefined {

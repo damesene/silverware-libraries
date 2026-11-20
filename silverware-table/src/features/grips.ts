@@ -21,9 +21,10 @@ import {
   rowBlockTo,
 } from "../core/structure.ts";
 import { ICONS } from "../icons.ts";
-import type { Align, Table } from "../markdown.ts";
+import type { Align } from "../markdown.ts";
+import type { TableModel } from "../model/model.ts";
 import { type MenuEntry, namingThatCloses, wrapRuns } from "../menu.ts";
-import { setAlign } from "../ops.ts";
+import { withAlign } from "../model/ops.ts";
 import { columnZone, insertColumnAt, insertRowAt, rowZone } from "../pins.ts";
 import { type ViewState, withoutSort, withSort } from "../view.ts";
 import type { TableKey } from "../core/feature.ts";
@@ -823,9 +824,9 @@ export class Grips implements Feature {
     const view = host.viewOf(info);
     const sorted = view.sort?.column === column ? view.sort.direction : undefined;
     const align = info.model.align[column] ?? "";
-    const edit = (change: (t: Table) => Table | undefined) => this.runAndClose(() => void host.writeTable(host.tableFor(info.key) ?? info, change));
+    const edit = (change: (t: TableModel) => TableModel | undefined) => this.runAndClose(() => void host.writeModel(host.tableFor(info.key) ?? info, change));
     const sortBy = (next: ViewState) => this.runAndClose(() => host.setSort(host.tableFor(info.key) ?? info, next));
-    const alignTo = (target: Align) => edit((t) => setAlign(t, column, align === target ? "" : target));
+    const alignTo = (target: Align) => edit((t) => withAlign(t, column, align === target ? "" : target));
     const act = (run: () => unknown) => this.runAndClose(() => void run());
     const zone = columnZone(info.pins, info.columns, column);
     // The columns selected whole move together when they hold this one

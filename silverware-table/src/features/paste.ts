@@ -24,7 +24,7 @@ import {
 } from "../core/feature.ts";
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/feature.ts";
 import type { MenuEntry } from "../menu.ts";
-import { cellMoveRules, growTo, moveRowsTo } from "../core/structure.ts";
+import { growTo, moveRowsTo } from "../core/structure.ts";
 import { ICONS } from "../icons.ts";
 import { moveCells, parseClipboardCells, pasteCells, planPaste } from "../paste.ts";
 
@@ -499,7 +499,7 @@ export class Paste implements Feature {
     }
     // A cell past the table (the sheet view's empty cell): the table grown to it first, in the same edit
     const growth = at.row >= info.rows || at.column >= info.columns ? growTo(info, at) : undefined;
-    const source = info.model;
+    const source = this.host.asModel(info.model);
     const base = growth ? growth.grow(source) : source;
     if (!base) return;
     const plan = planPaste(base, info.pins, growth ? growth.cell : at, cut ? cut.held : data, insert);
@@ -510,18 +510,16 @@ export class Paste implements Feature {
     const closed = fromEditor ? this.host.takeEditor() : undefined;
     let skipped: ReadonlyMap<string, number> = new Map();
     const { newRows, newColumns } = plan;
-    const result = await this.host.writeTable(
+    const result = await this.host.writeModel(
       info,
       (t) => {
-        // (The editor's value saved on the model, until paste writes on it too)
-        const model = closed && closed.save(this.host.asModel(t));
-        const saved = closed ? model && this.host.fromModel(model, t) : t;
+        const saved = closed ? closed.save(t) : t;
         const edited = saved && growth ? growth.grow(saved) : saved;
         if (!edited) return undefined;
-        if (cut) return moveCells(edited, cut.cells, plan, cellMoveRules(this.host));
+        // (A cell moved over another: its content and its formula with it, the name there staying)
+        if (cut) return moveCells(edited, cut.cells, plan, (moved, over) => this.host.cellWrittenOver(moved, over));
         const pasted = pasteCells(edited, plan, data, {
           keptBy: (cell) => this.host.cellKeptBy(cell),
-          keepTags: (value, from) => this.host.keepTags(value, from),
           headerRenamed: (name, from) => this.host.headerRenamed(name, from),
         });
         skipped = pasted.skipped;

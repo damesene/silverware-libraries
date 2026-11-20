@@ -633,11 +633,11 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      a hashtag typed into a header still makes one and the column types'
      header hooks work on that text as before); `editorText(…, original:
      ModelCell)`, `editorValue(…): ModelCell` (the formulas' formula set on
-     the cell as it was, so its name stays); a value typed is the cell with
-     its content set, as the edit leaves it (`editedCell`, the rule for one
-     cell, which `withAttributeRules` uses per cell and the core gives as
-     `TableHost.editedCell`), so a value held to write later is right
-     wherever it goes; written by `writeModel`, refused where the cell
+     the cell as it was, so its name stays); a value typed is written over
+     the cell (`cellWrittenOver`, below: a formula ends even where the value
+     equals its result, which the rule alone, judging by content, would
+     miss), so a value held to write later is right wherever it goes;
+     written by `writeModel`, refused where the cell
      changed meanwhile (`sameCell`: content and attributes). The lazy
      module's held edits are model cells (`HeldEdit`, `PendingEdits.apply`
      on the model); the core puts them into a table read with the rules
@@ -646,6 +646,22 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      for paste's commit, next: the cell typed past a table (`growTo`,
      written through the codec) and paste's change (the editor's value
      saved on the model of its table).
+   - **Cells written on the model (2026-11-20)**: paste (`pasteCells`, a
+     value the cell's content, a header its text as written; `planPaste`
+     on the model), cut and moved cells (`moveCells`), copied cells
+     (`moveCellsTo`), Clear, AutoFill (its domain, `FillCells` of `claim`
+     and `placed`), a table grown to a cell past it (`growTo`, a header
+     there the new column's name), the alignment. A cell moved, copied or
+     filled over another, a value typed or cleared, is `cellWrittenOver`
+     (model/rules.ts, the host's; first written for moves, made the one way
+     a value is written once review found a value equal to a formula's
+     result kept the formula):
+     its content and what is bound to it, set explicitly, the cell there
+     keeping its other attributes (its name), as tags were kept before.
+     `keepsCell`, `cellKeptBy` and `fillCell` take model cells. The host's
+     `keepTags` and `uniqueTags` are gone, and with them tags.ts'
+     `keepTags` and `withoutTagsWith`: no write of cells goes through the
+     markdown's tags any more.
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

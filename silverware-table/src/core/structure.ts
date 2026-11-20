@@ -2,7 +2,6 @@
 // moving and pinning rows and columns; moving and copying cells. Each is one write, rows and columns
 // pinned to the edges stay there (pins.ts), and formulas and the stored
 // sorting follow through the write steps (rowMap, columnMap).
-import type { Table } from "../markdown.ts";
 import type { TableModel } from "../model/model.ts";
 import { metaPins } from "../meta.ts";
 import {
@@ -18,9 +17,8 @@ import {
   moveRow,
   moveRows,
 } from "../model/ops.ts";
-import { insertColumn, insertRow, setCell } from "../ops.ts";
-import { type MoveRules, moveCells } from "../paste.ts";
-import { cellTags, withoutTags } from "../tags.ts";
+import { EMPTY_CELL, withCellAt } from "../model/ops.ts";
+import { moveCells } from "../paste.ts";
 import {
   clampColumnMove,
   clampRowMove,
@@ -36,25 +34,6 @@ import {
   type RowZone,
 } from "../pins.ts";
 import type { CellRef, ModelHost, TableInfo, WriteResult } from "./feature.ts";
-
-/**
- * What moving cells does with their hidden tags: the text and the tags a
- * feature manages (a formula's) go with a cell; the others (a row's or a
- * cell's name) stay where they are, at both ends, so names keep naming their
- * rows and places
- */
-export function cellMoveRules(host: ModelHost): MoveRules {
-  // The tags no feature manages: those keepTags keeps from a cell
-  const unmanaged = (cell: string) => new Set(cellTags(host.keepTags("", cell)));
-  return {
-    emptied: (cell) => host.keepTags("", cell),
-    placed: (moved, over) => {
-      const stay = unmanaged(moved);
-      const content = [withoutTags(moved), ...cellTags(moved).filter((tag) => !stay.has(tag))].filter((part) => part !== "").join(" ");
-      return host.keepTags(content, over);
-    },
-  };
-}
 
 /**
  * Moves the cells (rows of the markdown and columns, as they are shown: row
@@ -73,17 +52,21 @@ export function moveCellsTo(
   const columns = (cells[0] ?? []).map((_, j) => to.column + j);
   if (to.row < 1 || rows[rows.length - 1]! >= info.rows || columns[columns.length - 1]! >= info.columns) return Promise.resolve("unchanged");
   const plan = { rows, columns, newRows: { at: 0, count: 0 }, newColumns: { at: 0, count: 0 }, pins: info.pins };
-  if (!copy) return host.writeTable(info, (t) => moveCells(t, cells, plan, cellMoveRules(host)));
-  return host.writeTable(info, (t) => {
+  // (A cell moved or copied over another: its content and its formula with it, the name there staying)
+  if (!copy) return host.writeModel(info, (t) => moveCells(t, cells, plan, (moved, over) => host.cellWrittenOver(moved, over)));
+  return host.writeModel(info, (t) => {
     // Read before any is written: the copy may overlap its cells
-    const raw = cells.map((row) => row.map((ref) => t.rows[ref.row]?.cells[ref.column] ?? ""));
+    const read = cells.map((row) => row.map((ref) => t.rows[ref.row - 1]?.cells[ref.column] ?? EMPTY_CELL));
     let result = t;
     cells.forEach((row, i) =>
       row.forEach((from, j) => {
         const dest = { row: rows[i]!, column: columns[j]! };
-        const cell = raw[i]![j]!;
-        const value = host.fillCell(info, cell, from, dest) ?? withoutTags(cell);
-        result = setCell(result, dest.row, dest.column, host.keepTags(value, result.rows[dest.row]?.cells[dest.column] ?? ""));
+        const cell = read[i]![j]!;
+        const over = result.rows[dest.row - 1]?.cells[dest.column];
+        if (!over) return;
+        // A module's copy (a formula, its references moved), else the value alone
+        const copied = host.fillCell(info, cell, from, dest) ?? { content: cell.content, attributes: EMPTY_CELL.attributes };
+        result = withCellAt(result, dest.row, dest.column, host.cellWrittenOver(copied, over));
       }),
     );
     return result;
@@ -208,7 +191,7 @@ export function moveColumnsTo(host: ModelHost, info: TableInfo, first: number, l
 /** A table grown to hold a cell past its last row or column (growTo) */
 export type Growth = {
   // The table grown; undefined when it is no longer the shape it was rendered with (its rows, columns and pins)
-  readonly grow: (table: Table) => Table | undefined;
+  readonly grow: (table: TableModel) => TableModel | undefined;
   // Where the cell is in the table grown
   readonly cell: CellRef;
   readonly rowMap: IndexMap;
@@ -231,10 +214,11 @@ export function growTo(info: TableInfo, at: CellRef): Growth {
     grow: (table) => {
       const pins = metaPins(table);
       const same = (["top", "bottom", "left", "right"] as const).every((side) => pins[side] === info.pins[side]);
-      if (table.rows.length !== info.rows || table.align.length !== info.columns || !same) return undefined;
+      // (info.rows counts the header as a row, as the markdown's)
+      if (table.rows.length + 1 !== info.rows || table.columns.length !== info.columns || !same) return undefined;
       let grown = table;
-      for (let i = 0; i < columns; i++) grown = insertColumn(grown, columnsAt + i);
-      for (let i = 0; i < rows; i++) grown = insertRow(grown, rowsAt + i);
+      for (let i = 0; i < columns; i++) grown = insertModelColumn(grown, columnsAt + i);
+      for (let i = 0; i < rows; i++) grown = insertModelRow(grown, rowsAt + i);
       return grown;
     },
     cell: { row: rows ? rowsAt + rows - 1 : at.row, column: columns ? columnsAt + columns - 1 : at.column },

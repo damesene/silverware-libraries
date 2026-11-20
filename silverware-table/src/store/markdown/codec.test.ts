@@ -8,7 +8,7 @@ import { followColumnMeta, metaValue, withColumnValues, withMetaValue } from "..
 import { attributeIn, type ModelCell, type TableModel, withAttributeIn } from "../../model/model.ts";
 import { withCellNameIn, withColumnNameIn, withRowNameIn } from "../../names.ts";
 import { reorderRows, setCell } from "../../ops.ts";
-import { keepTags } from "../../tags.ts";
+import { cellTags } from "../../tags.ts";
 import { withTagValue } from "../../tagvalues.ts";
 import { HASHTAGS_KEY } from "../../columns.ts";
 import { decode, decodeCell, encode, encodeCell } from "./codec.ts";
@@ -82,7 +82,7 @@ describe("the markdown codec", () => {
     });
 
     it("a cell's content, its tags kept", () => {
-      const before = setCell(table, 1, 1, keepTags("14", table.rows[1]!.cells[1]!));
+      const before = setCell(table, 1, 1, ["14", ...cellTags(table.rows[1]!.cells[1]!)].join(" "));
       expect(md(encode(withCell(model, 1, 1, (c) => ({ ...c, content: "14" })), table))).toBe(md(before));
       // A | in it escaped
       const piped = setCell(table, 2, 0, "a \\| b");
@@ -94,7 +94,7 @@ describe("the markdown codec", () => {
       const read = decode(second);
       expect(attributeIn(read.rows[0]!.attributes, "core", "n")).toBe("two");
       const changed = encode(withCell(read, 1, 1, (c) => ({ ...c, content: "5" })), second);
-      expect(md(changed)).toBe(md(setCell(second, 1, 1, keepTags("5", second.rows[1]!.cells[1]!))));
+      expect(md(changed)).toBe(md(setCell(second, 1, 1, ["5", ...cellTags(second.rows[1]!.cells[1]!)].join(" "))));
     });
 
     it("a cell's, a row's and a column's names, in the names' one tag", () => {

@@ -836,8 +836,6 @@ export interface ModelHost {
    * Closes the cell editor for an edit that ends editing: `save` adds what the
    * editor held to that edit (undefined: the cell changed in the meantime)
    */
-  /** A body cell as an edit leaves it, `before` as it was: the rules of an edit applied (a value typed over a formula ends it) */
-  editedCell(before: ModelCell, after: ModelCell): ModelCell;
   takeEditor(): { readonly key: TableKey; readonly row: number; readonly column: number; readonly save: (table: TableModel) => TableModel | undefined } | undefined;
   /** Closes the cell editor saving, as leaving it does (an edit a feature holds stays held), the focus left where it is */
   saveEditing(): Promise<void>;
@@ -963,8 +961,6 @@ export interface ModelHost {
   tablesChanged(): void;
   /** What deleting a column also removes, by the features (names of rows and cells in it) */
   columnDeleteWarnings(info: TableInfo, column: number): string[];
-  /** Attributes of hidden tags a copy of a row leaves out (names: one per page or table) */
-  uniqueTags(): ReadonlySet<string>;
   /** What a feature's toolbar buttons show changed: the toolbar in view is shown again */
   toolbarChanged(): void;
   /** Whether a table is shown sorted or with rows hidden (filtered), so rows are not where the markdown has them */
@@ -976,14 +972,15 @@ export interface ModelHost {
   forgetStoredView(key: TableKey): void;
   /** The same for the table with `key`, as it is shown now */
   viewChangedFor(key: TableKey): void;
-  /**
-   * A cell's new markdown with the hidden tags the cell had, but those the
-   * bound to their cell's content (Feature.boundToContent): editing, pasting or
-   * clearing a cell keeps the data modules keep in it
-   */
-  keepTags(value: string, from: string): string;
   /** Why a cell's value is a feature's (Feature.keepsCell): pasting leaves it */
-  cellKeptBy(cell: string): string | undefined;
+  cellKeptBy(cell: ModelCell): string | undefined;
+  /**
+   * A cell written over another (a value typed, cleared, copied or filled: a
+   * cell of no attributes; a cell moved): its content and what is bound to it
+   * (a formula) with it, so a value ends a formula even where it equals its
+   * result; the other's other attributes (its name) staying (model/rules.ts)
+   */
+  cellWrittenOver(cell: ModelCell, over: ModelCell): ModelCell;
   /** Why one of these cells of the table is not changed by hand (Feature.readOnly), the first said; undefined: none is */
   readOnly(table: Table, cells: readonly CellRef[]): string | undefined;
   /** Why the table's rows and columns are not added, deleted or moved by hand (Feature.fixedShape); undefined: they may be */
@@ -993,7 +990,7 @@ export interface ModelHost {
   /** The user tried to edit a cell not changed by hand: the features' ways to change it instead (Feature.editRefused) */
   editRefused(info: TableInfo, cell: CellRef): void;
   /** A feature's copy of a cell for another cell (Feature.fillCell), or undefined: copied as its value */
-  fillCell(info: TableInfo, cell: string, from: CellRef, to: CellRef): string | undefined;
+  fillCell(info: TableInfo, cell: ModelCell, from: CellRef, to: CellRef): ModelCell | undefined;
   /** Keyboard and input events from a field of a feature must not reach SilverBullet's editor */
   isolate(element: HTMLElement): void;
   /** The entries features give a row's or a column's menu, in their slots (see Feature.lineMenu) */
@@ -1339,7 +1336,7 @@ export interface Feature {
    * Why a cell's value is the feature's, so pasting leaves the cell as it is
    * (formulas: "formula cell", the formula computes it); undefined: it is not
    */
-  keepsCell?(cell: string): string | undefined;
+  keepsCell?(cell: ModelCell): string | undefined;
   /**
    * Why a cell of the table (its markdown's row, the header 0) is not changed
    * by hand, said to the user (a pivot's: calculated from its source); the
@@ -1361,7 +1358,7 @@ export interface Feature {
    * references moved by as many rows and columns; undefined: not the
    * feature's cell (it is copied as its value)
    */
-  fillCell?(info: TableInfo, cell: string, from: CellRef, to: CellRef): string | undefined;
+  fillCell?(info: TableInfo, cell: ModelCell, from: CellRef, to: CellRef): ModelCell | undefined;
   /** The cells selected changed (the selection module): what goes with them follows */
   selectionChanged?(): void;
   /**

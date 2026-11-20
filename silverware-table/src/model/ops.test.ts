@@ -3,7 +3,7 @@ import { escapeCell, parseTable, serializeTable, type Table } from "../markdown.
 import { followColumnMeta } from "../meta.ts";
 import * as markdown from "../ops.ts";
 import { decode, encode } from "../store/markdown/codec.ts";
-import { keepTags } from "../tags.ts";
+import { cellTags } from "../tags.ts";
 import { attributeIn, type TableModel } from "./model.ts";
 import * as ops from "./ops.ts";
 
@@ -51,8 +51,9 @@ describe("the model's operations, written back as the markdown's are", () => {
   });
 
   it("a cell's content set keeps its attributes, as a value kept with the cell's tags", () => {
-    expect(written((m) => ops.withContentAt(m, 2, 2, "a | c"))).toBe(md(markdown.setCell(TABLE, 2, 2, keepTags(escapeCell("a | c"), ""))));
-    expect(written((m) => ops.withContentAt(m, 3, 1, "8"))).toBe(md(markdown.setCell(TABLE, 3, 1, keepTags("8", TABLE.rows[3]!.cells[1]!))));
+    expect(written((m) => ops.withContentAt(m, 2, 2, "a | c"))).toBe(md(markdown.setCell(TABLE, 2, 2, escapeCell("a | c"))));
+    // (The content written with the cell's tags as they were)
+    expect(written((m) => ops.withContentAt(m, 3, 1, "8"))).toBe(md(markdown.setCell(TABLE, 3, 1, ["8", ...cellTags(TABLE.rows[3]!.cells[1]!)].join(" "))));
     const model = decode(TABLE);
     expect(ops.withContentAt(model, 3, 1, "7")).toBe(model);
   });

@@ -345,7 +345,7 @@ export class ChoicesDialog {
         const cell = table.rows[r - 1]!.cells[c];
         const to = cell && renamed.get(cell.content.trim().toLowerCase());
         // (Its attributes kept: a formula's cell is left, a feature computes it)
-        if (cell && to !== undefined && !this.host.cellKeptBy(this.host.fromModel(cell))) table = withContentAt(table, r, c, to);
+        if (cell && to !== undefined && !this.host.cellKeptBy(cell)) table = withContentAt(table, r, c, to);
       }
     }
     return table;

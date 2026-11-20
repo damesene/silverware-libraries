@@ -14,7 +14,7 @@ import type { Feature, ModelHost, PageCommand, TableBadge, TableInfo, ToolbarBut
 import { type Calculated, calculatedTable, readRenames, renamedColumns, renamedIn, renamedViewIds, sameCells, storedRenames, viewCalculated } from "../calculated/index.ts";
 import { type CalculatedBy, type CalculatedOffer, followFormula, FormulaError, type FormulasOffer, type Grid, referredTableNames, tokenize, viewGrid, withEquals } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
-import { locateBySource, type Table } from "../markdown.ts";
+import type { Table } from "../markdown.ts";
 import { freeTableName, sameTableName, validateTableName } from "../namerules.ts";
 import { openViewDialog } from "./viewdialog.ts";
 
@@ -170,7 +170,7 @@ export class Views implements Feature {
   }
 
   /** The result of a formula in the dialog, or why there is none (the formulas off, a page not read yet) */
-  private result(formula: string, table?: Table, replace?: { readonly from: number; readonly table: Table }): Grid | string {
+  private result(formula: string, table?: Table, replace?: { readonly key: string; readonly table: Table }): Grid | string {
     const formulas = this.formulas();
     if (!formulas) return "It needs the formulas module, which is off";
     const problem = formulas.validate(withEquals(formula).formula.trim());
@@ -230,8 +230,7 @@ export class Views implements Feature {
     const own = this.host.tableName(table)?.trim();
     const source = own ?? this.freeName("table");
     // A table to be named so: the view's formula reads it as it will be written
-    const range = own ? undefined : locateBySource(this.host.pageText, info.hint, info.source);
-    const replace = range ? { from: range.from, table: this.host.withTableName(table, source) } : undefined;
+    const replace = own ? undefined : { key: info.key, table: this.host.withTableName(table, source) };
     const naming = (formula: string) => !own && tokenize(formula).tokens.some((t) => t.kind === "table" && t.page === undefined && sameTableName(t.name, source));
     const preview = (formula: string) => this.result(formula, undefined, naming(formula) ? replace : undefined);
     const empty: Table = { indent: table.indent, align: [], rows: [{ cells: [""] }], padded: false };
@@ -239,7 +238,7 @@ export class Views implements Feature {
       const result = preview(formula);
       if (typeof result === "string") return this.host.notify(`Silverware Table: ${result}`, "error");
       const made = this.made(withEquals(formula).formula, name, table.indent, result);
-      void this.host.insertTable(made, info, naming(formula) ? { target: info, change: (t) => this.host.withTableName(t, source) } : undefined);
+      void this.host.insertTable(made, info, naming(formula) ? { key: info.key, change: (t) => this.host.withTableName(t, source) } : undefined);
     }, this.blocked(empty), undefined, (formula) => (naming(formula) ? source : undefined));
   }
 
@@ -257,8 +256,9 @@ export class Views implements Feature {
       const made = this.made(withEquals(formula).formula, name, "", result);
       // The cursor as it is now: the editor moved it with any edit made while the dialog was open
       void (async () => {
-        const position = (await this.host.cursorNow()) ?? (await this.host.pageTextNow()).length;
-        await this.host.insertTable(made, { position });
+        const position = await this.host.cursorNow();
+        // (No cursor: the page's end)
+        await this.host.insertTable(made, position === undefined ? undefined : { position });
       })();
     }, this.blocked(empty));
   }

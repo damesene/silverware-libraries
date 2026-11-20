@@ -13,12 +13,12 @@
 // each column stands for). How a calculated table is written, its renamed
 // headers kept and its staleness told is src/calculated/'s, shared with views.
 // Without the formulas module nothing is calculated.
-import type { Feature, ModelHost, PageCommand, TableBadge, TableInfo, ToolbarButton } from "../core/feature.ts";
+import type { Feature, ModelHost, PageCommand, StoredTable, TableBadge, TableInfo, ToolbarButton } from "../core/feature.ts";
 import { type Calculated, calculatedTable, movedRenames, readRenames, renamedIn, type Renames, sameCells, storedRenames } from "../calculated/index.ts";
 import { type CalculatedBy, type CalculatedOffer, followOwnFormula, type Following, callsPureFunctionsOnly, FormulaError, type FormulaCells, type FormulasOffer, type PageLinksOffer, PLAIN_CELLS } from "../formulas/index.ts";
 import { columnName } from "../columns.ts";
 import { ICONS } from "../icons.ts";
-import { type PageTable, type Table, unescapeCell } from "../markdown.ts";
+import { type Table, unescapeCell } from "../markdown.ts";
 import { definitionAttributes, groupFormula, KEYS, type Key, looseDefinition, type PivotDefinition, readDefinition, sourceRef, sourceText, valueItem, valueParts } from "../pivot/definition.ts";
 import { type Fields, fieldsOf } from "../pivot/fields.ts";
 import { pivotOf } from "../pivot/pivot.ts";
@@ -37,7 +37,7 @@ export class Pivot implements Feature {
   // Whether a pivot shown is out of date (or why it cannot be calculated), as last read
   private readonly stale = new WeakMap<TableInfo, string | boolean>();
   // Another page's tables (as pageLinks read them) a pivot of one of them was last checked from
-  private readonly checkedFrom = new WeakMap<TableInfo, readonly PageTable[] | null>();
+  private readonly checkedFrom = new WeakMap<TableInfo, readonly StoredTable[] | null>();
 
   // The pivots last calculated, by their definition and their source's cells
   private readonly made = new Map<string, Calculated>();
@@ -99,7 +99,7 @@ export class Pivot implements Feature {
     const read = this.host.otherPages()?.tables(page);
     if (read === undefined) return { unread: page };
     if (read === null) return { problem: `no page ${page}` };
-    const table = this.sourceIn(read.map((t) => t.table), name);
+    const table = this.sourceIn(read.map((t) => t.model), name);
     return table ? { table } : { problem: `no table named ${name} on ${page}` };
   }
 
@@ -399,7 +399,7 @@ export class Pivot implements Feature {
     const tables = this.host.otherPages()?.tables(page);
     if (tables === null) return `There is no page ${page}`;
     if (!tables) return `${page} could not be read`;
-    const named = this.namedIn(tables.map((t) => t.table)).map(({ name, table }) => ({ name, columns: (table.rows[0]?.cells ?? []).map(columnName) }));
+    const named = this.namedIn(tables.map((t) => t.model)).map(({ name, table }) => ({ name, columns: (table.rows[0]?.cells ?? []).map(columnName) }));
     return named.length ? named : `No table of ${page} has a name: a pivot names the table it summarizes`;
   }
 
@@ -446,7 +446,7 @@ export class Pivot implements Feature {
       if (typeof pivot === "string") return this.host.notify(`Silverware Table: ${pivot}`, "error");
       const made = this.written(this.withDefinition({ indent: table.indent, align: [], rows: [{ cells: [""] }], padded: false }, definition), pivot, {});
       const names = !own && definition.source.trim().toLowerCase() === name.toLowerCase();
-      void this.host.insertTable(made, info, names ? { target: info, change: (t) => this.host.withTableName(t, name) } : undefined);
+      void this.host.insertTable(made, info, names ? { key: info.key, change: (t) => this.host.withTableName(t, name) } : undefined);
     }, blocked);
   }
 
@@ -496,8 +496,9 @@ export class Pivot implements Feature {
       const made = this.written(this.withDefinition(empty, definition), pivot, {});
       // The cursor as it is now: the editor moved it with any edit made while the dialog was open
       void (async () => {
-        const position = (await this.host.cursorNow()) ?? (await this.host.pageTextNow()).length;
-        await this.host.insertTable(made, { position });
+        const position = await this.host.cursorNow();
+        // (No cursor: the page's end)
+        await this.host.insertTable(made, position === undefined ? undefined : { position });
       })();
     }, this.blocked(empty));
   }

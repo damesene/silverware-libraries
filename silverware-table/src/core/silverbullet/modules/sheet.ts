@@ -608,7 +608,7 @@ export class Sheet implements AdapterFeature {
     const last = tables[tables.length - 1];
     if (!last) return undefined;
     const renamed = (t: Table) => this.host.setMeta(t, SHEET_KEY, name);
-    const result = await this.host.writeTable(last.target, renamed, { also: tables.slice(0, -1).map((t) => ({ target: t.target, change: renamed })) });
+    const result = await this.host.writeTable(last.target, renamed, { also: tables.slice(0, -1).map((t) => ({ key: t.target.key, change: renamed })) });
     if (result === "written" && shown && this.board === board) board.sheet = name;
     return undefined;
   }
@@ -637,7 +637,7 @@ export class Sheet implements AdapterFeature {
       if (!last) return;
       const off = (t: Table) => this.host.setMeta(this.host.setMeta(t, SHEET_KEY, undefined), AT_KEY, undefined);
       const bare = (t: Table) => [...this.host.metaOf(t).keys()].filter((k) => k.startsWith(WIDTH_PREFIX)).reduce((out, k) => this.host.setMeta(out, k, undefined), off(t));
-      await this.host.writeTable(last.target, off, { also: tables.slice(0, -1).map((t) => ({ target: t.target, change: bare })) });
+      await this.host.writeTable(last.target, off, { also: tables.slice(0, -1).map((t) => ({ key: t.target.key, change: bare })) });
     }
     if (ends && this.board === board) this.end();
   }
@@ -1728,7 +1728,7 @@ export class Sheet implements AdapterFeature {
       sheet,
       taken: [name],
       also: {
-        target: { key: board.alone, source: alone.text, hint: alone.from },
+        key: board.alone,
         change: (t: Table) => this.host.setMeta(this.host.setMeta(this.host.withTableName(t, name), SHEET_KEY, sheet), AT_KEY, "A1"),
       },
     };

@@ -31,9 +31,9 @@ export class MarkdownStore implements TableStore {
     private readonly register: TableRegister,
   ) {}
 
-  async tables(document: string): Promise<readonly StoredTable[]> {
+  async tables(document: string): Promise<readonly StoredTable[] | null> {
     const text = await textOf(this.platform(), document);
-    return text === undefined ? [] : tablesIn(this.register, document, text);
+    return text === undefined ? null : tablesIn(this.register, document, text);
   }
 
   documentOf(key: TableKey): string | undefined {

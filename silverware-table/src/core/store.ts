@@ -21,8 +21,8 @@ export type StoredTable = {
 };
 
 export interface TableStore {
-  /** A document's tables in its order (a page's name in SilverBullet); none where it has none or is not there */
-  tables(document: string): Promise<readonly StoredTable[]>;
+  /** A document's tables in its order (a page's name in SilverBullet); none where it has none; null where it is not there (or not read) */
+  tables(document: string): Promise<readonly StoredTable[] | null>;
   /** The document a table's key is of; undefined: a key the store did not give */
   documentOf(key: TableKey): string | undefined;
 }

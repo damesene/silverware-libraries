@@ -187,7 +187,7 @@ export class Names implements Feature {
     if (problem) return problem;
     if (name !== "") {
       // The page's tables as they are now, this one by its key (it may have moved since it was rendered)
-      const tables = await this.host.tables(await this.host.pageNameNow());
+      const tables = (await this.host.tables(await this.host.pageNameNow())) ?? [];
       const taken = tables.some(({ key, model }) => {
         if (key === info.key) return false;
         const other = this.host.tableName(model);

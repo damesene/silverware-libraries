@@ -11,14 +11,17 @@
 // nothing back. Pure: places in, places out.
 import { formatAt, type SheetCell } from "./page.ts";
 
+/** What tells a table apart on the sheet: its place in the page (the sheet view's), its key (the sheets module's) */
+export type LayoutId = number | string;
+
 /** A table as the layout sees it: an id (where it is in the page), its top left on the sheet, its rows (the header too) and columns */
-export type LaidOut = { readonly id: number; readonly at: SheetCell; readonly rows: number; readonly columns: number; readonly name?: string };
+export type LaidOut = { readonly id: LayoutId; readonly at: SheetCell; readonly rows: number; readonly columns: number; readonly name?: string };
 
 /** A table that grows: its rows and columns after the edit; `claims`: they take the empty cells past it rather than being inserted */
-export type Growth = { readonly id: number; readonly rows: number; readonly columns: number; readonly claims: boolean };
+export type Growth = { readonly id: LayoutId; readonly rows: number; readonly columns: number; readonly claims: boolean };
 
 /** The tables moved (their new top left, by id), or why the growth is refused (the table it would reach into) */
-export type Room = { readonly moved: ReadonlyMap<number, SheetCell> } | { readonly refused: string };
+export type Room = { readonly moved: ReadonlyMap<LayoutId, SheetCell> } | { readonly refused: string };
 
 type Box = { top: number; left: number; bottom: number; right: number };
 
@@ -62,7 +65,7 @@ export function roomFor(tables: readonly LaidOut[], growth: Growth): Room {
     const by = growth.claims ? reach : columns - grown.columns;
     for (const t of beyond) at.set(t.id, { row: at.get(t.id)!.row, column: at.get(t.id)!.column + by });
   }
-  const moved = new Map<number, SheetCell>();
+  const moved = new Map<LayoutId, SheetCell>();
   for (const t of others) {
     const now = at.get(t.id)!;
     if (now.row !== t.at.row || now.column !== t.at.column) moved.set(t.id, now);
@@ -75,7 +78,7 @@ export function roomFor(tables: readonly LaidOut[], growth: Growth): Room {
  * table it would overlap (a table is never put over another, nor pushes one
  * aside); undefined: it can
  */
-export function validatePlace(tables: readonly LaidOut[], id: number, at: SheetCell): string | undefined {
+export function validatePlace(tables: readonly LaidOut[], id: LayoutId, at: SheetCell): string | undefined {
   const moved = tables.find((t) => t.id === id);
   if (!moved) return undefined;
   const there = box(at, moved.rows, moved.columns);

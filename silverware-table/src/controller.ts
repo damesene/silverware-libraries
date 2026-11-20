@@ -2,7 +2,7 @@
 // inline cell editing and row/column editing. Every change to the markdown is
 // one `editor.replaceRange`, so undo works as for any other edit.
 import { type FeatureName, formatRule, moduleOnByDefault, SETTINGS, type SettingValue } from "./bridge.ts";
-import { type AdapterFeature, type AddressFrame, type AlsoChanged, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, type ColumnsMeasure, type ColumnWidths, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type TextPosition, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget, type PageAccess } from "./core/feature.ts";
+import { type AdapterFeature, type AddressFrame, type AlsoChanged, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, type ColumnsMeasure, type ColumnWidths, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type TextPosition, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget, type PageAccess, type KeyedTable, type OtherPages, type TableChange } from "./core/feature.ts";
 import { type Dialog, type DialogOptions, Dialogs } from "./core/dialog.ts";
 import { ViewAnchor } from "./core/anchor.ts";
 import { mapPosition, type TextEdit, withWriteListeners } from "./core/writelisteners.ts";
@@ -56,9 +56,6 @@ import {
   locateByShape,
   locateWithEmptyHeaders,
   minimalEdit,
-  type OtherPages,
-  type PageTable,
-  pageTablesOf,
   parseTable,
   serializeTable,
   type Table,
@@ -560,7 +557,7 @@ export class Controller implements TableHost {
     void this.platform.editor.open?.(ref);
   }
 
-  tables(document: string): Promise<readonly StoredTable[]> {
+  tables(document: string): Promise<readonly StoredTable[] | null> {
     return this.store.tables(document);
   }
 
@@ -568,6 +565,46 @@ export class Controller implements TableHost {
     const table = info.model;
     const place = locateBySource(this.pageText, info.hint, info.source) ?? { from: info.hint, to: info.hint + info.source.length };
     return tableData(table, place, this.tableName(table), (column) => this.columnName(table, column));
+  }
+
+  /** Where the open page's table of a key is in its `text`; undefined: not there */
+  private rangeOfKey(text: string, key: TableKey): TableRange | undefined {
+    return findTables(text)[this.register.keysOf(this.currentPage, text).indexOf(key)];
+  }
+
+  /** The page's tables as a write's hooks see them (by key, with their models), and where each is in `text` (the core's alone) */
+  private writePage(text: string, at: number): { readonly page: WritePage; readonly rangeOf: ReadonlyMap<TableKey, TableRange> } {
+    const ranges = findTables(text);
+    const keys = this.register.keysOf(this.currentPage, text);
+    const tables = ranges.map((range, i): KeyedTable => ({ key: keys[i]!, model: parseTable(range.text) }));
+    const own = ranges.findIndex((range) => range.from === at);
+    return { page: { text, tables, read: tables, key: keys[own]! }, rangeOf: new Map(ranges.map((range, i) => [keys[i]!, range])) };
+  }
+
+  /**
+   * The other tables the features change with a write, in their order, each feature seeing the page as the ones
+   * before it changed it (a table two change: the later one's on the earlier one's); never the written table itself
+   */
+  private othersWritten(page: WritePage, of: (feature: Feature, page: WritePage) => readonly KeyedTable[] | undefined): { readonly written: Map<TableKey, Table>; readonly page: WritePage } {
+    const written = new Map<TableKey, Table>();
+    let pageNow = page;
+    for (const feature of this.features) {
+      for (const other of of(feature, pageNow) ?? []) {
+        if (other.key === page.key) continue;
+        written.set(other.key, other.model);
+        pageNow = { ...pageNow, tables: pageNow.tables.map((t) => (t.key === other.key ? other : t)) };
+      }
+    }
+    return { written, page: pageNow };
+  }
+
+  /**
+   * A page's tables in a text given (the Space Lua API's: a page's text its Lua read; none: the page shown), keyed
+   * for this call alone: the session's register matches every text it is given to the page's keys, and Lua's may be
+   * another page's for a moment (the editor's text is still the old page's as another opens), so it never sees one
+   */
+  tablesOfText(text: string, page = this.currentPage): readonly StoredTable[] {
+    return tablesIn(new TableRegister(), page, text);
   }
 
   pageTables(): readonly StoredTable[] {
@@ -584,8 +621,39 @@ export class Controller implements TableHost {
     return this.platform.editor.documentName();
   }
 
-  async replacePageText(from: number, to: number, insert: string): Promise<void> {
-    await this.platform.editor.replace(from, to, insert);
+  async replaceTables(document: string, changes: readonly TableChange[], options?: { readonly formatted?: boolean }): Promise<WriteResult> {
+    const { editor, space } = this.platform;
+    const open = (await editor.documentName()) === document;
+    let text: string;
+    try {
+      if (open) text = await editor.text();
+      else if (space) text = await space.read(document);
+      else return "failed";
+    } catch {
+      return "failed";
+    }
+    const ranges = findTables(text);
+    const keys = this.register.keysOf(document, text);
+    const changed = new Map(changes.map((c) => [c.key, c.change]));
+    if (changes.some((c) => !keys.includes(c.key))) return "failed";
+    const serialize = options?.formatted ? await this.serializer() : (table: Table) => serializeTable(table);
+    // From the last table up, so the earlier ones keep their places
+    let written = text;
+    for (let i = ranges.length - 1; i >= 0; i--) {
+      const change = changed.get(keys[i]!);
+      if (!change) continue;
+      const range = ranges[i]!;
+      written = written.slice(0, range.from) + serialize(change(parseTable(range.text))) + written.slice(range.to);
+    }
+    if (written === text) return "unchanged";
+    if (open) {
+      // One edit over all of them: one Ctrl+Z undoes it
+      const edit = minimalEdit(text, written);
+      await editor.replace(edit.from, edit.to, edit.insert);
+    } else {
+      await space!.write(document, written);
+    }
+    return "written";
   }
 
   async cursorNow(): Promise<number | undefined> {
@@ -830,18 +898,10 @@ export class Controller implements TableHost {
       }
       const held = this.features.flatMap((f) => f.pendingEdits?.(info) ?? []);
       const before = parseTable(range.text);
-      const page: WritePage = { text, tables: pageTablesOf(text), from: range.from };
+      const { page, rangeOf } = this.writePage(text, range.from);
       const serialize = await this.serializer();
       // The other tables the features change for it, each seeing the earlier ones' changes
-      const others = new Map<number, PageTable>();
-      let pageNow = page;
-      for (const feature of this.features) {
-        for (const other of feature.otherTablesWritten?.(before, undefined, { page: pageNow }) ?? []) {
-          if (other.range.from === range.from) continue;
-          others.set(other.range.from, other);
-          pageNow = { ...pageNow, tables: pageNow.tables.map((t) => (t.range.from === other.range.from ? { range: t.range, table: other.table } : t)) };
-        }
-      }
+      const others = this.othersWritten(page, (feature, pageNow) => feature.otherTablesWritten?.(before, undefined, { page: pageNow }));
       // The table and the blank line after it; the last of the page, the blank line before it (one line break kept)
       let from = range.from;
       let to = range.to;
@@ -853,7 +913,7 @@ export class Controller implements TableHost {
         const previous = /(\r?\n)+$/.exec(text.slice(0, from))?.[0] ?? "";
         from -= Math.max(0, previous.length - (previous.endsWith("\r\n") ? 2 : 1));
       }
-      const updates = [{ from, to, markdown: "" }, ...[...others.values()].map((o) => ({ from: o.range.from, to: o.range.to, markdown: serialize(o.table) }))];
+      const updates = [{ from, to, markdown: "" }, ...[...others.written].map(([key, model]) => ({ from: rangeOf.get(key)!.from, to: rangeOf.get(key)!.to, markdown: serialize(model) }))];
       let written = text;
       for (const update of [...updates].sort((a, b) => b.from - a.from)) written = written.slice(0, update.from) + update.markdown + written.slice(update.to);
       // What other plugins write with it (silverware.table.onWrite), in the same edit
@@ -863,7 +923,7 @@ export class Controller implements TableHost {
       const replace = minimalEdit(text, written);
       // The span the features see: the tables written, the deleted one's own (not the blank line after it: what is
       // placed after it, the history marker, would be in the next table)
-      const spans = [{ from: range.from, to: range.to }, ...[...others.values()].map((o) => o.range)];
+      const spans = [{ from: range.from, to: range.to }, ...[...others.written.keys()].map((key) => rangeOf.get(key)!)];
       const spanFrom = Math.min(...spans.map((s) => s.from));
       const spanTo = Math.max(...spans.map((s) => s.to));
       const after: ((editFrom: number, lengthChange: number, moved: (pos: number, after: boolean) => number) => void)[] = [];
@@ -2594,7 +2654,7 @@ export class Controller implements TableHost {
     try {
       const text = await this.platform.editor.text();
       const range = after && !("position" in after) ? locateBySource(text, after.hint, after.source) : undefined;
-      const changed = also && locateBySource(text, also.target.hint, also.target.source);
+      const changed = also && this.rangeOfKey(text, also.key);
       if (also && !changed) {
         this.notify(NOT_SAVED, "error");
         return "failed";
@@ -2710,7 +2770,7 @@ export class Controller implements TableHost {
         this.notify(`Silverware Table: ${fixed}`, "info");
         return "failed";
       }
-      const page: WritePage = { text, tables: pageTablesOf(text), from: range.from };
+      const { page, rangeOf } = this.writePage(text, range.from);
       for (const feature of this.features) await feature.prepareEdit?.(edited, page);
       // The features' write steps (formulas), then the core's (metadata)
       const edit = { ...options, page };
@@ -2736,27 +2796,21 @@ export class Controller implements TableHost {
       // Other tables the features change with it (those whose formulas refer
       // to it), in the same edit: one Ctrl+Z undoes it all
       // A table two features change: the later one sees the earlier one's change (the page's tables as changed so far)
-      const others = new Map<number, PageTable>();
-      let pageNow = page;
-      for (const feature of this.features) {
-        for (const other of feature.otherTablesWritten?.(before, changed, { ...edit, page: pageNow }) ?? []) {
-          if (other.range.from === range.from) continue;
-          others.set(other.range.from, other);
-          pageNow = { ...pageNow, tables: pageNow.tables.map((t) => (t.range.from === other.range.from ? { range: t.range, table: other.table } : t)) };
-        }
-      }
+      const others = this.othersWritten(page, (feature, pageNow) => feature.otherTablesWritten?.(before, changed, { ...edit, page: pageNow }));
+      const pageNow = others.page;
       // Other tables the caller changes with it
       for (const changed of options.also ?? []) {
-        const also = locateBySource(text, changed.target.hint, changed.target.source);
-        if (!also || also.from === range.from) {
+        const also = rangeOf.get(changed.key);
+        if (!also || changed.key === page.key) {
           this.notify(NOT_SAVED, "error");
           return "failed";
         }
-        others.set(also.from, { range: also, table: changed.change(others.get(also.from)?.table ?? parseTable(also.text)) });
+        others.written.set(changed.key, changed.change(others.written.get(changed.key) ?? parseTable(also.text)));
       }
       const updates: { readonly range: { readonly from: number; readonly to: number }; readonly markdown: string }[] = [{ range, markdown }];
-      for (const other of others.values()) {
-        updates.push({ range: other.range, markdown: serialize(this.withoutNewTags(parseTable(other.range.text), other.table, {}, taken)) });
+      for (const [key, model] of others.written) {
+        const at = rangeOf.get(key)!;
+        updates.push({ range: at, markdown: serialize(this.withoutNewTags(parseTable(at.text), model, {}, taken)) });
       }
       // Places of the text outside the tables written that the features change with them (formulas written there)
       const tablesWritten = updates.length;

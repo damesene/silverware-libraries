@@ -28,20 +28,20 @@ export function storeContract(name: string, make: (documents: Readonly<Record<st
 
     it("reads a document's tables in order, each with its model", async () => {
       const { store } = make({ Shop: [prices, counts] });
-      const tables = await store.tables("Shop");
+      const tables = (await store.tables("Shop"))!;
       expect(tables.map((t) => t.model.rows.map((r) => r.cells))).toEqual([prices.rows.map((r) => r.cells), counts.rows.map((r) => r.cells)]);
     });
 
-    it("gives no tables for a document without any, or not there", async () => {
+    it("gives no tables for a document without any, null for one not there", async () => {
       const { store } = make({ Empty: [] });
       expect(await store.tables("Empty")).toEqual([]);
-      expect(await store.tables("Nowhere")).toEqual([]);
+      expect(await store.tables("Nowhere")).toBeNull();
     });
 
     it("keeps a table's key and revision read again unchanged, each table's its own", async () => {
       const { store } = make({ Shop: [prices, counts] });
-      const first = await store.tables("Shop");
-      const again = await store.tables("Shop");
+      const first = (await store.tables("Shop"))!;
+      const again = (await store.tables("Shop"))!;
       expect(again.map((t) => t.key)).toEqual(first.map((t) => t.key));
       expect(again.map((t) => t.revision)).toEqual(first.map((t) => t.revision));
       expect(new Set(first.map((t) => t.key)).size).toBe(2);
@@ -51,17 +51,17 @@ export function storeContract(name: string, make: (documents: Readonly<Record<st
       const fixture = make({ Shop: [prices, counts] });
       const before = await fixture.store.tables("Shop");
       fixture.replace("Shop", [table(["Fruit", "Price"], ["Pear", "13"], ["Fig", "3"]), counts]);
-      const after = await fixture.store.tables("Shop");
-      expect(after.map((t) => t.key)).toEqual(before.map((t) => t.key));
-      expect(after[0]!.revision).not.toBe(before[0]!.revision);
+      const after = (await fixture.store.tables("Shop"))!;
+      expect(after.map((t) => t.key)).toEqual(before!.map((t) => t.key));
+      expect(after[0]!.revision).not.toBe(before![0]!.revision);
       expect(after[0]!.model.rows[1]!.cells).toEqual(["Pear", "13"]);
-      expect(after[1]!.revision).toBe(before[1]!.revision);
+      expect(after[1]!.revision).toBe(before![1]!.revision);
     });
 
     it("tells the document a key is of", async () => {
       const { store } = make({ Shop: [prices], Stock: [counts] });
-      const [shop] = await store.tables("Shop");
-      const [stock] = await store.tables("Stock");
+      const [shop] = (await store.tables("Shop"))!;
+      const [stock] = (await store.tables("Stock"))!;
       expect(store.documentOf(shop!.key)).toBe("Shop");
       expect(store.documentOf(stock!.key)).toBe("Stock");
     });

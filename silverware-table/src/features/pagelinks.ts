@@ -8,16 +8,16 @@
 // read again as they change too.
 // Turned off, no page is read, and formulas referring to one keep their
 // results (formula/page.ts: pages not read are `unread`).
-import type { Feature, ModelHost, TableTarget, TableInfo, WritePage } from "../core/feature.ts";
+import type { Feature, ModelHost, OtherPages, StoredTable, TableTarget, TableInfo, WritePage } from "../core/feature.ts";
 import { type FormulaCells, type FormulasOffer, formulaPages, type PageLinksOffer, referredPages, tablesWritten } from "../formulas/index.ts";
-import { type OtherPages, type PageTable, pageTablesOf, type Table } from "../markdown.ts";
+import type { Table } from "../markdown.ts";
 
 // At most this many other pages are read for one page's formulas (pages that refer on and on)
 const MAX_OTHER_PAGES = 20;
 
 export class PageLinks implements Feature {
   // The other pages read: their tables, or null where there is no such page
-  private readonly pages = new Map<string, readonly PageTable[] | null>();
+  private readonly pages = new Map<string, readonly StoredTable[] | null>();
   // Counts the pages read, so what formulas computed from them is computed anew
   private version = 0;
   // The pages being read: asked again meanwhile (a table shown and a pivot of it at once), the same reading
@@ -54,13 +54,13 @@ export class PageLinks implements Feature {
   async prepareWrite(info: TableTarget): Promise<void> {
     const cells = this.cells();
     if (!cells) return;
-    const tables = pageTablesOf(this.host.pageText).map((t) => ({ ...t, name: this.host.tableName(t.table) }));
-    await this.load(tablesWritten(cells, tables, info.source), true);
+    const tables = this.host.pageTables().map((t) => ({ id: t.key, table: t.model, name: this.host.tableName(t.model) }));
+    await this.load(tablesWritten(cells, tables, info.key), true);
   }
 
   /** After the edit: pages the page's tables and the edited one refer to, if not read yet */
   async prepareEdit(edited: Table, page: WritePage): Promise<void> {
-    await this.load([...page.tables.map((t) => t.table), edited], false);
+    await this.load([...page.tables.map((t) => t.model), edited], false);
   }
 
   /**
@@ -106,7 +106,7 @@ export class PageLinks implements Feature {
         await this.read(page);
         read = true;
       }
-      for (const { table } of this.pages.get(page) ?? []) for (const next of referredPages(cells, table)) queue.add(next);
+      for (const { model } of this.pages.get(page) ?? []) for (const next of referredPages(cells, model)) queue.add(next);
     }
     return read;
   }
@@ -120,15 +120,9 @@ export class PageLinks implements Feature {
     return read;
   }
 
-  /** Reads another page's tables; the earlier ones stay until it is read, so formulas never see it missing meanwhile */
+  /** Reads another page's tables (null: no such page); the earlier ones stay until it is read, so formulas never see it missing meanwhile */
   private async readNow(page: string): Promise<void> {
-    let tables: readonly PageTable[] | null;
-    try {
-      tables = pageTablesOf(await this.host.pages!.read(page));
-    } catch {
-      tables = null;
-    }
-    this.pages.set(page, tables);
+    this.pages.set(page, await this.host.tables(page));
     this.version++;
   }
 }

@@ -43,6 +43,6 @@ describe("the markdown store", () => {
     const { platform } = pagesOf({ Open: [], Other: [table] }, "Open");
     expect(await new MarkdownStore(() => platform, new TableRegister()).tables("Other")).toHaveLength(1);
     const { space: _, ...editorOnly } = platform;
-    expect(await new MarkdownStore(() => editorOnly, new TableRegister()).tables("Other")).toEqual([]);
+    expect(await new MarkdownStore(() => editorOnly, new TableRegister()).tables("Other")).toBeNull();
   });
 });

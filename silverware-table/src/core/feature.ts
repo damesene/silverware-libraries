@@ -16,7 +16,7 @@ import type { Rect } from "./geometry.ts";
 export type { Dialog, DialogOptions } from "./dialog.ts";
 export type { Rect } from "./geometry.ts";
 import type { IndexMap } from "../ops.ts";
-import type { OtherPages, PageTable, Table } from "../markdown.ts";
+import type { Table } from "../markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "../menu.ts";
 import type { MenuBuilder, MenuGroup, MenuSection } from "../../../shared/menuslots.ts";
 import type { CellNameAt, RowName } from "../names.ts";
@@ -434,7 +434,8 @@ export type ToolbarButton = {
 /** A place in the page's text (the cursor's), as an offset */
 export type TextPosition = { readonly position: number };
 
-export type AlsoChanged = { readonly target: TableTarget; readonly change: (table: Table) => Table };
+/** Another table of the page a write changes in the same edit, by its key: its table as it is now to the table as written */
+export type AlsoChanged = TableChange;
 
 export type WriteOptions = {
   // The cell to edit once the table is rendered again
@@ -485,8 +486,28 @@ export type ColumnsMeasure = { readonly columns: readonly ColumnMeasure[]; reado
  */
 export type ColumnWidths = { readonly widths: ReadonlyMap<number, number>; readonly box?: number };
 
-/** The page a write edits: its text as read for it, its tables, and where the edited table is */
-export type WritePage = { readonly text: string; readonly tables: readonly PageTable[]; readonly from: number };
+/**
+ * The page a write edits: its tables in order (as the features before have changed them so far), its tables as read
+ * for the write, the edited table's key; its text as read, for formulas written outside its tables (until the store
+ * keeps such places: docs/silverware-table-store-plan.md, step 4)
+ */
+export type WritePage = { readonly text: string; readonly tables: readonly KeyedTable[]; readonly read: readonly KeyedTable[]; readonly key: TableKey };
+
+/** A table's change, by its key: the table as it is now to the table as written */
+export type TableChange = { readonly key: TableKey; readonly change: (model: Table) => Table };
+
+/** A table of the page by its key, with its model: one a write reads, or another it changes in the same edit (otherTablesWritten) */
+export type KeyedTable = { readonly key: TableKey; readonly model: Table };
+
+/**
+ * The other pages formulas can read (the pageLinks module reads them): the tables of each as read (null: no such
+ * page; undefined: not read, formulas referring to it keep their results), and a count that changes whenever one is
+ * read
+ */
+export type OtherPages = {
+  readonly tables: (page: string) => readonly StoredTable[] | null | undefined;
+  readonly version: number;
+};
 
 /** An edit as features' write steps see it: how rows and columns moved, and the page */
 export type WriteEdit = WriteOptions & { readonly page: WritePage };
@@ -596,20 +617,23 @@ export interface ModelHost {
   /** Opens a reference where the platform opens one (a page, a hashtag's page: a link in a table drawn by a module) */
   navigate(ref: string): void;
 
-  // The open page and other pages as text, until the store gives a module its tables (docs/silverware-table-store-plan.md,
-  // steps 2 and 4: `host.tables`, other documents through the store); nothing else of the platform reaches a module
-  /** The open page's text as the editor has it now */
-  pageTextNow(): Promise<string>;
+  // What a module asks of the platform besides tables (the store's: `tables`, `pageTables`, `replaceTables`): until
+  // the store plan's step 4 (an insert's place, docs/silverware-table-store-plan.md), nothing else reaches a module
   /** The open page's name now */
   pageNameNow(): Promise<string>;
-  /** `from` to `to` of the open page's text made `insert`, one edit (Remove metadata's, of every table at once) */
-  replacePageText(from: number, to: number, insert: string): Promise<void>;
   /** Where the cursor is in the open page's text; undefined: the platform does not say */
   cursorNow(): Promise<number | undefined>;
   /** The editor's own undo of its last edit; undefined: the platform has none */
   readonly undoEdit: (() => Promise<void>) | undefined;
-  /** A document's tables in order (a page's name), as it is now: the open page's in the editor, another's in the space */
-  tables(document: string): Promise<readonly StoredTable[]>;
+  /** A document's tables in order (a page's name), as it is now: the open page's in the editor, another's in the space; null: not there, or not read */
+  tables(document: string): Promise<readonly StoredTable[] | null>;
+  /**
+   * A document's tables changed in one edit, by their keys (the open page's: one step of its undo; another's written
+   * whole), each change given the table as it is now; as they are, no module's write step taking part (a page
+   * command over every table, edits held for a page left). `formatted`: as the autoFormat setting writes tables.
+   * "failed" where one of the tables is not in the document (or it is not there)
+   */
+  replaceTables(document: string, changes: readonly TableChange[], options?: { readonly formatted?: boolean }): Promise<WriteResult>;
   /**
    * The open page's tables in order, as last read (pageText): the same list while that text is (a module's state kept
    * for the page compares it), a table of the page found in it by its key
@@ -656,13 +680,6 @@ export interface ModelHost {
   newTableKey(): TableKey;
   /** A table shown, by its key, as it is now (rendered anew after a write: its new info) */
   tableFor(key: TableKey): TableInfo | undefined;
-  /**
-   * The keys of a page's tables in its text (as read now: pageTextNow), in
-   * the order findTables gives them: a table found in the text by its key. How
-   * tables are told apart is the core's (core/tables.ts): a key is made by it
-   * only, never from a table's place
-   */
-  tableKeys(page: string, text: string): readonly TableKey[];
   /** A module's part for a table (its tableParts), made the first time it is asked for */
   tablePart<P extends object>(owner: Feature, key: TableKey): P | undefined;
   /** A module's parts made so far: what it does for every table (flushing what each holds) */
@@ -798,8 +815,6 @@ export interface ModelHost {
   ask(question: string): Promise<boolean>;
   /** The table as edited: its markdown with the edits features hold (pendingEdits), what a cell's editor starts from */
   tableOf(info: TableInfo): Table;
-  /** The page's text as last read */
-  readonly pageText: string;
   /** The name of the page shown */
   readonly currentPage: string;
   /** The other pages a feature read for formulas (pageLinks); undefined: none reads them */
@@ -963,6 +978,17 @@ export type PageAccess = {
 export interface TableHost extends ModelHost {
   /** The platform (core/platform.ts): the adapter is the host's side, which the modules' host functions stand for */
   readonly platform: TablePlatform;
+  /** The page's text as last read */
+  readonly pageText: string;
+  /** The open page's text as the editor has it now */
+  pageTextNow(): Promise<string>;
+  /**
+   * The keys of a page's tables in its text (as read now: pageTextNow), in
+   * the order findTables gives them: a table found in the text by its key. How
+   * tables are told apart is the core's (core/tables.ts): a key is made by it
+   * only, never from a table's place
+   */
+  tableKeys(page: string, text: string): readonly TableKey[];
   infoOf(widget: HTMLElement): WidgetInfo | undefined;
   /** The rendered table a key belongs to, if it is enhanced and on screen */
   widgetForKey(key: TableKey): HTMLElement | undefined;
@@ -1179,7 +1205,7 @@ export interface Feature {
    * referring to the edited table); `edit.page.tables` has those features
    * before it changed. `after` undefined: the table is deleted (Delete table)
    */
-  otherTablesWritten?(before: Table, after: Table | undefined, edit: WriteEdit): readonly PageTable[];
+  otherTablesWritten?(before: Table, after: Table | undefined, edit: WriteEdit): readonly KeyedTable[];
   /**
    * Other places of the page's text, outside its tables, the write changes
    * too, in the same edit (formulas written in the text, referring to the

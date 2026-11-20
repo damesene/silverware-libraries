@@ -10,7 +10,7 @@ import { FEATURE_NAMES, MODULE_LABELS } from "../bridge.ts";
 import { CELL_MENU_ORDER, type CellMenuGroup, type CellRef, type Feature, type ModelHost, type ToolbarButton, type TableInfo } from "../core/feature.ts";
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
-import { findTables, minimalEdit, parseTable, serializeTable, type Table } from "../markdown.ts";
+import type { Table } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
 import { columnsAttributes } from "../meta.ts";
 import { CORE } from "../metanames.ts";
@@ -181,35 +181,20 @@ export class Metadata implements Feature {
   /** Removes the metadata of all tables on the current page, once confirmed */
   async removeFromPage(): Promise<void> {
     const { host } = this;
-    const text = await host.pageTextNow();
-    // From the last table up, so the earlier ones keep their positions
-    const tables = findTables(text)
-      .filter((range) => {
-        return hasMetadata(parseTable(range.text));
-      })
-      .reverse();
+    const page = await host.pageNameNow();
+    const tables = ((await host.tables(page)) ?? []).filter((t) => hasMetadata(t.model));
     if (tables.length === 0) {
       host.notify("Silverware Table: no table on this page has metadata", "info");
       return;
     }
-    const models = tables.map((range) => parseTable(range.text));
-    const owners = metadataOwners(models);
+    const owners = metadataOwners(tables.map((t) => t.model));
     const question =
       `Remove the metadata of ${tables.length === 1 ? "the 1 table" : `all ${tables.length} tables`} on this page` +
       `${whose(owners, tables.length === 1 ? "it" : "them")}? ${KEPT} Ctrl+Z brings it back.`;
     if (!(await this.host.ask(question))) return;
-    // One edit over the span of all those tables, so one Ctrl+Z undoes it
-    const from = tables[tables.length - 1]!.from;
-    const to = tables[0]!.to;
-    let span = text.slice(from, to);
-    const keys = host.tableKeys(await host.pageNameNow(), text);
-    for (const range of tables) {
-      const table = parseTable(range.text);
-      if (table.meta) this.host.forgetStoredView(keys[range.ordinal]!);
-      span = span.slice(0, range.from - from) + serializeTable(withoutMetadata(table)) + span.slice(range.to - from);
-    }
-    const edit = minimalEdit(text.slice(from, to), span);
-    await host.replacePageText(from + edit.from, from + edit.to, edit.insert);
+    for (const t of tables) if (t.model.meta) host.forgetStoredView(t.key);
+    // One edit of all those tables, so one Ctrl+Z undoes it
+    await host.replaceTables(page, tables.map((t) => ({ key: t.key, change: withoutMetadata })));
     // The dialog took the focus: back to the editor, so Ctrl+Z works right away
     this.host.focusPage();
     host.notify(`Silverware Table: removed the metadata of ${tables.length} table(s)`, "info");

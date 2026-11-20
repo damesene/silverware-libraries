@@ -1,8 +1,8 @@
 # Silverware Table: tables apart from where they are kept
 
-Status (2026-11-20): step 1 done in branch `refactor/table-store`
-(*Decided*), step 2 begun (its first part below), the rest planned; the plan
-is in `main`. What it waited for is
+Status (2026-11-20): steps 1 and 2 done in branch `refactor/table-store`
+(*Decided*; what step 2 left to later steps is under it), the rest planned;
+the plan is in `main`. What it waited for is
 in `main`: the views plan
 (docs/silverware-table-views-plan.md), whose sources (`@tasks`) are the first
 tables kept nowhere in a page and this plan's second store; the platform
@@ -399,11 +399,34 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    (`store/contract.ts`, run by the markdown store's test); `host.tables`;
    `TableInfo.model` and `.revision`, so no module parses a shown table's
    markdown any more (`isolation.test.ts`) and the filters' and widths'
-   state is kept by revision. Left for the next parts: the modules reading a
-   page's tables with their places (`pageTablesOf`, `locateBySource`, `hint`,
-   `pageText`: formulas, pivot, names, views, sheets, pagelinks, metadata,
-   lazy, the choices' lists by formula), transactions in place of `also`,
-   and custom menus after the check below.
+   state is kept by revision.
+   **Done (2026-11-20)**: the rest. `host.pageTables()` (the open page's
+   tables as last read, the same list while its text is) and
+   `host.tables(document)` (null: no such document; the store's contract
+   says so); a table of the page told apart by its key everywhere a module
+   compared places or text. The write hooks by key: `WritePage` holds the
+   page's tables as `KeyedTable`s (key and model; `read` as read, `key` the
+   written one's), `otherTablesWritten` gives `KeyedTable`s, `AlsoChanged`
+   is a `TableChange` by key, the core alone turning keys into places. The
+   formulas' domain tells tables apart by an `id` (the module gives the key;
+   `replace`, `tablesWritten`), the sheet's domain takes tables with whatever
+   tells them apart (`sheetTablesOf<T>`, layout ids), the formulas offer
+   takes a page's tables, not its text (the Lua API's text made into tables
+   by the entry, `tablesOfText`; an error's place given as table, row and
+   column, its offset the entry's). `host.replaceTables(document, changes)`:
+   a document's tables changed in one edit by key, no module's write step
+   (Remove metadata, lazy saving into a page left). `host.tableData(info)`:
+   a table as `silverware.table.tables` gives it, made by the core, so the
+   custom menus' context is unchanged (the check below is for when the core
+   no longer has offsets, step 4 or 6). Modules read no markdown, no page
+   text and no table's place (`isolation.test.ts`); `pageText`,
+   `pageTextNow` and `tableKeys` are the adapter's (`TableHost`).
+   Left to later steps, as planned: a cell's escapes, `sameTable` and Copy
+   as Markdown's `serializeTable` (step 3: content unescaped, the codec);
+   formulas written outside tables (`WritePage.text`, `TextWritten`) and an
+   insert's place at the cursor (`cursorNow`, step 4); the transaction in the
+   store with its contract tests (`replaceTables` is the core's now: step
+   4b, where a transaction becomes a batch of the page writer's).
    **A check before custom menus move**: what `defineMenuEntries` hands a
    user's entry (`silverware.table.defineMenuEntries`, menus/custom.ts). Data
    of the table stays; a text or an offset in it would be gone after this

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { findTables, locateByShape, parseMetaRow, parseTable, serializeTable, type Table, writtenMeta } from "./markdown.ts";
-import { columnValues, followColumnMeta, metaName, metaSort, withColumnValues, withMeta, withMetaName, withMetaSort } from "./meta.ts";
+import { columnValues, followColumnMeta, metaName, metaSort, withColumnValues, withMeta, withMetaSort, withMetaValue } from "./meta.ts";
 import { sameTableName, validateTableName } from "./namerules.ts";
 import { columnAfterMove, deleteColumn, insertRow, moveColumn, setCell } from "./ops.ts";
 
@@ -180,11 +180,11 @@ describe("table names", () => {
 
   it("reads and writes a table's name in its metadata row, compared ignoring case", () => {
     const table = parseTable("| A |\n|---|\n| 1 |");
-    const named = withMetaName(table, "prices");
+    const named = withMetaValue(table, "core", "name", "prices");
     expect(serializeTable(named)).toBe(`| A |\n|---|\n| 1 |\n| <meta core.table core.name='prices'> |`);
     expect(metaName(parseTable(serializeTable(named)))).toBe("prices");
     expect(metaName(withMeta(table, "core.name", "A1"))).toBeUndefined();
-    expect(serializeTable(withMetaName(named, undefined))).toBe(serializeTable(table));
+    expect(serializeTable(withMetaValue(named, "core", "name", undefined))).toBe(serializeTable(table));
     expect(sameTableName("Prices", "prices")).toBe(true);
   });
 });

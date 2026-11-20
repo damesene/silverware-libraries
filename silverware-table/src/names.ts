@@ -10,9 +10,8 @@
 // and leaves it out of the column's key in its index (verified), so queries
 // see the header as before. Modules read and write names through the host.
 import { attributeIn, attributesAt, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt } from "./model/model.ts";
-import { metaAttribute, type Table, unescapeMetaValue } from "./markdown.ts";
+import { metaAttribute, unescapeMetaValue } from "./markdown.ts";
 import { attributeName, CORE, escapedForRegExp } from "./metanames.ts";
-import { setCell } from "./ops.ts";
 
 // The names' attributes: the core's (meta.ts makes their names)
 /** The core's keys of names: a line's (a column's own in its header, a row's in one of its cells), a cell's */
@@ -83,49 +82,10 @@ export function rowNameIn(cells: readonly string[]): { readonly name: string; re
   return undefined;
 }
 
-/** A table's named rows by their names (lowercase), the first row of each name; rows of the markdown (header 0) */
-export function namedRows(table: Table): Map<string, number> {
-  const rows = new Map<string, number>();
-  table.rows.forEach((r, row) => {
-    const name = row === 0 ? undefined : rowNameIn(r.cells)?.name.toLowerCase();
-    if (name && !rows.has(name)) rows.set(name, row);
-  });
-  return rows;
-}
+/** A named row: its name as written, its row (the header 0, the body from 1) */
+export type RowName = { readonly name: string; readonly row: number };
 
-/** A table's named body cells by their names (lowercase), the first cell of each name; rows of the markdown (header 0) */
-export function namedCells(table: Table): Map<string, { readonly row: number; readonly column: number }> {
-  const cells = new Map<string, { readonly row: number; readonly column: number }>();
-  table.rows.forEach((r, row) => {
-    if (row === 0) return;
-    r.cells.forEach((cell, column) => {
-      const name = cellNameOf(cell)?.toLowerCase();
-      if (name && !cells.has(name)) cells.set(name, { row, column });
-    });
-  });
-  return cells;
-}
-
-/** Whether a table has names in its cells */
-export function hasNames(table: Table): boolean {
-  return table.rows.some((row) => row.cells.some((cell) => withoutName(cell) !== cell.trim()));
-}
-
-/** The table with every name in its cells removed */
-export function withoutNames(table: Table): Table {
-  let result = table;
-  table.rows.forEach((row, r) =>
-    row.cells.forEach((cell, c) => {
-      if (withoutName(cell) !== cell.trim()) result = setCell(result, r, c, withoutName(cell));
-    }),
-  );
-  return result;
-}
-
-/** A named row: its name as written, its row of the markdown (header 0), the column of the cell holding the name */
-export type RowName = { readonly name: string; readonly row: number; readonly column: number };
-
-/** A named body cell: its name as written, its row of the markdown (header 0) and column */
+/** A named body cell: its name as written, its row (the body from 1) and column */
 export type CellNameAt = { readonly name: string; readonly row: number; readonly column: number };
 
 /** A model's column's own name, a row's (`row` from 1), a body cell's: the core's attributes there */
@@ -148,7 +108,7 @@ export function withModelName(model: TableModel, at: { readonly column: number; 
 }
 
 /** A model's named rows, in their order (rows from 1, as the markdown's body) */
-export function modelRowNames(model: TableModel): { readonly name: string; readonly row: number }[] {
+export function modelRowNames(model: TableModel): RowName[] {
   return model.rows.flatMap((r, i) => {
     const name = attributeIn(r.attributes, CORE, LINE_NAME_KEY);
     return name ? [{ name, row: i + 1 }] : [];
@@ -163,46 +123,4 @@ export function modelCellNames(model: TableModel): CellNameAt[] {
       return name ? [{ name, row: i + 1, column }] : [];
     }),
   );
-}
-
-/** A table's named rows, in their order */
-export function rowNamesIn(table: Table): RowName[] {
-  return table.rows.flatMap((r, row) => {
-    const named = row === 0 ? undefined : rowNameIn(r.cells);
-    return named ? [{ ...named, row }] : [];
-  });
-}
-
-/** A table's named body cells, in their order */
-export function cellNamesIn(table: Table): CellNameAt[] {
-  return table.rows.flatMap((r, row) =>
-    row === 0
-      ? []
-      : r.cells.flatMap((cell, column) => {
-          const name = cellNameOf(cell);
-          return name ? [{ name, row, column }] : [];
-        }),
-  );
-}
-
-/** A column's fixed name (its header's), if it has one */
-export function columnNameIn(table: Table, column: number): string | undefined {
-  return nameOf(table.rows[0]?.cells[column] ?? "");
-}
-
-/** The table with the column named so (undefined: unnamed), its header's text kept */
-export function withColumnNameIn(table: Table, column: number, name: string | undefined): Table {
-  return setCell(table, 0, column, withName(table.rows[0]?.cells[column] ?? "", name));
-}
-
-/** The table with the row (of the markdown) named so (undefined: unnamed), where its name is written, else in its first cell */
-export function withRowNameIn(table: Table, row: number, name: string | undefined): Table {
-  const cells = table.rows[row]?.cells ?? [];
-  const column = rowNameIn(cells)?.column ?? 0;
-  return setCell(table, row, column, withName(cells[column] ?? "", name));
-}
-
-/** The table with the body cell named so (undefined: unnamed), its text kept */
-export function withCellNameIn(table: Table, row: number, column: number, name: string | undefined): Table {
-  return setCell(table, row, column, withCellName(table.rows[row]?.cells[column] ?? "", name));
 }

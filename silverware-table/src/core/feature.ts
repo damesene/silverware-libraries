@@ -20,7 +20,7 @@ import type { IndexMap } from "../ops.ts";
 import type { Table } from "../markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "../menu.ts";
 import type { MenuBuilder, MenuGroup, MenuSection } from "../../../shared/menuslots.ts";
-import type { CellNameAt } from "../names.ts";
+import type { CellNameAt, RowName } from "../names.ts";
 import type { Pins, ViewState } from "../view.ts";
 import type { TableData } from "../tabledata.ts";
 
@@ -927,7 +927,7 @@ export interface ModelHost {
   /** The table with these pins (an edge that cannot be pinned, canPin, as it was): a module's table made whole (a pivot's totals) */
   withPins(table: TableModel, pins: Pins): TableModel;
   /** A table's named rows, in their order */
-  rowNames(table: TableModel): readonly { readonly name: string; readonly row: number }[];
+  rowNames(table: TableModel): readonly RowName[];
   /** A table's named body cells, in their order */
   cellNames(table: TableModel): readonly CellNameAt[];
   /** A column's hashtags (its header's, its type among them), as text: the core's attribute; undefined: none */

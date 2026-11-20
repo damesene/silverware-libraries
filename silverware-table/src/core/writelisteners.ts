@@ -13,7 +13,7 @@ import { listOf } from "../bridge.ts";
 import { columnKey, columnName } from "../columns.ts";
 import { findTables, type Table } from "../markdown.ts";
 import { metaName } from "../meta.ts";
-import { columnNameIn } from "../names.ts";
+import { nameOf } from "../names.ts";
 
 export type TextEdit = { readonly from: number; readonly to: number; readonly text: string };
 
@@ -47,7 +47,8 @@ export type TableWritten = {
 
 /** A column's name as names are compared: its fixed name, else its header's */
 function nameOfColumn(table: Table, column: number): string {
-  return columnNameIn(table, column) ?? columnName(table.rows[0]?.cells[column] ?? "");
+  const header = table.rows[0]?.cells[column] ?? "";
+  return nameOf(header) ?? columnName(header);
 }
 
 const same = (a: string | undefined, b: string | undefined) => (a ?? "").toLowerCase() === (b ?? "").toLowerCase();

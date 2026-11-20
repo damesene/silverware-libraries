@@ -250,25 +250,14 @@ export function hasMetaPins(table: Table): boolean {
 // ---- the table's name ---------------------------------------------------------------
 
 /** The table's name, if it has a valid one */
-export function metaName(table: Table): string | undefined {
-  const name = metaValue(table, CORE, "name")?.trim();
-  return name && !validateTableName(name) ? name : undefined;
-}
-
-/** A model's name, if it has a valid one */
-export function modelTableName(model: TableModel): string | undefined {
-  const name = attributeIn(model.attributes, CORE, "name")?.trim();
+export function metaName(table: Table | TableModel): string | undefined {
+  const name = writtenName(table)?.trim();
   return name && !validateTableName(name) ? name : undefined;
 }
 
 /** The table's name as written, valid or not */
 export function writtenName(table: Table | TableModel): string | undefined {
   return metaValue(table, CORE, "name");
-}
-
-/** Names (or, with undefined, unnames) the table */
-export function withMetaName(table: Table, name: string | undefined): Table {
-  return withMetaValue(table, CORE, "name", name);
 }
 
 // ---- keeping the metadata through edits ------------------------------------------

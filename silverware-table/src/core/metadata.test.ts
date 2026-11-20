@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { STORE_SORT_DELAY_MS } from "../controller.ts";
 import { parseTable } from "../markdown.ts";
+import { decode } from "../store/markdown/codec.ts";
 import { bridge, PAGE, bodyTexts, buttonLabel, cell, cellMenuItem, clickOn, controller, editor, flashes, flush, key, menuButtons, nameInMenu, setup, tableMenuItem, text, toolbarName, useTablePage } from "../testing/page.ts";
 
 describe("Table metadata", () => {
@@ -124,8 +125,9 @@ describe("Table metadata", () => {
     expect(text).toContain("| apple | 10 |");
     expect(flashes.some((f) => f.includes("2 new hidden values") && f.includes("not stored"))).toBe(true);
     // (Pins: only where the table has them)
-    expect(controller.canPin(parseTable(`| A |\n|---|\n| 1 |\n| <meta core.table core.pin-top='1'> |`), "top")).toBe(true);
-    expect(controller.canPin(parseTable(`| A |\n|---|\n| 1 |\n| <meta core.table core.pin-top='1'> |`), "bottom")).toBe(false);
+    const pinned = decode(parseTable(`| A |\n|---|\n| 1 |\n| <meta core.table core.pin-top='1'> |`));
+    expect(controller.canPin(pinned, "top")).toBe(true);
+    expect(controller.canPin(pinned, "bottom")).toBe(false);
   });
 
   it("stores the sorting with the setting on, only where the clicks end", async () => {

@@ -28,8 +28,9 @@ import { CELLS, model, calculatedFormula, cellNamesOf, followTable, formulaCell,
 import { formulaErrors as domainFormulaErrors } from "./evaluate.ts";
 import { FormulaError } from "./values.ts";
 import { parseMetaRow, parseTable, serializeTable, splitRow } from "../markdown.ts";
-import { metaName, withMetaName } from "../meta.ts";
-import { cellNameOf, namedRows, nameOf, rowNameIn, withCellName, withName, withoutName } from "../names.ts";
+import { metaName, withMetaValue } from "../meta.ts";
+import { cellNameOf, modelRowName, nameOf, rowNameIn, withCellName, withName, withoutName } from "../names.ts";
+import { decode } from "../store/markdown/codec.ts";
 import { deleteColumn, deleteRow, insertRow, moveColumn, moveRow, reorderRows, setCell } from "../ops.ts";
 import { cellResult, errorCodeIn, isErrorText } from "./cell.ts";
 
@@ -910,7 +911,7 @@ describe("references to another table follow its edits", () => {
   it("follows a renamed column and a renamed table", () => {
     const renamedColumn = setCell(prices, 0, 1, "Cost");
     expect(formulas(followTable(referring("=SUM(prices![price])"), prices, renamedColumn))).toEqual(["=SUM(prices![cost])"]);
-    const renamed = withMetaName(prices, "cost");
+    const renamed = withMetaValue(prices, "core", "name", "cost");
     expect(formulas(followTable(referring("=prices!B1*prices![price]", "=PRICES!A1"), prices, renamed))).toEqual([
       "=cost!B1*cost![price]",
       "=cost!A1",
@@ -920,14 +921,14 @@ describe("references to another table follow its edits", () => {
     expect(formulas(followTable(referring("=1+prices!vat"), prices, renamed))).toEqual(["=1+cost!vat"]);
     expect(referredTableNames(referring("=prices!#REF!"))).toEqual(new Set(["prices"]));
     // The name removed: the references stay, and show #REF!
-    expect(formulas(followTable(referring("=prices!B1"), prices, withMetaName(prices, undefined)))).toEqual(["=prices!B1"]);
+    expect(formulas(followTable(referring("=prices!B1"), prices, withMetaValue(prices, "core", "name", undefined)))).toEqual(["=prices!B1"]);
   });
 
   it("follows the table's own edits in references that name the table itself", () => {
     const mine = parseTable(`| A |\n|---|\n| 5 |\n| 0 <meta formulas.f='=mine!A1*2'> |\n| <meta core.table core.name='mine'> |`);
     const inserted = insertRow(mine, 1);
     expect(formulas(shiftReferences(mine, inserted, (r) => (r === 0 ? 0 : r + 1)))).toEqual(["=mine!A2*2"]);
-    expect(formulas(shiftReferences(mine, withMetaName(mine, "ours")))).toEqual(["=ours!A1*2"]);
+    expect(formulas(shiftReferences(mine, withMetaValue(mine, "core", "name", "ours")))).toEqual(["=ours!A1*2"]);
   });
 
   it("evaluates a reference to deleted cells of another table as #REF!", () => {
@@ -1113,6 +1114,6 @@ describe("named rows", () => {
   it("finds a row's name a column inserted before the first one moved", () => {
     const table = parseTable(`| New | Name | Price |\n|---|---|---|\n| | Pear <meta core.n='pear'> | 12 |`);
     expect(rowNameIn(table.rows[1]!.cells)).toEqual({ name: "pear", column: 1 });
-    expect(namedRows(table).get("pear")).toBe(1);
+    expect(modelRowName(decode(table), 1)).toBe("pear");
   });
 });

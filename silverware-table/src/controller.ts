@@ -70,8 +70,8 @@ import {
 } from "./markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "./menu.ts";
 import { floatingMenu, focusMenu } from "./core/menu.ts";
-import { CORE, metadataAfterEdit, metaName, modelTableName, metaPins, metaSort, withMetaPins, withMetaSort, writtenName } from "./meta.ts";
-import { CELL_NAME_KEY, type CellNameAt, cellNameOf, cellNamesIn, LINE_NAME_KEY, columnNameIn, modelCellName, modelCellNames, modelColumnName, modelRowName, modelRowNames, type RowName, rowNameIn, rowNamesIn, withCellNameIn, withColumnNameIn, withModelName, withRowNameIn } from "./names.ts";
+import { CORE, metadataAfterEdit, metaName, metaPins, metaSort, withMetaPins, withMetaSort, writtenName } from "./meta.ts";
+import { CELL_NAME_KEY, type CellNameAt, LINE_NAME_KEY, modelCellName, modelCellNames, modelColumnName, modelRowName, modelRowNames, type RowName, withModelName } from "./names.ts";
 import { ownMeta } from "./core/metaaccess.ts";
 import { withoutNewTagValues } from "./tagvalues.ts";
 import { nameEmptyHeaders, reorderRows } from "./ops.ts";
@@ -249,7 +249,7 @@ export class Controller implements TableHost {
   // columns already: followed by name again, where headers repeat, they would move twice), pins are stored (as far as
   // they may be)
   private readonly writeSteps: readonly WriteStep[] = [
-    (before, after, options, byModel) => metadataAfterEdit(before, after, options, (edge) => this.canPin(before, edge), !byModel),
+    (before, after, options, byModel) => metadataAfterEdit(before, after, options, (edge) => this.coreMeta.canStore(before, `pin-${edge}`), !byModel),
   ];
 
   constructor(
@@ -579,7 +579,7 @@ export class Controller implements TableHost {
   tableData(info: TableInfo): TableData {
     const table = parseTable(info.source);
     const place = locateBySource(this.pageText, info.hint, info.source) ?? { from: info.hint, to: info.hint + info.source.length };
-    return tableData(table, place, this.tableName(table), (column) => this.columnName(table, column));
+    return tableData(table, place, this.tableName(info.model), (column) => this.columnName(info.model, column));
   }
 
   /** Where the open page's table of a key is in its `text`; undefined: not there */
@@ -750,43 +750,37 @@ export class Controller implements TableHost {
 
   // ---- what tables keep: the core's own, and the names every part reads --------------
 
-  // (The owner's functions take either form of a table, their overloads one at a time: `as TableModel` hands either on)
-  attribute(table: Table, key: string, at?: { readonly column: number }): string | undefined;
   attribute(table: TableModel, key: string, at?: AttributePlace): string | undefined;
   attribute(cell: ModelCell, key: string): string | undefined;
-  attribute(table: Table | TableModel | ModelCell, key: string, at?: AttributePlace): string | undefined {
-    return this.coreMeta.attribute(table as TableModel, key, at);
+  attribute(table: TableModel | ModelCell, key: string, at?: AttributePlace): string | undefined {
+    return "content" in table ? this.coreMeta.attribute(table, key) : this.coreMeta.attribute(table, key, at);
   }
 
-  withAttribute(table: Table, key: string, value: string | undefined, at?: { readonly column: number }): Table;
   withAttribute(table: TableModel, key: string, value: string | undefined, at?: AttributePlace): TableModel;
   withAttribute(cell: ModelCell, key: string, value: string | undefined): ModelCell;
-  withAttribute(table: Table | TableModel | ModelCell, key: string, value: string | undefined, at?: AttributePlace): Table | TableModel | ModelCell {
-    return this.coreMeta.withAttribute(table as TableModel, key, value, at);
+  withAttribute(table: TableModel | ModelCell, key: string, value: string | undefined, at?: AttributePlace): TableModel | ModelCell {
+    return "content" in table ? this.coreMeta.withAttribute(table, key, value) : this.coreMeta.withAttribute(table, key, value, at);
   }
 
-  attributes(table: Table | TableModel): ReadonlyMap<string, string> {
+  attributes(table: TableModel): ReadonlyMap<string, string> {
     return this.coreMeta.attributes(table);
   }
 
-  columnAttributes(table: Table | TableModel, key: string): Map<number, string> {
+  columnAttributes(table: TableModel, key: string): Map<number, string> {
     return this.coreMeta.columnAttributes(table, key);
   }
 
-  withColumnAttributes(table: Table, key: string, values: ReadonlyMap<number, string>): Table;
-  withColumnAttributes(table: TableModel, key: string, values: ReadonlyMap<number, string>): TableModel;
-  withColumnAttributes(table: Table | TableModel, key: string, values: ReadonlyMap<number, string>): Table | TableModel {
-    return this.coreMeta.withColumnAttributes(table as TableModel, key, values);
+  withColumnAttributes(table: TableModel, key: string, values: ReadonlyMap<number, string>): TableModel {
+    return this.coreMeta.withColumnAttributes(table, key, values);
   }
 
-  canStore(table: Table, key: string, at?: { readonly column: number }): boolean;
   canStore(table: TableModel, key: string, at?: AttributePlace): boolean;
   canStore(cell: ModelCell, key: string): boolean;
-  canStore(table: Table | TableModel | ModelCell, key: string, at?: AttributePlace): boolean {
-    return this.coreMeta.canStore(table as TableModel, key, at);
+  canStore(table: TableModel | ModelCell, key: string, at?: AttributePlace): boolean {
+    return "content" in table ? this.coreMeta.canStore(table, key) : this.coreMeta.canStore(table, key, at);
   }
 
-  canName(table: Table | TableModel, target: NamingTarget): boolean {
+  canName(table: TableModel, target: NamingTarget): boolean {
     if (this.metadataOn) return true;
     switch (target.kind) {
       case "table":
@@ -800,17 +794,15 @@ export class Controller implements TableHost {
     }
   }
 
-  canPin(table: Table | TableModel, edge: "top" | "bottom" | "left" | "right"): boolean {
-    return "columns" in table ? this.coreMeta.canStore(table, `pin-${edge}`) : this.coreMeta.canStore(table, `pin-${edge}`);
+  canPin(table: TableModel, edge: "top" | "bottom" | "left" | "right"): boolean {
+    return this.coreMeta.canStore(table, `pin-${edge}`);
   }
 
-  pinsOf(table: Table | TableModel): Pins {
+  pinsOf(table: TableModel): Pins {
     return metaPins(table);
   }
 
-  withPins(table: Table, pins: Pins): Table;
-  withPins(table: TableModel, pins: Pins): TableModel;
-  withPins<T extends Table | TableModel>(table: T, pins: Pins): T {
+  withPins(table: TableModel, pins: Pins): TableModel {
     const was = metaPins(table);
     const edge = (side: keyof Pins) => (pins[side] === was[side] || this.canPin(table, side) ? pins[side] : was[side]);
     return withMetaPins(table, { top: edge("top"), bottom: edge("bottom"), left: edge("left"), right: edge("right") });
@@ -835,60 +827,48 @@ export class Controller implements TableHost {
     if (n) this.notify(`Silverware Table: ${n} new hidden value${n === 1 ? " (a formula, a name) was" : "s (formulas, names) were"} not stored: the Store table metadata setting is off`, "info");
   }
 
-  tableName(table: Table | TableModel): string | undefined {
-    return "columns" in table ? modelTableName(table) : metaName(table);
+  tableName(table: TableModel): string | undefined {
+    return metaName(table);
   }
 
   tableBadges(info: TableInfo): readonly TableBadge[] {
     return this.features.flatMap((feature) => feature.tableBadges?.(info) ?? []);
   }
 
-  writtenTableName(table: Table | TableModel): string | undefined {
+  writtenTableName(table: TableModel): string | undefined {
     return writtenName(table);
   }
 
-  withTableName(table: Table, name: string | undefined): Table;
-  withTableName(table: TableModel, name: string | undefined): TableModel;
-  withTableName(table: Table | TableModel, name: string | undefined): Table | TableModel {
-    return this.coreMeta.withAttribute(table as TableModel, "name", name);
+  withTableName(table: TableModel, name: string | undefined): TableModel {
+    return this.coreMeta.withAttribute(table, "name", name);
   }
 
-  columnName(table: Table | TableModel, column: number): string | undefined {
-    return "columns" in table ? modelColumnName(table, column) : columnNameIn(table, column);
+  columnName(table: TableModel, column: number): string | undefined {
+    return modelColumnName(table, column);
   }
 
-  withColumnName(table: Table, column: number, name: string | undefined): Table;
-  withColumnName(table: TableModel, column: number, name: string | undefined): TableModel;
-  withColumnName(table: Table | TableModel, column: number, name: string | undefined): Table | TableModel {
-    return "columns" in table ? withModelName(table, { column }, name) : withColumnNameIn(table, column, name);
+  withColumnName(table: TableModel, column: number, name: string | undefined): TableModel {
+    return withModelName(table, { column }, name);
   }
 
-  rowName(table: Table | TableModel, row: number): string | undefined {
-    if (row === 0) return undefined;
-    return "columns" in table ? modelRowName(table, row) : rowNameIn(table.rows[row]?.cells ?? [])?.name;
+  rowName(table: TableModel, row: number): string | undefined {
+    return row === 0 ? undefined : modelRowName(table, row);
   }
 
-  withRowName(table: Table, row: number, name: string | undefined): Table;
-  withRowName(table: TableModel, row: number, name: string | undefined): TableModel;
-  withRowName(table: Table | TableModel, row: number, name: string | undefined): Table | TableModel {
-    return "columns" in table ? withModelName(table, { row }, name) : withRowNameIn(table, row, name);
+  withRowName(table: TableModel, row: number, name: string | undefined): TableModel {
+    return withModelName(table, { row }, name);
   }
 
-  cellName(table: Table | TableModel, row: number, column: number): string | undefined {
-    if (row === 0) return undefined;
-    return "columns" in table ? modelCellName(table, row, column) : cellNameOf(table.rows[row]?.cells[column] ?? "");
+  cellName(table: TableModel, row: number, column: number): string | undefined {
+    return row === 0 ? undefined : modelCellName(table, row, column);
   }
 
-  withCellName(table: Table, row: number, column: number, name: string | undefined): Table;
-  withCellName(table: TableModel, row: number, column: number, name: string | undefined): TableModel;
-  withCellName(table: Table | TableModel, row: number, column: number, name: string | undefined): Table | TableModel {
-    return "columns" in table ? withModelName(table, { row, column }, name) : withCellNameIn(table, row, column, name);
+  withCellName(table: TableModel, row: number, column: number, name: string | undefined): TableModel {
+    return withModelName(table, { row, column }, name);
   }
 
-  rowNames(table: Table): readonly RowName[];
-  rowNames(table: TableModel): readonly { readonly name: string; readonly row: number }[];
-  rowNames(table: Table | TableModel): readonly { readonly name: string; readonly row: number }[] {
-    return "columns" in table ? modelRowNames(table) : rowNamesIn(table);
+  rowNames(table: TableModel): readonly RowName[] {
+    return modelRowNames(table);
   }
 
   columnHashtags(table: TableModel, column: number): string | undefined {
@@ -899,8 +879,8 @@ export class Controller implements TableHost {
     return withAttributesAt(table, { column }, (attributes) => withAttributeIn(attributes, CORE, HASHTAGS_KEY, hashtags?.trim() || undefined));
   }
 
-  cellNames(table: Table | TableModel): readonly CellNameAt[] {
-    return "columns" in table ? modelCellNames(table) : cellNamesIn(table);
+  cellNames(table: TableModel): readonly CellNameAt[] {
+    return modelCellNames(table);
   }
 
   tablesChanged(): void {

@@ -6,7 +6,6 @@ import { withColumnType } from "../../columntypes/registry.ts";
 import { findTables, parseTable, serializeTable, type Table } from "../../markdown.ts";
 import { followColumnMeta, metaValue, withColumnValues, withMetaValue } from "../../meta.ts";
 import { attributeIn, type ModelCell, type TableModel, withAttributeIn } from "../../model/model.ts";
-import { withCellNameIn, withColumnNameIn, withRowNameIn } from "../../names.ts";
 import { reorderRows, setCell } from "../../ops.ts";
 import { cellTags } from "../../tags.ts";
 import { withTagValue } from "../../tagvalues.ts";
@@ -103,14 +102,16 @@ describe("the markdown codec", () => {
     });
 
     it("a cell's, a row's and a column's names, in the names' one tag", () => {
-      expect(md(encode(withCell(model, 2, 0, (c) => ({ ...c, attributes: withAttributeIn(c.attributes, "core", "cn", "fig1") })), table))).toBe(md(withCellNameIn(table, 2, 0, "fig1")));
-      expect(md(encode(withCell(model, 1, 0, (c) => ({ ...c, attributes: withAttributeIn(c.attributes, "core", "cn", undefined) })), table))).toBe(md(withCellNameIn(table, 1, 0, undefined)));
+      // (As the writers of names before the model wrote them)
+      const form = (from: string, to: string) => FORMS[1]!.replace(from, to);
+      expect(md(encode(withCell(model, 2, 0, (c) => ({ ...c, attributes: withAttributeIn(c.attributes, "core", "cn", "fig1") })), table))).toBe(form("| Fig |", "| Fig <meta core.cn='fig1'> |"));
+      expect(md(encode(withCell(model, 1, 0, (c) => ({ ...c, attributes: withAttributeIn(c.attributes, "core", "cn", undefined) })), table))).toBe(form("<meta core.n='pear' core.cn='p'>", "<meta core.n='pear'>"));
       const rowNamed = { ...model, rows: model.rows.map((r, i) => (i === 1 ? { ...r, attributes: withAttributeIn(r.attributes, "core", "n", "fig") } : r)) };
-      expect(md(encode(rowNamed, table))).toBe(md(withRowNameIn(table, 2, "fig")));
+      expect(md(encode(rowNamed, table))).toBe(form("| Fig |", "| Fig <meta core.n='fig'> |"));
       const renamedRow = { ...model, rows: model.rows.map((r, i) => (i === 0 ? { ...r, attributes: withAttributeIn(r.attributes, "core", "n", "pear2") } : r)) };
-      expect(md(encode(renamedRow, table))).toBe(md(withRowNameIn(table, 1, "pear2")));
+      expect(md(encode(renamedRow, table))).toBe(form("core.n='pear' core.cn='p'", "core.n='pear2' core.cn='p'"));
       const columnNamed = { ...model, columns: model.columns.map((c, i) => (i === 1 ? { ...c, attributes: withAttributeIn(c.attributes, "core", "n", "price") } : c)) };
-      expect(md(encode(columnNamed, table))).toBe(md(withColumnNameIn(table, 1, "price")));
+      expect(md(encode(columnNamed, table))).toBe(form("Price #currency-usd |", "Price #currency-usd <meta core.n='price'> |"));
     });
 
     it("a column's type, among its hashtags", () => {

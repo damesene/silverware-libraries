@@ -70,6 +70,19 @@ export function withAttributeIn(attributes: Attributes, owner: Owner, key: strin
   return all;
 }
 
+/**
+ * As withAttributeIn, but a new set recorded as the change even where the
+ * value stays: an attribute an edit sets explicitly (a formula typed again),
+ * which the rules of an edit tell from one the edit left (model/rules.ts)
+ */
+export function withAttributeSet(attributes: Attributes, owner: Owner, key: string, value: string | undefined): Attributes {
+  const changed = withAttributeIn(attributes, owner, key, value);
+  if (changed !== attributes) return changed;
+  const all = new Map(attributes);
+  madeFrom.set(all, { from: attributes, owner, key, value });
+  return all;
+}
+
 /** The change a set of attributes was made by (withAttributeIn), undefined: made otherwise (read, or made whole) */
 export function attributeChangeOf(attributes: Attributes): AttributeChange | undefined {
   return madeFrom.get(attributes);

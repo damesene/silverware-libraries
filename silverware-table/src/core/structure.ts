@@ -9,17 +9,17 @@ import {
   deleteColumn,
   deleteRow,
   type IndexMap,
-  insertColumn,
-  insertRow,
+  insertColumn as insertModelColumn,
+  insertRow as insertModelRow,
   lineAfterBlockMove,
   moveColumn,
   moveColumns,
   moveRow,
   moveRows,
-  setCell,
-} from "../ops.ts";
+} from "../model/ops.ts";
+import { insertColumn, insertRow, setCell } from "../ops.ts";
 import { type MoveRules, moveCells } from "../paste.ts";
-import { cellTags, withoutTags, withoutTagsWith } from "../tags.ts";
+import { cellTags, withoutTags } from "../tags.ts";
 import {
   clampColumnMove,
   clampRowMove,
@@ -124,16 +124,12 @@ export function insertRowWith(
 export function duplicateRowAt(host: ModelHost, info: TableInfo, row: number): Promise<WriteResult> {
   // The copy goes below the row, or above it when the row is the last one pinned to the bottom
   const insert = insertRowAt(info.pins, info.rows, row + 1);
-  return host.writeTable(
+  return host.writeModel(
     info,
     (t) => {
-      // What is one cell's or row's (names) the copy does not take
-      const unique = host.uniqueTags();
-      const cells = t.rows[row]?.cells.map((cell) => {
-        const copy = withoutTagsWith(cell, unique);
-        return copy === cell.trim() ? cell : copy;
-      });
-      return cells ? insertRow(t, insert.at, cells) : undefined;
+      // (What is one cell's or row's, a name, the copy does not take: the rule of unique attributes, as the write applies it)
+      const cells = t.rows[row - 1]?.cells;
+      return cells ? insertModelRow(t, insert.at, cells) : undefined;
     },
     { pins: insert.pins, rowMap: rowAfterInsert(insert.at) },
   );
@@ -150,7 +146,7 @@ export async function deleteRowsAt(host: ModelHost, info: TableInfo, rows: reado
   // From the last up: the rows above keep their places, the pins count down zone by zone
   let pins = info.pins;
   doomed.forEach((row, i) => (pins = deleteRowPins(pins, info.rows - i, row)));
-  const written = await host.writeTable(info, (t) => doomed.reduce((table, row) => deleteRow(table, row), t), {
+  const written = await host.writeModel(info, (t) => doomed.reduce((table, row) => deleteRow(table, row), t), {
     pins,
     rowMap: (r) => (doomed.includes(r) ? undefined : r - doomed.filter((d) => d < r).length),
   });
@@ -169,7 +165,7 @@ export async function deleteRowsAt(host: ModelHost, info: TableInfo, rows: reado
 export function moveRowTo(host: ModelHost, info: TableInfo, from: number, asked: number): Promise<WriteResult> {
   const to = clampRowMove(info.pins, info.rows, from, asked);
   if (to === from) return Promise.resolve("unchanged");
-  return host.writeTable(info, (t) => moveRow(t, from, to), { rowMap: (r) => columnAfterMove(r, from, to) });
+  return host.writeModel(info, (t) => moveRow(t, from, to), { rowMap: (r) => columnAfterMove(r, from, to) });
 }
 
 /**
@@ -198,14 +194,14 @@ export function columnBlockTo(info: TableInfo, first: number, last: number, aske
 export function moveRowsTo(host: ModelHost, info: TableInfo, first: number, last: number, asked: number): Promise<WriteResult> {
   const to = rowBlockTo(info, first, last, asked);
   if (to === first) return Promise.resolve("unchanged");
-  return host.writeTable(info, (t) => moveRows(t, first, last, to), { rowMap: (r) => lineAfterBlockMove(r, first, last, to) });
+  return host.writeModel(info, (t) => moveRows(t, first, last, to), { rowMap: (r) => lineAfterBlockMove(r, first, last, to) });
 }
 
 /** Moves columns `first`..`last` so that the first is at `asked` (within their zone), as one edit */
 export function moveColumnsTo(host: ModelHost, info: TableInfo, first: number, last: number, asked: number): Promise<WriteResult> {
   const to = columnBlockTo(info, first, last, asked);
   if (to === first) return Promise.resolve("unchanged");
-  return host.writeTable(info, (t) => moveColumns(t, first, last, to), { columnMap: (c) => lineAfterBlockMove(c, first, last, to) });
+  return host.writeModel(info, (t) => moveColumns(t, first, last, to), { columnMap: (c) => lineAfterBlockMove(c, first, last, to) });
 }
 
 /** A table grown to hold a cell past its last row or column (growTo) */
@@ -249,7 +245,7 @@ export function growTo(info: TableInfo, at: CellRef): Growth {
 /** Adds a column asked for at `at` and edits its name */
 export function insertColumnWith(host: ModelHost, info: TableInfo, at: number): Promise<WriteResult> {
   const insert = insertColumnAt(info.pins, info.columns, at);
-  return host.writeTable(info, (t) => insertColumn(t, insert.at), {
+  return host.writeModel(info, (t) => insertModelColumn(t, insert.at), {
     focus: { row: 0, column: insert.at, select: true },
     columnMap: (c) => (c >= insert.at ? c + 1 : c),
     pins: insert.pins,
@@ -281,7 +277,7 @@ export async function deleteColumnsAt(host: ModelHost, info: TableInfo, columns:
   }
   let pins = info.pins;
   doomed.forEach((column, i) => (pins = deleteColumnPins(pins, info.columns - i, column)));
-  const written = await host.writeTable(info, (t) => doomed.reduce((table, column) => deleteColumn(table, column), t), {
+  const written = await host.writeModel(info, (t) => doomed.reduce((table, column) => deleteColumn(table, column), t), {
     columnMap: (c) => (doomed.includes(c) ? undefined : c - doomed.filter((d) => d < c).length),
     pins,
   });
@@ -296,14 +292,14 @@ export async function deleteColumnsAt(host: ModelHost, info: TableInfo, columns:
 export function moveColumnTo(host: ModelHost, info: TableInfo, from: number, asked: number): Promise<WriteResult> {
   const to = clampColumnMove(info.pins, info.columns, from, asked);
   if (to === from) return Promise.resolve("unchanged");
-  return host.writeTable(info, (t) => moveColumn(t, from, to), { columnMap: (c) => columnAfterMove(c, from, to) });
+  return host.writeModel(info, (t) => moveColumn(t, from, to), { columnMap: (c) => columnAfterMove(c, from, to) });
 }
 
 /** Pins a row to the top or bottom (moving it there), or unpins it; pinning needs the metadata setting */
 export async function pinRowAt(host: ModelHost, info: TableInfo, row: number, pin: RowZone | undefined): Promise<void> {
   if (pin && !(await host.setting("metadata"))) return;
   const { to, pins } = pinRow(info.pins, info.rows, row, pin);
-  await host.writeTable(info, (t) => moveRow(t, row, to), { pins, rowMap: (r) => columnAfterMove(r, row, to) });
+  await host.writeModel(info, (t) => moveRow(t, row, to), { pins, rowMap: (r) => columnAfterMove(r, row, to) });
 }
 
 export async function pinColumnAt(
@@ -313,5 +309,5 @@ export async function pinColumnAt(
 ): Promise<void> {
   if (pin && !(await host.setting("metadata"))) return;
   const { to, pins } = pinColumn(info.pins, info.columns, column, pin);
-  await host.writeTable(info, (t) => moveColumn(t, column, to), { columnMap: (c) => columnAfterMove(c, column, to), pins });
+  await host.writeModel(info, (t) => moveColumn(t, column, to), { columnMap: (c) => columnAfterMove(c, column, to), pins });
 }

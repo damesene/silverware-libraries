@@ -680,6 +680,15 @@ export interface ModelHost {
    */
   writeTable(target: TableTarget, change: (table: Table) => Table | undefined, options?: WriteOptions): Promise<WriteResult>;
   /**
+   * As writeTable, the change made on the model (`rowMap` and `columnMap` say
+   * how its rows and columns moved, as for writeTable): what an edit does with
+   * the attributes declared bound to their cell's content and unique applied
+   * after it (model/rules.ts), before the modules' write steps. Modules move
+   * onto it from writeTable, which then takes its place
+   * (docs/silverware-table-store-plan.md, step 3, 4c).
+   */
+  writeModel(target: TableTarget, change: (table: TableModel) => TableModel | undefined, options?: WriteOptions): Promise<WriteResult>;
+  /**
    * A new table written into the page, in one edit: after the table `after`
    * (an empty line between), or where a position is (after its line, or the
    * table it is in: the cursor's), else at the page's end; `also`: a table of the
@@ -964,7 +973,7 @@ export interface ModelHost {
   viewChangedFor(key: TableKey): void;
   /**
    * A cell's new markdown with the hidden tags the cell had, but those the
-   * features that manage them take (Feature.takesTags): editing, pasting or
+   * bound to their cell's content (Feature.boundToContent): editing, pasting or
    * clearing a cell keeps the data modules keep in it
    */
   keepTags(value: string, from: string): string;
@@ -1312,12 +1321,12 @@ export interface Feature {
   /** A header given a new name other than by its editor (a paste): what it becomes (the column type's hashtag kept); undefined: as given */
   headerRenamed?(name: string, original: string): string | undefined;
   /**
-   * Keys of the module's attributes in hidden tags in cells (tags.ts) it
-   * manages: when a cell's text is edited, pasted over or cleared, its tags
-   * with them are not kept but what the module wrote (formulas: f). Others'
-   * tags are kept.
+   * Keys of the module's cells' attributes bound to their cell's content
+   * (formulas: f): a cell whose content an edit changed (typed, pasted,
+   * cleared over) loses them unless the edit set them (model/rules.ts, the
+   * core's write step); every other attribute of a cell, whoever's, is kept
    */
-  takesTags?(): readonly string[];
+  boundToContent?(): readonly string[];
   /**
    * Why a cell's value is the feature's, so pasting leaves the cell as it is
    * (formulas: "formula cell", the formula computes it); undefined: it is not

@@ -81,17 +81,14 @@ export class Names implements Feature {
     );
   }
 
-  /** Deleting a column removes the names of the rows and cells it holds, and the formulas using them break */
+  /**
+   * Deleting a column removes the names of the cells it holds, and the formulas using them break (a row's name is
+   * the row's: it stays, wherever the table keeps it)
+   */
   columnDeleteWarning(info: TableInfo, column: number): string | undefined {
-    const table = info.model;
-    const rows = this.host.rowNames(table).flatMap((named) => (named.column === column ? [named.name] : []));
-    const cells = this.host.cellNames(table).flatMap((named) => (named.column === column ? [named.name] : []));
-    if (!rows.length && !cells.length) return undefined;
-    const lost = [
-      ...(rows.length ? [`the name${rows.length === 1 ? "" : "s"} of ${rows.length === 1 ? "the row" : `${rows.length} rows`} ${listed(rows)}`] : []),
-      ...(cells.length ? [`the name${cells.length === 1 ? "" : "s"} of ${cells.length === 1 ? "the cell" : `${cells.length} cells`} ${listed(cells)}`] : []),
-    ];
-    return `${lost.join(" and ")}: formulas that use ${rows.length + cells.length === 1 ? "it" : "them"} show #REF! or #NAME?`;
+    const cells = this.host.cellNames(info.model).flatMap((named) => (named.column === column ? [named.name] : []));
+    if (!cells.length) return undefined;
+    return `the name${cells.length === 1 ? "" : "s"} of ${cells.length === 1 ? "the cell" : `${cells.length} cells`} ${listed(cells)}: formulas that use ${cells.length === 1 ? "it" : "them"} show #REF! or #NAME?`;
   }
 
   /** Named cells show a mark in their corner, and their name on hover */

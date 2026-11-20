@@ -252,9 +252,10 @@ describe("Row and column grips", () => {
     key(editor, "Delete");
     await flush();
     expect(questions).toEqual([
-      "Deleting these columns also removes the name of the row pear: formulas that use it show #REF! or #NAME?, and the name of the cell fig_price: formulas that use it show #REF! or #NAME?. Delete the 2 columns? Ctrl+Z brings it back.",
+      "Deleting these columns also removes the name of the cell fig_price: formulas that use it show #REF! or #NAME?. Delete the 2 columns? Ctrl+Z brings it back.",
     ]);
-    expect(text).toBe("| Note |\n|---|\n| a |\n| b |\n");
+    // (A row's name is the row's: it stays, in the cell left)
+    expect(text).toBe("| Note |\n|---|\n| a <meta core.n='pear'> |\n| b |\n");
   });
 
   it("offers pinning only with the metadata setting", async () => {

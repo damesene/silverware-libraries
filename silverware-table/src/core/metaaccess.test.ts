@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseTable, serializeTable, writtenMeta } from "../markdown.ts";
 import { setCell } from "../ops.ts";
+import { attributeChangeOf } from "../model/model.ts";
 import { decode, encode } from "../store/markdown/codec.ts";
 import { withTagValue } from "../tagvalues.ts";
 import { ownMeta } from "./metaaccess.ts";
@@ -56,7 +57,10 @@ describe("a module's own metadata", () => {
       expect(formulas.attribute(cell, "f")).toBe("=1+2");
       expect(ownMeta("filters", () => true).attribute(cell, "f")).toBeUndefined();
       expect(formulas.attribute(formulas.withAttribute(cell, "f", "=2+2"), "f")).toBe("=2+2");
-      expect(formulas.withAttribute(cell, "f", "=1+2")).toBe(cell);
+      // (Set explicitly: a new cell even at the same value, its set recorded)
+      const again = formulas.withAttribute(cell, "f", "=1+2");
+      expect(again).not.toBe(cell);
+      expect(attributeChangeOf(again.attributes)).toMatchObject({ owner: "formulas", key: "f", value: "=1+2" });
       const off = ownMeta("formulas", () => false);
       expect(off.canStore(cell, "f")).toBe(true);
       expect(off.canStore({ content: "1", attributes: new Map() }, "f")).toBe(false);

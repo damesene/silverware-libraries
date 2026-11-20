@@ -25,6 +25,7 @@ import type { TablePlatform } from "./core/platform.ts";
 import type { StoredTable } from "./core/store.ts";
 import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, type TableModel } from "./model/model.ts";
 import { HASHTAGS_KEY } from "./columns.ts";
+import { type AttributeRules, withAttributeRules } from "./model/rules.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
 import { decode, decodeCell, encode, encodeCell, plainMarkdown } from "./store/markdown/codec.ts";
@@ -70,7 +71,7 @@ import {
 import type { MenuBack, MenuEntry, MenuNaming } from "./menu.ts";
 import { floatingMenu, focusMenu } from "./core/menu.ts";
 import { CORE, attributeName, metadataAfterEdit, metaName, modelTableName, metaPins, metaSort, withMetaPins, withMetaSort, writtenName } from "./meta.ts";
-import { CELL_NAME, type CellNameAt, cellNameOf, cellNamesIn, LINE_NAME, columnNameIn, modelCellName, modelCellNames, modelColumnName, modelRowName, modelRowNames, type RowName, rowNameIn, rowNamesIn, withCellNameIn, withColumnNameIn, withModelName, withRowNameIn } from "./names.ts";
+import { CELL_NAME_KEY, type CellNameAt, cellNameOf, cellNamesIn, LINE_NAME_KEY, columnNameIn, modelCellName, modelCellNames, modelColumnName, modelRowName, modelRowNames, type RowName, rowNameIn, rowNamesIn, withCellNameIn, withColumnNameIn, withModelName, withRowNameIn } from "./names.ts";
 import { ownMeta } from "./core/metaaccess.ts";
 import { withoutNewTagValues } from "./tagvalues.ts";
 import { keepTags } from "./tags.ts";
@@ -987,7 +988,18 @@ export class Controller implements TableHost {
 
   /** Attributes of cells' hidden tags a copy of a row leaves out: the names of rows and cells, one row's, one cell's */
   uniqueTags(): ReadonlySet<string> {
-    return new Set([LINE_NAME.toLowerCase(), CELL_NAME.toLowerCase()]);
+    return new Set(this.attributeRules().unique.map(({ owner, key }) => attributeName(owner, key).toLowerCase()));
+  }
+
+  /** The attributes their owners declare a rule for: the modules' bound to their cell's content, the core's names unique */
+  private attributeRules(): AttributeRules {
+    return {
+      boundToContent: this.features.flatMap((f) => (f.boundToContent?.() ?? []).map((key) => ({ owner: this.ownerOf(f), key }))),
+      unique: [
+        { owner: CORE, key: LINE_NAME_KEY },
+        { owner: CORE, key: CELL_NAME_KEY },
+      ],
+    };
   }
 
   /** Whose a feature's data is: its module's (by the module's name), else the core's */
@@ -1375,7 +1387,7 @@ export class Controller implements TableHost {
   }
 
   keepTags(value: string, from: string): string {
-    return keepTags(value, from, new Set(this.features.flatMap((f) => (f.takesTags?.() ?? []).map((key) => attributeName(this.ownerOf(f), key).toLowerCase()))));
+    return keepTags(value, from, new Set(this.attributeRules().boundToContent.map(({ owner, key }) => attributeName(owner, key).toLowerCase())));
   }
 
   clickSelects(): boolean {
@@ -2668,6 +2680,18 @@ export class Controller implements TableHost {
     const widget = this.widgetForKey(target.key);
     const info = widget && this.infos.get(widget);
     return info && info.source === target.source ? this.writeAt(info, widget, change, options) : this.writeAt(target, undefined, change, options);
+  }
+
+  writeModel(target: TableTarget, change: (table: TableModel) => TableModel | undefined, options: WriteOptions = {}): Promise<WriteResult> {
+    return this.writeTable(
+      target,
+      (table) => {
+        const before = decode(table);
+        const edited = change(before);
+        return edited && encode(withAttributeRules(before, edited, this.attributeRules(), options.rowMap, options.columnMap), table);
+      },
+      options,
+    );
   }
 
   newTableKey(): TableKey {

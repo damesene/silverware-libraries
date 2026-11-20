@@ -832,7 +832,7 @@ describe("Formulas", () => {
       expect(text).toContain(`| Figs <meta core.n='fig'> | 3 |`);
     });
 
-    it("asks before deleting a column that holds names of rows or cells", async () => {
+    it("asks before deleting a column that holds names of cells; the names of rows stay with their rows", async () => {
       const NAMED = `| Name | Price | Note |\n|---|---|---|\n| Pear <meta core.n='pear'> | 12 | a |\n| Fig <meta core.n='fig'> | 3 <meta core.cn='fig_price'> | b |\n`;
       await setup(NAMED);
       const confirm = vi.spyOn(window, "confirm");
@@ -847,11 +847,6 @@ describe("Formulas", () => {
         await flush();
       };
       confirm.mockReturnValue(false);
-      await deleteColumn(0);
-      expect(confirm).toHaveBeenLastCalledWith(
-        "Deleting this column also removes the names of 2 rows pear and fig: formulas that use them show #REF! or #NAME?. Delete the column? Ctrl+Z brings it back.",
-      );
-      expect(text).toBe(NAMED);
       await deleteColumn(1);
       expect(confirm).toHaveBeenLastCalledWith(
         "Deleting this column also removes the name of the cell fig_price: formulas that use it show #REF! or #NAME?. Delete the column? Ctrl+Z brings it back.",
@@ -863,9 +858,10 @@ describe("Formulas", () => {
       expect(confirm).not.toHaveBeenCalled();
       expect(text).toBe(`| Name | Price |\n|---|---|\n| Pear <meta core.n='pear'> | 12 |\n| Fig <meta core.n='fig'> | 3 <meta core.cn='fig_price'> |\n`);
       await controller.scan();
-      confirm.mockReturnValue(true);
+      // The column holding the rows' names: nothing asked, the names written in their rows' cells left
       await deleteColumn(0);
-      expect(text).toBe(`| Price |\n|---|\n| 12 |\n| 3 <meta core.cn='fig_price'> |\n`);
+      expect(confirm).not.toHaveBeenCalled();
+      expect(text).toBe(`| Price |\n|---|\n| 12 <meta core.n='pear'> |\n| 3 <meta core.n='fig' core.cn='fig_price'> |\n`);
     });
 
     const TWO_TABLES = `| A | B |\n|---|---|\n| 1 <meta core.cn='one'> | 2 |\n\n| C |\n|---|\n| 3 <meta core.cn='two'> |\n`;

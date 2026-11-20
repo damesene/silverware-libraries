@@ -7,7 +7,7 @@
 // has may change or go, none is added (`enabled`: whether the setting is on).
 import { attributeName, columnAttributeOf, columnValues, hasMetaNamed, metaValue, metaValuesOf, type Owner, withColumnValues, withMetaValue } from "../meta.ts";
 import type { Table } from "../markdown.ts";
-import { attributeIn, type AttributePlace, attributesAt, type ModelCell, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt } from "../model/model.ts";
+import { attributeIn, type AttributePlace, attributesAt, type ModelCell, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributeSet, withAttributesAt } from "../model/model.ts";
 import type { ModelHost } from "./feature.ts";
 
 export type OwnMeta = Pick<
@@ -45,10 +45,8 @@ export function ownMeta(owner: Owner, enabled: () => boolean): OwnMeta {
   function withAttribute(table: TableModel, key: string, value: string | undefined, at?: AttributePlace): TableModel;
   function withAttribute(cell: ModelCell, key: string, value: string | undefined): ModelCell;
   function withAttribute(table: Table | TableModel | ModelCell, key: string, value: string | undefined, at?: AttributePlace): Table | TableModel | ModelCell {
-    if (isCell(table)) {
-      const attributes = withAttributeIn(table.attributes, owner, key, value);
-      return attributes === table.attributes ? table : { ...table, attributes };
-    }
+    // (A cell's: an explicit set, recorded even at the same value, which an edit's rules tell from one it left)
+    if (isCell(table)) return { ...table, attributes: withAttributeSet(table.attributes, owner, key, value) };
     if (isModel(table)) return withInModel(table, key, value, at);
     const column = at && { column: at.column! };
     if (value !== undefined && !storable(table, nameOf(table, key, column))) return table;

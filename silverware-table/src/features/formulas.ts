@@ -730,7 +730,7 @@ export class Formulas implements Feature {
   // ---- the cell editor ----------------------------------------------------------
 
   /** The formula tag (<meta f>) is the module's: edited, it is what editorValue writes */
-  takesTags(): readonly string[] {
+  boundToContent(): readonly string[] {
     return ["f"];
   }
 

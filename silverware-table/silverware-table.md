@@ -356,7 +356,7 @@ A row can have a name, by which formulas use its cells: `pear[price]` is the Pri
 * The name alone is the row's cells as a range, as `[price]` is a column's: `=SUM(pear)`, `=MAX(prices!pear)`. It is every cell of the row: a formula in that row is in its own range, `#CYCLE!` (put a row's total in another row, or another table). Left as a cell's result (`=pear*2`), it is `#SPILL!` (several values). A cell named as the row (see [[#Named cells]]) goes first. In an Excel file it is the row's cells (`SUM(A2:D2)`).
 * A row's name is its table's: two rows of a table cannot have the same one. The column after it is written as any column reference (`[price]`, a column's name, `[price:2]`) and follows the column when it is renamed or moved.
 * `XLOOKUP("Pear", prices![name], prices![price])` does the same by a key column's value; a row's name works without one, and is not changed by editing the row's cells.
-* Deleting the column that holds rows' or cells' names removes the names with it: Silverware Table says which and asks first, as the formulas that use them then show `#REF!` or `#NAME?`.
+* Deleting a column that holds cells' names removes those names with it: Silverware Table says which and asks first, as the formulas that use them then show `#REF!` or `#NAME?`. A row's name stays with its row whichever column is deleted.
 
 ### Other tables
 

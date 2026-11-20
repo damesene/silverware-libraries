@@ -3,7 +3,7 @@
 // them (formulas: `f`; names: `n`, `cn`). The core keeps a cell's tags,
 // whatever they are for, when its text is edited, pasted over or cleared, so a
 // module turned off loses nothing; a module that manages a tag says so
-// (Feature.takesTags), and writes it itself.
+// (Feature.boundToContent), and writes it itself.
 
 /**
  * What a hidden tag holds between "<meta" and its ">": anything but ">". A tag

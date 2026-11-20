@@ -598,6 +598,28 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      the writers of names set them (only a table's name through the metadata
      setting, as before). `Align` is the model's (markdown.ts re-exports it),
      so the model imports nothing of the markdown.
+   - **4c begun, with the cell rules (2026-11-20)**: every write of cells
+     (typed, pasted, moved, filled) runs into the rules, so they come with
+     `writeModel` instead of after it. `model/rules.ts`
+     (`withAttributeRules`, run by the core in `writeModel` after the
+     change, before the modules' write steps, with the write's maps): a
+     cell whose content changed loses its attributes declared bound to its
+     content unless the edit set them, told by its attributes being the
+     very ones it had (a value typed, pasted, cleared over keeps them;
+     a cell moved there brings its own); a row or a cell the edit made
+     takes no unique attribute another has (a duplicated row leaves its
+     names). An attribute set explicitly on a cell is recorded even at the
+     same value (`withAttributeSet`, the host's cell overload), so the same
+     formula typed again keeps it. `Feature.takesTags` is
+     `Feature.boundToContent`, the one declaration `keepTags` (the
+     markdown writes) and the rule read; the core's names are unique.
+     `host.writeModel(target, change, options)` beside `writeTable`, which
+     it replaces once the last caller moved; first moved: the structural
+     edits of `core/structure.ts` (rows and columns inserted, duplicated,
+     deleted, moved, pinned). **Changed for users**: a row's name is the
+     row's, so deleting the column whose cell held it keeps it (written in
+     the row's first cell left); deleting a column asks only about the
+     cells' names it takes (library page updated).
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

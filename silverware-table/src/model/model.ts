@@ -1,11 +1,14 @@
 // A table as Silverware Table works on it, apart from where it is kept
-// (docs/silverware-table-store-plan.md, *The model*): what of it is here so
-// far, its attributes; its columns, rows and cells come with `TableModel`.
-// Nothing of a store's form is here (escapes, hidden tags, a metadata row,
-// lines, places): a store's codec reads its form into the model and writes it
-// back, and is the one place that knows that form.
+// (docs/silverware-table-store-plan.md, *The model*): columns, body rows and
+// cells, each with its content and its attributes. Nothing of a store's form
+// is here (escapes, hidden tags, a metadata row, lines, places): a store's
+// codec reads its form into a model and writes a model back
+// (store/markdown/codec.ts), and is the one place that knows that form.
 //
-// Immutable: an edit makes a new version, sharing what it did not change.
+// Immutable: an edit makes a new version, sharing what it did not change, so
+// a write, an undo and a module may each hold a version that never changes
+// under them.
+import type { Align } from "../markdown.ts";
 
 /** Whose an attribute is: a module's name in lowercase, the core's (`core`), or none (`""`: a tag typed by hand without one) */
 export type Owner = string;
@@ -18,6 +21,33 @@ export type Owner = string;
 export type Attributes = ReadonlyMap<Owner, ReadonlyMap<string, string>>;
 
 export const NO_ATTRIBUTES: Attributes = new Map();
+
+/** A cell: its content in the cell language (inline markdown, unescaped: `|` is `|`), and its attributes */
+export type ModelCell = { readonly content: string; readonly attributes: Attributes };
+
+/** A body row: its cells by column, and its attributes (its name) */
+export type ModelRow = { readonly cells: readonly ModelCell[]; readonly attributes: Attributes };
+
+/** A column: its header (its name as shown, the cell language), its alignment, and its attributes (its type, its own name) */
+export type ModelColumn = { readonly header: string; readonly align: Align; readonly attributes: Attributes };
+
+/**
+ * A table: its columns, its body rows (the first is row 1: the header is no
+ * row, it is the columns'), and its attributes
+ */
+export type TableModel = {
+  readonly columns: readonly ModelColumn[];
+  readonly rows: readonly ModelRow[];
+  readonly attributes: Attributes;
+};
+
+/** An attribute set on attributes: what they were made from, and the change */
+export type AttributeChange = { readonly from: Attributes; readonly owner: Owner; readonly key: string; readonly value: string | undefined };
+
+// What each set of attributes was made from, so a store writes the change into
+// its form as it was written (a codec keeps a cell's tags as they were, one
+// attribute changed in place)
+const madeFrom = new WeakMap<Attributes, AttributeChange>();
 
 /** An attribute's value; undefined: none */
 export function attributeIn(attributes: Attributes, owner: Owner, key: string): string | undefined {
@@ -34,5 +64,11 @@ export function withAttributeIn(attributes: Attributes, owner: Owner, key: strin
   const all = new Map(attributes);
   if (changed.size) all.set(owner, changed);
   else all.delete(owner);
+  madeFrom.set(all, { from: attributes, owner, key, value });
   return all;
+}
+
+/** The change a set of attributes was made by (withAttributeIn), undefined: made otherwise (read, or made whole) */
+export function attributeChangeOf(attributes: Attributes): AttributeChange | undefined {
+  return madeFrom.get(attributes);
 }

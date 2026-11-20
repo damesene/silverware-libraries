@@ -7,9 +7,9 @@
 // occurrence where several share it), so it survives moves and renames, which
 // every edit follows here whatever the attribute is for.
 import { type ColumnId, columnIdOf, findColumn, matchColumns } from "./columns.ts";
-import type { Row, Table } from "./markdown.ts";
+import type { Row, Table, TableMeta } from "./markdown.ts";
 import { attributeName, COLUMN_ATTRIBUTE_RE, COLUMN_MARK, CORE, type Owner, splitAttributeName } from "./metanames.ts";
-import { attributeIn, NO_ATTRIBUTES, withAttributeIn } from "./model/model.ts";
+import { type Attributes, attributeIn, NO_ATTRIBUTES, withAttributeIn } from "./model/model.ts";
 import { validateTableName } from "./namerules.ts";
 import type { SortDirection } from "../../shared/compare.ts";
 import { NO_PINS, type Pins } from "./view.ts";
@@ -100,6 +100,47 @@ export function withColumnValues(table: Table, owner: Owner, key: string, values
   const current = table.meta ?? {};
   const same = Object.keys(meta).length === Object.keys(current).length && Object.entries(meta).every(([n, v]) => current[n] === v);
   return same ? table : { ...table, meta };
+}
+
+/**
+ * Every attribute of the table's columns in its metadata row, by column (by
+ * owner and key), and those naming no column (a header renamed by hand: kept
+ * as written, for the column's name to come back)
+ */
+export function columnsMetaOf(table: Table): { readonly byColumn: readonly Attributes[]; readonly orphans: TableMeta } {
+  const headers = table.rows[0]?.cells ?? [];
+  const byColumn = table.align.map(() => new Map<string, Map<string, string>>());
+  const orphans: Record<string, string> = {};
+  for (const [name, value] of Object.entries(table.meta ?? {})) {
+    const attribute = parseColumnAttribute(name);
+    const column = attribute && findColumn(headers, attribute.id);
+    const own = column === undefined ? undefined : byColumn[column];
+    if (!attribute || !own) {
+      orphans[name] = value;
+      continue;
+    }
+    const { owner, key } = splitAttributeName(attribute.what);
+    let values = own.get(owner);
+    if (!values) own.set(owner, (values = new Map()));
+    // (The first of a name counts, as columnValues reads it)
+    if (!values.has(key)) values.set(key, value);
+  }
+  return { byColumn, orphans };
+}
+
+/** Columns' attributes (by column) as a metadata row names them by these headers, then those kept as written */
+export function columnsMetaNamed(headers: readonly string[], byColumn: readonly Attributes[], orphans: TableMeta): TableMeta {
+  const meta: Record<string, string> = {};
+  byColumn.forEach((attributes, column) => {
+    for (const [owner, own] of attributes) {
+      for (const [key, value] of own) {
+        const name = columnAttributeName(headers, attributeName(owner, key), column);
+        if (name) meta[name] = value;
+      }
+    }
+  });
+  for (const [name, value] of Object.entries(orphans)) if (!(name in meta)) meta[name] = value;
+  return meta;
 }
 
 /** The whole name of an owner's attribute of one column, as the headers name it (undefined: no such column) */

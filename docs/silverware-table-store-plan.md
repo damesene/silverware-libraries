@@ -488,6 +488,23 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      import each other in a ring (markdown.ts, meta.ts, columns.ts); they go
      onto the model's columns with `TableModel`, where the codec gives
      places on reading and names on writing by this same pairing.
+   - **The model and its codec, how the rest goes (2026-11-20)**: the
+     model's types are in `model/model.ts` (`TableModel`, columns, rows,
+     cells, attributes), the markdown codec in `store/markdown/codec.ts`
+     (`decode`: a `Table` into the model; `encode`: a model back, against
+     the table it came from). `Table` is not turned into the model in place,
+     part by part: a module or domain moves onto the model on its own (its
+     commit), reading a table through `decode` and writing through
+     `encode` where it meets the core; once every one has, the hooks take
+     and give `TableModel` and those conversions go. The codec writes what
+     did not change as it was read, byte for byte, and an attribute changed
+     into the tags it was read from, by the writers of before
+     (`withTagValue`, the names' one tag, a type's hashtag at the header's
+     end): its tests read every table of the playground's sample and of
+     the forms it knows back unchanged, and compare each change written
+     through the model with the same change by those writers. Which change
+     made a set of attributes is the model's (`attributeChangeOf`), so the
+     codec writes a change where it was read.
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

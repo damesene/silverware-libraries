@@ -16,6 +16,16 @@ export type ColumnId = { readonly name: string; readonly nth: number };
 // A hashtag in a header (`Price #euro`): SilverBullet leaves it out of the column's key
 const HASHTAG_RE = /(^|\s)#[^\s#]+/g;
 
+/** A header's hashtags (`Price #currency-usd #x`: `#currency-usd`, `#x`), in their order */
+export function headerHashtags(header: string): string[] {
+  return Array.from(header.matchAll(HASHTAG_RE), (match) => match[0].trim());
+}
+
+/** A header without its hashtags, its spaces between words one */
+export function withoutHashtags(header: string): string {
+  return header.replace(HASHTAG_RE, "$1").replace(/\s+/g, " ").trim();
+}
+
 /**
  * A header cell as a column name: markdown escapes, hashtags and the
  * emphasis around it (**Qty**) dropped

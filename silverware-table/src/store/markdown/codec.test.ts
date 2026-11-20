@@ -1,0 +1,147 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import { withColumnType } from "../../columntypes/registry.ts";
+import { findTables, parseTable, serializeTable, type Table } from "../../markdown.ts";
+import { followColumnMeta, metaValue, withColumnValues, withMetaValue } from "../../meta.ts";
+import { attributeIn, type ModelCell, type TableModel, withAttributeIn } from "../../model/model.ts";
+import { withCellNameIn, withColumnNameIn, withRowNameIn } from "../../names.ts";
+import { reorderRows, setCell } from "../../ops.ts";
+import { keepTags } from "../../tags.ts";
+import { withTagValue } from "../../tagvalues.ts";
+import { decode, encode, HASHTAGS_KEY } from "./codec.ts";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const SAMPLE = readFileSync(join(here, "../../../../playground/sample.md"), "utf8");
+
+// Tables of every form the codec reads: hidden tags in cells and headers, names, hashtags, escapes, a metadata row
+// with the table's and its columns' attributes (one naming no column), padding, an indent, quotes in values
+const FORMS = [
+  "| Name | Qty |\n|---|---|\n| Pear | 3 |\n| apple | 10 |",
+  "| Item <meta core.n='item'> | Price #currency-usd | Note #x #y |\n|:---|--:|:-:|\n| Pear <meta core.n='pear' core.cn='p'> | 12 <meta formulas.f='=B3*2'> | a \\| b |\n| Fig | 3 <meta core.cn='fig'> <meta other='x'> | |",
+  "| A | B |\n|---|---|\n| 1 | 2 |\n| <meta core.table core.name='t' core.-c-b.sort='desc' widths.-c-gone.size='9' note='say &quot;hi&quot;'> |",
+  "| Name  | Qty |\n| ----- | --- |\n| Pear  | 3   |\n| apple | 10  |",
+  "  | A |\n  |---|\n  | 1 |",
+  "| Qty | Qty |\n|---|---|\n| 1 | 2 |\n| <meta core.table filters.-c-qty:2.condition='&gt;1'> |",
+];
+
+const md = (table: Table) => serializeTable(table);
+const sampleTables = findTables(SAMPLE).map((range) => parseTable(range.text));
+
+/** The model with one cell changed */
+function withCell(model: TableModel, row: number, column: number, change: (cell: ModelCell) => ModelCell): TableModel {
+  return { ...model, rows: model.rows.map((r, i) => (i !== row - 1 ? r : { ...r, cells: r.cells.map((c, j) => (j === column ? change(c) : c)) })) };
+}
+
+describe("the markdown codec", () => {
+  it("writes back every table as it was read, the same table, byte for byte", () => {
+    expect(sampleTables.length).toBeGreaterThan(5);
+    for (const table of [...sampleTables, ...FORMS.map(parseTable)]) {
+      expect(encode(decode(table), table)).toBe(table);
+      // A model made anew from it (no object of it kept): the same markdown
+      const model = decode(table);
+      const anew: TableModel = { columns: model.columns.map((c) => ({ ...c })), rows: model.rows.map((r) => ({ ...r, cells: r.cells.map((c) => ({ ...c })) })), attributes: model.attributes };
+      expect(md(encode(anew, table))).toBe(md(table));
+    }
+  });
+
+  it("reads a column's header, hashtags, own name and metadata row's attributes; a row's name; a cell's content and tags", () => {
+    const model = decode(parseTable(FORMS[1]!));
+    expect(model.columns.map((c) => c.header)).toEqual(["Item", "Price", "Note"]);
+    expect(model.columns.map((c) => c.align)).toEqual(["left", "right", "center"]);
+    expect(attributeIn(model.columns[0]!.attributes, "core", "n")).toBe("item");
+    expect(attributeIn(model.columns[1]!.attributes, "core", HASHTAGS_KEY)).toBe("#currency-usd");
+    expect(attributeIn(model.columns[2]!.attributes, "core", HASHTAGS_KEY)).toBe("#x #y");
+    expect(attributeIn(model.rows[0]!.attributes, "core", "n")).toBe("pear");
+    expect(model.rows[0]!.cells.map((c) => c.content)).toEqual(["Pear", "12", "a | b"]);
+    expect(attributeIn(model.rows[0]!.cells[0]!.attributes, "core", "cn")).toBe("p");
+    expect(attributeIn(model.rows[0]!.cells[0]!.attributes, "core", "n")).toBeUndefined();
+    expect(attributeIn(model.rows[0]!.cells[1]!.attributes, "formulas", "f")).toBe("=B3*2");
+    expect(attributeIn(model.rows[1]!.cells[1]!.attributes, "", "other")).toBe("x");
+    const meta = decode(parseTable(FORMS[2]!));
+    expect(attributeIn(meta.attributes, "core", "name")).toBe("t");
+    expect(attributeIn(meta.attributes, "", "note")).toBe('say "hi"');
+    expect(attributeIn(meta.columns[1]!.attributes, "core", "sort")).toBe("desc");
+    const shared = decode(parseTable(FORMS[5]!));
+    expect(attributeIn(shared.columns[1]!.attributes, "filters", "condition")).toBe(">1");
+    expect(attributeIn(shared.columns[0]!.attributes, "filters", "condition")).toBeUndefined();
+  });
+
+  describe("writes a change as the writers before the model wrote it", () => {
+    const table = parseTable(FORMS[1]!);
+    const model = decode(table);
+
+    it("a cell's formula, into the tags it has", () => {
+      const before = setCell(table, 2, 1, withTagValue(table.rows[2]!.cells[1]!, "formulas.f", "=A1"));
+      const after = encode(withCell(model, 2, 1, (c) => ({ ...c, attributes: withAttributeIn(c.attributes, "formulas", "f", "=A1") })), table);
+      expect(md(after)).toBe(md(before));
+      const set = setCell(table, 1, 1, withTagValue(table.rows[1]!.cells[1]!, "formulas.f", "=B3*3"));
+      expect(md(encode(withCell(model, 1, 1, (c) => ({ ...c, attributes: withAttributeIn(c.attributes, "formulas", "f", "=B3*3") })), table))).toBe(md(set));
+    });
+
+    it("a cell's content, its tags kept", () => {
+      const before = setCell(table, 1, 1, keepTags("14", table.rows[1]!.cells[1]!));
+      expect(md(encode(withCell(model, 1, 1, (c) => ({ ...c, content: "14" })), table))).toBe(md(before));
+      // A | in it escaped
+      const piped = setCell(table, 2, 0, "a \\| b");
+      expect(md(encode(withCell(model, 2, 0, (c) => ({ ...c, content: "a | b" })), table))).toBe(md(piped));
+    });
+
+    it("a row's name in the cell holding it as that cell's content changes", () => {
+      const second = parseTable("| A | B |\n|---|---|\n| 1 | 2 <meta core.n='two'> |");
+      const read = decode(second);
+      expect(attributeIn(read.rows[0]!.attributes, "core", "n")).toBe("two");
+      const changed = encode(withCell(read, 1, 1, (c) => ({ ...c, content: "5" })), second);
+      expect(md(changed)).toBe(md(setCell(second, 1, 1, keepTags("5", second.rows[1]!.cells[1]!))));
+    });
+
+    it("a cell's, a row's and a column's names, in the names' one tag", () => {
+      expect(md(encode(withCell(model, 2, 0, (c) => ({ ...c, attributes: withAttributeIn(c.attributes, "core", "cn", "fig1") })), table))).toBe(md(withCellNameIn(table, 2, 0, "fig1")));
+      expect(md(encode(withCell(model, 1, 0, (c) => ({ ...c, attributes: withAttributeIn(c.attributes, "core", "cn", undefined) })), table))).toBe(md(withCellNameIn(table, 1, 0, undefined)));
+      const rowNamed = { ...model, rows: model.rows.map((r, i) => (i === 1 ? { ...r, attributes: withAttributeIn(r.attributes, "core", "n", "fig") } : r)) };
+      expect(md(encode(rowNamed, table))).toBe(md(withRowNameIn(table, 2, "fig")));
+      const renamedRow = { ...model, rows: model.rows.map((r, i) => (i === 0 ? { ...r, attributes: withAttributeIn(r.attributes, "core", "n", "pear2") } : r)) };
+      expect(md(encode(renamedRow, table))).toBe(md(withRowNameIn(table, 1, "pear2")));
+      const columnNamed = { ...model, columns: model.columns.map((c, i) => (i === 1 ? { ...c, attributes: withAttributeIn(c.attributes, "core", "n", "price") } : c)) };
+      expect(md(encode(columnNamed, table))).toBe(md(withColumnNameIn(table, 1, "price")));
+    });
+
+    it("a column's type, among its hashtags", () => {
+      const typed = { ...model, columns: model.columns.map((c, i) => (i === 1 ? { ...c, attributes: withAttributeIn(c.attributes, "core", HASHTAGS_KEY, "#stars") } : c)) };
+      expect(md(encode(typed, table))).toBe(md(setCell(table, 0, 1, withColumnType(table.rows[0]!.cells[1]!, "stars"))));
+    });
+
+    it("a header's own tags kept as its column changes: renamed, typed", () => {
+      const tagged = parseTable("| Price #currency-usd <meta note='x'> | Qty |\n|---|---|\n| 1 | 2 |\n| <meta core.table widths.-c-price.size='90'> |");
+      const read = decode(tagged);
+      const typed = { ...read, columns: read.columns.map((c, i) => (i === 0 ? { ...c, attributes: withAttributeIn(c.attributes, "core", HASHTAGS_KEY, "#stars") } : c)) };
+      expect(md(encode(typed, tagged))).toBe(md(followColumnMeta(tagged, setCell(tagged, 0, 0, withColumnType(tagged.rows[0]!.cells[0]!, "stars")))));
+      const renamed = { ...read, columns: read.columns.map((c, i) => (i === 0 ? { ...c, header: "Cost" } : c)) };
+      const written = md(encode(renamed, tagged));
+      expect(written).toContain("| Cost #currency-usd <meta note='x'> |");
+      expect(written).toContain("widths.-c-cost.size='90'");
+    });
+
+    it("a column's and the table's attributes, in the metadata row", () => {
+      const plain = parseTable(FORMS[2]!);
+      const read = decode(plain);
+      const sorted = { ...read, columns: read.columns.map((c, i) => (i === 0 ? { ...c, attributes: withAttributeIn(c.attributes, "core", "sort", "asc") } : c)) };
+      expect(md(encode(sorted, plain))).toBe(md(withColumnValues(plain, "core", "sort", new Map([[0, "asc"], [1, "desc"]]))));
+      const named = { ...read, attributes: withAttributeIn(read.attributes, "core", "name", "u") };
+      expect(md(encode(named, plain))).toBe(md(withMetaValue(plain, "core", "name", "u")));
+      expect(metaValue(encode(named, plain), "core", "name")).toBe("u");
+    });
+
+    it("rows moved, each as it was written; a header renamed, its column's attributes with it", () => {
+      const plain = parseTable(FORMS[0]!);
+      const read = decode(plain);
+      const reversed = { ...read, rows: [...read.rows].reverse() };
+      expect(md(encode(reversed, plain))).toBe(md(reorderRows(plain, [2, 1])));
+      const meta = parseTable(FORMS[2]!);
+      const model2 = decode(meta);
+      const renamed = { ...model2, columns: model2.columns.map((c, i) => (i === 1 ? { ...c, header: "Total" } : c)) };
+      expect(md(encode(renamed, meta))).toBe(md(followColumnMeta(meta, setCell(meta, 0, 1, "Total"))));
+    });
+  });
+});

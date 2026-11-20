@@ -708,6 +708,39 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      core and the adapter still read markdown.ts (the write pipeline, Remove
      metadata, the sheet's board), which moves into the markdown store in
      steps 4 and 6.
+   - **Review of step 3 (2026-11-20)**: four reviewers, one area each (the
+     model and the codec; the core's writes; the formulas, views and pivots;
+     the other modules), every finding checked in the code and fixed with a
+     test that fails without it. What the conversion had broken: a cell cut
+     and moved kept a formula whose result was empty (emptied as
+     `cellWrittenOver` writes an empty cell, as Delete does); a cut stayed
+     valid after its cell got a formula of the same text (cells compared
+     whole, `sameCell`); a result with spaces around it or a line break was
+     never up to date (`resultContent`: one line, trimmed, as a cell holds
+     it); views and pivots were written on every edit (`calculatedTable`
+     gives the table itself where nothing changed); Copy as Markdown lost
+     the padding and a header's hashtags' place (written by the codec against
+     the table read, its tags then taken off); a column's attribute set
+     rewrote its header (a column decoded keeps what it was read as, its own
+     set of attributes even where it has none); a row's cells past its
+     header were lost when it changed (`beyond`); a new table after an
+     indented one lost the indent of its rows (written anew, each row);
+     columns' attributes moved twice where headers repeat (a write of the
+     model's is not followed by name again: `byModel`; a column its map
+     deleted takes its attributes in `encode`). Then the leftovers: names,
+     attributes and pins in the controller on the model only, one reader of
+     a table's name (`metaName`), the markdown's name writers gone; empty
+     headers named on the model (`nameEmptyHeaders` in columns.ts: a header
+     of hashtags or of its column's name alone is not empty); a page's table
+     by its key one type (`KeyedModel<Key>` in model/model.ts: `KeyedTable`
+     and `StoredTable` the core's, `PageTableModel` gone); a column's type set
+     by the column types module (`withType`, handed to the Choices dialog);
+     `headerRenamed` on the header's cell, as `editorText` and `editorValue`.
+     Left for later steps: the controller's markdown `write` beside
+     `writeMarkdown`, the markdown's operations (ops.ts) the core still uses
+     (step 4), the sources module's markdown table (step 5). A row shorter
+     than its header is written whole when it changes (the markdown's
+     operations grew it to the cell edited): shown the same.
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

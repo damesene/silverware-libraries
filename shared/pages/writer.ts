@@ -74,6 +74,10 @@ export type PlanOptions = {
   readonly progress?: Progress;
   // Why a page is left alone whatever the changes would do (a meta page, protected); undefined: it is not
   readonly leaveAlone?: (page: PageRead) => string | undefined;
+  // The page open in the editor, changed since it was read, planned anew on its text as it is then and written,
+  // not left: writes one after another, each built on the one before (a table's: Enter, Tab), where one left would
+  // lose an edit. A page not open, or renamed, keeps the check
+  readonly replanOpenPage?: boolean;
 };
 
 export interface PageWriter {
@@ -92,8 +96,9 @@ export interface PageWriter {
 }
 
 // A planned page's texts, kept by the writer that planned it (a plugin has one writer): the plugin is given
-// the page, never them; undefined: no page (before it is made, after it is removed)
-type Texts = { readonly before: string | undefined; readonly after: string | undefined };
+// the page, never them; undefined: no page (before it is made, after it is removed); `changes`: kept to plan it
+// anew where it is open and changed (PlanOptions.replanOpenPage)
+type Texts = { readonly before: string | undefined; readonly after: string | undefined; readonly changes?: readonly PageChange[] };
 
 function planned(texts: WeakMap<PlannedPage, Texts>, page: string, changes: number, own: Texts, renamedTo?: string): PlannedPage {
   const kind = own.before === undefined ? { created: true as const } : own.after === undefined ? { removed: true as const } : {};
@@ -189,11 +194,28 @@ export function pageWriter(platform: Pick<Platform, "editor" | "space">, options
         if (result.problem) return { page, cause: "refused", reason: result.problem };
         const renamed = entry.renameTo !== undefined && entry.renameTo !== page;
         if (!renamed && (!result.changes || result.text === before)) return undefined;
-        return planned(texts, page, result.changes + (renamed ? 1 : 0), { before, after: result.text }, renamed ? entry.renameTo : undefined);
+        const anew = planOptions.replanOpenPage && !renamed ? { changes: entry.changes } : {};
+        return planned(texts, page, result.changes + (renamed ? 1 : 0), { before, after: result.text, ...anew }, renamed ? entry.renameTo : undefined);
       },
       planOptions.progress,
     );
     return { pages: outcomes.filter(isPlanned), skipped: outcomes.filter(isSkipped) };
+  };
+
+  // The open page, changed since it was planned, its changes planned anew on its text now and written (reported as
+  // so written: Undo puts back what this wrote); changed again meanwhile, or the changes not made on it: left, said
+  const plannedAnew = async (page: string, changes: readonly PageChange[], toApply: PagePlan): Promise<PlannedPage | Skipped> => {
+    const now = String(await editor.text());
+    let result: EditResult;
+    try {
+      result = await changedPage(now, changes, options);
+    } catch (e) {
+      return { page, cause: "refused", reason: `its edit failed (${reasonOf(e)}): left alone` };
+    }
+    if (result.problem) return { page, cause: "refused", reason: result.problem };
+    const again = planned(texts, page, result.changes, { before: now, after: result.text });
+    if (result.text === now) return again;
+    return (await writeText(page, now, result.text)) === "written" ? again : { page, cause: "changed", reason: changedReason(toApply) };
   };
 
   const apply = async (toApply: PagePlan, applyOptions: { readonly progress?: Progress } = {}): Promise<ApplyReport> => {
@@ -235,6 +257,7 @@ export function pageWriter(platform: Pick<Platform, "editor" | "space">, options
           }
           const written = own.before === own.after ? "written" : await writeText(page, own.before, own.after);
           if (written === "written") return one;
+          if (own.changes && (await isOpen(page))) return await plannedAnew(page, own.changes, toApply);
           if (one.renamedTo === undefined) return { page: one.page, cause: "changed", reason: changedReason(toApply) };
           // Renamed, its text changed by the rename itself (a link to itself followed): the name is written, its
           // content left, and so it is reported, so that Undo can give the name back

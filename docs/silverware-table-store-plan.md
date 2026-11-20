@@ -336,8 +336,8 @@ store's, the one place that reads that form back (Principle 1), and is
 registered with the writer as its part `tables` (step 4b): a transaction of
 this plan becomes a batch of the writer's changes, so a table's edit and a
 page's properties or tags are written in one edit of one document. The
-writer's parts are built in only until a plugin needs its own; the registry
-they go through is the one the table's part is registered with.
+registry the built-in parts go through takes a plugin's own since
+2026-11-21 (`registerPart`, `PageChangeKinds`: step 4b's first part).
 
 ### The SilverBullet binding (`host/silverbullet/`)
 

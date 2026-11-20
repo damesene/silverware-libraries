@@ -1,14 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Editor, Space } from "../platform.ts";
 import { type PageBuilder, pageChanges } from "./changes.ts";
 import { diffLines, minimalEdit } from "./diff.ts";
 import { PageHistory } from "./history.ts";
-import { PARTS } from "./parts.ts";
+import { type Part, PARTS } from "./parts.ts";
 import { readGrids } from "../markdown/grid.ts";
 import { pageWriter } from "./writer.ts";
 
 /** A space of pages in memory, `open` the page in its editor; `edits` what the editor was asked */
-function memory(pages: Record<string, string>, open?: string) {
+function memory(pages: Record<string, string>, open?: string, writerOf: typeof pageWriter = pageWriter) {
   const map = new Map(Object.entries(pages));
   const edits: string[] = [];
   const editor: Editor = {
@@ -40,7 +40,7 @@ function memory(pages: Record<string, string>, open?: string) {
       return {};
     },
   };
-  return { map, edits, writer: pageWriter({ editor, space }) };
+  return { map, edits, writer: writerOf({ editor, space }) };
 }
 
 describe("the page writer", () => {
@@ -58,6 +58,27 @@ describe("the page writer", () => {
     expect(report.written).toHaveLength(2);
     expect(map.get("A")).toBe("---\ntitle: X # mine\nstatus: Done\n---\n#defect here");
     expect(map.get("B")).toBe('---\ndue: "2026-11-10"\n---\nnothing');
+  });
+
+  it("plans the open page anew where it changed since it was read, where asked; leaves it otherwise, and a page not open", async () => {
+    const { map, writer } = memory({ A: "one #a two" }, "A");
+    const changes = pageChanges().page("A", (p) => p.tags.rename("a", "c")).build();
+    const plan = await writer.plan(changes);
+    map.set("A", "zero one #a two");
+    expect((await writer.apply(plan)).skipped.map((one) => one.cause)).toEqual(["changed"]);
+    expect(map.get("A")).toBe("zero one #a two");
+    const anew = await writer.plan(changes, { replanOpenPage: true });
+    map.set("A", "zero! one #a two");
+    const report = await writer.apply(anew);
+    expect(report.written).toHaveLength(1);
+    expect(map.get("A")).toBe("zero! one #c two");
+    // Undo puts back what it wrote, on the text it wrote it on
+    await writer.apply(await writer.planUndo(report));
+    expect(map.get("A")).toBe("zero! one #a two");
+    const other = memory({ B: "#a" });
+    const planned = await other.writer.plan(pageChanges().page("B", (p) => p.tags.rename("a", "c")).build(), { replanOpenPage: true });
+    other.map.set("B", "x #a");
+    expect((await other.writer.apply(planned)).skipped.map((one) => one.cause)).toEqual(["changed"]);
   });
 
   it("writes the page open through the editor, in one edit", async () => {
@@ -587,5 +608,31 @@ describe("edits and diffs", () => {
       { line: 2, removed: ["b"], added: ["B"] },
       { line: 5, removed: [], added: ["e"] },
     ]);
+  });
+});
+
+describe("a plugin's own part", () => {
+  it("is registered: its section in the builder, its kind written by it, once; a kind or a section another has refused", async () => {
+    // (Modules of their own: the registry of the other tests keeps the built-in parts alone)
+    vi.resetModules();
+    const parts = await import("./parts.ts");
+    const changes = await import("./changes.ts");
+    const { pageWriter: writerOf } = await import("./writer.ts");
+    // (Its kind and section in no type: a plugin adds them to PageChangeKinds and PageSections)
+    const shout = {
+      kinds: ["shout"],
+      section: { name: "shouting", make: (add: (change: unknown) => unknown) => ({ all: () => add({ kind: "shout" }) }) },
+      write: (text: string) => ({ text: text.toUpperCase(), changes: 1 }),
+    } as unknown as Part;
+    parts.registerPart(shout);
+    parts.registerPart(shout);
+    expect(parts.PARTS.filter((one) => one === shout)).toHaveLength(1);
+    const { map, writer } = memory({ A: "quiet" }, undefined, writerOf);
+    const built = changes.pageChanges().page("A", (p) => (p as unknown as { shouting: { all(): unknown } }).shouting.all()).build();
+    expect(built[0]!.changes.map((change) => change.kind)).toEqual(["shout"]);
+    await writer.write(built);
+    expect(map.get("A")).toBe("QUIET");
+    expect(() => parts.registerPart({ ...shout, section: undefined } as Part)).toThrow(/kind shout/);
+    expect(() => parts.registerPart({ ...shout, kinds: ["whisper"], section: { ...shout.section!, name: "properties" } } as unknown as Part)).toThrow(/section properties/);
   });
 });

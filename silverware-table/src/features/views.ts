@@ -236,7 +236,7 @@ export class Views implements Feature {
       const result = preview(formula);
       if (typeof result === "string") return this.host.notify(`Silverware Table: ${result}`, "error");
       const made = this.made(withEquals(formula).formula, name, result);
-      void this.host.insertTable(made, info, naming(formula) ? { key: info.key, change: (t) => this.host.withTableName(t, source) } : undefined);
+      void this.host.insertTable(made, { after: info }, naming(formula) ? { key: info.key, change: (t) => this.host.withTableName(t, source) } : undefined);
     }, this.blocked(EMPTY_TABLE), undefined, (formula) => (naming(formula) ? source : undefined));
   }
 
@@ -251,12 +251,7 @@ export class Views implements Feature {
       const result = preview(formula);
       if (typeof result === "string") return this.host.notify(`Silverware Table: ${result}`, "error");
       const made = this.made(withEquals(formula).formula, name, result);
-      // The cursor as it is now: the editor moved it with any edit made while the dialog was open
-      void (async () => {
-        const position = await this.host.cursorNow();
-        // (No cursor: the page's end)
-        await this.host.insertTable(made, position === undefined ? undefined : { position });
-      })();
+      void this.host.insertTable(made, { at: "cursor" });
     }, this.blocked(EMPTY_TABLE));
   }
 

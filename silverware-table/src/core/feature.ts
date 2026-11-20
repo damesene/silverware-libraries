@@ -432,9 +432,12 @@ export type ToolbarButton = {
   readonly choices?: { readonly title: string; readonly entries: () => readonly MenuEntry[] };
 };
 
-/** Another table a write changes in the same edit: where it is, and how */
-/** A place in the page's text (the cursor's), as an offset */
-export type TextPosition = { readonly position: number };
+/**
+ * Where a new table goes (insertTable): after a table (an empty line between),
+ * or where the cursor is as it is written (after its line, or after the table
+ * it is in); none: the page's end
+ */
+export type InsertPlace = { readonly after: TableTarget } | { readonly at: "cursor" };
 
 
 export type WriteOptions = {
@@ -619,12 +622,9 @@ export interface ModelHost {
   /** Opens a reference where the platform opens one (a page, a hashtag's page: a link in a table drawn by a module) */
   navigate(ref: string): void;
 
-  // What a module asks of the platform besides tables (the store's: `tables`, `pageTables`, `replaceTables`): until
-  // the store plan's step 4 (an insert's place, docs/silverware-table-store-plan.md), nothing else reaches a module
+  // What a module asks of the platform besides tables (the store's: `tables`, `pageTables`, `replaceTables`)
   /** The open page's name now */
   pageNameNow(): Promise<string>;
-  /** Where the cursor is in the open page's text; undefined: the platform does not say */
-  cursorNow(): Promise<number | undefined>;
   /** The editor's own undo of its last edit; undefined: the platform has none */
   readonly undoEdit: (() => Promise<void>) | undefined;
   /** A document's tables in order (a page's name), as it is now: the open page's in the editor, another's in the space; null: not there, or not read */
@@ -678,14 +678,13 @@ export interface ModelHost {
    */
   writeTable(target: TableTarget, change: (table: TableModel) => TableModel | undefined, options?: WriteOptions): Promise<WriteResult>;
   /**
-   * A new table written into the page, in one edit: after the table `after`
-   * (an empty line between), or where a position is (after its line, or the
-   * table it is in: the cursor's), else at the page's end; `also`: a table of the
-   * page changed in the same edit (put on a sheet with it); `key`: the new
-   * table's, made before it is written (newTableKey), for what the caller
-   * keeps for it meanwhile. No other table's key changes, wherever it goes.
+   * A new table written into the page, in one edit, where `place` says (none:
+   * at the page's end); `also`: a table of the page changed in the same edit
+   * (put on a sheet with it); `key`: the new table's, made before it is
+   * written (newTableKey), for what the caller keeps for it meanwhile. No
+   * other table's key changes, wherever it goes.
    */
-  insertTable(table: TableModel, after?: TableTarget | TextPosition, also?: TableChange, key?: TableKey): Promise<WriteResult>;
+  insertTable(table: TableModel, place?: InsertPlace, also?: TableChange, key?: TableKey): Promise<WriteResult>;
   /**
    * Deletes a table from the page in one edit, as Delete table in its ⋯ menu
    * does; `unasked`: no question, unless something goes with it (formulas

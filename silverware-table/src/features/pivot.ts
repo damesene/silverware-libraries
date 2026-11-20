@@ -453,7 +453,7 @@ export class Pivot implements Feature {
       if (typeof pivot === "string") return this.host.notify(`Silverware Table: ${pivot}`, "error");
       const made = this.toInsert(definition, pivot);
       const names = !own && definition.source.trim().toLowerCase() === name.toLowerCase();
-      void this.host.insertTable(made, info, names ? { key: info.key, change: (t) => this.host.withTableName(t, name) } : undefined);
+      void this.host.insertTable(made, { after: info }, names ? { key: info.key, change: (t) => this.host.withTableName(t, name) } : undefined);
     }, blocked);
   }
 
@@ -506,12 +506,7 @@ export class Pivot implements Feature {
       const pivot = this.calculate(definition, this.sourceFor(definition, this.sources()));
       if (typeof pivot === "string") return this.host.notify(`Silverware Table: ${pivot}`, "error");
       const made = this.toInsert(definition, pivot);
-      // The cursor as it is now: the editor moved it with any edit made while the dialog was open
-      void (async () => {
-        const position = await this.host.cursorNow();
-        // (No cursor: the page's end)
-        await this.host.insertTable(made, position === undefined ? undefined : { position });
-      })();
+      void this.host.insertTable(made, { at: "cursor" });
     }, this.blocked(EMPTY_TABLE));
   }
 

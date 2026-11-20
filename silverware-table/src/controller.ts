@@ -2,7 +2,7 @@
 // inline cell editing and row/column editing. Every change to the markdown is
 // one `editor.replaceRange`, so undo works as for any other edit.
 import { type FeatureName, formatRule, moduleOnByDefault, SETTINGS, type SettingValue } from "./bridge.ts";
-import { type AdapterFeature, type AddressFrame, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, type ColumnsMeasure, type ColumnWidths, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type TextPosition, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget, type KeyedTable, type OtherPages, type PendingEdits, type TableChange } from "./core/feature.ts";
+import { type AdapterFeature, type AddressFrame, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, type ColumnsMeasure, type ColumnWidths, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type InsertPlace, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget, type KeyedTable, type OtherPages, type PendingEdits, type TableChange } from "./core/feature.ts";
 import { type Dialog, type DialogOptions, Dialogs } from "./core/dialog.ts";
 import { ViewAnchor } from "./core/anchor.ts";
 import { mapPosition, type TextEdit, withWriteListeners } from "./core/writelisteners.ts";
@@ -673,10 +673,6 @@ export class Controller implements TableHost {
       await space!.write(document, written);
     }
     return "written";
-  }
-
-  async cursorNow(): Promise<number | undefined> {
-    return this.platform.editor.cursor?.();
   }
 
   get undoEdit(): (() => Promise<void>) | undefined {
@@ -2713,24 +2709,27 @@ export class Controller implements TableHost {
     return this.features.flatMap((feature) => feature.commands?.() ?? []);
   }
 
-  async insertTable(table: TableModel, after?: TableTarget | TextPosition, also?: TableChange, key?: TableKey): Promise<WriteResult> {
-    const result = await this.insertTableNow(table, after, also, key);
+  async insertTable(table: TableModel, place?: InsertPlace, also?: TableChange, key?: TableKey): Promise<WriteResult> {
+    const result = await this.insertTableNow(table, place, also, key);
     // Not written: no table gets the key made for it
     if (key && result !== "written") this.register.release(key);
     return result;
   }
 
-  private async insertTableNow(model: TableModel, after: TableTarget | TextPosition | undefined, also: TableChange | undefined, key: TableKey | undefined): Promise<WriteResult> {
+  private async insertTableNow(model: TableModel, place: InsertPlace | undefined, also: TableChange | undefined, key: TableKey | undefined): Promise<WriteResult> {
     try {
       const text = await this.platform.editor.text();
-      const range = after && !("position" in after) ? locateBySource(text, after.hint, after.source) : undefined;
+      // The cursor as it is with that text (the editor moved it with any edit made meanwhile, a dialog open); none: the page's end
+      const position = place && "at" in place ? await this.platform.editor.cursor?.() : undefined;
+      const after = place && "after" in place ? place.after : undefined;
+      const range = after && locateBySource(text, after.hint, after.source);
       const changed = also && this.rangeOfKey(text, also.key);
       if (also && !changed) {
         this.notify(NOT_SAVED, "error");
         return "failed";
       }
       // After the table, at the position, else at the page's end; an empty line around it
-      const { at, before, after: trail } = tablePlace(text, range ? { after: range } : after && "position" in after ? after : undefined);
+      const { at, before, after: trail } = tablePlace(text, range ? { after: range } : position !== undefined ? { position } : undefined);
       const serialize = await this.serializer();
       // Written as a new table, indented as the table it goes after (the codec's form of the new one: none read), each
       // row anew: a line read elsewhere (a table made from markdown) is not its line, nor indented as it

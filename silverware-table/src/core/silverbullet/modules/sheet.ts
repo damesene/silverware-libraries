@@ -1721,7 +1721,7 @@ export class Sheet implements AdapterFeature {
     if (!last) return "failed";
     const { sheet, taken, also } = this.sheetFor(board, text);
     const table = this.host.withAttribute(this.host.withAttribute(this.host.withTableName(made, this.freeNameIn(text, taken)), SHEET_KEY, sheet), AT_KEY, formatAt(at));
-    const result = await this.host.insertTable(table, { key: keys[last.ordinal]!, source: last.text, hint: last.from }, also, key);
+    const result = await this.host.insertTable(table, { after: { key: keys[last.ordinal]!, source: last.text, hint: last.from } }, also, key);
     if (result === "written") this.becameSheet(board, sheet, also, "the new one");
     return result;
   }

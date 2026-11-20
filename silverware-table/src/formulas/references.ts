@@ -1,7 +1,7 @@
 // What formulas refer to and how references are written: cells (A1),
 // ranges, [columns], [@columns] of the row, named cells and rows, other
 // tables and pages; what a table's formulas refer to.
-import { type ColumnId, columnIdOf, columnKey, findColumn } from "../columns.ts";
+import { type ColumnId, columnIdOf, columnKey, findColumn, type ColumnHead } from "../columns.ts";
 import type { Table } from "../markdown.ts";
 import { cellsByName, type FormulaCells, forFormulas } from "./cell.ts";
 import { isBuiltInFunction, isCustomFunction } from "./registry.ts";
@@ -98,7 +98,7 @@ export function columnIdText(id: ColumnId): string | undefined {
  * Silverware Table writes them ([Unit price] becomes [unit_price]); references to
  * columns the table does not have stay as written
  */
-export function withColumnKeys(formula: string, headers: readonly string[]): string {
+export function withColumnKeys(formula: string, headers: readonly ColumnHead[]): string {
   let result = formula;
   for (const ref of references(formula).reverse()) {
     // Another table's columns are not among these headers
@@ -119,7 +119,7 @@ export function withColumnKeys(formula: string, headers: readonly string[]): str
 }
 
 /** The column a [Name] or [Name:2] reference names; a column named exactly "Name:2" comes first */
-export function referencedColumnId(headers: readonly string[], written: string): ColumnId {
+export function referencedColumnId(headers: readonly ColumnHead[], written: string): ColumnId {
   const exact = { name: written, nth: 1 };
   if (findColumn(headers, exact) !== undefined) return exact;
   const match = /^(.*\S)\s*:\s*([1-9]\d*)$/.exec(written);
@@ -127,7 +127,7 @@ export function referencedColumnId(headers: readonly string[], written: string):
 }
 
 /** The index of the column a [Name] reference names, or undefined */
-export function referencedColumn(headers: readonly string[], written: string): number | undefined {
+export function referencedColumn(headers: readonly ColumnHead[], written: string): number | undefined {
   return findColumn(headers, referencedColumnId(headers, written));
 }
 

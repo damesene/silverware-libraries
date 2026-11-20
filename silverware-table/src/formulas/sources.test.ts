@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { headsOf } from "../columns.ts";
 import { sourceTable } from "../features/sources.ts";
 import { parseTable, type Table } from "../markdown.ts";
 import { CELLS, formulaCell, formulaErrors, pageTables, recalculate, shiftReferences } from "../testing/formulas.ts";
@@ -73,7 +74,7 @@ describe("sources in formulas", () => {
 
   it("leaves a source's columns out of the page's references: nothing follows the table's own columns into them", () => {
     expect(references("=@tasks[due] + [due]").map((r) => r.from)).toEqual([15]);
-    expect(withColumnKeys("=@tasks[Due] & [Due]", ["Due"])).toBe("=@tasks[Due] & [due]");
+    expect(withColumnKeys("=@tasks[Due] & [Due]", headsOf(["Due"]))).toBe("=@tasks[Due] & [due]");
     // The table's column due renamed: its own reference follows, the source's stays
     const before = parseTable(["| Due | Late |", "|---|---|", `| x | ${formulaCell("", "=COUNTIFS(@tasks[due], [@due])")} |`].join("\n"));
     const after = parseTable(["| When | Late |", "|---|---|", `| x | ${formulaCell("", "=COUNTIFS(@tasks[due], [@due])")} |`].join("\n"));

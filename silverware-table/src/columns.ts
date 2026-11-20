@@ -13,6 +13,18 @@ import { metaTagPattern } from "./tags.ts";
 
 export type ColumnId = { readonly name: string; readonly nth: number };
 
+/**
+ * A column as its name tells it: its header's text (as markdown writes it or
+ * as the model has it: its tags, hashtags and emphasis are no part of its key
+ * either way) and its fixed name, if it has one
+ */
+export type ColumnHead = { readonly text: string; readonly fixed: string | undefined };
+
+/** Markdown header cells as their columns' heads: a fixed name read from the cell's tag (names.ts) */
+export function headsOf(headers: readonly string[]): ColumnHead[] {
+  return headers.map((text) => ({ text, fixed: nameOf(text) }));
+}
+
 // A hashtag in a header (`Price #euro`): SilverBullet leaves it out of the column's key
 const HASHTAG_RE = /(^|\s)#[^\s#]+/g;
 
@@ -51,7 +63,7 @@ export function columnKey(name: string): string {
 }
 
 /** The column `id` names, or undefined if the table has none of that name (and occurrence) */
-export function findColumn(headers: readonly string[], id: ColumnId): number | undefined {
+export function findColumn(headers: readonly ColumnHead[], id: ColumnId): number | undefined {
   // A fixed name first: it is the column's whatever the headers say
   const fixed = fixedColumn(headers, id.name);
   if (fixed >= 0 && id.nth === 1) return fixed;
@@ -61,16 +73,16 @@ export function findColumn(headers: readonly string[], id: ColumnId): number | u
   const find = (wanted: string) => {
     // The column with the fixed name is the first of that name, the headers of that key follow it
     let seen = fixed >= 0 ? 1 : 0;
-    const index = headers.findIndex((header, c) => c !== fixed && columnKey(header) === wanted && ++seen === id.nth);
+    const index = headers.findIndex((header, c) => c !== fixed && columnKey(header.text) === wanted && ++seen === id.nth);
     return index < 0 ? undefined : index;
   };
   return (asKey === undefined ? undefined : find(asKey)) ?? find(columnKey(id.name));
 }
 
 /** The column whose fixed name is `name`, or -1 */
-function fixedColumn(headers: readonly string[], name: string): number {
+function fixedColumn(headers: readonly ColumnHead[], name: string): number {
   const wanted = name.toLowerCase();
-  return headers.findIndex((header) => nameOf(header)?.toLowerCase() === wanted);
+  return headers.findIndex((header) => header.fixed?.toLowerCase() === wanted);
 }
 
 /**
@@ -78,17 +90,16 @@ function fixedColumn(headers: readonly string[], name: string): number {
  * key (then the occurrence must be written to tell them apart)
  */
 export function columnIdOf(
-  headers: readonly string[],
+  headers: readonly ColumnHead[],
   column: number,
 ): (ColumnId & { readonly shared: boolean }) | undefined {
   const header = headers[column];
   if (header === undefined) return undefined;
-  const fixed = nameOf(header);
-  if (fixed) return { name: fixed, nth: 1, shared: false };
-  const wanted = columnKey(header);
+  if (header.fixed) return { name: header.fixed, nth: 1, shared: false };
+  const wanted = columnKey(header.text);
   // Another column with this key as its fixed name comes first (findColumn)
   const fixedOther = fixedColumn(headers, wanted);
-  const counted = (h: string, c: number) => c !== fixedOther && columnKey(h) === wanted;
+  const counted = (h: ColumnHead, c: number) => c !== fixedOther && columnKey(h.text) === wanted;
   const before = fixedOther >= 0 ? 1 : 0;
   const same = before + headers.filter(counted).length;
   const nth = before + headers.slice(0, column + 1).filter(counted).length;
@@ -104,7 +115,7 @@ export function columnIdOf(
  * renumbers, go by place too); undefined: neither (a column gone, or another
  * in its place)
  */
-export function matchColumns(before: readonly string[], after: readonly string[]): (column: number) => number | undefined {
+export function matchColumns(before: readonly ColumnHead[], after: readonly ColumnHead[]): (column: number) => number | undefined {
   const moved = new Map<number, number>();
   const taken = new Set<number>();
   before.forEach((_, column) => {
@@ -129,8 +140,8 @@ export function matchColumns(before: readonly string[], after: readonly string[]
  * Null: the column was deleted; undefined: `before` had no such column.
  */
 export function followColumn(
-  before: readonly string[],
-  after: readonly string[],
+  before: readonly ColumnHead[],
+  after: readonly ColumnHead[],
   id: ColumnId,
   map: (column: number) => number | undefined = (c) => c,
 ): ColumnId | null | undefined {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { headsOf } from "../columns.ts";
 import {
   choiceText,
   functionHelp,
@@ -283,7 +284,7 @@ describe("evaluation", () => {
   });
 
   it("writes column references by the columns' keys, leaving unknown ones as written", () => {
-    const headers = ["Name", "Unit price", "Qty", "qty"];
+    const headers = headsOf(["Name", "Unit price", "Qty", "qty"]);
     expect(withColumnKeys("=[@Unit price]*[QTY:2]+[Nope]", headers)).toBe("=[@unit_price]*[qty:2]+[Nope]");
     expect(withColumnKeys("=SUM(A1:A3)", headers)).toBe("=SUM(A1:A3)");
   });
@@ -552,7 +553,7 @@ describe("formulaChoices of functions", () => {
 
   it("offers the table's columns in a column reference not closed yet: [ ], [@ ], the table's own name's; none in one closed", () => {
     // Shown by their headers' names, put in by their ids (a second Qty: qty:2), as a click on a header writes them
-    const columns = columnChoicesOf(["Qty #number", "Price", "quality", "Unit price", "Qty"]);
+    const columns = columnChoicesOf(headsOf(["Qty #number", "Price", "quality", "Unit price", "Qty"]));
     expect(columns.map((c) => c.id)).toEqual(["qty", "price", "quality", "unit_price", "qty:2"]);
     // Two columns of one name told apart by their occurrence, as their ids are
     expect(choiceNames(formulaChoices("=[q", 3, 3, [], undefined, columns))).toEqual({ from: 2, to: 3, names: ["Qty", "quality", "Qty (2)"] });
@@ -1022,7 +1023,7 @@ describe("the formula's row from one column to another, [@[a]:[b]]", () => {
 
   it("is written by the columns' keys, and follows its columns renamed, moved and deleted", () => {
     const named = setCell(table, 0, 1, "Jan 2026");
-    expect(withColumnKeys("=SUM([@[Jan 2026]:[Mar]])", named.rows[0]!.cells)).toBe("=SUM([@[jan_2026]:[mar]])");
+    expect(withColumnKeys("=SUM([@[Jan 2026]:[Mar]])", headsOf(named.rows[0]!.cells))).toBe("=SUM([@[jan_2026]:[mar]])");
     const written = at(table, "=SUM([@[jan]:[mar]])");
     expect(formulaOf(shiftReferences(written, setCell(written, 0, 3, "March")).rows[1]!.cells[4]!)!.formula).toBe("=SUM([@[jan]:[march]])");
     expect(formulaOf(shiftReferences(written, deleteColumn(written, 3), undefined, (c) => (c === 3 ? undefined : c > 3 ? c - 1 : c)).rows[1]!.cells[3]!)!.formula).toBe(

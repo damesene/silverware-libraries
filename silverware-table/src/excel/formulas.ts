@@ -5,6 +5,7 @@
 // [@qty] (the cell in the formula's row), the table's named cells and rows.
 // Anything that cannot be written so (another table or page, a function
 // Excel has no form of) makes the formula its cell's value, with the reason.
+import { headsOf } from "../columns.ts";
 import { type Table } from "../markdown.ts";
 import {
   columnLetters,
@@ -65,7 +66,7 @@ export function structuredColumn(name: string): string {
 export function excelFormula(formula: string, { table, name, cells, structured, totals: given }: ExcelTable, row: number, column: number, templates: ExcelTemplates = {}): ExcelFormula {
   const tree = parseFormula(formula);
   if (tree instanceof FormulaError) return { reason: `it cannot be read: ${tree.detail}` };
-  const headers = table.rows[0]?.cells ?? [];
+  const headers = headsOf(table.rows[0]?.cells ?? []);
   const bodyRows = table.rows.length - 1;
   let array = false;
   let totals: ReadonlySet<number> | undefined = given;

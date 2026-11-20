@@ -14,7 +14,7 @@
 // table copied with it): formulas elsewhere use the first of them, so each
 // such table's name shows in the danger color in the toolbar, whatever the
 // setting, and it is said once (again once it was not shared meanwhile).
-import { columnIdOf } from "../columns.ts";
+import { columnIdOf, headsOf } from "../columns.ts";
 import type { CellLook, CellRef, Feature, HeaderLook, NamingTarget, ModelHost, StoredTable, TableLooks, ToolbarButton, TableInfo } from "../core/feature.ts";
 import { functionNamed } from "../formulas/index.ts";
 import type { Table } from "../markdown.ts";
@@ -242,7 +242,7 @@ export class Names implements Feature {
   /** Names a column (empty: unnames it); refused, with why, when not valid or another column answers to it */
   private async rename(shownInfo: TableInfo, column: number, name: string): Promise<string | undefined> {
     const table = shownInfo.model;
-    const headers = table.rows[0]?.cells ?? [];
+    const headers = headsOf(table.rows[0]?.cells ?? []);
     const current = this.host.columnName(table, column) ?? "";
     if (name === current) return this.unchanged();
     const problem = name === "" ? undefined : validateName(name, "column");

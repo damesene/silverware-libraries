@@ -1,6 +1,6 @@
 // Calculating formulas: a table's cells as a sheet, the other tables they
 // refer to as a book, results and the reasons of errors.
-import { columnName } from "../columns.ts";
+import { columnName, type ColumnHead, headsOf } from "../columns.ts";
 import { escapeCell, type Table, unescapeCell } from "../markdown.ts";
 import { setCell } from "../ops.ts";
 import { withoutTags } from "../tags.ts";
@@ -219,7 +219,7 @@ class Book {
  * one. [qty] leaves them out.
  */
 export function totalRows(cells: FormulaCells, table: Table): ReadonlySet<number> {
-  const headers = table.rows[0]?.cells ?? [];
+  const headers = headsOf(table.rows[0]?.cells ?? []);
   const totals = new Set<number>();
   table.rows.slice(1).forEach((row, r) => {
     row.cells.forEach((cell, column) => {
@@ -235,7 +235,7 @@ export function totalRows(cells: FormulaCells, table: Table): ReadonlySet<number
 
 /** A table's cells as a sheet: values of plain cells, results of formula cells */
 class Sheet {
-  private readonly headers: readonly string[];
+  private readonly headers: readonly ColumnHead[];
   private readonly body: readonly (readonly string[])[];
   private readonly results = new Map<string, Scalar>();
   private readonly evaluating = new Set<string>();
@@ -263,7 +263,7 @@ class Sheet {
     private readonly cells: FormulaCells = book.cells,
   ) {
     this.name = name?.trim() || undefined;
-    this.headers = table.rows[0]?.cells ?? [];
+    this.headers = headsOf(table.rows[0]?.cells ?? []);
     this.body = table.rows.slice(1).map((r) => r.cells);
     let comma = 0;
     let point = 0;
@@ -438,7 +438,7 @@ class Sheet {
   /** A column's display name (its header without tags, hashtags and emphasis), as a grid names its columns */
   private headerName(column: number): string | undefined {
     const header = this.headers[column];
-    return header === undefined ? undefined : columnName(header) || undefined;
+    return header === undefined ? undefined : columnName(header.text) || undefined;
   }
 
   /** An area's values as a grid of its rows and columns, named by the table's headers */

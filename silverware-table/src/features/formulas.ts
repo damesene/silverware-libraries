@@ -10,7 +10,7 @@
 // formula/; this is the module around it.) Turned off, nothing is
 // recalculated: results stay as written.
 
-import { columnIdOf } from "../columns.ts";
+import { columnIdOf, headsOf } from "../columns.ts";
 import { CELL_MENU_ORDER } from "../core/feature.ts";
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/feature.ts";
 import type {
@@ -291,7 +291,7 @@ export class Formulas implements Feature {
       errors: (tables, page) => this.errors(tables, page),
       complete: (formula, caret, tables, table) =>
         table
-          ? formulaChoices(formula, caret, caret, this.namesOf(table, tables), this.nameOf(table), columnChoicesOf(table.rows[0]?.cells ?? []), true)
+          ? formulaChoices(formula, caret, caret, this.namesOf(table, tables), this.nameOf(table), columnChoicesOf(headsOf(table.rows[0]?.cells ?? [])), true)
           : formulaChoices(formula, caret, caret, [...pageNameChoices(this.cells, this.named(tables)), ...this.sourceNames()], undefined, [], true),
       help: (formula, caret) => functionHelp(formula, caret),
       validate: (formula) => {
@@ -331,7 +331,7 @@ export class Formulas implements Feature {
     const source = pageTables(this.cells, () => this.named(tables), page, undefined, this.elsewhere());
     const errors = tables.flatMap(({ model: table }, index) => {
       const name = this.nameOf(table);
-      const headers = table.rows[0]?.cells ?? [];
+      const headers = headsOf(table.rows[0]?.cells ?? []);
       return Array.from(formulaErrors(table, { cells: this.cells, tables: source, name }), ([key, error]): FormulaErrorAt => {
         const [row, column] = key.split(",").map(Number) as [number, number];
         // As a reference names it: its key, `:2` where several share it
@@ -826,7 +826,7 @@ export class Formulas implements Feature {
       const formula = names.formula;
       const fixes = [...slips.fixes, ...names.fixes];
       if (fixes.length) this.host.notify(`Silverware Table: formula fixed: ${fixes.join(", ")}`, "info");
-      const headers = info?.model.rows[0]?.cells ?? [];
+      const headers = headsOf(info?.model.rows[0]?.cells ?? []);
       return this.cells.formulaCell("", withColumnKeys(formula, headers));
     }
     return typed.startsWith("'=") ? escapeCell(typed.slice(1)) : undefined;
@@ -924,7 +924,7 @@ export class Formulas implements Feature {
   /** A range dragged over that has no address (areaWritten): the hint says why, and what to use instead */
   private noRanged(info: TableInfo, active: CellEditor, column: number): void {
     if (this.noRange?.editor === active) return;
-    const headers = info.model.rows[0]?.cells ?? [];
+    const headers = headsOf(info.model.rows[0]?.cells ?? []);
     const named = columnRefText(columnIdOf(headers, column), false);
     // Another table's (the frame's): by its name, as a click on its header inserts it
     const other = info.key !== active.key ? this.nameOf(info.model) : undefined;
@@ -1187,7 +1187,7 @@ export class Formulas implements Feature {
       this.updateFormulaUi();
     };
     if (cell.row === 0) {
-      const headers = info.model.rows[0]?.cells ?? [];
+      const headers = headsOf(info.model.rows[0]?.cells ?? []);
       const text = columnRefText(columnIdOf(headers, cell.column), false);
       // A header whose name cannot be a reference: the click is taken, but inserts nothing
       if (text) put(other ? `${other}!${text}` : text);
@@ -1265,7 +1265,7 @@ export class Formulas implements Feature {
     const info = this.host.tableFor(active.key);
     const own = info ? this.nameOf(this.host.tableOf(info)) : undefined;
     // The table's columns too, in a column reference ([qu, [@qu): shown by their headers' names, put in by their ids
-    const columns = info ? columnChoicesOf(this.host.tableOf(info).rows[0]?.cells ?? []) : [];
+    const columns = info ? columnChoicesOf(headsOf(this.host.tableOf(info).rows[0]?.cells ?? [])) : [];
     const typed = this.typedAt;
     const typing = typed?.editor === active && typed.text === text && typed.at === to;
     const choices = formulaChoices(text, from, to, info ? this.namesFor(info) : [], own, columns, typing);
@@ -1476,7 +1476,8 @@ export class Formulas implements Feature {
     const lastRow = info.rows - 2;
     const lastColumn = info.columns - 1;
     if (ref.kind === "column") {
-      const column = referencedColumn(table.rows[0]?.cells ?? [], ref.name);
+      const heads = headsOf(table.rows[0]?.cells ?? []);
+      const column = referencedColumn(heads, ref.name);
       if (column === undefined || lastRow < 0) return undefined;
       // A named row's cell: that one cell
       if (ref.row) {
@@ -1485,7 +1486,7 @@ export class Formulas implements Feature {
       }
       if (!ref.thisRow) return { top: 0, left: column, bottom: lastRow, right: column };
       // [@[a]:[b]]: the formula's row from one column to the other
-      const last = ref.last === undefined ? column : referencedColumn(table.rows[0]?.cells ?? [], ref.last);
+      const last = ref.last === undefined ? column : referencedColumn(heads, ref.last);
       if (last === undefined) return undefined;
       return { top: row, left: Math.min(column, last), bottom: row, right: Math.max(column, last) };
     }
@@ -1544,7 +1545,7 @@ export class Formulas implements Feature {
     const target = written && this.referenceTarget(info, active, written);
     const ref = target?.info.key === info.key ? target.ref : undefined;
     const table = info.model;
-    const headers = table.rows[0]?.cells ?? [];
+    const headers = headsOf(table.rows[0]?.cells ?? []);
     const start = this.bodyCellAt(info, e.clientX, e.clientY);
     const startArea = ref && this.referenceArea(info, table, ref, active.row - 1);
     if (!ref || !start || !startArea) return;

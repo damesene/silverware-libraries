@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { columnIdOf, columnKey, findColumn } from "./columns.ts";
+import { columnIdOf, columnKey, findColumn, headsOf } from "./columns.ts";
 import {
   referencedColumn,
 } from "./formulas/index.ts";
@@ -37,10 +37,10 @@ describe("names in cells", () => {
 });
 
 describe("a column's fixed name", () => {
-  const headers = [`Unit price <meta core.n='price'>`, "Qty", "Price"];
+  const headers = headsOf([`Unit price <meta core.n='price'>`, "Qty", "Price"]);
 
   it("names the column whatever its header says, and is left out of its key as SilverBullet does", () => {
-    expect(columnKey(headers[0]!)).toBe("unit_price");
+    expect(columnKey(headers[0]!.text)).toBe("unit_price");
     expect(findColumn(headers, { name: "price", nth: 1 })).toBe(0);
     expect(findColumn(headers, { name: "unit_price", nth: 1 })).toBe(0);
     expect(columnIdOf(headers, 0)).toEqual({ name: "price", nth: 1, shared: false });
@@ -50,10 +50,10 @@ describe("a column's fixed name", () => {
   it("comes before a column whose header has that key, which is then the second of the name", () => {
     expect(columnIdOf(headers, 2)).toEqual({ name: "price", nth: 2, shared: true });
     expect(findColumn(headers, { name: "price", nth: 2 })).toBe(2);
-    const same = [`Price <meta core.n='price'>`, "Price"];
+    const same = headsOf([`Price <meta core.n='price'>`, "Price"]);
     expect(columnIdOf(same, 1)).toEqual({ name: "price", nth: 2, shared: true });
     expect(findColumn(same, { name: "price", nth: 2 })).toBe(1);
-    const after = ["Price", `Cost <meta core.n='price'>`];
+    const after = headsOf(["Price", `Cost <meta core.n='price'>`]);
     expect(columnIdOf(after, 0)).toEqual({ name: "price", nth: 2, shared: true });
     expect(findColumn(after, { name: "price", nth: 2 })).toBe(0);
   });

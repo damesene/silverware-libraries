@@ -1,7 +1,7 @@
 // Formulas through table edits: references following inserted, deleted and
 // moved rows and columns, renamed columns and tables; calculated columns
 // filling new rows; formulas removed.
-import { followColumn, sameColumnId } from "../columns.ts";
+import { followColumn, sameColumnId, headsOf } from "../columns.ts";
 import type { Table } from "../markdown.ts";
 import { type IndexMap, setCell } from "../ops.ts";
 import { type FormulaCells, hasFormulas } from "./cell.ts";
@@ -161,10 +161,10 @@ function followedReference(formula: string, ref: Reference, edit: TableEdit): st
     const text = start && end ? (written.includes(":") ? `${start}:${end}` : start) : REF_ERROR;
     return text === written.toUpperCase() ? undefined : text;
   }
-  const headersBefore = edit.before.rows[0]?.cells ?? [];
+  const headersBefore = headsOf(edit.before.rows[0]?.cells ?? []);
   const follow = (written: string) => {
     const id = referencedColumnId(headersBefore, written);
-    return { id, followed: followColumn(headersBefore, edit.after.rows[0]?.cells ?? [], id, columnMap ?? ((c) => c)) };
+    return { id, followed: followColumn(headersBefore, headsOf(edit.after.rows[0]?.cells ?? []), id, columnMap ?? ((c) => c)) };
   };
   const first = follow(ref.name);
   if (ref.last !== undefined) {

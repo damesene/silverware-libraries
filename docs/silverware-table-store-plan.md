@@ -514,6 +514,13 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      attribute set on the model is written by the codec as `withTagValue`
      wrote it, so `getCellTag`, `withCellTag`, `canStoreCellTag` go once
      their one user, the formulas module, is on the model.
+   - **A column's identity from what it is (2026-11-20)**: columns.ts
+     finds and names columns by their heads (`ColumnHead`: the header's
+     text and the column's fixed name), no longer by the header's markdown;
+     markdown header cells give their heads by `headsOf` (the fixed name
+     from its tag), the model's columns will give theirs (the header, the
+     fixed name its attribute). What the formulas' domain moves onto the
+     model stands on it.
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

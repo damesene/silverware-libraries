@@ -16,7 +16,7 @@
 // from, as the writers before the model wrote it (withTagValue; a name as
 // names.ts writes it), so a changed table reads as before. What the metadata
 // row has of no column found (a header renamed by hand) is kept as written.
-import { headerHashtags, withoutHashtags } from "../../columns.ts";
+import { headerHashtags, withoutHashtags, headsOf } from "../../columns.ts";
 import { escapeCell, type Row, serializeTable, type Table, unescapeCell } from "../../markdown.ts";
 import { columnsMetaNamed, columnsMetaOf } from "../../meta.ts";
 import { attributeName, CORE, escapedForRegExp, splitAttributeName } from "../../metanames.ts";
@@ -234,7 +234,7 @@ export function encode(model: TableModel, base: Table): Table {
   });
   const baseHeader = base.rows[0];
   const headerRow: Row = !baseHeader ? { cells: headerCells } : headerCells.length === baseHeader.cells.length && headerCells.every((cell, c) => cell === baseHeader.cells[c]) ? baseHeader : { ...baseHeader, cells: headerCells };
-  const meta = columnsMetaNamed(headerCells, byColumn, columnsMetaOf(base).orphans);
+  const meta = columnsMetaNamed(headsOf(headerCells), byColumn, columnsMetaOf(base).orphans);
   const same = (a: Readonly<Record<string, string>>, b: Readonly<Record<string, string>> | undefined) =>
     !!b && Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([k, v]) => b[k] === v);
   return {

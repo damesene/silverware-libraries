@@ -11,6 +11,15 @@ Silverware Database. The first step here can start.
 The model API for AI agents (docs/silverware-agent.md) starts after this plan,
 on its model and its store.
 
+**Scope** (2026-11-20, with the user): the aim is that **no plugin depends on
+where it runs**, not the table alone (docs/silverware-database.md, *What
+next*). It is reached one plugin at a time: **this plan is Silverware Table
+alone, done whole first**; Silverware Toolbar and Chart (small bridges of
+their own) and Silverware Tags (pages read through a `Space` of its own,
+docs/silverware-database.md, *Left open after step 2b*) move onto the platform
+after it, each by a plan and a branch of its own, started only when the user
+says so. Nothing here waits for them or is done for them.
+
 ## Why
 
 Silverware Table is apart from SilverBullet's rendering already
@@ -22,9 +31,10 @@ behind `TableAdapter`). It is not apart from where a table is kept:
   it, the row's `source` line, `padded`, `delimiterSource`; the table's and its
   columns' data a flat record of the metadata row's attributes
   (`core.-c-qty.sort`); a column's type a hashtag in its header's text.
-- **Modules find tables in the page's text themselves.** 18 modules, 4 of the
-  adapter's and `drawn.ts` call `parseTable`, `findTables`, `locateBySource`
-  or `pageTablesOf`; modules read `host.pageText` or `bridge.getText()`, keep
+- **Modules find tables in the page's text themselves.** 28 files of
+  `features/` and `core/` (2026-11-20; 23 at the plan's start) call
+  `parseTable`, `findTables`, `locateBySource`, `pageTablesOf` or
+  `cellSourceOffset`, or read `pageText`; modules read `host.pageText` or `bridge.getText()`, keep
   offsets (`TableInfo.hint`, `cellSourceOffset`, `TextPosition`,
   `TextWritten`, `WritePage.from`) and compare a table's markdown
   (`TableInfo.source`).
@@ -35,7 +45,7 @@ behind `TableAdapter`). It is not apart from where a table is kept:
 - **Modules call SilverBullet.** `ModelHost.bridge` is SilverBullet's API
   handed over by the init page (`getText`, `replaceRange`, `readPage`,
   `writePage`, `getCursor`, `evalExpression`, `markdownToHtml`, `flash`,
-  `confirm`…): 35 files use it, 17 modules among them.
+  `confirm`…): 17 modules use it (2026-11-20).
 
 So a table kept anywhere else (a code block holding a view's definition, a
 source of Space Lua, a file, a database) means touching every module, and so
@@ -64,10 +74,15 @@ What the design below follows, and what decides a case it does not name:
    writes the model as its form allows and is the only one reading that form
    back. Nothing of one store's form (escapes, tags, hashtags, lines,
    offsets) is in the model or the modules' API.
-2. **Dependencies go one way**: model ← domains ← modules ← core ← stores ←
-   host bindings, each importing only what is left of it (and the
-   platform, the stores and the bindings). `isolation.test.ts` checks it by
-   folder.
+2. **Dependencies go one way**, as they do now (CLAUDE.md of the table,
+   *Layers*): domains import the model; modules import the model, domains
+   (through their index) and the core's interfaces (`core/feature.ts`:
+   `ModelHost`, the hooks); **the core imports no module** (the controller's
+   own `features/metadata.ts` the one exception, as now), the modules being
+   put together by `modules.ts`; stores implement the core's `TableStore`
+   and import the model and the platform; host bindings import all of it and
+   put it together. Nothing imports a binding. `isolation.test.ts` checks it
+   by folder.
 3. **What can be derived is not kept.** An attribute follows its column
    because it is on the column, not because a step moves it; a column's
    attributes survive its header renamed because the name is not where they
@@ -80,14 +95,19 @@ What the design below follows, and what decides a case it does not name:
 
 ## Layers
 
+Each layer imports only the layers above it (an arrow points at what is
+imported); the core's interfaces sit above the modules, its code beside them
+knowing none:
+
 ```text
 model/        TableModel, attributes, pure operations (ops, pins, structure)
    ▲
-domains       formulas/, pivot/, calculated/, conditions/, columntypes/, excel/, export/, sheet/
+domains       formulas/, pivot/, calculated/, conditions/, columntypes/, autofill/, excel/, export/, sheet/
    ▲
-features/     modules: ModelHost and TableModel only
+core/feature.ts and the store's interface: ModelHost, hooks, TableStore
    ▲
-core          controller, write pipeline, view, editor; TableStore (the interface)
+features/     modules: ModelHost and TableModel only        core: controller, write pipeline,
+                                                                  view, editor (no module)
    ▲
 store/        markdown/ (codec, register), memory.ts, sources; over the
               platform and the page writer
@@ -187,7 +207,11 @@ user):
   equal, the model is used. A table's text changed outside Silverware Table
   (typed in the markdown, Ctrl+Z, a sync, MCP's `write`) misses the cache and
   is built anew when something needs it, not when the text changes. No event
-  is relied on, so none missed (an undo, a sync) leaves a stale model.
+  is relied on, so none missed (an undo, a sync) leaves a stale model. The
+  store's `changed(listener)` stays, for another purpose: it tells the UI
+  that something is out of date (*Recalculate* highlighted, a pivot's
+  *Out of date*); the comparison keeps the cache right. Neither does the
+  other's work.
 - **Built when needed.** A table shown is built as it is rendered (its looks,
   types, formulas' marks need the model); one holding the cursor is markdown
   in SilverBullet, no widget, so typing in it builds nothing until the cursor
@@ -344,15 +368,24 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    see *The platform and the page writer*); `host.notify`, `host.ask`,
    `host.navigate` for modules; no module reads `host.bridge` (removed from
    `ModelHost`). Test: no `bridge` in `features/`.
-2. **Tables through the host.** The store interface and the markdown store
-   as a façade over today's code (the model still `Table`): `host.tables`,
+2. **Tables through the host.** (Steps 2 and 3 both go through every module:
+   first where tables come from, then what a table is. Done at once, no step
+   between would pass the tests; apart, each leaves the table working.) The
+   store interface and the markdown store as a façade over today's code (the
+   model still `Table`): `host.tables`,
    `host.table`, `revision`, transactions in place of `also`. Offsets stay,
    inside the core and the store only. Modules stop calling `parseTable`,
    `findTables`, `locateBySource`, `pageTablesOf`, `cellSourceOffset` and
    reading `pageText`, `hint`, `source`. The big modules one commit each
-   (formulas, sheets, the sheet, views, pivot, names, lazy, metadata). The
+   (formulas, sheets, the sheet, views, pivot, names, lazy, metadata, the
+   choices dialog, sources, custom menus, Silverware Layout's provider). The
    contract tests start here. Test: `features/` import nothing of markdown.ts
    but types.
+   **A check before custom menus move**: what `defineMenuEntries` hands a
+   user's entry (`silverware.table.defineMenuEntries`, menus/custom.ts). Data
+   of the table stays; a text or an offset in it would be gone after this
+   plan, a breaking change of the Lua API, so it is put to the user before
+   it is changed.
 3. **The neutral model.** `TableModel` and the markdown codec; the attribute
    API; domains on the model; the hooks' signatures of the table above. In
    parts, each its commits: table attributes; column attributes (following
@@ -362,6 +395,16 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    way of the table under *An attribute bound to its content*); content
    unescaped. Test: nothing outside `store/markdown/` imports
    markdown.ts; no `escapeCell`/`unescapeCell` in domains.
+   - **The formulas' interface to tables is designed once, for the table and
+     for Silverware Database** (docs/silverware-database.md, *What next* 5:
+     formulas in a database come after this step): `TableSource`, the
+     metadata and names it reads (about 6,100 lines tied to the table) go onto
+     the model so that a database's items can be such a source without a
+     second interface.
+   - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
+     the column types' domain gets a list's values from the formulas module
+     through an offer (`host.offer` / `host.offered`), as modules share data
+     now, never by importing `formulas/`: the domains stay side by side.
 4. **Outside tables.** Places through the store, `reveal`, `InsertPlace`;
    `TextPosition`, `TextWritten`, `WritePage` gone from the interfaces, the
    offsets left only in the markdown store.
@@ -370,20 +413,53 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
     registered as the writer's part `tables`, a transaction a batch of the
     writer's changes, its undo the writer's report where the document is not
     the open one. Test: nothing in `store/markdown/` calls `Editor.replace` or
-    `Space.write`.
+    `Space.write`. Two things this step does that the writer does not do now:
+    - **The registry opened to a part from outside.** The writer's parts are
+      built in (`shared/pages/parts.ts`: "Built in only for now"), but the
+      tables' codec stays the table's (*Principles* 1), so a plugin registers
+      a part of its own, its changes' types with it. A change of `shared/`:
+      every plugin writing through the writer (Silverware Database, Tags,
+      Layout, Assets) is built and tested with it, and released by its own
+      number when it ships (root CLAUDE.md, *Versions and changelogs*).
+    - **A table's write on the open page is never left as "changed since it
+      was read".** The writer leaves such a page, which is right for a review
+      of many pages (Silverware Tags, Database). The table writes quickly one
+      after another (Enter, Tab, typing) and builds each write on the one
+      before (`writtenAs`, `writeTarget` now); a write left would lose an
+      edit. So a table's transaction on the open page is planned anew on the
+      text as it is when the writer finds it changed, as `write` reads the
+      table anew now: from the writer, as an option of the batch (a part may
+      be planned again), not a path of the table's around it. Pages not open
+      (lazy saving, another page's table) keep the writer's check. The
+      contract tests have a write meeting a change of the page between its
+      read and its write.
 5. **The other stores.** The memory store and the views plan's sources on the
    store interface, both passing the contract tests; a few module tests over
    the memory store as the proof that modules need no text (the rest keep the
-   markdown store: they check the markdown written).
+   markdown store: they check the markdown written). A source is a named
+   table, not a document's: the sources' store gives each as a document of
+   its name (`@tasks`) holding that one table, read only (`writable`:
+   nothing), so the interface needs nothing of its own for them.
 6. **The SilverBullet binding.** The adapter, its pairing with the markdown
    store, history markers, Lua places and the Lua API into
    `host/silverbullet/`; the dependency rule checked by folder.
+   **Silverware Layout's provider** (core/layoutprovider.ts, after the plan
+   was first written) is the binding's: it registers tables with
+   `silverware.layout.api` and reads their `layout.width` from the table as
+   rendered (`renderedMeta`, synchronously, for the widget's size before the
+   model is at hand). The attribute is the model's (owner `layout`, written
+   by a transaction as any); reading it off SilverBullet's DOM is the
+   adapter's, as the rendered table is. The core keeps no provider.
 7. **Docs.** CLAUDE.md (Layout, Architecture), docs/silverware-table-isolation.md
    extended by the store's boundary.
 
-Rough size, not measured: step 1 a day or two; step 2 the largest by files
-(about 25), a week or more; step 3 the deepest (every domain), a week or more;
-steps 4 to 7 a few days each.
+Rough size, not measured, **as estimated on 2026-11-06**: step 1 a day or
+two; step 2 the largest by files (about 25), a week or more; step 3 the
+deepest (every domain), a week or more; steps 4 to 7 a few days each. The
+table has had about 435 commits since (views, sources, choice lists by
+formula, Silverware Layout's provider, custom menus; about 41,000 lines of
+code without tests now), so this is likely low: estimated anew once step 1
+is done, by what it took.
 
 ## Risks
 
@@ -400,6 +476,17 @@ steps 4 to 7 a few days each.
   UI tests (`ui-tests/sheet/`).
 - **One undo step**: a transaction is one edit of the text in the markdown
   store, as each write is now; the contract tests check it.
+- **Edits lost on the open page**: the page writer leaves a page changed
+  since it was read; quick writes of a table would be lost by it (step 4b
+  plans them anew; the contract tests meet a change between read and write).
+- **The long branch** (*Decided*): the table changes fast in `main` (about
+  435 commits between 2026-11-06 and 2026-11-20), and the refactor touches
+  most of its files, so a rebase meets conflicts in code, not only in docs.
+  Rebased often (at each step's end at least), each step's tests passing
+  after it.
+- **`shared/pages/` changed for every plugin** (step 4b's registry and its
+  planning anew): Silverware Database, Tags, Layout and Assets built and
+  tested with it.
 - **Data of a module turned off**: attributes on columns, rows and cells must
   go through every edit as they do now; the tests of `followColumnMeta` and
   of hidden tags run against the codec before and after step 3.
@@ -431,6 +518,18 @@ steps 4 to 7 a few days each.
   its name with parameters as written.
 - **Silverware Chart onto the codec: a follow-up** (*After this plan*).
 
+## Decided (2026-11-20, with the user)
+
+- **One long branch for the table stays** (`refactor/table-store`, merged at
+  the end), weighed against merging step by step: the table is done whole on
+  it. The other plugins (the platform for Silverware Toolbar, Chart, Tags) are
+  not started on it nor alongside: each later, on a branch of its own, only
+  when the user says so (*Scope*).
+- **The table first, whole** (*Scope*); the model API for agents after it
+  (docs/silverware-agent.md); a CSV store not part of it (*After this plan*).
+- **Our own writes keep the model** (*A model made once, kept from our own
+  writes*).
+
 ## Decided (2026-11-07, with the user)
 
 - **The platform and the page writer, shared with Silverware Database**: the
@@ -457,7 +556,9 @@ steps 4 to 7 a few days each.
   does, its edits written back into the file. It would be a CSV store (read
   and written through the platform's `space`) and the table drawn as the sheet
   view draws tables it places (the model through the codec to markdown,
-  rendered by SilverBullet into a widget of ours, enhanced as any table).
+  rendered by SilverBullet into a widget of ours, enhanced as any table), or
+  by the core's own preview table (the page's tables' look, drawn by us: the
+  formulas' *Show result*, features/resultview.ts).
   Where this plan has a choice that costs nothing either way, it keeps that
   open, and changes nothing of its scope or order for it:
   - a document is a name, not a page: nothing in the store interface assumes

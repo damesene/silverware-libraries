@@ -536,7 +536,7 @@ export class Paste implements Feature {
         if (cut) return moveCells(edited, cut.cells, plan, (moved, over) => this.host.cellWrittenOver(moved, over));
         const pasted = pasteCells(edited, plan, data, {
           keptBy: (cell) => this.host.cellKeptBy(cell),
-          headerRenamed: (name, from) => this.host.headerRenamed(name, from),
+          headerRenamed: (original, name) => this.host.headerRenamed(original, name),
         });
         skipped = pasted.skipped;
         return pasted.table;

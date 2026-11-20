@@ -1387,12 +1387,12 @@ export class Controller implements TableHost {
     if (widget) this.toolbar.openMenu(widget, naming);
   }
 
-  headerRenamed(name: string, original: string): string {
+  headerRenamed(original: ModelCell, name: string): ModelCell {
     for (const feature of this.features) {
-      const kept = feature.headerRenamed?.(name, original);
+      const kept = feature.headerRenamed?.(original, name);
       if (kept !== undefined) return kept;
     }
-    return name;
+    return { ...original, content: name };
   }
 
   fillCell(info: WidgetInfo, cell: ModelCell, from: CellRef, to: CellRef): ModelCell | undefined {

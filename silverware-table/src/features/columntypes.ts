@@ -477,9 +477,9 @@ export class ColumnTypes implements Feature {
   }
 
   // A header renamed by a paste keeps its type's hashtag, as one renamed in its editor
-  headerRenamed(name: string, original: string): string | undefined {
-    const kept = columnTypeOf(original);
-    return kept && name.trim() !== "" ? withColumnType(name, kept.tag) : undefined;
+  headerRenamed(original: ModelCell, name: string): ModelCell | undefined {
+    const kept = columnTypeOf(original.content);
+    return kept && name.trim() !== "" ? { ...original, content: withColumnType(name, kept.tag) } : undefined;
   }
 
   /**

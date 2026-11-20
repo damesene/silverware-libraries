@@ -806,8 +806,8 @@ export interface ModelHost {
   menuNaming(info: TableInfo, target: NamingTarget): MenuNaming | undefined;
   /** Opens the table's ⋯ menu (of its toolbar), with `naming` its title's name field open (a name to type) */
   openTableMenu(info: TableInfo, naming?: boolean): void;
-  /** A header given a new name (escaped markdown) other than by its editor: with what features keep in it (Feature.headerRenamed) */
-  headerRenamed(name: string, original: string): string;
+  /** A header given a new name other than by its editor: the header cell to save, with what features keep in it (Feature.headerRenamed) */
+  headerRenamed(original: ModelCell, name: string): ModelCell;
   /** Opens the cell menu at a point, as a right click on the cell would; false when no feature offers anything */
   openCellMenu(info: TableInfo, at: CellRef, point: { x: number; y: number }): boolean;
   /** A menu floating over the page (core/menu.ts) made of the entries, one of the core's floating elements, in the page: to place and focus (focusMenu) */
@@ -1309,8 +1309,12 @@ export interface Feature {
   clickSelects?(): boolean;
   /** The name of what a menu is about (a cell, a row, a column, the table), shown in its title with a pencil to change it */
   menuNaming?(info: TableInfo, target: NamingTarget): MenuNaming | undefined;
-  /** A header given a new name other than by its editor (a paste): what it becomes (the column type's hashtag kept); undefined: as given */
-  headerRenamed?(name: string, original: string): string | undefined;
+  /**
+   * A header given a new name other than by its editor (a paste): the header cell to save (`original` as headerCell
+   * gives it, its text as written; as editorValue gives a header's: the column type's hashtag kept); undefined: its
+   * text the name given
+   */
+  headerRenamed?(original: ModelCell, name: string): ModelCell | undefined;
   /**
    * Keys of the module's cells' attributes bound to their cell's content
    * (formulas: f): a cell whose content an edit changed (typed, pasted,

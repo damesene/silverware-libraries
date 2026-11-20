@@ -149,8 +149,8 @@ export type Pasted = {
 export type PasteRules = {
   // Why a cell's value is a feature's, so it is left as it is; undefined: pasted over
   readonly keptBy: (cell: ModelCell) => string | undefined;
-  // A header's new name (as written, its hashtags with it) with what features keep in it (a column type's hashtag)
-  readonly headerRenamed?: (name: string, from: string) => string;
+  // A header given a new name (as written, its hashtags with it): its cell to save, with what features keep in it (a column type's hashtag)
+  readonly headerRenamed?: (original: ModelCell, name: string) => ModelCell;
 };
 
 /**
@@ -171,8 +171,8 @@ export function pasteCells(table: TableModel, plan: PastePlan, data: readonly (r
       const column = plan.columns[j]!;
       if (row === 0) {
         // A header: written as its text (its hashtags with it), a name kept where none is pasted
-        const current = headerCell(result, column)?.content ?? "";
-        if (value !== "") result = withHeaderText(result, column, rules.headerRenamed ? rules.headerRenamed(value, current) : value);
+        const current = headerCell(result, column) ?? EMPTY_CELL;
+        if (value !== "") result = withHeaderText(result, column, rules.headerRenamed ? rules.headerRenamed(current, value).content : value);
         return;
       }
       const kept = rules.keptBy(result.rows[row - 1]?.cells[column] ?? EMPTY_CELL);

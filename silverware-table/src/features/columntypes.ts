@@ -6,7 +6,7 @@
 // is calculated by the formulas module (its offer `list`) as the column shows,
 // never written.
 import { type CellEditor, type CellLook, type CellRef, type Feature, HEADER_ICON_ORDER, type HeaderLook, type Panel, type ModelHost, type TableLooks, type TableInfo } from "../core/feature.ts";
-import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/feature.ts";
+import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget, StoredTable } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
 import type { MenuDetail, MenuEntry } from "../menu.ts";
 import { setCell } from "../ops.ts";
@@ -95,7 +95,7 @@ export class ColumnTypes implements Feature {
   private readonly choicesDialog: ChoicesDialog;
   // The lists read, by table and name, as of the page's text (a formula's reads the page's other tables); emptied
   // as what formulas read outside the page changes (tablesChanged)
-  private lists: { readonly text: string; readonly byTable: WeakMap<Table, Map<string, ListRead>> } | undefined;
+  private lists: { readonly page: readonly StoredTable[]; readonly byTable: WeakMap<Table, Map<string, ListRead>> } | undefined;
 
   constructor(private readonly host: ModelHost) {
     this.choicesDialog = new ChoicesDialog(host, (table, formula) => this.formulaList(table, formula));
@@ -147,8 +147,8 @@ export class ColumnTypes implements Feature {
    * (its leading "="), calculated by the formulas module on the page shown; undefined values where it gives none, with why
    */
   private listOf(table: Table, name: string, stored = this.host.metaOf(table)): ListRead {
-    const text = this.host.pageText;
-    if (this.lists?.text !== text) this.lists = { text, byTable: new WeakMap() };
+    const page = this.host.pageTables();
+    if (this.lists?.page !== page) this.lists = { page, byTable: new WeakMap() };
     let read = this.lists.byTable.get(table);
     if (!read) this.lists.byTable.set(table, (read = new Map()));
     let list = read.get(name);

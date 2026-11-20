@@ -15,9 +15,9 @@
 // such table's name shows in the danger color in the toolbar, whatever the
 // setting, and it is said once (again once it was not shared meanwhile).
 import { columnIdOf } from "../columns.ts";
-import type { CellLook, CellRef, Feature, HeaderLook, NamingTarget, ModelHost, TableLooks, ToolbarButton, TableInfo } from "../core/feature.ts";
+import type { CellLook, CellRef, Feature, HeaderLook, NamingTarget, ModelHost, StoredTable, TableLooks, ToolbarButton, TableInfo } from "../core/feature.ts";
 import { functionNamed } from "../formulas/index.ts";
-import { findTables, locateBySource, parseTable, type Table } from "../markdown.ts";
+import type { Table } from "../markdown.ts";
 import type { MenuNaming } from "../menu.ts";
 import { validateName, sameTableName, validateTableName } from "../namerules.ts";
 
@@ -33,19 +33,19 @@ export class Names implements Feature {
   constructor(private readonly host: ModelHost) {}
 
   // The names (lowercase) more than one table of the page has, by how many, for the page's text as last read
-  private shared: { readonly text: string; readonly names: ReadonlyMap<string, number> } | undefined;
+  private shared: { readonly tables: readonly StoredTable[]; readonly names: ReadonlyMap<string, number> } | undefined;
   // The names said to be shared on this page so far
   private readonly told = new Set<string>();
 
   private sharedNames(): ReadonlyMap<string, number> {
-    const text = this.host.pageText;
-    if (this.shared?.text !== text) {
+    const tables = this.host.pageTables();
+    if (this.shared?.tables !== tables) {
       const counts = new Map<string, number>();
-      for (const range of findTables(text)) {
-        const name = this.host.tableName(parseTable(range.text))?.toLowerCase();
+      for (const { model } of tables) {
+        const name = this.host.tableName(model)?.toLowerCase();
         if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
       }
-      this.shared = { text, names: new Map([...counts].filter(([, n]) => n > 1)) };
+      this.shared = { tables, names: new Map([...counts].filter(([, n]) => n > 1)) };
     }
     return this.shared.names;
   }
@@ -63,8 +63,8 @@ export class Names implements Feature {
 
   /** A table whose name another has too: said, once for that name on the page */
   enhanced(info: TableInfo): void {
-    // (The page's text as last read without this table as rendered: read before it, nothing to tell by)
-    if (!this.host.pageText.includes(info.source)) return;
+    // (The page's tables as last read without this table as rendered: read before it, nothing to tell by)
+    if (!this.host.pageTables().some((t) => t.key === info.key && t.revision === info.revision)) return;
     const shared = this.sharedNames();
     const own = this.host.tableName(info.model)?.toLowerCase();
     // No longer shared (renamed): said again should it be shared again
@@ -186,12 +186,11 @@ export class Names implements Feature {
     const problem = name === "" ? undefined : validateTableName(name);
     if (problem) return problem;
     if (name !== "") {
-      const text = await this.host.pageTextNow();
-      // This table where it is now: its position may have moved since it was rendered
-      const self = locateBySource(text, info.hint, info.source);
-      const taken = findTables(text).some((range) => {
-        if (range.from === self?.from) return false;
-        const other = this.host.tableName(parseTable(range.text));
+      // The page's tables as they are now, this one by its key (it may have moved since it was rendered)
+      const tables = await this.host.tables(await this.host.pageNameNow());
+      const taken = tables.some(({ key, model }) => {
+        if (key === info.key) return false;
+        const other = this.host.tableName(model);
         return other !== undefined && sameTableName(other, name);
       });
       if (taken) return `another table on this page is named ${name}`;

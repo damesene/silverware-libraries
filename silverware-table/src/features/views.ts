@@ -14,7 +14,7 @@ import type { Feature, ModelHost, PageCommand, TableBadge, TableInfo, ToolbarBut
 import { type Calculated, calculatedTable, readRenames, renamedColumns, renamedIn, renamedViewIds, sameCells, storedRenames, viewCalculated } from "../calculated/index.ts";
 import { type CalculatedBy, type CalculatedOffer, followFormula, FormulaError, type FormulasOffer, type Grid, referredTableNames, tokenize, viewGrid, withEquals } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
-import { locateBySource, pageTablesOf, type Table } from "../markdown.ts";
+import { locateBySource, type Table } from "../markdown.ts";
 import { freeTableName, sameTableName, validateTableName } from "../namerules.ts";
 import { openViewDialog } from "./viewdialog.ts";
 
@@ -184,8 +184,8 @@ export class Views implements Feature {
   private validateName(name: string, own?: Table): string | undefined {
     const problem = validateTableName(name);
     if (problem) return problem;
-    const taken = pageTablesOf(this.host.pageText).some(({ table }) => {
-      const other = this.host.tableName(table);
+    const taken = this.host.pageTables().some(({ model }) => {
+      const other = this.host.tableName(model);
       return !!other && sameTableName(other, name) && !(own && sameTableName(this.host.tableName(own) ?? "", name));
     });
     return taken ? `Another table of the page is named ${name}` : undefined;
@@ -193,7 +193,7 @@ export class Views implements Feature {
 
   /** A name for a new table not taken on the page: view1, view2… (table1… for a source) */
   private freeName(prefix: string): string {
-    return freeTableName(prefix, pageTablesOf(this.host.pageText).map((t) => this.host.tableName(t.table)));
+    return freeTableName(prefix, this.host.pageTables().map((t) => this.host.tableName(t.model)));
   }
 
   /** Why no view can be inserted or saved (its metadata not stored, the formulas off), if so */
@@ -245,8 +245,9 @@ export class Views implements Feature {
 
   /** Insert view at the cursor: the page's first named table's body to start from, else an empty formula */
   private insertAtCursor(): void {
-    const first = pageTablesOf(this.host.pageText)
-      .map(({ table }) => this.host.tableName(table)?.trim())
+    const first = this.host
+      .pageTables()
+      .map(({ model }) => this.host.tableName(model)?.trim())
       .find((name): name is string => !!name);
     const empty: Table = { indent: "", align: [], rows: [{ cells: [""] }], padded: false };
     const preview = (formula: string) => this.result(formula);

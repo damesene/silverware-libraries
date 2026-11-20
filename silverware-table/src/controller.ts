@@ -23,7 +23,8 @@ import { writingClipboard } from "../../shared/clipboard.ts";
 import { markTable, renderedMeta, SilverBulletAdapter } from "./core/silverbullet/adapter.ts";
 import type { TablePlatform } from "./core/platform.ts";
 import type { StoredTable } from "./core/store.ts";
-import { MarkdownStore, revisionOf } from "./store/markdown/store.ts";
+import { type TableData, tableData } from "./tabledata.ts";
+import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
 import { SettingsDialog } from "./settings.ts";
 import { Metadata } from "./features/metadata.ts";
 import { featureEntries } from "./modules.ts";
@@ -140,6 +141,8 @@ export class Controller implements TableHost {
   // The page's text as last read
   pageText = "";
   currentPage = "";
+  // The page's tables as last read (pageTables), made once per page and text
+  private shownPage: { readonly page: string; readonly text: string; readonly tables: readonly StoredTable[] } | undefined;
 
   // Tables being enhanced: a scan meanwhile waits for it instead of starting again
   private readonly enhancing = new WeakMap<HTMLElement, Promise<void>>();
@@ -559,6 +562,18 @@ export class Controller implements TableHost {
 
   tables(document: string): Promise<readonly StoredTable[]> {
     return this.store.tables(document);
+  }
+
+  tableData(info: TableInfo): TableData {
+    const table = info.model;
+    const place = locateBySource(this.pageText, info.hint, info.source) ?? { from: info.hint, to: info.hint + info.source.length };
+    return tableData(table, place, this.tableName(table), (column) => this.columnName(table, column));
+  }
+
+  pageTables(): readonly StoredTable[] {
+    const { currentPage: page, pageText: text } = this;
+    if (this.shownPage?.page !== page || this.shownPage.text !== text) this.shownPage = { page, text, tables: tablesIn(this.register, page, text) };
+    return this.shownPage.tables;
   }
 
   async pageTextNow(): Promise<string> {

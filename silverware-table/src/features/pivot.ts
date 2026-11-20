@@ -18,7 +18,7 @@ import { type Calculated, calculatedTable, movedRenames, readRenames, renamedIn,
 import { type CalculatedBy, type CalculatedOffer, followOwnFormula, type Following, callsPureFunctionsOnly, FormulaError, type FormulaCells, type FormulasOffer, type PageLinksOffer, PLAIN_CELLS } from "../formulas/index.ts";
 import { columnName } from "../columns.ts";
 import { ICONS } from "../icons.ts";
-import { type PageTable, pageTablesOf, type Table, unescapeCell } from "../markdown.ts";
+import { type PageTable, type Table, unescapeCell } from "../markdown.ts";
 import { definitionAttributes, groupFormula, KEYS, type Key, looseDefinition, type PivotDefinition, readDefinition, sourceRef, sourceText, valueItem, valueParts } from "../pivot/definition.ts";
 import { type Fields, fieldsOf } from "../pivot/fields.ts";
 import { pivotOf } from "../pivot/pivot.ts";
@@ -59,9 +59,9 @@ export class Pivot implements Feature {
   }
 
   /** The source the definition names among the page's tables: the first of that name, not the pivot itself */
-  private sourceIn(tables: readonly PageTable[], name: string, except: number): Table | undefined {
+  private sourceIn(tables: readonly Table[], name: string, except?: Table): Table | undefined {
     const wanted = name.trim().toLowerCase();
-    return tables.find((t) => t.range.from !== except && this.host.tableName(t.table)?.trim().toLowerCase() === wanted)?.table;
+    return tables.find((t) => t !== except && this.host.tableName(t)?.trim().toLowerCase() === wanted);
   }
 
   /** The page of a source on another page (one naming the page shown is of this page) */
@@ -81,7 +81,7 @@ export class Pivot implements Feature {
    * at `except`), or among another page's as pageLinks read it (`unread`
    * until it has: the pivot then stays as written)
    */
-  private find(definition: PivotDefinition, tables: readonly PageTable[], except: number): Found {
+  private find(definition: PivotDefinition, tables: readonly Table[], except?: Table): Found {
     const { name, space } = sourceRef(definition.source);
     if (space) {
       // A source of the space, as the sources module offers it (off: not read, the pivot kept as written)
@@ -99,7 +99,7 @@ export class Pivot implements Feature {
     const read = this.host.otherPages()?.tables(page);
     if (read === undefined) return { unread: page };
     if (read === null) return { problem: `no page ${page}` };
-    const table = this.sourceIn(read, name, -1);
+    const table = this.sourceIn(read.map((t) => t.table), name);
     return table ? { table } : { problem: `no table named ${name} on ${page}` };
   }
 
@@ -295,9 +295,9 @@ export class Pivot implements Feature {
     const definition = this.definitionOf(table);
     if (!definition) return void this.stale.delete(info);
     if ("problem" in definition) return void this.stale.set(info, `This pivot cannot be calculated: ${definition.problem}`);
-    const tables = pageTablesOf(this.host.pageText);
-    const own = tables.find((t) => t.table.rows[0]?.cells.join("|") === table.rows[0]?.cells.join("|") && this.host.getMeta(t.table, "source") === definition.source);
-    const found = this.find(definition, tables, own?.range.from ?? -1);
+    const tables = this.pageModels();
+    const own = tables.find((t) => t.rows[0]?.cells.join("|") === table.rows[0]?.cells.join("|") && this.host.getMeta(t, "source") === definition.source);
+    const found = this.find(definition, tables, own);
     const page = this.pageOf(definition);
     if (page !== undefined) {
       const from = this.host.otherPages()?.tables(page);
@@ -343,7 +343,7 @@ export class Pivot implements Feature {
   tableDeleteWarning(info: TableInfo): string | undefined {
     const name = this.host.tableName(info.model)?.trim().toLowerCase();
     if (!name) return undefined;
-    const pivots = pageTablesOf(this.host.pageText).filter(({ table }) => {
+    const pivots = this.pageModels().filter((table) => {
       const of = this.definitionOf(table);
       return of && !("problem" in of) && this.nameHere(of) === name;
     }).length;
@@ -368,7 +368,7 @@ export class Pivot implements Feature {
 
   /** The page's tables a pivot can summarize (named ones, not pivots), `also` one more first (a table to be named so, another page's source) */
   private sources(also?: { readonly name: string; readonly table: Table }): { name: string; columns: string[]; table: Table }[] {
-    return [...(also ? [also] : []), ...this.namedIn(pageTablesOf(this.host.pageText))].map(({ name, table }) => ({ name, table, columns: (table.rows[0]?.cells ?? []).map(columnName) }));
+    return [...(also ? [also] : []), ...this.namedIn(this.pageModels())].map(({ name, table }) => ({ name, table, columns: (table.rows[0]?.cells ?? []).map(columnName) }));
   }
 
   /** The sources of the space a pivot can summarize (the sources module's), by their names and their columns' */
@@ -377,9 +377,14 @@ export class Pivot implements Feature {
     return (offer?.names() ?? []).map((name) => ({ name, columns: offer?.columns(name) ?? [] }));
   }
 
+  /** The open page's tables as last read */
+  private pageModels(): readonly Table[] {
+    return this.host.pageTables().map((t) => t.model);
+  }
+
   /** The tables of a page a pivot can summarize: named ones, not pivots */
-  private namedIn(tables: readonly PageTable[]): { name: string; table: Table }[] {
-    return tables.flatMap(({ table }) => {
+  private namedIn(tables: readonly Table[]): { name: string; table: Table }[] {
+    return tables.flatMap((table) => {
       const name = this.host.tableName(table)?.trim();
       return name && !this.definitionOf(table) ? [{ name, table }] : [];
     });
@@ -394,7 +399,7 @@ export class Pivot implements Feature {
     const tables = this.host.otherPages()?.tables(page);
     if (tables === null) return `There is no page ${page}`;
     if (!tables) return `${page} could not be read`;
-    const named = this.namedIn(tables).map(({ name, table }) => ({ name, columns: (table.rows[0]?.cells ?? []).map(columnName) }));
+    const named = this.namedIn(tables.map((t) => t.table)).map(({ name, table }) => ({ name, columns: (table.rows[0]?.cells ?? []).map(columnName) }));
     return named.length ? named : `No table of ${page} has a name: a pivot names the table it summarizes`;
   }
 
@@ -402,7 +407,7 @@ export class Pivot implements Feature {
   private sourceFor(definition: PivotDefinition, sources: ReturnType<Pivot["sources"]>): Found {
     const name = this.nameHere(definition);
     const listed = name === undefined ? undefined : sources.find((s) => s.name.toLowerCase() === name)?.table;
-    return listed ? { table: listed } : this.find(definition, pageTablesOf(this.host.pageText), -1);
+    return listed ? { table: listed } : this.find(definition, this.pageModels());
   }
 
   /** The dialog: a pivot's fields picked, its preview calculated from the source as the page has it */
@@ -432,7 +437,7 @@ export class Pivot implements Feature {
   private insert(info: TableInfo): void {
     const table = info.model;
     const own = this.host.tableName(table)?.trim();
-    const name = own ?? freeTableName("table", pageTablesOf(this.host.pageText).map((t) => this.host.tableName(t.table)));
+    const name = own ?? freeTableName("table", this.pageModels().map((t) => this.host.tableName(t)));
     const fields = this.firstFields(name, table);
     const blocked = this.blocked({ ...table, meta: undefined });
     this.dialog(this.sources(own ? undefined : { name, table }), fields, "Insert", (definition) => {

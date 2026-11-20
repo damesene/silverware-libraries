@@ -3,7 +3,7 @@
 // state and listeners and works through the host.
 import type { TableKey } from "./tables.ts";
 export type { TableKey } from "./tables.ts";
-export type { TableRevision } from "./store.ts";
+export type { StoredTable, TableRevision } from "./store.ts";
 import type { TableParts } from "./parts.ts";
 export type { PartTable, TablePart, TableParts } from "./parts.ts";
 export { tablePartsOf } from "./parts.ts";
@@ -21,6 +21,7 @@ import type { MenuBack, MenuEntry, MenuNaming } from "../menu.ts";
 import type { MenuBuilder, MenuGroup, MenuSection } from "../../../shared/menuslots.ts";
 import type { CellNameAt, RowName } from "../names.ts";
 import type { Pins, ViewState } from "../view.ts";
+import type { TableData } from "../tabledata.ts";
 
 /** A table shown, in model terms (what modules get): where it is in the page, its shape, its pins */
 export type TableInfo = {
@@ -609,6 +610,16 @@ export interface ModelHost {
   readonly undoEdit: (() => Promise<void>) | undefined;
   /** A document's tables in order (a page's name), as it is now: the open page's in the editor, another's in the space */
   tables(document: string): Promise<readonly StoredTable[]>;
+  /**
+   * The open page's tables in order, as last read (pageText): the same list while that text is (a module's state kept
+   * for the page compares it), a table of the page found in it by its key
+   */
+  pageTables(): readonly StoredTable[];
+  /**
+   * A table shown as data, as `silverware.table.tables` gives it (its name, columns, cells, its place in the page's
+   * text as last read): what a user's script is handed (custom menu entries)
+   */
+  tableData(info: TableInfo): TableData;
   /** Other pages read, written and listed; undefined: none are read */
   readonly pages: PageAccess | undefined;
   /** A setting by its path, `fallback` where it has none: a module's own of an open form (Excel's functions), not in SETTINGS */

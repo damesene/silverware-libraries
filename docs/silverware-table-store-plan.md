@@ -1,7 +1,7 @@
 # Silverware Table: tables apart from where they are kept
 
-Status (2026-11-20): planned, nothing done; the plan is in `main`, the work
-goes on in branch `refactor/table-store` (*Decided*). What it waited for is
+Status (2026-11-20): step 1 done in branch `refactor/table-store`
+(*Decided*), the rest planned; the plan is in `main`. What it waited for is
 in `main`: the views plan
 (docs/silverware-table-views-plan.md), whose sources (`@tasks`) are the first
 tables kept nowhere in a page and this plan's second store; the platform
@@ -368,6 +368,16 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    see *The platform and the page writer*); `host.notify`, `host.ask`,
    `host.navigate` for modules; no module reads `host.bridge` (removed from
    `ModelHost`). Test: no `bridge` in `features/`.
+   **Done (2026-11-20)**: `core/platform.ts` (`TablePlatform`: `editor`,
+   `space` where pages are read, `ui`, `settings` of the shared platform, and
+   the table's `Renderer`), made of the bridge by the binding
+   (`host/silverbullet/platform.ts`; the init page unchanged), held by the
+   controller, the settings dialog and the adapter (`TableHost.platform`).
+   What modules read of the bridge besides notifying became host functions
+   that step 2 and 4 take away: `pageTextNow`, `pageNameNow`,
+   `replacePageText` (Remove metadata), `cursorNow`, `undoEdit`, `pages`
+   (other pages read, written, listed) and `configured` (a setting by path,
+   Excel's functions).
 2. **Tables through the host.** (Steps 2 and 3 both go through every module:
    first where tables come from, then what a table is. Done at once, no step
    between would pass the tests; apart, each leaves the table working.) The

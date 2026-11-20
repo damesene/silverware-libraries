@@ -8,12 +8,27 @@
 import { attributeName, columnAttributeOf, columnValues, hasMetaNamed, metaValue, metaValuesOf, type Owner, withColumnValues, withMetaValue } from "../meta.ts";
 import type { Table } from "../markdown.ts";
 import { attributeIn, type AttributePlace, attributesAt, type ModelCell, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributeSet, withAttributesAt } from "../model/model.ts";
-import type { ModelHost } from "./feature.ts";
 
-export type OwnMeta = Pick<
-  ModelHost,
-  "attribute" | "withAttribute" | "attributes" | "columnAttributes" | "withColumnAttributes" | "canStore"
->;
+/**
+ * An owner's attributes, read and written: the model's (what a module's host
+ * gives: ModelHost) and, for the core's own steps on the markdown (its write
+ * pipeline, the stored view, the layout's entries), a markdown table's too
+ */
+export type OwnMeta = {
+  attribute(table: Table, key: string, at?: { readonly column: number }): string | undefined;
+  attribute(table: TableModel, key: string, at?: AttributePlace): string | undefined;
+  attribute(cell: ModelCell, key: string): string | undefined;
+  withAttribute(table: Table, key: string, value: string | undefined, at?: { readonly column: number }): Table;
+  withAttribute(table: TableModel, key: string, value: string | undefined, at?: AttributePlace): TableModel;
+  withAttribute(cell: ModelCell, key: string, value: string | undefined): ModelCell;
+  attributes(table: Table | TableModel): ReadonlyMap<string, string>;
+  columnAttributes(table: Table | TableModel, key: string): Map<number, string>;
+  withColumnAttributes(table: Table, key: string, values: ReadonlyMap<number, string>): Table;
+  withColumnAttributes(table: TableModel, key: string, values: ReadonlyMap<number, string>): TableModel;
+  canStore(table: Table, key: string, at?: { readonly column: number }): boolean;
+  canStore(table: TableModel, key: string, at?: AttributePlace): boolean;
+  canStore(cell: ModelCell, key: string): boolean;
+};
 
 /** Whether a table is the model (else markdown's `Table`) */
 const isModel = (table: Table | TableModel | ModelCell): table is TableModel => "columns" in table;

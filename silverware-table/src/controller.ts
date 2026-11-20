@@ -28,7 +28,7 @@ import { HASHTAGS_KEY } from "./columns.ts";
 import { type AttributeRules, cellWrittenOver, withAttributeRules } from "./model/rules.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
-import { decode, decodeCell, encode, encodeCell, plainMarkdown } from "./store/markdown/codec.ts";
+import { decode, encode, plainMarkdown } from "./store/markdown/codec.ts";
 import { SettingsDialog } from "./settings.ts";
 import { Metadata } from "./core/metadata.ts";
 import { featureEntries } from "./modules.ts";
@@ -566,16 +566,8 @@ export class Controller implements TableHost {
     return this.store.tables(document);
   }
 
-  asModel(table: Table): TableModel;
-  asModel(cell: string): ModelCell;
-  asModel(table: Table | string): TableModel | ModelCell {
-    return typeof table === "string" ? decodeCell(table) : decode(table);
-  }
-
-  fromModel(model: TableModel, base: Table): Table;
-  fromModel(cell: ModelCell): string;
-  fromModel(model: TableModel | ModelCell, base?: Table): Table | string {
-    return "content" in model ? encodeCell(model) : encode(model, base!);
+  asModel(table: Table): TableModel {
+    return decode(table);
   }
 
   plainMarkdown(table: TableModel, rows: readonly number[]): string {

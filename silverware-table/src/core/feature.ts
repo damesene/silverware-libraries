@@ -20,7 +20,7 @@ import type { IndexMap } from "../ops.ts";
 import type { Table } from "../markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "../menu.ts";
 import type { MenuBuilder, MenuGroup, MenuSection } from "../../../shared/menuslots.ts";
-import type { CellNameAt, RowName } from "../names.ts";
+import type { CellNameAt } from "../names.ts";
 import type { Pins, ViewState } from "../view.ts";
 import type { TableData } from "../tabledata.ts";
 
@@ -645,20 +645,12 @@ export interface ModelHost {
    */
   tableData(info: TableInfo): TableData;
   /**
-   * A table as the model (its columns, rows and cells: a cell's content
-   * unescaped, its attributes apart), for a module moved onto the model before
-   * the hooks give it (docs/silverware-table-store-plan.md, step 3)
+   * A markdown table read into the model (its columns, rows and cells: a cell's
+   * content unescaped, its attributes apart): the sources module's, which makes
+   * its source's table as markdown until a source is a store of its own
+   * (docs/silverware-table-store-plan.md, step 5), and the adapter's
    */
   asModel(table: Table): TableModel;
-  // A body cell given alone (a cell hook's: keepsCell, fillCell, editorText's): its content and its attributes
-  asModel(cell: string): ModelCell;
-  /**
-   * A model written back as the table it was read from (`base`: asModel's), or
-   * a cell read alone written back: what a hook gives back until the hooks take
-   * the model
-   */
-  fromModel(model: TableModel, base: Table): Table;
-  fromModel(cell: ModelCell): string;
   /** A table's header and `rows` (its rows, the first 1, in that order) as plain markdown, as any renderer shows them: no hidden data, no metadata row (Copy as Markdown) */
   plainMarkdown(table: TableModel, rows: readonly number[]): string;
   /** Whether other pages are read (none where the platform reads no page but the open one): formulas and pivots referring to one */
@@ -880,21 +872,17 @@ export interface ModelHost {
   // attribute's name from the module's and its key (meta.ts), of a column
   // when `column` is given (it follows its column through edits). A module's
   // own host has them for that module; the core's for the core. Each takes the
-  // table as markdown (`Table`: the table's and its columns') or as the model
-  // (`TableModel`: also a row's, `row`, and a cell's, both), as a module moves
-  // onto the model (docs/silverware-table-store-plan.md, step 3)
+  // model: the table's, a column's (`column`), a row's (`row`) and a cell's
+  // (both)
   /** The module's attribute of the table (of one column: `column`; on the model of a row, `row`, of a cell, both) */
-  attribute(table: Table, key: string, at?: { readonly column: number }): string | undefined;
   attribute(table: TableModel, key: string, at?: AttributePlace): string | undefined;
   /** The table with the module's attribute set (undefined: removed) */
-  withAttribute(table: Table, key: string, value: string | undefined, at?: { readonly column: number }): Table;
   withAttribute(table: TableModel, key: string, value: string | undefined, at?: AttributePlace): TableModel;
   /** The module's attributes of the table (not of its columns), by key */
-  attributes(table: Table | TableModel): ReadonlyMap<string, string>;
+  attributes(table: TableModel): ReadonlyMap<string, string>;
   /** The module's attribute of the key for each column that has it, by column */
-  columnAttributes(table: Table | TableModel, key: string): Map<number, string>;
+  columnAttributes(table: TableModel, key: string): Map<number, string>;
   /** The table with the module's attribute of the key on these columns (by column), and on no other */
-  withColumnAttributes(table: Table, key: string, values: ReadonlyMap<number, string>): Table;
   withColumnAttributes(table: TableModel, key: string, values: ReadonlyMap<number, string>): TableModel;
   /**
    * Whether the module may store this attribute in the table: the metadata
@@ -902,7 +890,6 @@ export interface ModelHost {
    * setting off nothing new is stored: withAttribute and withColumnAttributes
    * leave it out)
    */
-  canStore(table: Table, key: string, at?: { readonly column: number }): boolean;
   canStore(table: TableModel, key: string, at?: AttributePlace): boolean;
   // A cell of the model given alone (a formula's cell as the formulas read and make one): its attribute, the cell with
   // it set, whether it may be stored there. Set unchecked: whether the cell may take one it had not is the write
@@ -913,40 +900,34 @@ export interface ModelHost {
 
   // What every part reads and the core keeps: the names of tables, columns, rows and cells
   /** A table's name, if it has a valid one */
-  tableName(table: Table | TableModel): string | undefined;
+  tableName(table: TableModel): string | undefined;
   /** What the features say the table is (Feature.tableBadges), in their order */
   tableBadges(info: TableInfo): readonly TableBadge[];
   /** A table's name as written, valid or not */
-  writtenTableName(table: Table | TableModel): string | undefined;
+  writtenTableName(table: TableModel): string | undefined;
   /** The table named so (undefined: unnamed) */
-  withTableName(table: Table, name: string | undefined): Table;
   withTableName(table: TableModel, name: string | undefined): TableModel;
   /** A column's fixed name (apart from its header's text) */
-  columnName(table: Table | TableModel, column: number): string | undefined;
-  withColumnName(table: Table, column: number, name: string | undefined): Table;
+  columnName(table: TableModel, column: number): string | undefined;
   withColumnName(table: TableModel, column: number, name: string | undefined): TableModel;
   /** A body row's name (rows from 1: the header 0) */
-  rowName(table: Table | TableModel, row: number): string | undefined;
-  withRowName(table: Table, row: number, name: string | undefined): Table;
+  rowName(table: TableModel, row: number): string | undefined;
   withRowName(table: TableModel, row: number, name: string | undefined): TableModel;
   /** A body cell's name */
-  cellName(table: Table | TableModel, row: number, column: number): string | undefined;
-  withCellName(table: Table, row: number, column: number, name: string | undefined): Table;
+  cellName(table: TableModel, row: number, column: number): string | undefined;
   withCellName(table: TableModel, row: number, column: number, name: string | undefined): TableModel;
   /** Whether a name may be given there: the metadata setting on, or one is there already (renamed or removed) */
-  canName(table: Table | TableModel, target: NamingTarget): boolean;
+  canName(table: TableModel, target: NamingTarget): boolean;
   /** Whether rows (columns) may be pinned at that edge: the metadata setting on, or the table has pins there already */
-  canPin(table: Table | TableModel, edge: "top" | "bottom" | "left" | "right"): boolean;
+  canPin(table: TableModel, edge: "top" | "bottom" | "left" | "right"): boolean;
   /** The rows and columns pinned at each edge of a table, as its attributes have them */
-  pinsOf(table: Table | TableModel): Pins;
+  pinsOf(table: TableModel): Pins;
   /** The table with these pins (an edge that cannot be pinned, canPin, as it was): a module's table made whole (a pivot's totals) */
-  withPins(table: Table, pins: Pins): Table;
   withPins(table: TableModel, pins: Pins): TableModel;
   /** A table's named rows, in their order */
-  rowNames(table: Table): readonly RowName[];
   rowNames(table: TableModel): readonly { readonly name: string; readonly row: number }[];
   /** A table's named body cells, in their order */
-  cellNames(table: Table | TableModel): readonly CellNameAt[];
+  cellNames(table: TableModel): readonly CellNameAt[];
   /** A column's hashtags (its header's, its type among them), as text: the core's attribute; undefined: none */
   columnHashtags(table: TableModel, column: number): string | undefined;
   /** The table with a column's hashtags (undefined or empty: none); a header's text, not metadata: no setting */

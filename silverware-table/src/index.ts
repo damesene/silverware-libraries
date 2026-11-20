@@ -15,6 +15,7 @@ import { isError, isRange, type Scalar, single, TimeValue, type Value } from "./
 import { customFunctionsAnew, defineCustomFunctions } from "./formulas/registry.ts";
 import { addWriteListener, type WriteListener, writeListenersAnew } from "./core/writelisteners.ts";
 import { cellSourceOffset, findTables, pageTablesOf } from "./markdown.ts";
+import { decodeCell } from "./store/markdown/codec.ts";
 import { metaName } from "./meta.ts";
 import { columnNameIn } from "./names.ts";
 import { type TableData, tableData } from "./tabledata.ts";
@@ -168,7 +169,7 @@ export function formulaPagesIn(rows: unknown): string[] {
     if (!row || typeof row !== "object") continue;
     const { page } = row as { page?: unknown };
     if (typeof page !== "string" || pages.has(page)) continue;
-    if (Object.values(row).some((cell) => typeof cell === "string" && formulas.cells.formulaOf(controller.asModel(cell)) !== undefined)) pages.add(page);
+    if (Object.values(row).some((cell) => typeof cell === "string" && formulas.cells.formulaOf(decodeCell(cell)) !== undefined)) pages.add(page);
   }
   return [...pages];
 }

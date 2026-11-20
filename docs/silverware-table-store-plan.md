@@ -693,6 +693,21 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      by hand. `isolation.test.ts`: no module imports the markdown's form
      (markdown.ts, tags.ts, ops.ts), the sources module alone until a source
      is a store of its own (step 5).
+   - **4e, the host in model terms only (2026-11-20)**: `ModelHost` takes
+     and gives the model alone, its `Table` overloads gone, and with them
+     `fromModel` and `asModel(cell)`; `asModel(table)` stays for the
+     sources module (step 5) and the adapter, which reads the page's text
+     for the sheet's board. The core's own steps on the markdown (the write
+     pipeline, the stored view, the layout's entries) read and write
+     attributes through `OwnMeta`, its own type now, both forms. The
+     domains and the model import nothing of the markdown and escape no
+     cell (`isolation.test.ts`, every domain listed: the column types,
+     conditions, autofill and pivot were not); the formulas' completion
+     read a column's header as markdown, unescaping the model's text again.
+     **Step 3 is done** for the modules, the domains and the model; the
+     core and the adapter still read markdown.ts (the write pipeline, Remove
+     metadata, the sheet's board), which moves into the markdown store in
+     steps 4 and 6.
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

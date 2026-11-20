@@ -168,9 +168,14 @@ export class Sheet implements AdapterFeature {
     return sheetTablesOf(this.host, pageTablesOf(text).map((t) => ({ range: t.range, table: this.host.asModel(t.table) })));
   }
 
+  /** A table of the page's text (a range's, or one made) read into the model */
+  private modelOf(markdown: string): TableModel {
+    return this.host.asModel(parseTable(markdown));
+  }
+
   /** A name no table of a page's text has (nor one of `taken`): table1, table2, … */
   private freeNameIn(text: string, taken: readonly string[] = []): string {
-    return freeNameOf(this.host, findTables(text).map((range) => this.host.asModel(parseTable(range.text))), taken);
+    return freeNameOf(this.host, findTables(text).map((range) => this.modelOf(range.text)), taken);
   }
 
   constructor(private readonly host: TableHost) {
@@ -364,7 +369,7 @@ export class Sheet implements AdapterFeature {
       const range = findTables(text)[keys.indexOf(board.alone)];
       if (range) wanted.set(board.alone, { range, at: { row: 0, column: 0 } });
       // A table alone: its grid's widths are kept in it, as a sheet's are in its first table
-      board.widths = sheetWidths(this.host, range && this.host.asModel(parseTable(range.text)));
+      board.widths = sheetWidths(this.host, range && this.modelOf(range.text));
     }
     // A width dragged and stored: shown as stored from now on
     for (const [column, width] of board.preview) if (board.widths.get(column) === width) board.preview.delete(column);
@@ -678,7 +683,7 @@ export class Sheet implements AdapterFeature {
     const widget = this.host.widgetOf(info);
     if (!widget.classList.contains(DRAWN_CLASS)) {
       // SilverBullet's table rendered anew (an edit, by another client too): the board follows the page
-      if (board.tables.has(info.key) || (board.sheet && this.host.attribute(parseTable(info.source), SHEET_KEY))) this.queueRefresh();
+      if (board.tables.has(info.key) || (board.sheet && this.host.attribute(info.model, SHEET_KEY))) this.queueRefresh();
       return;
     }
     const placed = board.tables.get(info.key);
@@ -960,7 +965,7 @@ export class Sheet implements AdapterFeature {
       tables: [...board.tables.keys()],
       outward: (table, area) => {
         const entry = this.shown().find(({ placed }) =>
-          table === undefined ? placed === mine : sameTableName(this.host.tableName(parseTable(placed.range.text)) ?? "", table),
+          table === undefined ? placed === mine : sameTableName(this.host.tableName(this.modelOf(placed.range.text)) ?? "", table),
         );
         if (!entry) return undefined;
         const { placed, info: shown, order } = entry;
@@ -997,6 +1002,15 @@ export class Sheet implements AdapterFeature {
 
   // ---- moving a table ----------------------------------------------------------------------
 
+  /** The board's tables as the sheet's layout takes them: by their rows in the markdown (the header one), their names */
+  private laidOut(board: Board): { id: number; at: SheetCell; rows: number; columns: number; name?: string }[] {
+    return [...board.tables.values()].map((p) => {
+      const model = this.modelOf(p.range.text);
+      const name = this.host.tableName(model);
+      return { id: p.range.from, at: p.at, rows: model.rows.length + 1, columns: model.columns.length, ...(name ? { name } : {}) };
+    });
+  }
+
   /** Why a table of the board cannot lie with its top left at `at` (sheet/layout.ts) */
   private validatePlaceFor(key: TableKey, at: SheetCell): string | undefined {
     const board = this.board;
@@ -1005,11 +1019,7 @@ export class Sheet implements AdapterFeature {
     if (!board.sheet) return "the table is on no sheet: put it on one first (the sheet's name in its ⋯ menu)";
     if (at.row < 0 || at.column < 0) return "the sheet starts at A1";
     // By its rows in the markdown, not as shown: a filter's hidden rows keep their room
-    const laidOut = [...board.tables.values()].map((p) => {
-      const model = parseTable(p.range.text);
-      const name = this.host.tableName(model);
-      return { id: p.range.from, at: p.at, rows: model.rows.length, columns: model.align.length, ...(name ? { name } : {}) };
-    });
+    const laidOut = this.laidOut(board);
     const problem = validatePlace(laidOut, placed.range.from, at);
     return problem && `${problem} is there`;
   }
@@ -1188,11 +1198,11 @@ export class Sheet implements AdapterFeature {
     const ranges = findTables(text);
     // A board of a table on no sheet makes that one a sheet's too, in the same edit: both must be placeable
     const alone = board.sheet ? undefined : ranges[keys.indexOf(board.alone)];
-    const aloneFits = !alone || canPlace(this.host, this.host.asModel(parseTable(alone.text)));
+    const aloneFits = !alone || canPlace(this.host, this.modelOf(alone.text));
     return ranges.flatMap((range, i) => {
       const key = keys[i]!;
       if (board.tables.has(key) || key === board.alone) return [];
-      const model = this.host.asModel(parseTable(range.text));
+      const model = this.modelOf(range.text);
       const sheet = this.host.attribute(model, SHEET_KEY);
       if (board.sheet && sheet && sameSheet(sheet, board.sheet)) return [];
       const header = model.columns.map((column) => column.header.trim()).filter(Boolean).join(", ");
@@ -1206,11 +1216,7 @@ export class Sheet implements AdapterFeature {
   private validateAdd(table: { rows: number; columns: number }, at: SheetCell): string | undefined {
     const board = this.board;
     if (!board) return undefined;
-    const laidOut = [...board.tables.values()].map((p) => {
-      const model = parseTable(p.range.text);
-      const name = this.host.tableName(model);
-      return { id: p.range.from, at: p.at, rows: model.rows.length, columns: model.align.length, ...(name ? { name } : {}) };
-    });
+    const laidOut = this.laidOut(board);
     return validatePlace([...laidOut, { id: -1, at, rows: table.rows, columns: table.columns }], -1, at);
   }
 
@@ -1228,8 +1234,8 @@ export class Sheet implements AdapterFeature {
     const ranges = findTables(text);
     const range = ranges[keys.indexOf(key)];
     if (!range) return;
-    const model = parseTable(range.text);
-    const problem = this.validateAdd({ rows: model.rows.length, columns: model.align.length }, at);
+    const model = this.modelOf(range.text);
+    const problem = this.validateAdd({ rows: model.rows.length + 1, columns: model.columns.length }, at);
     if (problem) {
       this.host.notify(`Silverware Table: the table cannot go to ${formatAt(at)}: it would cover ${problem}`, "info");
       return;
@@ -1426,7 +1432,7 @@ export class Sheet implements AdapterFeature {
         : findTables(text)[keys.indexOf(board.alone)];
       // Where the table cannot take it (the setting off, no width of that column stored): for the view only, as the widths module keeps them
       const key = `${WIDTH_PREFIX}${columnLetters(column)}`;
-      if (range && width !== undefined && !this.host.canStore(parseTable(range.text), key)) {
+      if (range && width !== undefined && !this.host.canStore(this.modelOf(range.text), key)) {
         board.preview.set(column, width);
         this.queuePlace();
         return;
@@ -1454,7 +1460,7 @@ export class Sheet implements AdapterFeature {
     }
     // One area of the table: rows one after another in the markdown, as on the sheet
     if (rows.some((row, i) => row !== rows[0]! + i)) return undefined;
-    const name = first.info.key === key ? undefined : this.host.tableName(parseTable(first.info.source));
+    const name = first.info.key === key ? undefined : this.host.tableName(first.info.model);
     if (first.info.key !== key && !name) return undefined;
     const left = first.ref.column;
     return { table: name, area: { top: rows[0]! - 1, left, bottom: rows[rows.length - 1]! - 1, right: left + area.right - area.left } };
@@ -1546,11 +1552,7 @@ export class Sheet implements AdapterFeature {
     const placed = board?.tables.get(key);
     const info = this.infoOfKey(key);
     if (!board || !placed || !info) return undefined;
-    const laidOut = [...board.tables.values()].map((p) => {
-      const model = parseTable(p.range.text);
-      const name = this.host.tableName(model);
-      return { id: p.range.from, at: p.at, rows: model.rows.length, columns: model.align.length, ...(name ? { name } : {}) };
-    });
+    const laidOut = this.laidOut(board);
     const room = roomFor(laidOut, { id: placed.range.from, rows: Math.max(info.rows, cell.row + 1), columns: Math.max(info.columns, cell.column + 1), claims: true });
     return "refused" in room ? room.refused : undefined;
   }
@@ -1702,7 +1704,7 @@ export class Sheet implements AdapterFeature {
         "info",
       );
     }
-    return this.insertNew(text, this.host.asModel(parseTable(`| Column 1 |\n|---|\n| ${escapeCell(value)} |`)), { row: Math.max(0, at.row - 1), column: at.column }, key);
+    return this.insertNew(text, this.modelOf(`| Column 1 |\n|---|\n| ${escapeCell(value)} |`), { row: Math.max(0, at.row - 1), column: at.column }, key);
   }
 
   /**
@@ -1736,7 +1738,7 @@ export class Sheet implements AdapterFeature {
     const alone = findTables(text)[keys.indexOf(board.alone)];
     const sheet = freeSheetName(this.sheetTablesIn(text));
     if (!alone) return { sheet, taken: [], also: undefined };
-    const name = this.host.tableName(parseTable(alone.text)) ?? this.freeNameIn(text);
+    const name = this.host.tableName(this.modelOf(alone.text)) ?? this.freeNameIn(text);
     return {
       sheet,
       taken: [name],
@@ -1791,7 +1793,7 @@ export class Sheet implements AdapterFeature {
     if (inWay) {
       // (The cell stays selected)
       this.go(at, false);
-      const name = this.host.tableName(parseTable(inWay.range.text));
+      const name = this.host.tableName(this.modelOf(inWay.range.text));
       const what = `${data.length} row${data.length === 1 ? "" : "s"} and ${columns} column${columns === 1 ? "" : "s"}`;
       this.host.notify(`Silverware Table: there is no room here for the ${what} pasted: they would cover ${name ?? `the table at ${formatAt(inWay.at)}`}`, "info");
       return;

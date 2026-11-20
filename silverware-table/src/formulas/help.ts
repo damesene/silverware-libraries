@@ -3,7 +3,6 @@
 // pointed reference goes; and the functions found by what they are or do
 // (the Functions dialog).
 import { columnIdOf, columnName, type ColumnHead } from "../columns.ts";
-import { escapeCell, unescapeCell } from "../markdown.ts";
 import { CELL_RE } from "../namerules.ts";
 import type { AnyFunction, FunctionCategory } from "./function.ts";
 import { functionNamed, functionNames } from "./registry.ts";
@@ -91,7 +90,7 @@ export type ColumnChoice = { readonly name: string; readonly id: string };
 export function columnChoicesOf(headers: readonly ColumnHead[]): ColumnChoice[] {
   return headers.flatMap((header, column) => {
     const ref = columnRefText(columnIdOf(headers, column), false);
-    const name = columnName(unescapeCell(header.text));
+    const name = columnName(header.text);
     const id = ref?.slice(1, -1);
     const nth = id && /:(\d+)$/.exec(id)?.[1];
     return id && name ? [{ name: nth ? `${name} (${nth})` : name, id }] : [];
@@ -100,7 +99,7 @@ export function columnChoicesOf(headers: readonly ColumnHead[]): ColumnChoice[] 
 
 /** The sources of the space as choices: each by its name, with its columns (by their names as the source gives them) for its [ ] */
 export function sourceChoices(sources: readonly { readonly name: string; readonly columns: readonly string[] }[]): FormulaChoice[] {
-  return sources.map(({ name, columns }): FormulaChoice => ({ kind: "source", name, columns: columnChoicesOf(columns.map((name) => ({ text: escapeCell(name), fixed: undefined }))) }));
+  return sources.map(({ name, columns }): FormulaChoice => ({ kind: "source", name, columns: columnChoicesOf(columns.map((name) => ({ text: name, fixed: undefined }))) }));
 }
 
 /** The choices a name typed right before the caret may be, and where the name is (from..to) */

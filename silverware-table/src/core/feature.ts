@@ -171,15 +171,16 @@ export type FocusTarget = CellRef & { readonly select?: boolean; readonly select
 
 export type WriteResult = "written" | "unchanged" | "failed";
 
-/** A cell's edit a feature keeps instead of having it written at once (the lazy module) */
-export type HeldEdit = { readonly row: number; readonly column: number; readonly original: string; readonly value: string };
+/** A body cell's edit a feature keeps instead of having it written at once (the lazy module): the cell as it was, and as edited */
+export type HeldEdit = { readonly row: number; readonly column: number; readonly original: ModelCell; readonly value: ModelCell };
 
 /**
- * Edits a feature holds for a table: every write of it starts from its
- * markdown with them (`apply`), so they are written with whatever the write
- * changes; `written` once that write is in the page
+ * Edits a feature holds for a table: every write of it starts from the table
+ * with them (`apply`), so they are written with whatever the write changes,
+ * the rules of an edit applied to them as to it (model/rules.ts); `written`
+ * once that write is in the page
  */
-export type PendingEdits = { readonly apply: (table: Table) => Table; readonly written: () => void };
+export type PendingEdits = { readonly apply: (table: TableModel) => TableModel; readonly written: () => void };
 
 /**
  * The cell editor: an input in place of the cell's content. In model terms
@@ -205,8 +206,8 @@ export type CellEditor = {
   focus(): void;
   /** Saved as Enter saves (and on as Enter goes on) */
   commit(): void;
-  // The cell's markdown when the editor opened
-  readonly original: string;
+  // The cell when the editor opened (a header: its text as written, the column's attributes: columns.ts headerCell)
+  readonly original: ModelCell;
   // What the field showed when it opened: the cell's text, or what a feature showed (a formula)
   readonly initial: string;
   // Edited in the cell's popup
@@ -835,7 +836,9 @@ export interface ModelHost {
    * Closes the cell editor for an edit that ends editing: `save` adds what the
    * editor held to that edit (undefined: the cell changed in the meantime)
    */
-  takeEditor(): { readonly key: TableKey; readonly row: number; readonly column: number; readonly save: (table: Table) => Table | undefined } | undefined;
+  /** A body cell as an edit leaves it, `before` as it was: the rules of an edit applied (a value typed over a formula ends it) */
+  editedCell(before: ModelCell, after: ModelCell): ModelCell;
+  takeEditor(): { readonly key: TableKey; readonly row: number; readonly column: number; readonly save: (table: TableModel) => TableModel | undefined } | undefined;
   /** Closes the cell editor saving, as leaving it does (an edit a feature holds stays held), the focus left where it is */
   saveEditing(): Promise<void>;
   /** Asks the user before a destructive change (SilverBullet's dialog, else the browser's) */
@@ -1295,8 +1298,8 @@ export interface Feature {
   tablesChanged?(): void;
   /** The page or a table scrolled, or tables moved: floating elements follow */
   layoutChanged?(): void;
-  /** What the cell editor shows for a cell's markdown (hidden tags and all); undefined: its text */
-  editorText?(info: TableInfo, cell: CellRef, original: string): string | undefined;
+  /** What the cell editor shows for a cell (a header: its text as written, columns.ts headerCell); undefined: its content */
+  editorText?(info: TableInfo, cell: CellRef, original: ModelCell): string | undefined;
   editorOpened?(editor: CellEditor): void;
   /** What the cell editor holds changed (typed, pasted, set) */
   editorInput?(editor: CellEditor): void;
@@ -1314,8 +1317,11 @@ export interface Feature {
   copied?(kind: "copy" | "cut", data: ClipboardData | undefined): void;
   /** A key in the cell editor, before Silverware Table handles it; true: handled (its default is prevented) */
   editorKeyDown?(e: KeyboardEvent, editor: CellEditor): boolean;
-  /** The markdown to save for what was typed; undefined: the text */
-  editorValue?(editor: CellEditor, typed: string): string | undefined;
+  /**
+   * The cell to save for what was typed (a header: its text as written, as headerCell gives it); undefined: the cell
+   * with its content the text typed, its attributes kept (those bound to the content go, the rule of an edit)
+   */
+  editorValue?(editor: CellEditor, typed: string): ModelCell | undefined;
   /** A click selects first (select mode: the selection module's), a second click acts; false: a click acts at once */
   clickSelects?(): boolean;
   /** The name of what a menu is about (a cell, a row, a column, the table), shown in its title with a pencil to change it */

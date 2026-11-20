@@ -2,7 +2,7 @@
 // inline cell editing and row/column editing. Every change to the markdown is
 // one `editor.replaceRange`, so undo works as for any other edit.
 import { type FeatureName, formatRule, moduleOnByDefault, SETTINGS, type SettingValue } from "./bridge.ts";
-import { type AdapterFeature, type AddressFrame, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, type ColumnsMeasure, type ColumnWidths, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type TextPosition, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget, type KeyedTable, type OtherPages, type TableChange } from "./core/feature.ts";
+import { type AdapterFeature, type AddressFrame, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, type ColumnsMeasure, type ColumnWidths, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type TextPosition, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget, type KeyedTable, type OtherPages, type PendingEdits, type TableChange } from "./core/feature.ts";
 import { type Dialog, type DialogOptions, Dialogs } from "./core/dialog.ts";
 import { ViewAnchor } from "./core/anchor.ts";
 import { mapPosition, type TextEdit, withWriteListeners } from "./core/writelisteners.ts";
@@ -25,7 +25,7 @@ import type { TablePlatform } from "./core/platform.ts";
 import type { StoredTable } from "./core/store.ts";
 import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt } from "./model/model.ts";
 import { HASHTAGS_KEY } from "./columns.ts";
-import { type AttributeRules, withAttributeRules } from "./model/rules.ts";
+import { type AttributeRules, editedCell, withAttributeRules } from "./model/rules.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
 import { decode, decodeCell, encode, encodeCell, plainMarkdown } from "./store/markdown/codec.ts";
@@ -1912,7 +1912,11 @@ export class Controller implements TableHost {
     return this.cellEditor.finish(true, undefined, false);
   }
 
-  takeEditor(): { key: TableKey; row: number; column: number; save: (table: Table) => Table | undefined } | undefined {
+  editedCell(before: ModelCell, after: ModelCell): ModelCell {
+    return editedCell(before, after, this.attributeRules());
+  }
+
+  takeEditor(): { key: TableKey; row: number; column: number; save: (table: TableModel) => TableModel | undefined } | undefined {
     const closed = this.cellEditor.close();
     const key = closed && this.infos.get(closed.widget)?.key;
     return closed && key !== undefined ? { key, row: closed.row, column: closed.column, save: (t) => this.cellEditor.withSaved(t, closed) } : undefined;
@@ -1966,7 +1970,18 @@ export class Controller implements TableHost {
   }
 
   tableOf(info: WidgetInfo): Table {
-    return this.features.reduce((table, f) => f.pendingEdits?.(info)?.apply(table) ?? table, parseTable(info.source));
+    return this.withHeld(parseTable(info.source), this.features.flatMap((f) => f.pendingEdits?.(info) ?? []));
+  }
+
+  /**
+   * A table as read with the edits features hold for it, as a write would put them: the rules of an edit applied
+   * (a value held over a formula ends it, model/rules.ts); the same table where none is held
+   */
+  private withHeld(read: Table, held: readonly PendingEdits[]): Table {
+    if (!held.length) return read;
+    const before = decode(read);
+    const after = held.reduce((table, pending) => pending.apply(table), before);
+    return encode(withAttributeRules(before, after, this.attributeRules()), read);
   }
 
   cancelEditing(): void {
@@ -2824,7 +2839,7 @@ export class Controller implements TableHost {
       const { focus, columnMap } = options;
       // The edits features hold for the table go into it first: the change applies to the table as shown
       const held = this.features.flatMap((f) => f.pendingEdits?.(info) ?? []);
-      const before = held.reduce((table, pending) => pending.apply(table), parseTable(range.text));
+      const before = this.withHeld(parseTable(range.text), held);
       const edited = change(before);
       if (!edited) {
         this.notify(NOT_SAVED, "error");

@@ -99,7 +99,7 @@ import { ResultView } from "./resultview.ts";
 import { el } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
 import type { SourcesOffer } from "../sources.ts";
-import { escapeCell, sameTable, type Table } from "../markdown.ts";
+import { sameTable, type Table } from "../markdown.ts";
 import { type ModelCell, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
 import { EMPTY_CELL } from "../model/ops.ts";
 import { sameTableName } from "../namerules.ts";
@@ -740,11 +740,10 @@ export class Formulas implements Feature {
   }
 
   /** A formula cell is edited as its formula; a text starting with "=" as '=…, so it stays text */
-  editorText(info: TableInfo, cell: CellRef, original: string): string | undefined {
+  editorText(info: TableInfo, cell: CellRef, original: ModelCell): string | undefined {
     this.unframed = undefined;
     if (cell.row === 0) return undefined;
-    const read = this.host.asModel(original);
-    const stored = this.cells.formulaOf(read);
+    const stored = this.cells.formulaOf(original);
     // Where a feature lays the table out on a grid of its own (the sheet view), in that grid's addresses
     const frame = stored && this.host.addressFrame(info);
     if (stored && frame) {
@@ -753,7 +752,7 @@ export class Formulas implements Feature {
       return shown ?? stored.formula;
     }
     if (stored) return stored.formula;
-    return read.content.startsWith("=") ? `'${read.content}` : undefined;
+    return original.content.startsWith("=") ? `'${original.content}` : undefined;
   }
 
   // The formula's references are shown in the table, its function explained under the cell
@@ -826,7 +825,7 @@ export class Formulas implements Feature {
    * one with a metadata row keeps its sorting)
    */
   private allowed(editor: CellEditor): boolean {
-    return this.host.canStore(this.host.asModel(editor.original), "f");
+    return this.host.canStore(editor.original, "f");
   }
 
   /**
@@ -836,11 +835,11 @@ export class Formulas implements Feature {
    * text, and so is a formula where formulas are not allowed (said so).
    * Undefined for anything else.
    */
-  editorValue(editor: CellEditor, typed: string): string | undefined {
+  editorValue(editor: CellEditor, typed: string): ModelCell | undefined {
     if (editor.row === 0) return undefined;
     if (isFormulaInput(typed) && !this.allowed(editor)) {
       this.host.notify(`Silverware Table: ${FORMULAS_NEED_METADATA}; saved as text`, "info");
-      return escapeCell(typed);
+      return { ...editor.original, content: typed };
     }
     if (isFormulaInput(typed)) {
       const slips = autofixFormula(typed.trim());
@@ -859,9 +858,10 @@ export class Formulas implements Feature {
       const fixes = [...slips.fixes, ...names.fixes];
       if (fixes.length) this.host.notify(`Silverware Table: formula fixed: ${fixes.join(", ")}`, "info");
       const headers = info ? modelHeads(this.modelOf(info)) : [];
-      return this.host.fromModel(this.cells.formulaCell("", withColumnKeys(formula, headers)));
+      // (Set on the cell as it was: its other attributes, its name, stay)
+      return this.cells.formulaCell("", withColumnKeys(formula, headers), editor.original);
     }
-    return typed.startsWith("'=") ? escapeCell(typed.slice(1)) : undefined;
+    return typed.startsWith("'=") ? { ...editor.original, content: typed.slice(1) } : undefined;
   }
 
   editorClosed(): void {

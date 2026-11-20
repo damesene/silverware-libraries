@@ -513,7 +513,9 @@ export class Paste implements Feature {
     const result = await this.host.writeTable(
       info,
       (t) => {
-        const saved = closed ? closed.save(t) : t;
+        // (The editor's value saved on the model, until paste writes on it too)
+        const model = closed && closed.save(this.host.asModel(t));
+        const saved = closed ? model && this.host.fromModel(model, t) : t;
         const edited = saved && growth ? growth.grow(saved) : saved;
         if (!edited) return undefined;
         if (cut) return moveCells(edited, cut.cells, plan, cellMoveRules(this.host));

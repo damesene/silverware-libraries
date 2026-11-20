@@ -3,6 +3,7 @@
 // pinned to the edges stay there (pins.ts), and formulas and the stored
 // sorting follow through the write steps (rowMap, columnMap).
 import type { Table } from "../markdown.ts";
+import type { TableModel } from "../model/model.ts";
 import { metaPins } from "../meta.ts";
 import {
   columnAfterMove,
@@ -101,7 +102,7 @@ export function insertRowWith(
   host: ModelHost, info: TableInfo,
   at: number,
   column: number,
-  prepare: (t: Table) => Table | undefined = (t) => t,
+  prepare: (t: TableModel) => TableModel | undefined = (t) => t,
   // Where the new row shows while it is edited (rows of the markdown before the insert); none: last
   beside: { readonly after?: number; readonly before?: number } = {},
 ): Promise<WriteResult> {
@@ -111,11 +112,11 @@ export function insertRowWith(
     ...(beside.after !== undefined ? { after: rowMap(beside.after) } : {}),
     ...(beside.before !== undefined ? { before: rowMap(beside.before) } : {}),
   };
-  return host.writeTable(
+  return host.writeModel(
     info,
     (t) => {
       const prepared = prepare(t);
-      return prepared && insertRow(prepared, insert.at);
+      return prepared && insertModelRow(prepared, insert.at);
     },
     { focus: { row: insert.at, column }, pins: insert.pins, rowMap, hold },
   );

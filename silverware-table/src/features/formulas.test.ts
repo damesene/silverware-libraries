@@ -35,6 +35,17 @@ describe("Formulas", () => {
     expect(cell(3, 1).title).toBe("=SUM(B1:B2)");
   });
 
+  it("keeps a formula typed again as it was, and its cell's name; a value typed over it ends it, the name staying", async () => {
+    const named = "| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Total | 3 <meta formulas.f='=SUM(B1:B1)' core.cn='total'> |\n";
+    await setup(named, { "silverware.table.editor.enterKey": "save" });
+    clickOn(cell(2, 1));
+    await type("=SUM(B1:B1)");
+    expect(text).toBe(named);
+    clickOn(cell(2, 1));
+    await type("7");
+    expect(text).toBe("| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Total | 7 <meta core.cn='total'> |\n");
+  });
+
   it("inserts a numbered column (=ROW() in every row) from a column's menu; rows added or moved are numbered again", async () => {
     const openColumnMenu = (column: number) => {
       cell(1, column).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));

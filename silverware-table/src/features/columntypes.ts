@@ -9,9 +9,8 @@ import { type CellEditor, type CellLook, type CellRef, type Feature, HEADER_ICON
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget, StoredTable } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
 import type { MenuDetail, MenuEntry } from "../menu.ts";
-import { escapeCell, type Table, unescapeCell } from "../markdown.ts";
-import type { TableModel } from "../model/model.ts";
-import { withoutTags } from "../tags.ts";
+import { type Table, unescapeCell } from "../markdown.ts";
+import type { ModelCell, TableModel } from "../model/model.ts";
 import {
   type Choice,
   type ColumnType,
@@ -103,7 +102,7 @@ export class ColumnTypes implements Feature {
     host.hideHeaderTags("types", typeTagPatterns());
     this.picker = host.panel("swt-choices");
     this.picker.element.setAttribute("role", "listbox");
-    host.offer({ valueOf: (table, column, text) => this.valueOf(table, column, text), held: (table) => this.held(table) } satisfies ColumnTypesOffer & HeldFormulasOffer);
+    host.offer({ valueOf: (table, column, text) => this.typedValueOf(table, column, text), held: (table) => this.held(table) } satisfies ColumnTypesOffer & HeldFormulasOffer);
   }
 
   /** A column's type, of its hashtags */
@@ -112,7 +111,7 @@ export class ColumnTypes implements Feature {
   }
 
   /** A cell's value as its column's type compares it, as its looks give it (`value`): the text where it is none of the type's */
-  private valueOf(table: TableModel, column: number, text: string): string {
+  private typedValueOf(table: TableModel, column: number, text: string): string {
     const typed = this.typeOf(table, column);
     if (!typed || text === "") return text;
     // A custom type's method that throws: the text, as its cell shows marked
@@ -345,9 +344,9 @@ export class ColumnTypes implements Feature {
   // ---- the cell editor ------------------------------------------------------------
 
   /** A header is edited as the column's name: its type's hashtag is the menu's business */
-  editorText(info: TableInfo, cell: CellRef, original: string): string | undefined {
-    if (cell.row !== 0 || !columnTypeOf(unescapeCell(original))) return undefined;
-    return unescapeCell(withoutTags(withColumnType(original, undefined)));
+  editorText(info: TableInfo, cell: CellRef, original: ModelCell): string | undefined {
+    if (cell.row !== 0 || !columnTypeOf(original.content)) return undefined;
+    return withColumnType(original.content, undefined);
   }
 
   /** The type of the edited cell's column, if any (header cells have none), and what it reads of its table */
@@ -456,10 +455,10 @@ export class ColumnTypes implements Feature {
    * stays the old one: a column needs a name). A value that is not of the
    * column's type is saved as typed, and said so.
    */
-  editorValue(editor: CellEditor, typed: string): string | undefined {
+  editorValue(editor: CellEditor, typed: string): ModelCell | undefined {
     if (editor.row === 0) {
-      const kept = columnTypeOf(unescapeCell(editor.original));
-      return kept && typed.trim() !== "" ? withColumnType(escapeCell(typed), kept.tag) : undefined;
+      const kept = columnTypeOf(editor.original.content);
+      return kept && typed.trim() !== "" ? { ...editor.original, content: withColumnType(typed, kept.tag) } : undefined;
     }
     const column = this.typeOfEdited(editor);
     const text = typed.trim();

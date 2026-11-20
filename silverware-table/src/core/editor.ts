@@ -4,14 +4,15 @@
 // Ctrl+Alt+arrows move the row or column with the cell, Esc cancels, F2 goes
 // on in the popup. Features shape what it shows and saves (a formula) through
 // the editor hooks of core/feature.ts.
-import { escapeCell, type Table, unescapeCell } from "../markdown.ts";
-import { columnAfterMove, moveColumn, moveRow, setCell } from "../ops.ts";
+import { headerCell, withHeaderText } from "../columns.ts";
+import { type ModelCell, sameCell, type TableModel } from "../model/model.ts";
+import { columnAfterMove, EMPTY_CELL, moveColumn, moveRow, withCellAt } from "../model/ops.ts";
+import { setCell } from "../ops.ts";
 import { appendRowAt, clampColumnMove, clampRowMove } from "../pins.ts";
 import { OUT_OF_LINE_CLASS, UI_CLASS } from "../dom.ts";
 import { type AdapterFeature, type CellField, type CellRef, type FocusTarget, PAGE_ROWS, type RenderedEditor, type TableHost, type WidgetInfo, type WriteResult } from "./feature.ts";
 import { STICKY_GAP } from "./layout.ts";
 import { type Growth, growTo, insertRowWith, MOVE_BLOCKED } from "./structure.ts";
-import { withoutTags } from "../tags.ts";
 import type { TableKey } from "./tables.ts";
 
 // Ctrl+Alt + these keys move the edited cell's row or column
@@ -133,15 +134,15 @@ export class CellEditing {
     // Measured below: in the document (a large table keeps only the rows in view there)
     if (ref.row > 0 && !beyond) this.host.rowNeeded(info, cell.parentElement as HTMLTableRowElement);
     this.context.holdRow(widget, info, ref.row);
-    // The cell as shown: with an edit a feature holds for it (the lazy module)
-    const original = this.host.tableOf(info).rows[ref.row]?.cells[ref.column] ?? "";
-    // The cell's hidden tags are not edited as text: they are kept (tags.ts)
-    const bare = withoutTags(original);
-    // What the field shows: the cell's text, unless a feature shows it otherwise (a formula)
+    // The cell as shown: with an edit a feature holds for it (the lazy module); a header as written, its hashtags with it
+    const shown = this.host.asModel(this.host.tableOf(info));
+    const original = (ref.row === 0 ? headerCell(shown, ref.column) : shown.rows[ref.row - 1]?.cells[ref.column]) ?? EMPTY_CELL;
+    // What the field shows: the cell's content (its attributes are not edited as text: they are kept), unless a
+    // feature shows it otherwise (a formula)
     const initial =
       popup?.initial ??
       this.context.features.reduce<string | undefined>((text, f) => text ?? f.editorText?.(info, ref, original), undefined) ??
-      unescapeCell(bare);
+      original.content;
 
     const cellStyle = cell.getAttribute("style");
     const kept = this.host.doc.createDocumentFragment();
@@ -370,15 +371,15 @@ export class CellEditing {
   }
 
   /** Puts the rendered cell back; returns what was being edited. `reopening`: it opens again at once (in its popup), its table not left */
-  close(reopening = false): (ActiveEditor & { value: string }) | undefined {
+  close(reopening = false): (ActiveEditor & { value: ModelCell }) | undefined {
     const active = this.editor;
     if (!active) return undefined;
     this.editor = undefined;
     for (const feature of this.context.features) feature.editorClosed?.(active);
     // Reopening: nothing is saved, so nothing is made of what is typed (a formula fixed, announced); the caller's
     // to write: as typed
-    let value = reopening || active.place ? active.field.value : this.cellValue(active);
-    if (!reopening && active.row === 0 && withoutTags(value) === "" && active.original !== "") {
+    let value = reopening || active.place ? { ...active.original, content: active.field.value } : this.cellValue(active);
+    if (!reopening && active.row === 0 && value.content.trim() === "" && active.original.content !== "") {
       // SilverBullet would not show a column without a name
       value = active.original;
       this.host.notify("Silverware Table: a column needs a name; the old name was kept", "info");
@@ -396,14 +397,17 @@ export class CellEditing {
   }
 
   /**
-   * The markdown for what the editor holds: the cell as it was when nothing was
-   * changed, what a feature makes of it (a formula), else the text
+   * The cell for what the editor holds: the cell as it was when nothing was
+   * changed, what a feature makes of it (a formula), else the cell with its
+   * content the text, its attributes kept (those bound to the content go: the
+   * rule of an edit, as it is written)
    */
-  private cellValue(active: ActiveEditor): string {
+  private cellValue(active: ActiveEditor): ModelCell {
     const typed = active.field.value;
     if (typed === active.initial) return active.original;
-    const value = this.context.features.reduce<string | undefined>((v, f) => v ?? f.editorValue?.(active, typed), undefined) ?? escapeCell(typed);
-    return this.host.keepTags(value, active.original);
+    const value = this.context.features.reduce<ModelCell | undefined>((v, f) => v ?? f.editorValue?.(active, typed), undefined) ?? { ...active.original, content: typed };
+    // (As the edit leaves it: what a feature holds to write later, the lazy module's, is so too; a header's are its column's)
+    return active.row === 0 ? value : this.host.editedCell(active.original, value);
   }
 
   /**
@@ -423,9 +427,9 @@ export class CellEditing {
     if (!(sameTable && next?.row === closed.row)) this.context.releaseRow();
     let result: WriteResult = "unchanged";
     // The caller's to write (nothing typed: nothing written)
-    if (closed.place && save && closed.value.trim() !== "") result = await closed.place(closed.value);
+    if (closed.place && save && closed.value.content.trim() !== "") result = await closed.place(closed.value.content);
     const growth = closed.growth;
-    if (growth && changed && withoutTags(closed.value) !== "") {
+    if (growth && changed && closed.value.content.trim() !== "") {
       // Past the table: written with the rows and columns that reach it (nothing typed: nothing written). A cell
       // pressed meanwhile (`next`) is edited once the table is rendered anew, where the growth moved it.
       const row = next && sameTable ? growth.rowMap(next.row) : undefined;
@@ -436,7 +440,8 @@ export class CellEditing {
         (t) => {
           const grown = growth.grow(t);
           changedMeanwhile = !grown;
-          return grown && setCell(grown, growth.cell.row, growth.cell.column, closed.value);
+          // (A new cell: as the codec writes it; the table grown is the markdown's until paste writes on the model too)
+          return grown && setCell(grown, growth.cell.row, growth.cell.column, this.host.fromModel(closed.value));
         },
         {
           rowMap: growth.rowMap,
@@ -453,7 +458,9 @@ export class CellEditing {
     const edit = { row: closed.row, column: closed.column, original: closed.original, value: closed.value };
     const held = !growth && !closed.place && !!info && this.context.features.some((f) => f.holdCellEdit?.(info, edit));
     if (changed && !held && !growth && !closed.place) {
-      result = await this.host.write(closed.widget, (t) => this.withCellEdit(t, closed), { focus: sameTable ? next : undefined });
+      // (Its table no longer known: failed, as a write of it would)
+      const target = this.host.infoOf(closed.widget);
+      result = target ? await this.host.writeModel(target, (t) => this.withCellEdit(t, closed), { focus: sameTable ? next : undefined }) : "failed";
     }
     if (next && (result === "unchanged" || !sameTable || closed.place)) {
       // The other table was not re-rendered by this edit unless they share text
@@ -465,12 +472,11 @@ export class CellEditing {
     if (!next && refocus) this.host.focusEditor(closed.widget);
   }
 
-  private withCellEdit(
-    table: Table,
-    edit: { row: number; column: number; original: string; value: string },
-  ): Table | undefined {
-    if ((table.rows[edit.row]?.cells[edit.column] ?? "") !== edit.original) return undefined;
-    return setCell(table, edit.row, edit.column, edit.value);
+  /** The table with a cell's edit, where the cell is still as it was (else undefined: changed meanwhile, nothing written) */
+  private withCellEdit(table: TableModel, edit: { row: number; column: number; original: ModelCell; value: ModelCell }): TableModel | undefined {
+    const current = edit.row === 0 ? headerCell(table, edit.column) : table.rows[edit.row - 1]?.cells[edit.column];
+    if (!current || !sameCell(current, edit.original)) return undefined;
+    return edit.row === 0 ? withHeaderText(table, edit.column, edit.value.content) : withCellAt(table, edit.row, edit.column, edit.value);
   }
 
   /**
@@ -491,7 +497,7 @@ export class CellEditing {
   }
 
   /** The table with the closed editor's value saved, if it changed */
-  withSaved(table: Table, closed: ActiveEditor & { value: string }): Table | undefined {
+  withSaved(table: TableModel, closed: ActiveEditor & { value: ModelCell }): TableModel | undefined {
     return closed.value !== closed.original ? this.withCellEdit(table, closed) : table;
   }
 
@@ -588,8 +594,8 @@ export class CellEditing {
       : clampColumnMove(info.pins, info.columns, from, asked);
     if (to === from) return;
     const closed = this.close()!;
-    await this.host.write(
-      closed.widget,
+    await this.host.writeModel(
+      info,
       (t) => {
         const edited = this.withSaved(t, closed);
         if (!edited) return undefined;

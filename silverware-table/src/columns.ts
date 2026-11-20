@@ -8,7 +8,7 @@
 // header (`<meta core.n='price'>`, names.ts) is named by it instead, so renaming
 // the header changes nothing.
 import { type Align, unescapeCell } from "./markdown.ts";
-import { type Attributes, attributeIn, type ModelColumn, NO_ATTRIBUTES, type TableModel, withAttributeIn } from "./model/model.ts";
+import { type Attributes, attributeIn, type ModelCell, type ModelColumn, NO_ATTRIBUTES, type TableModel, withAttributeIn } from "./model/model.ts";
 import { CORE } from "./metanames.ts";
 import { LINE_NAME_KEY, nameOf } from "./names.ts";
 import { metaTagPattern } from "./tags.ts";
@@ -34,6 +34,20 @@ export const HASHTAGS_KEY = "hashtags";
 export function headerText(column: ModelColumn): string {
   const hashtags = attributeIn(column.attributes, CORE, HASHTAGS_KEY);
   return hashtags ? `${column.header} ${hashtags}` : column.header;
+}
+
+/** A column's header as a cell: its text as written (its hashtags with it), the column's attributes (what a header's editor edits) */
+export function headerCell(model: TableModel, column: number): ModelCell | undefined {
+  const at = model.columns[column];
+  return at && { content: headerText(at), attributes: at.attributes };
+}
+
+/** The table with a column's header written so: its name the text without hashtags, its hashtags the text's */
+export function withHeaderText(model: TableModel, column: number, text: string): TableModel {
+  const at = model.columns[column];
+  if (!at || headerText(at) === text) return model;
+  const made = columnOfHeader(text, at.align, at.attributes);
+  return { ...model, columns: model.columns.map((c, i) => (i === column ? made : c)) };
 }
 
 /** A column of a header as written (its hashtags its attribute), with these attributes besides */

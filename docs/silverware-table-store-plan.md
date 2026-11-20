@@ -626,6 +626,26 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      wholly: a column's type written into its hashtags
      (`host.withColumnHashtags`, a header's text, so no setting), a list's
      values renamed in its cells by their content.
+   - **The cell editor on the model (2026-11-20)**: its cell is a model
+     cell (`CellEditor.original`; a header's is its text as written, its
+     hashtags with it, and the column's attributes: `headerCell`, written
+     back by `withHeaderText`, which splits the name from the hashtags, so
+     a hashtag typed into a header still makes one and the column types'
+     header hooks work on that text as before); `editorText(…, original:
+     ModelCell)`, `editorValue(…): ModelCell` (the formulas' formula set on
+     the cell as it was, so its name stays); a value typed is the cell with
+     its content set, as the edit leaves it (`editedCell`, the rule for one
+     cell, which `withAttributeRules` uses per cell and the core gives as
+     `TableHost.editedCell`), so a value held to write later is right
+     wherever it goes; written by `writeModel`, refused where the cell
+     changed meanwhile (`sameCell`: content and attributes). The lazy
+     module's held edits are model cells (`HeldEdit`, `PendingEdits.apply`
+     on the model); the core puts them into a table read with the rules
+     (`withHeld`: `tableOf` and the write). `takeEditor`'s save and
+     `insertRowWith`'s preparation are on the model. Left on the markdown
+     for paste's commit, next: the cell typed past a table (`growTo`,
+     written through the codec) and paste's change (the editor's value
+     saved on the model of its table).
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

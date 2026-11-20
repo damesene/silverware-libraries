@@ -22,6 +22,17 @@ export type RuledAttribute = { readonly owner: Owner; readonly key: string };
 /** The attributes declared bound to their cell's content, and those unique in a table */
 export type AttributeRules = { readonly boundToContent: readonly RuledAttribute[]; readonly unique: readonly RuledAttribute[] };
 
+/**
+ * A cell as an edit leaves it (`before` the cell as it was, `after` as edited
+ * there): its content changed and its attributes as they were, what is bound to
+ * the content goes; else as edited
+ */
+export function editedCell(before: ModelCell, after: ModelCell, rules: AttributeRules): ModelCell {
+  if (before.content === after.content || before.attributes !== after.attributes) return after;
+  const attributes = without(after.attributes, rules.boundToContent, () => false);
+  return attributes === after.attributes ? after : { ...after, attributes };
+}
+
 /** Where each row and column of the table as edited was before the edit (undefined: the edit made it), of the write's maps */
 function sources(map: IndexMap | undefined, before: number, after: number, from: number): (number | undefined)[] {
   const was: (number | undefined)[] = Array.from({ length: after }, () => undefined);
@@ -71,11 +82,9 @@ export function withAttributeRules(before: TableModel, after: TableModel, rules:
     const rowAttributes = was ? row.attributes : without(row.attributes, rules.unique, fresh);
     const cells = row.cells.map((cell, c): ModelCell => {
       const old = was && columnWas[c] !== undefined ? was.cells[columnWas[c]!] : undefined;
-      let attributes = cell.attributes;
-      // A new cell: no unique attribute another has
-      if (!old) attributes = without(attributes, rules.unique, fresh);
-      // Its content changed, its attributes as they were: what is bound to the content goes
-      else if (old.content !== cell.content && old.attributes === cell.attributes) attributes = without(attributes, rules.boundToContent, () => false);
+      // A new cell: no unique attribute another has; one edited: what is bound to its content as the edit leaves it
+      if (old) return editedCell(old, cell, rules);
+      const attributes = without(cell.attributes, rules.unique, fresh);
       return attributes === cell.attributes ? cell : { ...cell, attributes };
     });
     const same = rowAttributes === row.attributes && cells.every((cell, c) => cell === row.cells[c]);

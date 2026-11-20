@@ -88,6 +88,23 @@ export function attributeChangeOf(attributes: Attributes): AttributeChange | und
   return madeFrom.get(attributes);
 }
 
+/** Whether two sets of attributes hold the same attributes */
+export function sameAttributes(a: Attributes, b: Attributes): boolean {
+  if (a === b) return true;
+  if (a.size !== b.size) return false;
+  for (const [owner, own] of a) {
+    const other = b.get(owner);
+    if (!other || other.size !== own.size) return false;
+    for (const [key, value] of own) if (other.get(key) !== value) return false;
+  }
+  return true;
+}
+
+/** Whether two cells are the same: their content and their attributes */
+export function sameCell(a: ModelCell, b: ModelCell): boolean {
+  return a === b || (a.content === b.content && sameAttributes(a.attributes, b.attributes));
+}
+
 /** Where an attribute is: a column's (`column`), a body row's (`row`, the first 1), a cell's (both); none: the table's */
 export type AttributePlace = { readonly column: number; readonly row?: undefined } | { readonly row: number; readonly column?: number };
 

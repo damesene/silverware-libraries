@@ -3,9 +3,10 @@
 // a function in a page's text (silverware.table.evaluate, an alias of it) as
 // one string literal, in quotes or apostrophes: name("=…") or name('=…'). The
 // library's init page registers the finder made here with the names it calls
-// (formulas/places.ts). A literal with an escape or a line break in it is left
-// out: its text in the page is not the formula, so it could not be written back.
-import type { FormulaPlace, FormulaPlaces } from "../formulas/places.ts";
+// (store/markdown/pageformulas.ts). A literal with an escape or a line break in it
+// is left out: its text in the page is not the formula, so it could not be
+// written back; a text the literal cannot hold so is not written into it.
+import type { FormulaPlace, FormulaPlaces } from "../store/markdown/pageformulas.ts";
 
 /** A text to find as it is in a regular expression */
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -23,6 +24,7 @@ export function luaCallPlaces(...names: unknown[]): FormulaPlaces {
       const formula = match[1] ?? match[2] ?? "";
       // The literal is the end of the match, its closing quote last
       const to = match.index + match[0].length - 1;
-      return { from: to - formula.length, to };
+      const quote = match[1] !== undefined ? '"' : "'";
+      return { from: to - formula.length, to, holds: (text: string) => !text.includes(quote) && !/[\\\r\n]/.test(text) };
     });
 }

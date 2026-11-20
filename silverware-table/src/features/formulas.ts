@@ -26,7 +26,7 @@ import type {
   TableLooks,
   ToolbarButton,
   TableInfo,
-  TextWritten,
+  PageFormula,
   WriteEdit,
   KeyedTable,
   StoredTable,
@@ -91,7 +91,6 @@ import {
 } from "../formulas/index.ts";
 import { cellName, columnChoicesOf, columnIdText, FormulaError, type FormulaErrorAt, functionHelp, type Grid, parseFormula, withEquals } from "../formulas/index.ts";
 import { addAffected, affectedBy, type Elsewhere, isAffected, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../formulas/page.ts";
-import { formulaPlacesIn } from "../formulas/places.ts";
 import { functionNamed } from "../formulas/registry.ts";
 import type { FormulaHelpers } from "../formulafield.ts";
 import { FunctionDialog } from "./functiondialog.ts";
@@ -527,22 +526,21 @@ export class Formulas implements Feature {
   }
 
   /**
-   * Formulas written in the page's text outside its tables (where the host's
-   * finder says, formulas/places.ts): their references to the table follow its
-   * edit, as other tables' formulas do: moved rows and columns, renamed columns,
-   * its new name. Only for the first table of its name, which they read.
+   * The formulas written in the page's text (PageFormula): their
+   * references to the table follow its edit, as other tables' formulas do:
+   * moved rows and columns, renamed columns, its new name. Only for the first
+   * table of its name, which they read.
    */
-  otherTextWritten(before: TableModel, after: TableModel, edit: WriteEdit): readonly TextWritten[] {
+  pageFormulasWritten(before: TableModel, after: TableModel, edit: WriteEdit): readonly PageFormula[] {
     const { page } = edit;
     const oldName = this.nameOf(before)?.toLowerCase();
     if (!oldName || page.tables.find((t) => this.nameOf(t.model)?.toLowerCase() === oldName)?.key !== page.key) return [];
     const following = { cells: this.cells, rowMap: edit.rowMap, columnMap: edit.columnMap, names: { before: this.nameOf(before), after: this.nameOf(after) } };
-    return formulaPlacesIn(page.text).flatMap((place): TextWritten[] => {
-      const written = page.text.slice(place.from, place.to);
+    return page.formulas.flatMap((formula): PageFormula[] => {
       // Its "=" may be left out: read and written back as written
-      const lead = written.trimStart().startsWith("=") ? "" : "=";
-      const followed = followFormula(lead + written, before, after, following).slice(lead.length);
-      return followed === written ? [] : [{ from: place.from, to: place.to, text: followed }];
+      const lead = formula.text.trimStart().startsWith("=") ? "" : "=";
+      const followed = followFormula(lead + formula.text, before, after, following).slice(lead.length);
+      return followed === formula.text ? [] : [{ key: formula.key, text: followed }];
     });
   }
 

@@ -3,13 +3,14 @@
 // state and listeners and works through the host.
 import type { TableKey } from "./tables.ts";
 export type { TableKey } from "./tables.ts";
-export type { StoredTable, TableRevision } from "./store.ts";
+export type { PageFormula, PageFormulaKey, StoredTable, TableRevision } from "./store.ts";
 import type { TableParts } from "./parts.ts";
 export type { PartTable, TablePart, TableParts } from "./parts.ts";
 export { tablePartsOf } from "./parts.ts";
 import type { FeatureName, SETTINGS, SettingValue } from "../bridge.ts";
 import type { TablePlatform } from "./platform.ts";
 import type { AttributePlace, KeyedModel, ModelCell, TableModel } from "../model/model.ts";
+import type { PageFormula } from "./store.ts";
 import type { StoredTable, TableRevision } from "./store.ts";
 import type { Dialog, DialogOptions } from "./dialog.ts";
 import type { Rect } from "./geometry.ts";
@@ -493,10 +494,15 @@ export type ColumnWidths = { readonly widths: ReadonlyMap<number, number>; reado
 
 /**
  * The page a write edits: its tables in order (as the features before have changed them so far), its tables as read
- * for the write, the edited table's key; its text as read, for formulas written outside its tables (until the store
- * keeps such places: docs/silverware-table-store-plan.md, step 4)
+ * for the write, the edited table's key; the formulas written in its text as read (PageFormula: none where the
+ * store keeps none)
  */
-export type WritePage = { readonly text: string; readonly tables: readonly KeyedTable[]; readonly read: readonly KeyedTable[]; readonly key: TableKey };
+export type WritePage = {
+  readonly tables: readonly KeyedTable[];
+  readonly read: readonly KeyedTable[];
+  readonly key: TableKey;
+  readonly formulas: readonly PageFormula[];
+};
 
 /** A table's change, by its key: the table as it is now to the table as written */
 export type TableChange = { readonly key: TableKey; readonly change: (model: TableModel) => TableModel };
@@ -516,9 +522,6 @@ export type OtherPages = {
 
 /** An edit as features' write steps see it: how rows and columns moved, and the page */
 export type WriteEdit = WriteOptions & { readonly page: WritePage };
-
-/** A place of the page's text written anew with a table, in the same edit: its range in the text read and what goes there */
-export type TextWritten = { readonly from: number; readonly to: number; readonly text: string };
 
 /**
  * The places in the toolbar's row of names, in their order, by what they name:
@@ -1223,11 +1226,13 @@ export interface Feature {
    */
   otherTablesWritten?(before: TableModel, after: TableModel | undefined, edit: WriteEdit): readonly KeyedTable[];
   /**
-   * Other places of the page's text, outside its tables, the write changes
-   * too, in the same edit (formulas written in the text, referring to the
-   * edited table); one overlapping a table written is left out
+   * The formulas written in the page's text (`edit.page.formulas`) the write
+   * changes too, in the same edit, each by its key with its text as written
+   * anew (those referring to the edited table). One changed since it was
+   * read, or whose text its place cannot hold, is left as it was, said; one
+   * in a table written in the same edit, as the table is written
    */
-  otherTextWritten?(before: TableModel, after: TableModel, edit: WriteEdit): readonly TextWritten[];
+  pageFormulasWritten?(before: TableModel, after: TableModel, edit: WriteEdit): readonly PageFormula[];
   /** Other pages read for formulas (the pageLinks module) */
   otherPages?(): OtherPages;
   /** SilverBullet indexed a page (it changed) */

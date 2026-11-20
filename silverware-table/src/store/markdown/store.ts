@@ -7,7 +7,8 @@
 import { findTables, parseTable } from "../../markdown.ts";
 import { decode } from "./codec.ts";
 import type { TablePlatform } from "../../core/platform.ts";
-import type { StoredTable, TableRevision, TableStore } from "../../core/store.ts";
+import type { PageFormula, PageFormulaStore, StoredTable, TableRevision, TableStore } from "../../core/store.ts";
+import { pageFormulasIn } from "./pageformulas.ts";
 import type { TableKey, TableRegister } from "../../core/tables.ts";
 
 /** A table's revision in a page: its markdown, which is all its model is made of (the same text, the same model) */
@@ -26,7 +27,7 @@ async function textOf(platform: Pick<TablePlatform, "editor" | "space">, documen
   }
 }
 
-export class MarkdownStore implements TableStore {
+export class MarkdownStore implements TableStore, PageFormulaStore {
   constructor(
     private readonly platform: () => Pick<TablePlatform, "editor" | "space">,
     private readonly register: TableRegister,
@@ -39,6 +40,11 @@ export class MarkdownStore implements TableStore {
 
   documentOf(key: TableKey): string | undefined {
     return this.register.pageOf(key);
+  }
+
+  async pageFormulas(document: string): Promise<readonly PageFormula[] | null> {
+    const text = await textOf(this.platform(), document);
+    return text === undefined ? null : pageFormulasIn(document, text);
   }
 }
 

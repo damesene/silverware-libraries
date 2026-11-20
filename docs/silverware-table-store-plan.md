@@ -351,7 +351,7 @@ Everything that is SilverBullet's and not markdown's, in one place:
 - the history markers (the cursor put outside a table around each write, for
   SilverBullet's undo): the binding's `Editor` places them, as it knows
   the edit's range;
-- the places in Lua calls (host/lua.ts, formulas/places.ts' finding);
+- the places in Lua calls (host/lua.ts; found by store/markdown/pageformulas.ts);
 - the Lua API: `silverware.table.tables(text)`, `onWrite(fn(text))`,
   `evaluate(formula, text, page)`, `evaluateText`, `errors(page)`,
   `errorsText`, the aliases and the `define…` functions, implemented over the
@@ -935,7 +935,10 @@ is done, by what it took.
 - **Step 4's design, ahead of it:**
   7. **Formulas written in a page outside its tables are a store of their
      own, `PageFormulaStore`** (a formula given to `silverware.table.evaluate`
-     or an alias in a page's Space Lua, as one string literal). Weighed
+     or an alias in a page's Space Lua, as one string literal; anywhere in the
+     page's text, a table cell's text too, as before: not a formula cell, and
+     one in a table written in the same edit is written as that table is,
+     the page formula left). Weighed
      against a hook giving the core a rewrite of a formula's text (smaller, but
      a mechanism of one case, write only) and against leaving the module the
      page's text until step 6 (an exception to the isolation): chosen as one

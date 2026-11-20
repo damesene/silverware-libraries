@@ -11,7 +11,7 @@ import { checkedConditions, checkedFormats, customDefinitionsAnew, defineCustomC
 import { customFunctions } from "./formulas/custom.ts";
 import { cellResult, choiceText, type FormulasOffer, functionNamed, givesList, scalarText, withEquals } from "./formulas/index.ts";
 import type { KeyedModel } from "./model/model.ts";
-import { defineFormulaPlaces as defineFormulaPlacesIn, type FormulaPlaces } from "./formulas/places.ts";
+import { defineFormulaPlaces as defineFormulaPlacesIn, type FormulaPlaces } from "./store/markdown/pageformulas.ts";
 import { isError, isRange, type Scalar, single, TimeValue, type Value } from "./formulas/values.ts";
 import { customFunctionsAnew, defineCustomFunctions } from "./formulas/registry.ts";
 import { addWriteListener, type WriteListener, writeListenersAnew } from "./core/writelisteners.ts";

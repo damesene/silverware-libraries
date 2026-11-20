@@ -28,6 +28,7 @@ import { HASHTAGS_KEY, nameEmptyHeaders } from "./columns.ts";
 import { type AttributeRules, cellWrittenOver, withAttributeRules } from "./model/rules.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
+import { pageFormulaPlace, pageFormulasIn } from "./store/markdown/pageformulas.ts";
 import { decode, encode, plainMarkdown } from "./store/markdown/codec.ts";
 import { SettingsDialog } from "./settings.ts";
 import { Metadata } from "./core/metadata.ts";
@@ -593,7 +594,7 @@ export class Controller implements TableHost {
     const keys = this.register.keysOf(this.currentPage, text);
     const tables = ranges.map((range, i): KeyedTable => ({ key: keys[i]!, model: decode(parseTable(range.text)) }));
     const own = ranges.findIndex((range) => range.from === at);
-    return { page: { text, tables, read: tables, key: keys[own]! }, rangeOf: new Map(ranges.map((range, i) => [keys[i]!, range])) };
+    return { page: { tables, read: tables, key: keys[own]!, formulas: pageFormulasIn(this.currentPage, text) }, rangeOf: new Map(ranges.map((range, i) => [keys[i]!, range])) };
   }
 
   /**
@@ -2892,14 +2893,24 @@ export class Controller implements TableHost {
         const read = parseTable(at.text);
         updates.push({ range: at, markdown: serialize(this.withoutNewTags(read, encode(model, read), {}, taken)) });
       }
-      // Places of the text outside the tables written that the features change with them (formulas written there)
+      // The page's formulas in its text that the features change with them (their references to the table)
       const tablesWritten = updates.length;
+      const left: string[] = [];
       for (const feature of this.features) {
-        for (const place of feature.otherTextWritten?.(beforeModel, changedModel, { ...edit, page: pageNow }) ?? []) {
-          const overlaps = updates.some((u) => place.from < u.range.to && place.to > u.range.from);
-          if (overlaps || place.from < 0 || place.to > text.length || place.to < place.from) continue;
-          updates.push({ range: { from: place.from, to: place.to }, markdown: place.text });
+        for (const formula of feature.pageFormulasWritten?.(beforeModel, changedModel, { ...edit, page: pageNow }) ?? []) {
+          const place = pageFormulaPlace(this.currentPage, text, formula);
+          if ("problem" in place) {
+            left.push(place.problem);
+            continue;
+          }
+          // (In a table written with it: as the table is written; two features writing one: the first's)
+          if (updates.some((u) => place.from < u.range.to && place.to > u.range.from)) continue;
+          updates.push({ range: place, markdown: formula.text });
         }
+      }
+      if (left.length) {
+        const which = left.length === 1 ? "a formula" : `${left.length} formulas`;
+        this.notify(`Silverware Table: ${which} written in the page (silverware.table.evaluate) did not follow the table, left as written (${left.join("; ")})`, "info");
       }
       if (columnMap) {
         this.views.set(info.key, remapColumns(this.viewOf(info), columnMap));

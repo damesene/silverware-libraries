@@ -259,10 +259,10 @@ What the core asks; modules never see it (they get tables through the host):
   left: the store reads and writes it through the platform's `space` then). What a
   write needs today of `also`, `otherTablesWritten`, `otherTextWritten`,
   `insertTable`, `deleteTable`, and lazy saving's `writePage`.
-- `places(document)`: content kept outside tables that formulas are in, each
-  by a key of its own, read and written as a cell's content. Which places a
-  document has is told to the store by the binding (the formulas of
-  `silverware.table.evaluate(…)` calls: `defineFormulaPlaces`, as now).
+- The formulas written in a document outside its tables: not this
+  interface's, a store of their own beside it, `PageFormulaStore` (decided
+  2026-11-20, *Decided (2026-11-20)* 7), in place of the `places(document)`
+  first planned here.
 - `reveal(key, cell)`: the cell shown to the user (*Find formula errors*,
   `errorsText`'s links).
 - `InsertPlace`: where a new table goes, opaque (after a table, at the
@@ -792,6 +792,22 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    adapter's, as the rendered table is. The core keeps no provider.
 7. **Docs.** CLAUDE.md (Layout, Architecture), docs/silverware-table-isolation.md
    extended by the store's boundary.
+8. **The whole API and its names, reviewed.** With every layer in its place,
+   the API is gone through whole, the internal and the public alike (*Decided
+   (2026-11-20)*, *Consistency and maintainability before compatibility*):
+   names made consistent (one name for one thing, the same
+   words for the same ideas across the model, the store, the hosts, the
+   hooks, the domains, the Space Lua API, settings, stored attributes, CSS),
+   and each part weighed for whether a change is worth it (two functions doing
+   one thing, a shape that differs from its siblings, a name that says too
+   little or the wrong thing). The internal part is mechanical (the compiler
+   finds every use: a commit per area). The public part (the Space Lua API,
+   the API other plugins use, settings, the attributes stored in tables, CSS
+   classes and variables, `shared/` for the other plugins) is proposed change
+   by change to the user, each a breaking change (`!`, a major version, the
+   changelog saying what to change), stored attributes read in their old names
+   too where tables hold them. Names known to be wrong are fixed in the step
+   that touches them, not left for this one.
 
 Rough size, not measured, **as estimated on 2026-11-06**: step 1 a day or
 two; step 2 the largest by files (about 25), a week or more; step 3 the
@@ -916,6 +932,37 @@ is done, by what it took.
      decision of 2026-11-06 (a column's type an attribute of the column,
      written by the codec as the header's hashtag): the type is in that
      attribute, kept by its owner.
+- **Step 4's design, ahead of it:**
+  7. **Formulas written in a page outside its tables are a store of their
+     own, `PageFormulaStore`** (a formula given to `silverware.table.evaluate`
+     or an alias in a page's Space Lua, as one string literal). Weighed
+     against a hook giving the core a rewrite of a formula's text (smaller, but
+     a mechanism of one case, write only) and against leaving the module the
+     page's text until step 6 (an exception to the isolation): chosen as one
+     mechanism for reading and writing, as tables are, since an MCP server
+     giving an agent feedback on what is wrong (formula errors, and fixing
+     them) is to come, later. A capability beside `TableStore`, not a method
+     of it: the markdown store has it, the memory store, sources and a
+     database have none, and the host gives modules page formulas only where
+     the store does. Each page formula has an address that holds from a read
+     to a write (its document, its order among the page's formulas, its text
+     as read; a write refused where it changed since, as a table's), and is
+     written by a writer of its own, not a cell's: a text the string literal
+     cannot hold (a quote, a line break) is refused with why. The finder of
+     their places (`host/lua.ts`, `defineFormulaPlaces`, its registry now in
+     `formulas/places.ts`) is the binding's; `FormulaPlace` (offsets) the
+     markdown store's alone. The formulas module follows a table's edit in
+     them through that store in the same write, replacing
+     `otherTextWritten`, `TextWritten` and `WritePage.text`. The errors of
+     page formulas (for the MCP server) come with it, later; the interface
+     needs no change for them. Named `PageFormulaStore`, not `PlaceStore`:
+     "place" means a position everywhere else (`InsertPlace`, `FormulaPlace`,
+     `SheetPlace`), and the name says what it holds, beside `pageTables()`.
+- **Consistency and maintainability before compatibility**: the public API
+  (Space Lua, settings, stored attributes, CSS) may change where that makes it
+  consistent and easier to keep; such a change is announced in the changelog
+  with what to change (no known users yet). Reviewed whole at the end
+  (step 8).
 
 ## Decided (2026-11-07, with the user)
 

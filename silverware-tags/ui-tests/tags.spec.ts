@@ -234,7 +234,7 @@ test("the tags' panel: + adds the tag to the page open at once, − of one of it
   await expect(page.locator(".swg-workspace")).toHaveCount(0);
   // Its own now: − in place of +
   const idea = await panelRow(page, "idea");
-  await expect.poll(() => panelOffers(page, idea, "Add to the page open")).toBe(false);
+  await expect.poll(() => panelOffers(page, idea, ["Add to the page open", "Remove from the page open"])).toEqual({ "Add to the page open": false, "Remove from the page open": true });
   await panelAction(page, idea, "Remove from the page open");
   await expect.poll(() => pageText(page, "Recipes/Soup")).toBe("---\ntitle: Soup\n---\nCarrots, onions, salt.\n");
 });

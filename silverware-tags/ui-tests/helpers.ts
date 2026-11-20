@@ -165,11 +165,15 @@ export async function panelRow(page: Page, tag: string): Promise<Locator> {
 // 2.12.1 and the playground draw them as buttons of the row
 const ROW_MENU = ".sb-row-menu-trigger";
 
-/** A panel row's actions shown (the pointer over the row; on SilverBullet's edge its menu opened): where they are, and their role */
-async function rowActions(page: Page, row: Locator): Promise<{ readonly within: Locator; readonly role: "button" | "menuitem" }> {
+/**
+ * A panel row's actions shown (the pointer over the row; on SilverBullet's edge its menu opened): where they are, and
+ * their role. Waits for the row's menu or a button of one of `labels` (not any button: a row may have others).
+ */
+async function rowActions(page: Page, row: Locator, labels: readonly string[]): Promise<{ readonly within: Locator; readonly role: "button" | "menuitem" }> {
   await row.hover();
   const trigger = row.locator(ROW_MENU);
-  await expect(trigger.or(row.getByRole("button")).first()).toBeVisible();
+  const named = new RegExp(labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"));
+  await expect(trigger.or(row.getByRole("button", { name: named })).first()).toBeVisible();
   if (!(await trigger.isVisible())) return { within: row, role: "button" };
   if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click();
   const menu = page.locator(".sb-row-menu");
@@ -179,14 +183,18 @@ async function rowActions(page: Page, row: Locator): Promise<{ readonly within: 
 
 /** One of a panel row's actions run, by its label */
 export async function panelAction(page: Page, row: Locator, label: string): Promise<void> {
-  const { within, role } = await rowActions(page, row);
+  const { within, role } = await rowActions(page, row, [label]);
   await within.getByRole(role, { name: label }).click();
 }
 
-/** Whether a panel row offers an action, by its label; its menu, where it has one, closed again */
-export async function panelOffers(page: Page, row: Locator, label: string): Promise<boolean> {
-  const { within, role } = await rowActions(page, row);
-  const offered = (await within.getByRole(role, { name: label }).count()) > 0;
+/**
+ * Which of `labels` a panel row offers as its actions, each label to whether it does; its menu, where it has one,
+ * closed again. Ask for one it must offer beside one it must not: a row whose buttons are not drawn yet offers none.
+ */
+export async function panelOffers(page: Page, row: Locator, labels: readonly string[]): Promise<Record<string, boolean>> {
+  const { within, role } = await rowActions(page, row, labels);
+  const offered: Record<string, boolean> = {};
+  for (const label of labels) offered[label] = (await within.getByRole(role, { name: label }).count()) > 0;
   if (role === "menuitem") {
     await page.keyboard.press("Escape");
     await expect(within).toHaveCount(0);

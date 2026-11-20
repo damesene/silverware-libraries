@@ -21,7 +21,7 @@ import {
   rowBlockTo,
 } from "../core/structure.ts";
 import { ICONS } from "../icons.ts";
-import type { Align } from "../markdown.ts";
+import type { Align } from "../model/model.ts";
 import type { TableModel } from "../model/model.ts";
 import { type MenuEntry, namingThatCloses, wrapRuns } from "../menu.ts";
 import { withAlign } from "../model/ops.ts";
@@ -776,7 +776,8 @@ export class Grips implements Feature {
     const lines = this.selectedLines(info, axis, line);
     // Cells not changed by hand (a pivot's): the clipboard's bar alone (which then copies), no Clear
     const table = info.model;
-    const cells = axis === "row" ? lines.flatMap((row) => table.align.map((_, column) => ({ row, column }))) : lines.flatMap((column) => table.rows.map((_, row) => ({ row, column })));
+    // (Rows as the markdown's: the header 0, as the model's rows count from 1)
+    const cells = axis === "row" ? lines.flatMap((row) => table.columns.map((_, column) => ({ row, column }))) : lines.flatMap((column) => Array.from({ length: table.rows.length + 1 }, (_, row) => ({ row, column })));
     const fixed = !!this.host.readOnly(table, cells);
     return [...this.section(slot("clipboard")), ...(fixed ? [] : this.section(slot("edit")))];
   }
@@ -823,8 +824,8 @@ export class Grips implements Feature {
     const host = this.host;
     const view = host.viewOf(info);
     const sorted = view.sort?.column === column ? view.sort.direction : undefined;
-    const align = info.model.align[column] ?? "";
-    const edit = (change: (t: TableModel) => TableModel | undefined) => this.runAndClose(() => void host.writeModel(host.tableFor(info.key) ?? info, change));
+    const align = info.model.columns[column]?.align ?? "";
+    const edit = (change: (t: TableModel) => TableModel | undefined) => this.runAndClose(() => void host.writeTable(host.tableFor(info.key) ?? info, change));
     const sortBy = (next: ViewState) => this.runAndClose(() => host.setSort(host.tableFor(info.key) ?? info, next));
     const alignTo = (target: Align) => edit((t) => withAlign(t, column, align === target ? "" : target));
     const act = (run: () => unknown) => this.runAndClose(() => void run());

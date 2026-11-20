@@ -85,9 +85,9 @@ const FORMULAS_OFF: EvaluatedError = { code: "#N/A", detail: "formulas are off" 
  * the formulas module is off. `text`: the page's text (else the editor's),
  * `page` its name (else the page shown).
  */
-/** A text's tables as the formulas take them: each told apart by its key, as the model */
-function modelsOfText(controller: Controller, text: string, page?: string): PageTableModel[] {
-  return controller.tablesOfText(text, page).map((t) => ({ key: t.key, model: controller.asModel(t.model) }));
+/** A text's tables as the formulas take them: each told apart by its key */
+function modelsOfText(controller: Controller, text: string, page?: string): readonly PageTableModel[] {
+  return controller.tablesOfText(text, page);
 }
 
 async function calculated(formula: string, text?: string, page?: string): Promise<{ readonly value: Value; readonly pages: readonly string[] } | undefined> {

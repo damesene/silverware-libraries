@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { insertRowWith } from "../core/structure.ts";
-import { setCell } from "../ops.ts";
+import { NO_ATTRIBUTES } from "../model/model.ts";
+import { insertRow, withContentAt } from "../model/ops.ts";
 import { memorySources } from "../sources.ts";
 import { bridge, cell, cellMenuItem, clickOn, controller, cursorMoves, editor, flashes, flush, key, renderPage, setText, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 
@@ -142,7 +143,7 @@ describe("Pivot tables", () => {
     key(editor.querySelector(".swt-cell-editor")!, "Escape");
     // An edit that would change one (a paste, a key, a feature's) is not written, nor a row added
     const info = controller.shownTables()[1]!;
-    expect(await controller.writeTable(info, (t) => setCell(t, 1, 1, "999"))).toBe("failed");
+    expect(await controller.writeTable(info, (t) => withContentAt(t, 1, 1, "999"))).toBe("failed");
     expect(await insertRowWith(controller, info, 2, 0)).toBe("failed");
     expect(text).toBe(page);
     // Its cell menu: copied, not cut, pasted or cleared
@@ -172,7 +173,7 @@ describe("Pivot tables", () => {
     const under = "| Note |\n|---|\n| x |\n| <meta core.table sheet.name='S' sheet.at='A11'> |";
     await setup(`${source}\n\n${pivot}\n\n${under}\n`, { "silverware.table.metadata": true });
     const info = controller.shownTables()[0]!;
-    await controller.writeTable(info, (t) => ({ ...t, rows: [...t.rows, { cells: ["North", "5"] }] }));
+    await controller.writeTable(info, (t) => insertRow(t, t.rows.length + 1, ["North", "5"].map((content) => ({ content, attributes: NO_ATTRIBUTES }))));
     await controller.scan();
     // The source a row longer: the pivot one lower; the pivot a row longer (North): the note two lower
     expect(text).toContain("sheet.at='A7' pivot.source=");
@@ -349,7 +350,7 @@ describe("Pivot tables", () => {
     it("is not calculated from a second table of its source's name", async () => {
       const copy = ORDERS.replace("| East | 100 |", "| East | 9 |");
       await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n\n${copy}\n`, { "silverware.table.metadata": true });
-      await controller.writeTable(controller.shownTables()[2]!, (t) => setCell(t, 2, 1, "7"));
+      await controller.writeTable(controller.shownTables()[2]!, (t) => withContentAt(t, 2, 1, "7"));
       await controller.scan();
       expect(text).toContain("| East | 120 |\n| West | 50 |\n| Total | 170 |");
     });
@@ -504,7 +505,7 @@ describe("Pivot tables", () => {
 
     it("is not written by an edit of a table of its source's name on this page", async () => {
       await shown(`${ORDERS}\n\n${OTHER("| East | 1 |")}\n`, { Orders: ORDERS.replace("| East | 100 |", "| East | 900 |") });
-      await controller.writeTable(controller.shownTables()[0]!, (t) => setCell(t, 2, 1, "7"));
+      await controller.writeTable(controller.shownTables()[0]!, (t) => withContentAt(t, 2, 1, "7"));
       await controller.scan();
       expect(text).toContain("| East | 1 |");
     });

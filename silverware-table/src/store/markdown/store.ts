@@ -5,6 +5,7 @@
 // of the same text free). For now a façade over that code (the plan's step
 // 2); the codec and the register move in here with step 3.
 import { findTables, parseTable } from "../../markdown.ts";
+import { decode } from "./codec.ts";
 import type { TablePlatform } from "../../core/platform.ts";
 import type { StoredTable, TableRevision, TableStore } from "../../core/store.ts";
 import type { TableKey, TableRegister } from "../../core/tables.ts";
@@ -44,5 +45,5 @@ export class MarkdownStore implements TableStore {
 /** A page's tables in its text, in order, keyed by the register */
 export function tablesIn(register: TableRegister, document: string, text: string): readonly StoredTable[] {
   const keys = register.keysOf(document, text);
-  return findTables(text).map((range) => ({ key: keys[range.ordinal]!, revision: revisionOf(range.text), model: parseTable(range.text) }));
+  return findTables(text).map((range) => ({ key: keys[range.ordinal]!, revision: revisionOf(range.text), model: decode(parseTable(range.text)) }));
 }

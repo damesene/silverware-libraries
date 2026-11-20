@@ -398,7 +398,7 @@ export class AutoFill implements Feature {
   private drag(start: MouseEvent | PointerEvent): void {
     const selected = this.selection();
     if (!selected) return;
-    const table = this.host.asModel(this.host.tableOf(selected.info));
+    const table = this.host.tableOf(selected.info);
     let extent: Extent | undefined;
     this.tipFor = "";
     const finish = (apply: boolean) => {
@@ -456,7 +456,7 @@ export class AutoFill implements Feature {
   private fillDown(): void {
     const selected = this.selection();
     if (!selected) return;
-    const table = this.host.asModel(this.host.tableOf(selected.info));
+    const table = this.host.tableOf(selected.info);
     const columns = table.columns.length;
     const beside = [selected.left - 1, selected.right + 1].filter((c) => c >= 0 && c < columns);
     const last = selected.rowZone[1];
@@ -485,7 +485,7 @@ export class AutoFill implements Feature {
     const area = this.areaOf(selected, extent);
     const corner = (shown: number, column: number): CellRef => ({ row: selected.rows[shown]!, column });
     this.host.selectCells(info, corner(area.top, area.left), corner(area.bottom, area.right));
-    const result = await this.host.writeModel(info, (t) => filled(t, lines, this.fillCells(info)));
+    const result = await this.host.writeTable(info, (t) => filled(t, lines, this.fillCells(info)));
     if (result === "written") return;
     const now = this.host.tableFor(info.key);
     if (now) this.host.selectCells(now, corner(selected.top, selected.left), corner(selected.bottom, selected.right));

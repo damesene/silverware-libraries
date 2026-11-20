@@ -14,10 +14,10 @@
 // table copied with it): formulas elsewhere use the first of them, so each
 // such table's name shows in the danger color in the toolbar, whatever the
 // setting, and it is said once (again once it was not shared meanwhile).
-import { columnIdOf, headsOf } from "../columns.ts";
+import type { TableModel } from "../model/model.ts";
+import { columnIdOf, modelHeads } from "../columns.ts";
 import type { CellLook, CellRef, Feature, HeaderLook, NamingTarget, ModelHost, StoredTable, TableLooks, ToolbarButton, TableInfo } from "../core/feature.ts";
 import { functionNamed } from "../formulas/index.ts";
-import type { Table } from "../markdown.ts";
 import type { MenuNaming } from "../menu.ts";
 import { validateName, sameTableName, validateTableName } from "../namerules.ts";
 
@@ -92,11 +92,11 @@ export class Names implements Feature {
   }
 
   /** Named cells show a mark in their corner, and their name on hover */
-  looks(_info: TableInfo, table: Table): TableLooks | undefined {
+  looks(_info: TableInfo, table: TableModel): TableLooks | undefined {
     const headers: ({ column: number } & HeaderLook)[] = [];
     const cells: (CellRef & CellLook)[] = [];
     // A column's name: the same mark in its header
-    table.rows[0]?.cells.forEach((_, column) => {
+    table.columns.forEach((_, column) => {
       const name = this.host.columnName(table, column);
       if (name) headers.push({ column, marks: ["named"], title: `Column name: ${name}` });
     });
@@ -192,7 +192,7 @@ export class Names implements Feature {
       });
       if (taken) return `another table on this page is named ${name}`;
     }
-    await this.host.writeModel(info, (t) => this.host.withTableName(t, name === "" ? undefined : name));
+    await this.host.writeTable(info, (t) => this.host.withTableName(t, name === "" ? undefined : name));
     this.host.focusPage();
     return undefined;
   }
@@ -209,7 +209,7 @@ export class Names implements Feature {
     if (problem) return problem;
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
     // Renamed where the name is (a column inserted or moved may have taken it out of the first cell)
-    await this.host.writeModel(info, (t) => this.host.withRowName(t, row, name || undefined));
+    await this.host.writeTable(info, (t) => this.host.withRowName(t, row, name || undefined));
     this.host.focusPage();
     return undefined;
   }
@@ -231,7 +231,7 @@ export class Names implements Feature {
     }
     if (problem) return problem;
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
-    await this.host.writeModel(info, (t) => this.host.withCellName(t, row, column, name || undefined));
+    await this.host.writeTable(info, (t) => this.host.withCellName(t, row, column, name || undefined));
     this.host.focusPage();
     return undefined;
   }
@@ -239,7 +239,7 @@ export class Names implements Feature {
   /** Names a column (empty: unnames it); refused, with why, when not valid or another column answers to it */
   private async rename(shownInfo: TableInfo, column: number, name: string): Promise<string | undefined> {
     const table = shownInfo.model;
-    const headers = headsOf(table.rows[0]?.cells ?? []);
+    const headers = modelHeads(table);
     const current = this.host.columnName(table, column) ?? "";
     if (name === current) return this.unchanged();
     const problem = name === "" ? undefined : validateName(name, "column");
@@ -249,7 +249,7 @@ export class Names implements Feature {
       headers.some((_, c) => c !== column && (this.host.columnName(table, c)?.toLowerCase() === name.toLowerCase() || columnIdOf(headers, c)?.name === name.toLowerCase()));
     if (problem || taken) return problem ?? `another column of this table is named ${name}`;
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
-    await this.host.writeModel(info, (t) => this.host.withColumnName(t, column, name || undefined));
+    await this.host.writeTable(info, (t) => this.host.withColumnName(t, column, name || undefined));
     this.host.focusPage();
     return undefined;
   }

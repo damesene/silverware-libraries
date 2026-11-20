@@ -382,7 +382,7 @@ class FilterTable {
     const storable = [...filters.keys()].every((column) => this.host.canStore(table, "condition", { column }));
     // (Nothing it can take and nothing to change: no write, whose step would recalculate every formula for nothing)
     if (this.host.withColumnAttributes(table, "condition", filters) === table) return;
-    const result = await this.host.writeModel(info, (t) => this.host.withColumnAttributes(t, "condition", filters));
+    const result = await this.host.writeTable(info, (t) => this.host.withColumnAttributes(t, "condition", filters));
     // Stored: the table's markdown has them now
     if (result !== "failed" && storable && sameFilters(this.typed ?? [], written)) this.typed = undefined;
   }

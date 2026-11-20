@@ -64,7 +64,7 @@ export class ChoicesDialog {
   /** Opens the dialog for a column: a choice column's, or one to become one (nothing written until Save) */
   open(info: TableInfo, column: number): void {
     const { doc } = this.host;
-    const table = this.host.asModel((this.host.tableFor(info.key) ?? info).model);
+    const table = (this.host.tableFor(info.key) ?? info).model;
     const hashtags = this.host.columnHashtags(table, column);
     const columnName = table.columns[column]?.header ?? "";
     const stored = this.host.attributes(table);
@@ -208,7 +208,7 @@ export class ChoicesDialog {
     const save = () => {
       if (way === "column") {
         this.dialog?.close();
-        void this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => withTypeOf(this.host, t, column, "choice"));
+        void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => withTypeOf(this.host, t, column, "choice"));
         return;
       }
       const name = nameField.value.trim().toLowerCase();
@@ -228,7 +228,7 @@ export class ChoicesDialog {
             )
           : new Map<string, string>();
       this.dialog?.close();
-      void this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => this.written(t, column, was, kept, name, value ?? writeChoiceList(listed), renamed));
+      void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.written(t, column, was, kept, name, value ?? writeChoiceList(listed), renamed));
     };
     const saveButton = el(doc, "button", { class: "swt-dialog-primary", text: "Save", run: save });
     const cancel = el(doc, "button", { class: "swt-dialog-button", text: "Cancel", run: () => this.close() });

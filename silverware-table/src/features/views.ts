@@ -14,7 +14,7 @@ import type { Feature, ModelHost, PageCommand, TableBadge, TableInfo, ToolbarBut
 import { type Calculated, calculatedTable, readRenames, renamedColumns, renamedIn, renamedViewIds, sameCells, storedRenames, viewCalculated } from "../calculated/index.ts";
 import { type CalculatedBy, type CalculatedOffer, followFormula, FormulaError, type FormulasOffer, type Grid, referredTableNames, tokenize, viewGrid, withEquals } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
-import type { Table } from "../markdown.ts";
+import { EMPTY_TABLE } from "../model/ops.ts";
 import type { TableModel } from "../model/model.ts";
 import { freeTableName, sameTableName, validateTableName } from "../namerules.ts";
 import { openViewDialog } from "./viewdialog.ts";
@@ -75,26 +75,26 @@ export class Views implements Feature {
   // ---- what a view is, and whether it is up to date ------------------------------------
 
   /** A view's cells are its formula's: its header alone is the user's (its names) */
-  readOnly(table: Table, cell: { readonly row: number }): string | undefined {
+  readOnly(table: TableModel, cell: { readonly row: number }): string | undefined {
     if (cell.row === 0) return undefined;
-    const formula = this.formulaOf(this.host.asModel(table));
+    const formula = this.formulaOf(table);
     return formula === undefined ? undefined : `this table is a view: its values are its formula's result (${formula}). Change what it reads, or its formula`;
   }
 
   /** A cell of a view edited: its formula is changed in its settings, opened instead */
   editRefused(info: TableInfo, cell: { readonly row: number }): void {
-    if (cell.row > 0 && this.formulaOf(this.host.asModel(info.model)) !== undefined) this.settings(info);
+    if (cell.row > 0 && this.formulaOf(info.model) !== undefined) this.settings(info);
   }
 
   /** A view's rows and columns are its formula's */
-  fixedShape(table: Table): string | undefined {
-    const formula = this.formulaOf(this.host.asModel(table));
+  fixedShape(table: TableModel): string | undefined {
+    const formula = this.formulaOf(table);
     return formula === undefined ? undefined : `this table is a view: its rows and columns are its formula's result (${formula})`;
   }
 
   /** A view shown: whether it is as its formula makes it now; another table shown anew (edited by hand): the views reading it */
   enhanced(info: TableInfo): void {
-    const table = this.host.asModel(info.model);
+    const table = info.model;
     if (this.formulaOf(table) !== undefined) this.check(info);
     else {
       this.stale.delete(info);
@@ -102,7 +102,7 @@ export class Views implements Feature {
       const cells = this.formulas()?.cells;
       if (!name || !cells) return;
       for (const other of this.host.shownTables()) {
-        if (other.key !== info.key && referredTableNames(cells, this.host.asModel(other.model)).has(name)) this.check(other);
+        if (other.key !== info.key && referredTableNames(cells, other.model).has(name)) this.check(other);
       }
     }
     this.host.toolbarChanged();
@@ -116,7 +116,7 @@ export class Views implements Feature {
 
   /** Whether a view shown is as its formula makes it now (nothing written), or why it cannot be calculated */
   private check(info: TableInfo): void {
-    const table = this.host.asModel(info.model);
+    const table = info.model;
     const formula = this.formulaOf(table);
     if (formula === undefined) return void this.stale.delete(info);
     const now = this.formulas()?.calculated(table);
@@ -128,7 +128,7 @@ export class Views implements Feature {
 
   /** What a view is, at a glance; out of date, or not calculated at all, said so */
   tableBadges(info: TableInfo): TableBadge[] {
-    if (this.formulaOf(this.host.asModel(info.model)) === undefined) return [];
+    if (this.formulaOf(info.model) === undefined) return [];
     const what = { icon: ICONS.view, text: "View" };
     const state = this.stale.get(info);
     if (!state) return [what];
@@ -137,7 +137,7 @@ export class Views implements Feature {
 
   /** Insert view… in any table's ⋯ menu; a view's settings and Refresh view in its toolbar, highlighted where it is out of date */
   toolbarButtons(info: TableInfo): ToolbarButton[] {
-    const table = this.host.asModel(info.model);
+    const table = info.model;
     const insert: ToolbarButton = { label: "Insert view…", place: "menu", icon: ICONS.view, title: "A table made by a formula under this one: its rows filtered, sorted, picked…", run: () => this.insert(info) };
     if (this.formulaOf(table) === undefined) return [insert];
     const state = this.stale.get(info);
@@ -151,7 +151,7 @@ export class Views implements Feature {
         attention: !!state,
         title: typeof state === "string" ? state : state ? "Refresh view: it is out of date (what it reads was changed outside Silverware Table)" : "Refresh view (it is up to date)",
         // A write of the view calculates it anew (the formulas module's write step)
-        run: () => void this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => t),
+        run: () => void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => t),
       },
     ];
   }
@@ -163,11 +163,9 @@ export class Views implements Feature {
     return [{ name: "Silverware Table: Insert view", slash: "view", description: "A view at the cursor: a table made by a formula (FILTER, SORT, UNIQUE…)", run: () => this.insertAtCursor() }];
   }
 
-  /** The table to insert: the formula and the name in its metadata row, its body the result */
-  private made(formula: string, name: string, indent: string, result: Grid): Table {
-    const empty: Table = { indent, align: [], rows: [{ cells: [""] }], padded: false };
-    const named = this.host.withTableName(this.host.withAttribute(empty, "formula", formula), name || undefined);
-    return this.host.fromModel(this.written(this.host.asModel(named), result), named);
+  /** The table to insert: its formula and its name, its body the result */
+  private made(formula: string, name: string, result: Grid): TableModel {
+    return this.written(this.host.withTableName(this.host.withAttribute(EMPTY_TABLE, "formula", formula), name || undefined), result);
   }
 
   /** The result of a formula in the dialog, or why there is none (the formulas off, a page not read yet) */
@@ -182,7 +180,7 @@ export class Views implements Feature {
   }
 
   /** Why a name cannot be a view's: no table's name, or another table's of the page (`own`: the view itself) */
-  private validateName(name: string, own?: Table): string | undefined {
+  private validateName(name: string, own?: TableModel): string | undefined {
     const problem = validateTableName(name);
     if (problem) return problem;
     const taken = this.host.pageTables().some(({ model }) => {
@@ -198,13 +196,13 @@ export class Views implements Feature {
   }
 
   /** Why no view can be inserted or saved (its metadata not stored, the formulas off), if so */
-  private blocked(table: Table): string | undefined {
+  private blocked(table: TableModel): string | undefined {
     if (!this.formulas()) return FORMULAS_OFF;
     return this.host.canStore(table, "formula") ? undefined : "A view is kept in its table's metadata: turn on Store table metadata in the settings";
   }
 
   /** The dialog, its preview calculated as a write would calculate the view */
-  private dialog(formula: string, name: string, submitLabel: string, preview: (formula: string) => Grid | string, submit: (formula: string, name: string) => void, blocked: string | undefined, own?: Table, naming?: (formula: string) => string | undefined): void {
+  private dialog(formula: string, name: string, submitLabel: string, preview: (formula: string) => Grid | string, submit: (formula: string, name: string) => void, blocked: string | undefined, own?: TableModel, naming?: (formula: string) => string | undefined): void {
     const formulas = this.formulas();
     openViewDialog(this.host, {
       formula,
@@ -231,16 +229,15 @@ export class Views implements Feature {
     const own = this.host.tableName(table)?.trim();
     const source = own ?? this.freeName("table");
     // A table to be named so: the view's formula reads it as it will be written
-    const replace = own ? undefined : { key: info.key, table: this.host.asModel(this.host.withTableName(table, source)) };
+    const replace = own ? undefined : { key: info.key, table: this.host.withTableName(table, source) };
     const naming = (formula: string) => !own && tokenize(formula).tokens.some((t) => t.kind === "table" && t.page === undefined && sameTableName(t.name, source));
     const preview = (formula: string) => this.result(formula, undefined, naming(formula) ? replace : undefined);
-    const empty: Table = { indent: table.indent, align: [], rows: [{ cells: [""] }], padded: false };
     this.dialog(`=${source}![#Data]`, this.freeName("view"), "Insert", preview, (formula, name) => {
       const result = preview(formula);
       if (typeof result === "string") return this.host.notify(`Silverware Table: ${result}`, "error");
-      const made = this.made(withEquals(formula).formula, name, table.indent, result);
+      const made = this.made(withEquals(formula).formula, name, result);
       void this.host.insertTable(made, info, naming(formula) ? { key: info.key, change: (t) => this.host.withTableName(t, source) } : undefined);
-    }, this.blocked(empty), undefined, (formula) => (naming(formula) ? source : undefined));
+    }, this.blocked(EMPTY_TABLE), undefined, (formula) => (naming(formula) ? source : undefined));
   }
 
   /** Insert view at the cursor: the page's first named table's body to start from, else an empty formula */
@@ -249,29 +246,27 @@ export class Views implements Feature {
       .pageTables()
       .map(({ model }) => this.host.tableName(model)?.trim())
       .find((name): name is string => !!name);
-    const empty: Table = { indent: "", align: [], rows: [{ cells: [""] }], padded: false };
     const preview = (formula: string) => this.result(formula);
     this.dialog(first ? `=${first}![#Data]` : "", this.freeName("view"), "Insert", preview, (formula, name) => {
       const result = preview(formula);
       if (typeof result === "string") return this.host.notify(`Silverware Table: ${result}`, "error");
-      const made = this.made(withEquals(formula).formula, name, "", result);
+      const made = this.made(withEquals(formula).formula, name, result);
       // The cursor as it is now: the editor moved it with any edit made while the dialog was open
       void (async () => {
         const position = await this.host.cursorNow();
         // (No cursor: the page's end)
         await this.host.insertTable(made, position === undefined ? undefined : { position });
       })();
-    }, this.blocked(empty));
+    }, this.blocked(EMPTY_TABLE));
   }
 
   /** View settings…: the view's formula and name in the dialog, saved into its metadata row (the write calculates it) */
   private settings(info: TableInfo): void {
     const table = info.model;
-    const model = this.host.asModel(table);
-    const formula = this.formulaOf(model);
+    const formula = this.formulaOf(table);
     if (formula === undefined) return;
-    this.dialog(formula, this.host.tableName(table) ?? "", "Save", (f) => this.result(f, model), (changed, name) => {
-      void this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => this.host.withTableName(this.host.withAttribute(t, "formula", withEquals(changed).formula), name || undefined));
+    this.dialog(formula, this.host.tableName(table) ?? "", "Save", (f) => this.result(f, table), (changed, name) => {
+      void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.host.withTableName(this.host.withAttribute(t, "formula", withEquals(changed).formula), name || undefined));
     }, this.blocked(table), table);
   }
 }

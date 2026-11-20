@@ -197,10 +197,11 @@ export function encodeCell(cell: ModelCell): string {
   return cellMarkdown(cell.content, cell.attributes, () => true);
 }
 
-/** The table's header and `rows` (its rows, the first 1, in that order) as plain markdown: no hidden tags, no metadata row */
-export function plainMarkdown(table: Table, rows: readonly number[]): string {
-  const plain = (row: number) => ({ cells: (table.rows[row]?.cells ?? []).map(withoutTags) });
-  return serializeTable({ indent: "", align: table.align, padded: table.padded, rows: [plain(0), ...rows.map(plain)] });
+/** A table's header and `rows` (its rows, the first 1, in that order) as plain markdown: no attribute, no metadata row */
+export function plainMarkdown(model: TableModel, rows: readonly number[]): string {
+  const header = { cells: model.columns.map((column) => escapeCell(headerText(column))) };
+  const body = rows.map((row) => ({ cells: (model.rows[row - 1]?.cells ?? []).map((cell) => escapeCell(cell.content)) }));
+  return serializeTable({ indent: "", align: model.columns.map((column) => column.align), padded: false, rows: [header, ...body] });
 }
 
 /**

@@ -49,11 +49,10 @@ import {
   moveRowsTo,
   rowBlockTo,
 } from "../core/structure.ts";
-import { lineAfterBlockMove } from "../ops.ts";
+import { lineAfterBlockMove } from "../model/ops.ts";
 import { columnLetters } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import type { MenuEntry } from "../menu.ts";
-import { withoutTags } from "../tags.ts";
 import type { TableModel } from "../model/model.ts";
 import { EMPTY_CELL, withCellAt } from "../model/ops.ts";
 import type { TableKey } from "../core/feature.ts";
@@ -1050,14 +1049,16 @@ export class Selection implements Feature {
     const { info } = area;
     const refs = this.refs();
     const table = info.model;
-    const empty = (row: number, column: number) => withoutTags(table.rows[row]?.cells[column] ?? "") === "";
+    const empty = (row: number, column: number) => (row === 0 ? table.columns[column]?.header : table.rows[row - 1]?.cells[column]?.content)?.trim() === "";
     const rows = [...new Set(refs.map((ref) => ref.row))];
     const columns = [...new Set(refs.map((ref) => ref.column))];
     const body = rows.filter((row) => row > 0);
     const wholeRows = columns.length === info.columns && body.length > 0;
     const wholeColumns = rows.includes(0) && rows.length === this.host.shownOrder(info).length;
     // Every row's cells, also the rows a filter hides: their data would go too
-    if (wholeColumns && columns.length === info.columns && table.rows.every((r, row) => row === 0 || r.cells.every((_, column) => empty(row, column)))) {
+    // (Body rows from 1, as the markdown's: the model's row r is rows[r - 1])
+    const bodyRows = Array.from({ length: table.rows.length }, (_, i) => i + 1);
+    if (wholeColumns && columns.length === info.columns && bodyRows.every((row) => table.columns.every((_, column) => empty(row, column)))) {
       this.clear();
       // Laid out on a grid (the sheet): its cell where the table was selected, the keyboard going on from there
       const frame = this.host.addressFrame(info);
@@ -1071,7 +1072,7 @@ export class Selection implements Feature {
       return;
     }
     // Every row's cell, also the rows a filter hides: their data would go too
-    if (wholeColumns && !wholeRows && columns.every((column) => table.rows.every((_, row) => row === 0 || empty(row, column)))) {
+    if (wholeColumns && !wholeRows && columns.every((column) => bodyRows.every((row) => empty(row, column)))) {
       this.clear();
       await deleteColumnsAt(this.host, info, columns);
       return;
@@ -1100,7 +1101,7 @@ export class Selection implements Feature {
       const cell = table.rows[ref.row - 1]?.cells[ref.column];
       return cell ? withCellAt(table, ref.row, ref.column, this.host.cellWrittenOver(EMPTY_CELL, cell)) : table;
     };
-    await this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => refs.reduce(emptied, t));
+    await this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => refs.reduce(emptied, t));
   }
 
   /**

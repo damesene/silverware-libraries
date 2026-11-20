@@ -13,9 +13,9 @@
 // as the table is rendered (its metadata as rendered, before the browser lays
 // it out), so a table rendered anew after an edit does not show SilverBullet's
 // look for a moment; once its markdown is read, again from it.
+import type { TableModel } from "../model/model.ts";
 import type { Feature, ModelHost, TableLook, TablePreview, ToolbarButton, TableInfo } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
-import type { Table } from "../markdown.ts";
 import type { MenuDetail, MenuEntry } from "../menu.ts";
 
 type MenuItem = Extract<MenuEntry, { readonly kind: "item" }>;
@@ -41,17 +41,17 @@ export class Themes implements Feature {
   }
 
   /** A table's own theme, from its metadata row, if it chose one */
-  private ownTheme(table: Table): string | undefined {
+  private ownTheme(table: TableModel): string | undefined {
     return themeName(this.host.attribute(table, "name"));
   }
 
   /** A table's own stripes (none, rows, columns), from its metadata row, if it chose them */
-  private ownStripes(table: Table): Stripes | undefined {
+  private ownStripes(table: TableModel): Stripes | undefined {
     return stripesName(this.host.attribute(table, "stripes"));
   }
 
   /** The table's own theme and stripes (its metadata row), else the settings'; native and rows are SilverBullet's own look: no attribute */
-  tableLook(table: Table): TableLook {
+  tableLook(table: TableModel): TableLook {
     const theme = this.ownTheme(table) ?? this.theme;
     const stripes = this.ownStripes(table) ?? this.stripes;
     return { theme: theme === NATIVE_THEME ? undefined : theme, stripes: stripes === "rows" ? undefined : stripes };
@@ -144,7 +144,7 @@ export class Themes implements Feature {
   /** The table's own choices written into its metadata row, as one edit (undefined: the setting's again) */
   private async choose(shownInfo: TableInfo, choices: Readonly<Record<string, string | undefined>>): Promise<void> {
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
-    await this.host.writeModel(info, (table) => Object.entries(choices).reduce((t, [key, value]) => this.host.withAttribute(t, key, value), table));
+    await this.host.writeTable(info, (table) => Object.entries(choices).reduce((t, [key, value]) => this.host.withAttribute(t, key, value), table));
     this.host.focusPage();
   }
 }

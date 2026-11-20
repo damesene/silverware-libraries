@@ -134,7 +134,7 @@ export class CellEditing {
     if (ref.row > 0 && !beyond) this.host.rowNeeded(info, cell.parentElement as HTMLTableRowElement);
     this.context.holdRow(widget, info, ref.row);
     // The cell as shown: with an edit a feature holds for it (the lazy module); a header as written, its hashtags with it
-    const shown = this.host.asModel(this.host.tableOf(info));
+    const shown = this.host.tableOf(info);
     const original = (ref.row === 0 ? headerCell(shown, ref.column) : shown.rows[ref.row - 1]?.cells[ref.column]) ?? EMPTY_CELL;
     // What the field shows: the cell's content (its attributes are not edited as text: they are kept), unless a
     // feature shows it otherwise (a formula)
@@ -438,7 +438,7 @@ export class CellEditing {
       const target = this.host.infoOf(closed.widget);
       result = !target
         ? "failed"
-        : await this.host.writeModel(
+        : await this.host.writeTable(
         target,
         (t) => {
           const grown = growth.grow(t);
@@ -465,7 +465,7 @@ export class CellEditing {
     if (changed && !held && !growth && !closed.place) {
       // (Its table no longer known: failed, as a write of it would)
       const target = this.host.infoOf(closed.widget);
-      result = target ? await this.host.writeModel(target, (t) => this.withCellEdit(t, closed), { focus: sameTable ? next : undefined }) : "failed";
+      result = target ? await this.host.writeTable(target, (t) => this.withCellEdit(t, closed), { focus: sameTable ? next : undefined }) : "failed";
     }
     if (next && (result === "unchanged" || !sameTable || closed.place)) {
       // The other table was not re-rendered by this edit unless they share text
@@ -599,7 +599,7 @@ export class CellEditing {
       : clampColumnMove(info.pins, info.columns, from, asked);
     if (to === from) return;
     const closed = this.close()!;
-    await this.host.writeModel(
+    await this.host.writeTable(
       info,
       (t) => {
         const edited = this.withSaved(t, closed);

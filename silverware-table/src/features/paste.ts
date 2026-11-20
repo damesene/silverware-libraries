@@ -364,7 +364,7 @@ export class Paste implements Feature {
 
   private startCut(info: TableInfo, cells: CellRef[][], text: string, moves: boolean): void {
     const table = this.host.tableOf(info);
-    const held = cells.map((row) => row.map((ref) => table.rows[ref.row]?.cells[ref.column] ?? ""));
+    const held = cells.map((row) => row.map((ref) => table.rows[ref.row - 1]?.cells[ref.column]?.content ?? ""));
     this.cut = { moves, key: info.key, shape: this.shapeOf(table), cells, held, text: sameText(text) };
     this.markCut(info);
   }
@@ -386,12 +386,12 @@ export class Paste implements Feature {
     const table = this.host.tableOf(info);
     // Rows or columns added or deleted: the cells are not where they were (one of the same value would be taken for them)
     if (this.shapeOf(table) !== cut.shape) return undefined;
-    const same = cut.cells.every((row, i) => row.every((ref, j) => (table.rows[ref.row]?.cells[ref.column] ?? "") === cut.held[i]![j]));
+    const same = cut.cells.every((row, i) => row.every((ref, j) => (table.rows[ref.row - 1]?.cells[ref.column]?.content ?? "") === cut.held[i]![j]));
     return same ? cut : undefined;
   }
 
   private shapeOf(table: ReturnType<ModelHost["tableOf"]>): string {
-    return `${table.rows.length}×${table.align.length}`;
+    return `${table.rows.length}×${table.columns.length}`;
   }
 
   /** The cells copied or cut outlined, dashed, as a spreadsheet marks them */
@@ -499,7 +499,7 @@ export class Paste implements Feature {
     }
     // A cell past the table (the sheet view's empty cell): the table grown to it first, in the same edit
     const growth = at.row >= info.rows || at.column >= info.columns ? growTo(info, at) : undefined;
-    const source = this.host.asModel(info.model);
+    const source = info.model;
     const base = growth ? growth.grow(source) : source;
     if (!base) return;
     const plan = planPaste(base, info.pins, growth ? growth.cell : at, cut ? cut.held : data, insert);
@@ -510,7 +510,7 @@ export class Paste implements Feature {
     const closed = fromEditor ? this.host.takeEditor() : undefined;
     let skipped: ReadonlyMap<string, number> = new Map();
     const { newRows, newColumns } = plan;
-    const result = await this.host.writeModel(
+    const result = await this.host.writeTable(
       info,
       (t) => {
         const saved = closed ? closed.save(t) : t;

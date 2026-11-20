@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { setCell } from "../ops.ts";
+import { withContentAt } from "../model/ops.ts";
 import { cell, clickOn, controller, cursorMoves, editor, edits, flashes, flush, key, renderPage, setText, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 import { PREVIEW_DELAY_MS } from "./viewdialog.ts";
 
@@ -118,7 +118,7 @@ describe("Views", () => {
     expect(editor.querySelector(".swt-cell-editor")).toBeNull();
     expect(flashes.at(-1)).toContain("is a view");
     const info = controller.shownTables()[1]!;
-    expect(await controller.writeTable(info, (t) => setCell(t, 1, 0, "zed"))).toBe("failed");
+    expect(await controller.writeTable(info, (t) => withContentAt(t, 1, 0, "zed"))).toBe("failed");
     expect(text).toBe(page);
   });
 

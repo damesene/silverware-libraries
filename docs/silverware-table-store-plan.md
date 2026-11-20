@@ -79,7 +79,7 @@ What the design below follows, and what decides a case it does not name:
    *Layers*): domains import the model; modules import the model, domains
    (through their index) and the core's interfaces (`core/feature.ts`:
    `ModelHost`, the hooks); **the core imports no module** (the controller's
-   own `features/metadata.ts` the one exception, as now), the modules being
+   own Remove metadata, `core/metadata.ts` since step 3), the modules being
    put together by `modules.ts`; stores implement the core's `TableStore`
    and import the model and the platform; host bindings import all of it and
    put it together. Nothing imports a binding. `isolation.test.ts` checks it
@@ -669,6 +669,30 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      no model expresses: they become the markdown store's in step 4;
      `insertTable` and `TableChange` (`also`, `replaceTables`) move with the
      hooks in 4d, where `writeTable` takes `writeModel`'s place.
+   - **4d, the hooks and the host on the model (2026-11-20)**: `TableInfo.model`,
+     the page's tables (`StoredTable`, `KeyedTable`: one with the formulas'
+     `PageTableModel`), `tableOf`, `TableChange`, `insertTable` and every hook
+     (`looks`, `tableLook`, `readOnly`, `fixedShape`, `prepareEdit`,
+     `writeStep`, `refusesWrite`, `otherTablesWritten`, `otherTextWritten`)
+     take and give `TableModel`; `writeTable` changes the model, the rules
+     applied (`writeModel` gone into it). The core keeps its markdown inside
+     the write (its own steps: columns' attributes following, the setting's
+     check, formatting) and converts once where the hooks see the tables; a
+     new table is written as one, indented as the table it goes after. Remove
+     metadata works on the markdown's form (the metadata row and every hidden
+     tag, those of no column too), which no model expresses: it is the core's
+     (`core/metadata.ts`, from `features/`), writing through
+     `TableHost.writeMarkdown` and `replaceMarkdown`, the core's and the
+     adapter's alone, until the markdown store does it (step 4). The sheet's
+     domain is on the model (`SheetPlace.table`, rows counted with the
+     header); reading a page's text for the board is the adapter's
+     (`sheetTablesIn`). Copy as Markdown is the codec's of the model
+     (`plainMarkdown`). Two errors of the conversion the compiler could not
+     see (a model's rows indexed as the markdown's, a cell compared with
+     text) were found by the tests and fixed, and every such index checked
+     by hand. `isolation.test.ts`: no module imports the markdown's form
+     (markdown.ts, tags.ts, ops.ts), the sources module alone until a source
+     is a store of its own (step 5).
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

@@ -13,7 +13,6 @@
 // right above the table), and the mouseup and click ending a press that inserted are
 // swallowed: the table rendered anew puts something else under the pointer (a
 // link the click would follow).
-import { parseTable } from "../markdown.ts";
 import { ICONS } from "../icons.ts";
 import { inTextLine, renderedTable, WIDGET_SELECTOR } from "../dom.ts";
 import { coveredAt, underWindow } from "./overwindow.ts";
@@ -210,7 +209,7 @@ export class InsertControls {
     const info = widget && host.infoOf(widget);
     if (e.pointerType === "touch" || e.buttons !== 0 || !widget || !info || renderedTable(widget) !== info.table) return this.hide();
     // Rows and columns that come from a calculation (a pivot's): none inserted
-    if (host.fixedShape(parseTable(info.source))) return this.hide();
+    if (host.fixedShape(info.model)) return this.hide();
     if (e.target instanceof Node && this.mark.contains(e.target)) return true;
     if (e.target instanceof Node && host.isFloating(e.target)) return this.hide();
     // Over another table (it is hovered next), or over what is laid over the window above this one (the sheet's board)
@@ -327,7 +326,7 @@ export class InsertControls {
     const info = widget && host.infoOf(widget);
     // A table under what is over the window (its cell still selected): out of sight
     if (!widget || !info || underWindow(widget)) return undefined;
-    if (renderedTable(widget) !== info.table || host.fixedShape(parseTable(info.source))) return undefined;
+    if (renderedTable(widget) !== info.table || host.fixedShape(info.model)) return undefined;
     return { widget, info };
   }
 

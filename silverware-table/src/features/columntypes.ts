@@ -9,7 +9,6 @@ import { type CellEditor, type CellLook, type CellRef, type Feature, HEADER_ICON
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget, StoredTable } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
 import type { MenuDetail, MenuEntry } from "../menu.ts";
-import { type Table, unescapeCell } from "../markdown.ts";
 import type { ModelCell, TableModel } from "../model/model.ts";
 import {
   type Choice,
@@ -200,8 +199,8 @@ export class ColumnTypes implements Feature {
   }
 
   /** The formulas of a table's choice lists (none where it has no list made by one) */
-  private listFormulas(table: Table): readonly string[] {
-    return this.held(this.host.asModel(table))?.formulas ?? [];
+  private listFormulas(table: TableModel): readonly string[] {
+    return this.held(table)?.formulas ?? [];
   }
 
   /**
@@ -230,9 +229,9 @@ export class ColumnTypes implements Feature {
   /** "Type: …" in a column's menu (what the column is): picks the column's type, written as a hashtag in its header */
   lineMenu(info: TableInfo, { axis, at: column }: LineMenuTarget, menu: LineMenuBuilder): LineMenuGroup[] {
     if (axis !== "column") return [];
-    const table = this.host.asModel(info.model);
+    const table = info.model;
     const current = this.typeOf(table, column);
-    const setType = (tag: string | undefined) => () => void this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => withTypeOf(this.host, t, column, tag));
+    const setType = (tag: string | undefined) => () => void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => withTypeOf(this.host, t, column, tag));
     const choices: MenuEntry[] = [
       { kind: "item", label: "No type", icon: ICONS.clear, checked: !current, run: setType(undefined) },
       { kind: "separator" },
@@ -295,7 +294,7 @@ export class ColumnTypes implements Feature {
     });
     const taken = choiceListOf(this.host.columnHashtags(table, column));
     // The list taken for the column: its header naming it
-    const take = (name: string) => () => void this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => withTypeOf(this.host, t, column, `choice-${name}`));
+    const take = (name: string) => () => void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => withTypeOf(this.host, t, column, `choice-${name}`));
     const stored = this.host.attributes(table);
     return listNames(stored).map((name): MenuEntry => {
       const used = users.get(name);
@@ -332,7 +331,7 @@ export class ColumnTypes implements Feature {
       const columns = used.length === 1 ? `the column ${used[0]}` : `the columns ${used.join(", ")}`;
       if (!(await this.host.ask(`Delete the list ${name}? ${columns[0]!.toUpperCase()}${columns.slice(1)} take${used.length === 1 ? "s" : ""} it and will have no type; the cells stay as written.`))) return;
     }
-    void this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => {
+    void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => {
       let table = this.host.withAttribute(t, listKey(name), undefined);
       table.columns.forEach((_, c) => {
         if (choiceListOf(this.host.columnHashtags(table, c)) === name) table = withTypeOf(this.host, table, c, undefined);
@@ -353,7 +352,7 @@ export class ColumnTypes implements Feature {
   private typeOfEdited(editor: CellEditor): (TypedColumn & { readonly table: TypeTable }) | undefined {
     if (editor.row === 0) return undefined;
     const shown = this.host.tableFor(editor.key);
-    const table = shown && this.host.asModel(shown.model);
+    const table = shown && shown.model;
     const typed = table && this.typeOf(table, editor.column);
     return typed && table && { ...typed, table: this.typeTable(table, editor.column) };
   }
@@ -470,7 +469,7 @@ export class ColumnTypes implements Feature {
 
   // A header renamed by a paste keeps its type's hashtag, as one renamed in its editor
   headerRenamed(name: string, original: string): string | undefined {
-    const kept = columnTypeOf(unescapeCell(original));
+    const kept = columnTypeOf(original);
     return kept && name.trim() !== "" ? withColumnType(name, kept.tag) : undefined;
   }
 
@@ -479,8 +478,7 @@ export class ColumnTypes implements Feature {
    * after its name; its cells shown as the type formats them (their value for
    * sorting the type's), those that are not values of the type marked with why
    */
-  looks(info: TableInfo, markdown: Table): TableLooks | undefined {
-    const table = this.host.asModel(markdown);
+  looks(info: TableInfo, table: TableModel): TableLooks | undefined {
     const headers: ({ column: number } & HeaderLook)[] = [];
     const cells: (CellRef & CellLook)[] = [];
     table.columns.forEach((_, column) => {

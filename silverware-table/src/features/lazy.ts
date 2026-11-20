@@ -12,7 +12,6 @@
 // browser asks whether to leave.
 import { type CellEditor, type Feature, type HeldEdit, type ModelHost, type PartTable, type PendingEdits, type TableInfo, type TableKey, type TableLooks, tablePartsOf, type ToolbarButton } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
-import type { Table } from "../markdown.ts";
 import { sameCell, type TableModel } from "../model/model.ts";
 import { withCellAt } from "../model/ops.ts";
 
@@ -187,7 +186,7 @@ class LazyTable {
     // Not rendered (scrolled far out of view): written once it is (enhanced), or when the page is left;
     // a cell opened meanwhile: written once it closes (a write now would render the table anew under it)
     if (!target || this.host.editing) return false;
-    return (await this.host.writeModel(target, (table) => table)) === "written";
+    return (await this.host.writeTable(target, (table) => table)) === "written";
   }
 
   /** The page left: what was held for it is written into its file (SilverBullet saved it before loading the other) */
@@ -197,10 +196,10 @@ class LazyTable {
     try {
       let skipped = 0;
       // (The page's table read into the model, the cells held put in, written back as read where they are not)
-      const change = (table: Table) => {
-        const applied = applyEdits(this.host.asModel(table), [...held.edits.values()]);
+      const change = (table: TableModel) => {
+        const applied = applyEdits(table, [...held.edits.values()]);
         skipped = applied.skipped;
-        return this.host.fromModel(applied.table, table);
+        return applied.table;
       };
       // Its table there by its key
       if ((await this.host.replaceTables(held.page, [{ key: held.key, change }])) === "failed") return lost();

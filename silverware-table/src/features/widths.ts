@@ -29,10 +29,10 @@
 // the table moving as it gets narrower, cannot feed back into them. The widths
 // are the module's (columnWidths); the core shows them, and the handles (a
 // handle layer per table, as every table's headers have them).
+import type { TableModel } from "../model/model.ts";
 import type { ColumnsMeasure, ColumnWidths, Feature, HandleLayer, LineMenuBuilder, LineMenuGroup, LineMenuTarget, ModelHost, PartTable, TableInfo, TableKey, TableRevision, ToolbarButton, WriteEdit } from "../core/feature.ts";
 import { tablePartsOf } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
-import type { Table } from "../markdown.ts";
 
 // The narrowest a column can be dragged to, in pixels
 const MIN_WIDTH = 80;
@@ -237,7 +237,7 @@ class TableWidths {
     const stored = [...set.keys()].filter((column) => set.get(column) === undefined || this.host.canStore(table, "size", { column }));
     const boxStored = box === undefined || this.host.canStore(table, BOX_KEY);
     if (!stored.length && !boxStored) return;
-    const result = await this.host.writeModel(info, (t) => {
+    const result = await this.host.writeTable(info, (t) => {
       const widths = this.host.columnAttributes(t, "size");
       for (const [column, width] of set) {
         if (width === undefined) widths.delete(column);
@@ -342,9 +342,9 @@ export class Widths implements Feature {
   }
 
   /** Columns added or deleted in a table with a width for every column: every column has one after (widthsAfterEdit) */
-  writeStep(before: Table, after: Table, edit: WriteEdit): Table {
-    const columns = after.rows[0]?.cells.length ?? 0;
-    const count = before.rows[0]?.cells.length ?? 0;
+  writeStep(before: TableModel, after: TableModel, edit: WriteEdit): TableModel {
+    const columns = after.columns.length;
+    const count = before.columns.length;
     if (columns === count || !count || !columns) return after;
     const sizes = this.host.columnAttributes(before, "size");
     if (sizes.size !== count) return after;

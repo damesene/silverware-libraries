@@ -99,7 +99,6 @@ import { ResultView } from "./resultview.ts";
 import { el } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
 import type { SourcesOffer } from "../sources.ts";
-import { sameTable, type Table } from "../markdown.ts";
 import { type ModelCell, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
 import { EMPTY_CELL, insertColumn, withCellAt, withHeader } from "../model/ops.ts";
 import { sameTableName } from "../namerules.ts";
@@ -245,8 +244,6 @@ export class Formulas implements Feature {
 
   // The cells as the formulas read and write them (a formula's attribute, the names of rows and cells): what the domain is given
   private readonly cells: FormulaCells;
-  // The models of a list of tables the host gave (the page's, another page's), made once for the list
-  private readonly models = new WeakMap<readonly KeyedTable[], readonly PageTableModel[]>();
 
   constructor(private readonly host: ModelHost) {
     this.formulaHint = host.panel("swt-formula-hint");
@@ -356,7 +353,7 @@ export class Formulas implements Feature {
   /** A view's formula calculated on the page shown (the view module's dialog and its staleness): see FormulasOffer.view */
   private viewOf(formula: string, table: TableModel | undefined, replace: { readonly key: string; readonly table: TableModel } | undefined): Grid | FormulaError | undefined {
     const tables = replace
-      ? pageTables(this.cells, () => this.named(this.pageModels()), this.host.currentPage, { key: replace.key, table: replace.table, name: this.nameOf(replace.table) }, this.elsewhere())
+      ? pageTables(this.cells, () => this.named(this.host.pageTables()), this.host.currentPage, { key: replace.key, table: replace.table, name: this.nameOf(replace.table) }, this.elsewhere())
       : this.tableSource();
     // A view to be inserted: a table of its own it has none (A1, [x] alone read nothing)
     const own = table ?? { columns: [], rows: [], attributes: NO_ATTRIBUTES };
@@ -382,7 +379,7 @@ export class Formulas implements Feature {
     return {
       complete: (text, caret) => {
         const { formula, shift } = withEquals(text);
-        const made = offer.complete(formula, caret + shift, this.pageModels(), table?.());
+        const made = offer.complete(formula, caret + shift, this.host.pageTables(), table?.());
         if (!made) return undefined;
         return {
           from: made.from - shift,
@@ -408,16 +405,9 @@ export class Formulas implements Feature {
     return this.host.tableName(table);
   }
 
-  /** The tables of a list the host gave (the page's: pageTables; else another page's) as models, made once for the list */
-  private pageModels(tables: readonly KeyedTable[] = this.host.pageTables()): readonly PageTableModel[] {
-    let models = this.models.get(tables);
-    if (!models) this.models.set(tables, (models = tables.map((t) => ({ key: t.key, model: this.host.asModel(t.model) }))));
-    return models;
-  }
-
-  /** A shown table as the model: as rendered (`info.model`), or with the edits held for it (`now`: tableOf) */
+  /** A shown table: as rendered (`info.model`), or with the edits held for it (`now`: tableOf) */
   private modelOf(info: TableInfo, now = false): TableModel {
-    return this.host.asModel(now ? this.host.tableOf(info) : info.model);
+    return now ? this.host.tableOf(info) : info.model;
   }
 
   /** The formula of a body cell (`row` from 1, as the markdown's), if it has one */
@@ -439,7 +429,7 @@ export class Formulas implements Feature {
         pages: {
           tables: (page: string) => {
             const tables = others.tables(page);
-            return tables ? this.named(this.pageModels(tables)) : tables;
+            return tables ? this.named(tables) : tables;
           },
         },
       }),
@@ -455,7 +445,7 @@ export class Formulas implements Feature {
     const sources = this.host.offered<SourcesOffer>("sources")?.version() ?? -1;
     const key = `${others?.version ?? -1}\u0000${sources}\u0000${currentPage}`;
     if (this.source?.key !== key || this.source.tables !== tables) {
-      this.source = { key, tables, source: pageTables(this.cells, () => this.named(this.pageModels(tables)), currentPage, undefined, this.elsewhere(others)) };
+      this.source = { key, tables, source: pageTables(this.cells, () => this.named(tables), currentPage, undefined, this.elsewhere(others)) };
     }
     return this.source.source;
   }
@@ -467,18 +457,16 @@ export class Formulas implements Feature {
    * rows and columns, and the results are recalculated, other tables of the
    * page (the written one as edited) and of other pages read seen
    */
-  writeStep(beforeTable: Table, afterTable: Table, edit: WriteEdit): Table {
+  writeStep(before: TableModel, after: TableModel, edit: WriteEdit): TableModel {
     const { page } = edit;
-    const before = this.host.asModel(beforeTable);
-    const after = this.host.asModel(afterTable);
-    const tables = pageTables(this.cells, () => this.named(this.pageModels(page.tables)), this.host.currentPage, { key: page.key, table: after, name: this.nameOf(after) }, this.elsewhere());
+    const tables = pageTables(this.cells, () => this.named(page.tables), this.host.currentPage, { key: page.key, table: after, name: this.nameOf(after) }, this.elsewhere());
     const names = { before: this.nameOf(before), after: this.nameOf(after) };
     let edited = formulasAfterEdit(before, after, { ...edit, tables, cells: this.cells, names });
     // Formulas it holds besides its cells' (a choice list's) follow its own edit, as its cells' do
     const held = this.cells.held?.(edited);
     if (held) edited = held.follow((formula) => followOwnFormula(formula, before, after, { cells: this.cells, rowMap: edit.rowMap, columnMap: edit.columnMap, names }));
     // A calculated table written (its Refresh, its definition changed): calculated anew; one that cannot be stays as it was
-    return this.host.fromModel(this.calculatedWritten(edited, tables, before), afterTable);
+    return this.calculatedWritten(edited, tables, before);
   }
 
   /** A calculated table (a view, a pivot) as calculated now (`tables` the page's), else the table as it is */
@@ -493,23 +481,20 @@ export class Formulas implements Feature {
    * their results for it as written, their references to it following its
    * moved rows and columns and its new name. Other tables are left as they are.
    */
-  otherTablesWritten(beforeTable: Table, afterTable: Table | undefined, edit: WriteEdit): readonly KeyedTable[] {
+  otherTablesWritten(before: TableModel, after: TableModel | undefined, edit: WriteEdit): readonly KeyedTable[] {
     const { page } = edit;
-    const before = this.host.asModel(beforeTable);
-    const after = afterTable && this.host.asModel(afterTable);
-    const pageModels = this.pageModels(page.tables);
     // Its name and the names of its cells, before and after the edit, and in turn those of the tables that refer to them
     const affected = after ? affectedBy(this.nameOf(before), this.nameOf(after)) : affectedBy(this.nameOf(before));
     const oldName = this.nameOf(before)?.toLowerCase();
     // References by its name are its only where it is the first table of that name (another of it, typed or copied in
     // the markdown, is the one they use): else they stay as they are, only recalculated
-    const firstOfName = oldName && pageModels.find((t) => this.nameOf(t.model)?.toLowerCase() === oldName)?.key === page.key;
+    const firstOfName = oldName && page.tables.find((t) => this.nameOf(t.model)?.toLowerCase() === oldName)?.key === page.key;
     // What each other table refers to, read once for all the passes below
-    const rest = pageModels.filter((other) => other.key !== page.key).map((other) => ({ key: other.key, table: other.model, referred: referredBy(this.cells, other.model) }));
+    const rest = page.tables.filter((other) => other.key !== page.key).map((other) => ({ key: other.key, table: other.model, referred: referredBy(this.cells, other.model) }));
     const following = { cells: this.cells, rowMap: edit.rowMap, columnMap: edit.columnMap, names: { before: this.nameOf(before), after: after && this.nameOf(after) } };
     // First every table the edit affects, its references to the edited table following it (a calculated table's definition too):
     // what one reads of another is then as the edit leaves it, whichever is calculated first
-    const affectedTables: { key: string; table: TableModel; followed: TableModel }[] = [];
+    const affectedTables: { key: TableKey; table: TableModel; followed: TableModel }[] = [];
     for (let found = true; found; ) {
       found = false;
       for (let i = rest.length - 1; i >= 0; i--) {
@@ -531,15 +516,12 @@ export class Formulas implements Feature {
     // Then each calculated over the page as followed (a calculated table read by another calculated as it is now)
     const followedAt = new Map(affectedTables.map((t) => [t.key, t.followed]));
     // Deleted (no `after`): the page without it, so what refers to it is #REF!
-    const tables = pageModels.filter((t) => after || t.key !== page.key).map((t) => (followedAt.has(t.key) ? { key: t.key, model: followedAt.get(t.key)! } : t));
+    const tables = page.tables.filter((t) => after || t.key !== page.key).map((t) => (followedAt.has(t.key) ? { key: t.key, model: followedAt.get(t.key)! } : t));
     const now = pageTables(this.cells, () => this.named(tables), this.host.currentPage, after ? { key: page.key, table: after, name: this.nameOf(after) } : undefined, this.elsewhere());
     const written: KeyedTable[] = [];
     for (const { key, table, followed } of affectedTables) {
       const recalculated = this.calculatedWritten(recalculate(followed, { cells: this.cells, tables: now, name: this.nameOf(followed) }), now);
-      if (recalculated === table) continue;
-      const base = page.tables.find((t) => t.key === key)!;
-      const markdown = this.host.fromModel(recalculated, base.model);
-      if (!sameTable(markdown, base.model)) written.push({ key: base.key, model: markdown });
+      if (recalculated !== table) written.push({ key, model: recalculated });
     }
     return written;
   }
@@ -550,12 +532,10 @@ export class Formulas implements Feature {
    * edit, as other tables' formulas do: moved rows and columns, renamed columns,
    * its new name. Only for the first table of its name, which they read.
    */
-  otherTextWritten(beforeTable: Table, afterTable: Table, edit: WriteEdit): readonly TextWritten[] {
+  otherTextWritten(before: TableModel, after: TableModel, edit: WriteEdit): readonly TextWritten[] {
     const { page } = edit;
-    const before = this.host.asModel(beforeTable);
-    const after = this.host.asModel(afterTable);
     const oldName = this.nameOf(before)?.toLowerCase();
-    if (!oldName || this.pageModels(page.tables).find((t) => this.nameOf(t.model)?.toLowerCase() === oldName)?.key !== page.key) return [];
+    if (!oldName || page.tables.find((t) => this.nameOf(t.model)?.toLowerCase() === oldName)?.key !== page.key) return [];
     const following = { cells: this.cells, rowMap: edit.rowMap, columnMap: edit.columnMap, names: { before: this.nameOf(before), after: this.nameOf(after) } };
     return formulaPlacesIn(page.text).flatMap((place): TextWritten[] => {
       const written = page.text.slice(place.from, place.to);
@@ -572,7 +552,7 @@ export class Formulas implements Feature {
     const name = own?.toLowerCase();
     if (!name) return undefined;
     // The table itself by its key (a copy of it, the same text, is another table)
-    const others = this.pageModels().filter((t) => t.key !== info.key);
+    const others = this.host.pageTables().filter((t) => t.key !== info.key);
     const referring = others.filter((t) => referredBy(this.cells, t.model).tables.has(name));
     if (!referring.length) return undefined;
     // Another table of that name (typed into the markdown: Silverware Table names none twice): formulas take the
@@ -618,7 +598,7 @@ export class Formulas implements Feature {
 
   private insertNumbered(info: TableInfo, column: number): Promise<unknown> {
     const insert = insertColumnAt(info.pins, info.columns, column);
-    return this.host.writeModel(
+    return this.host.writeTable(
       this.host.tableFor(info.key) ?? info,
       (t) => {
         let table = withHeader(insertColumn(t, insert.at), insert.at, "#");
@@ -1102,7 +1082,7 @@ export class Formulas implements Feature {
           ? "Recalculate: some formula results are out of date (the table was changed outside Silverware Table, TODAY() moved on, or a custom function changed)"
           : "Recalculate the formulas (their results are up to date)",
         // A write recalculates: an edit that changes nothing else
-        run: () => void this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => t),
+        run: () => void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => t),
       },
     ];
   }
@@ -1316,7 +1296,7 @@ export class Formulas implements Feature {
    * names as edited (the table only, so cheap whatever edits a feature holds)
    */
   private namesFor(info: TableInfo): readonly FormulaChoice[] {
-    return this.namesOf(this.modelOf(info, true), this.pageModels());
+    return this.namesOf(this.modelOf(info, true), this.host.pageTables());
   }
 
   /** The names a formula of `table` is offered among the page's `tables`: the other tables' and the page's, the table's own */

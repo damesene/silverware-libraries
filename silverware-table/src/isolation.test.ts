@@ -50,10 +50,17 @@ describe("isolation", () => {
     expect(matches(modules, /\b(Map|Set|WeakMap)<TableKey\b/)).toEqual([]);
   });
 
+  it("the modules work on the model: nothing of the markdown's form (its tables, cells, tags and operations)", () => {
+    // (The sources module makes its source's table as markdown, read in by the host, until a source is a store of its own:
+    // docs/silverware-table-store-plan.md, step 5)
+    const modules = Object.fromEntries(Object.entries(features).filter(([path]) => path !== "./features/sources.ts"));
+    expect(matches(modules, /from "[./]*(markdown|tags|ops)\.ts"/)).toEqual([]);
+  });
+
   it("what tables keep is read and written through the host: no module nor domain names an attribute or reads the metadata itself", () => {
-    // (Remove metadata is the core's: it names whose each attribute is)
+    // (Remove metadata is the core's, core/metadata.ts: it names whose each attribute is)
     const modules = Object.fromEntries(
-      Object.entries({ ...features, ...core }).filter(([path]) => (path.startsWith("./features/") && path !== "./features/metadata.ts") || path.startsWith("./core/silverbullet/modules/")),
+      Object.entries({ ...features, ...core }).filter(([path]) => path.startsWith("./features/") || path.startsWith("./core/silverbullet/modules/")),
     );
     // A guard against calling them by mistake: a module could keep its data elsewhere, which nothing here prevents
     expect(matches(modules, /from "[./]*(meta|metanames|names|tagvalues)\.ts"/)).toEqual([]);

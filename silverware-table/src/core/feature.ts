@@ -31,7 +31,7 @@ export type TableInfo = {
   // the store's: modules read `model` and compare `revision`)
   readonly source: string;
   /** The table as rendered */
-  readonly model: Table;
+  readonly model: TableModel;
   /** Its model's revision: equal, the same model (a module's state kept for it compares it) */
   readonly revision: TableRevision;
   readonly hint: number;
@@ -494,10 +494,10 @@ export type ColumnWidths = { readonly widths: ReadonlyMap<number, number>; reado
 export type WritePage = { readonly text: string; readonly tables: readonly KeyedTable[]; readonly read: readonly KeyedTable[]; readonly key: TableKey };
 
 /** A table's change, by its key: the table as it is now to the table as written */
-export type TableChange = { readonly key: TableKey; readonly change: (model: Table) => Table };
+export type TableChange = { readonly key: TableKey; readonly change: (model: TableModel) => TableModel };
 
 /** A table of the page by its key, with its model: one a write reads, or another it changes in the same edit (otherTablesWritten) */
-export type KeyedTable = { readonly key: TableKey; readonly model: Table };
+export type KeyedTable = { readonly key: TableKey; readonly model: TableModel };
 
 /**
  * The other pages formulas can read (the pageLinks module reads them): the tables of each as read (null: no such
@@ -660,7 +660,7 @@ export interface ModelHost {
   fromModel(model: TableModel, base: Table): Table;
   fromModel(cell: ModelCell): string;
   /** A table's header and `rows` (its rows, the first 1, in that order) as plain markdown, as any renderer shows them: no hidden data, no metadata row (Copy as Markdown) */
-  plainMarkdown(table: Table, rows: readonly number[]): string;
+  plainMarkdown(table: TableModel, rows: readonly number[]): string;
   /** Whether other pages are read (none where the platform reads no page but the open one): formulas and pivots referring to one */
   readonly readsOtherPages: boolean;
   /** Every page's name (none where the platform lists none): what a page is picked from */
@@ -676,19 +676,13 @@ export interface ModelHost {
    */
   openDialog(options: DialogOptions): Dialog;
   /**
-   * The same for a table of the page by where it is (a TableInfo is one),
-   * whether it is rendered or not: what modules write with
+   * A table of the page changed by where it is (a TableInfo is one), whether
+   * it is rendered or not: what modules write with. The change is made on the
+   * model (`rowMap` and `columnMap` say how its rows and columns moved); what an
+   * edit does with the attributes declared bound to their cell's content and
+   * unique is applied after it (model/rules.ts), before the write steps
    */
-  writeTable(target: TableTarget, change: (table: Table) => Table | undefined, options?: WriteOptions): Promise<WriteResult>;
-  /**
-   * As writeTable, the change made on the model (`rowMap` and `columnMap` say
-   * how its rows and columns moved, as for writeTable): what an edit does with
-   * the attributes declared bound to their cell's content and unique applied
-   * after it (model/rules.ts), before the modules' write steps. Modules move
-   * onto it from writeTable, which then takes its place
-   * (docs/silverware-table-store-plan.md, step 3, 4c).
-   */
-  writeModel(target: TableTarget, change: (table: TableModel) => TableModel | undefined, options?: WriteOptions): Promise<WriteResult>;
+  writeTable(target: TableTarget, change: (table: TableModel) => TableModel | undefined, options?: WriteOptions): Promise<WriteResult>;
   /**
    * A new table written into the page, in one edit: after the table `after`
    * (an empty line between), or where a position is (after its line, or the
@@ -697,7 +691,7 @@ export interface ModelHost {
    * table's, made before it is written (newTableKey), for what the caller
    * keeps for it meanwhile. No other table's key changes, wherever it goes.
    */
-  insertTable(table: Table, after?: TableTarget | TextPosition, also?: TableChange, key?: TableKey): Promise<WriteResult>;
+  insertTable(table: TableModel, after?: TableTarget | TextPosition, also?: TableChange, key?: TableKey): Promise<WriteResult>;
   /**
    * Deletes a table from the page in one edit, as Delete table in its ⋯ menu
    * does; `unasked`: no question, unless something goes with it (formulas
@@ -841,8 +835,8 @@ export interface ModelHost {
   saveEditing(): Promise<void>;
   /** Asks the user before a destructive change (SilverBullet's dialog, else the browser's) */
   ask(question: string): Promise<boolean>;
-  /** The table as edited: its markdown with the edits features hold (pendingEdits), what a cell's editor starts from */
-  tableOf(info: TableInfo): Table;
+  /** The table as edited: as rendered with the edits features hold (pendingEdits), what a cell's editor starts from */
+  tableOf(info: TableInfo): TableModel;
   /** The name of the page shown */
   readonly currentPage: string;
   /** The other pages a feature read for formulas (pageLinks); undefined: none reads them */
@@ -982,11 +976,11 @@ export interface ModelHost {
    */
   cellWrittenOver(cell: ModelCell, over: ModelCell): ModelCell;
   /** Why one of these cells of the table is not changed by hand (Feature.readOnly), the first said; undefined: none is */
-  readOnly(table: Table, cells: readonly CellRef[]): string | undefined;
+  readOnly(table: TableModel, cells: readonly CellRef[]): string | undefined;
   /** Why the table's rows and columns are not added, deleted or moved by hand (Feature.fixedShape); undefined: they may be */
-  fixedShape(table: Table): string | undefined;
+  fixedShape(table: TableModel): string | undefined;
   /** Why no cell of the table's body is changed by hand (a pivot's: none to edit, hold or switch editing for); undefined: some may be */
-  readOnlyBody(table: Table): string | undefined;
+  readOnlyBody(table: TableModel): string | undefined;
   /** The user tried to edit a cell not changed by hand: the features' ways to change it instead (Feature.editRefused) */
   editRefused(info: TableInfo, cell: CellRef): void;
   /** A feature's copy of a cell for another cell (Feature.fillCell), or undefined: copied as its value */
@@ -1007,6 +1001,15 @@ export interface ModelHost {
 
 /** What the core offers the adapter's modules (src/core/silverbullet/modules/): the model host and the rendering */
 export interface TableHost extends ModelHost {
+  /**
+   * A table written as markdown (the change on its markdown): what works on how
+   * markdown keeps a table, which no model expresses (Remove metadata: its
+   * metadata row and every hidden tag; a table padded), the core's alone until
+   * the markdown store does it (docs/silverware-table-store-plan.md, step 4)
+   */
+  writeMarkdown(target: TableTarget, change: (table: Table) => Table | undefined, options?: WriteOptions): Promise<WriteResult>;
+  /** As replaceTables, the changes on the tables' markdown (Remove metadata of a page) */
+  replaceMarkdown(document: string, changes: readonly { readonly key: TableKey; readonly change: (table: Table) => Table }[]): Promise<WriteResult>;
   /** The platform (core/platform.ts): the adapter is the host's side, which the modules' host functions stand for */
   readonly platform: TablePlatform;
   /** The page's text as last read */
@@ -1173,13 +1176,13 @@ export interface Feature {
    * applies it), asked when the table is rendered and when a feature says its
    * looks changed (TableHost.looksChanged); `table` is its markdown as shown
    */
-  looks?(info: TableInfo, table: Table): TableLooks | undefined;
+  looks?(info: TableInfo, table: TableModel): TableLooks | undefined;
   /**
    * How a table looks as a whole, from its metadata row (none: undefined);
    * asked as soon as the table is rendered (before it is laid out: the
    * metadata as rendered) and once its markdown is read
    */
-  tableLook?(table: Table): TableLook | undefined;
+  tableLook?(table: TableModel): TableLook | undefined;
   /**
    * Entries for the menu of a row or a column (its grip's), each group in
    * the slot of what its entries do (`menu.slot.look([…])`: LineMenuSlots);
@@ -1223,26 +1226,26 @@ export interface Feature {
   /** Another page was loaded into the editor (`name`): what was held for the page left can no longer be written into the editor */
   pageLoaded?(name: string): Promise<void> | void;
   /** After the edit, before the write steps: what they need read (other pages the edited table refers to) */
-  prepareEdit?(edited: Table, page: WritePage): Promise<void>;
+  prepareEdit?(edited: TableModel, page: WritePage): Promise<void>;
   /** A write step: the table edited, as the feature changes it in the same write (formulas recalculated, references following) */
-  writeStep?(before: Table, after: Table, edit: WriteEdit): Table;
+  writeStep?(before: TableModel, after: TableModel, edit: WriteEdit): TableModel;
   /**
    * Why the write must not be made (said so, nothing written): a sheet's table
    * that would grow into another; undefined: it may
    */
-  refusesWrite?(before: Table, after: Table, edit: WriteEdit): string | undefined;
+  refusesWrite?(before: TableModel, after: TableModel, edit: WriteEdit): string | undefined;
   /**
    * Other tables of the page the write changes too, in the same edit (formulas
    * referring to the edited table); `edit.page.tables` has those features
    * before it changed. `after` undefined: the table is deleted (Delete table)
    */
-  otherTablesWritten?(before: Table, after: Table | undefined, edit: WriteEdit): readonly KeyedTable[];
+  otherTablesWritten?(before: TableModel, after: TableModel | undefined, edit: WriteEdit): readonly KeyedTable[];
   /**
    * Other places of the page's text, outside its tables, the write changes
    * too, in the same edit (formulas written in the text, referring to the
    * edited table); one overlapping a table written is left out
    */
-  otherTextWritten?(before: Table, after: Table, edit: WriteEdit): readonly TextWritten[];
+  otherTextWritten?(before: TableModel, after: TableModel, edit: WriteEdit): readonly TextWritten[];
   /** Other pages read for formulas (the pageLinks module) */
   otherPages?(): OtherPages;
   /** SilverBullet indexed a page (it changed) */
@@ -1343,9 +1346,9 @@ export interface Feature {
    * core writes no edit that changes it, the features offering edits ask
    * first (ModelHost.readOnly); undefined: it may be changed
    */
-  readOnly?(table: Table, cell: CellRef): string | undefined;
+  readOnly?(table: TableModel, cell: CellRef): string | undefined;
   /** Why the table's rows and columns are not added, deleted or moved by hand (a pivot's: its calculation's); undefined: they may be */
-  fixedShape?(table: Table): string | undefined;
+  fixedShape?(table: TableModel): string | undefined;
   /**
    * The user tried to edit a cell that is not changed by hand (readOnly), told
    * why: the feature's own way to change it instead, if it has one (a pivot's

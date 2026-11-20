@@ -13,6 +13,9 @@ export type IndexMap = (index: number) => number | undefined;
 /** A cell holding nothing */
 export const EMPTY_CELL: ModelCell = { content: "", attributes: NO_ATTRIBUTES };
 
+/** A table of nothing: what a table made whole (a view, a pivot to insert) starts from */
+export const EMPTY_TABLE: TableModel = { columns: [], rows: [], attributes: NO_ATTRIBUTES };
+
 function emptyRow(columns: number): ModelRow {
   return { cells: Array.from({ length: columns }, () => EMPTY_CELL), attributes: NO_ATTRIBUTES };
 }

@@ -37,10 +37,8 @@ import {
 } from "../conditions/index.ts";
 import { FormulaError, type FormulasOffer, isErrorText, type Scalar, scalarText } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
-import { type Table, unescapeCell } from "../markdown.ts";
 import type { TableModel } from "../model/model.ts";
 import type { MenuEntry } from "../menu.ts";
-import { withoutTags } from "../tags.ts";
 import type { FormulaHelpers } from "../formulafield.ts";
 import { openConditionsDialog, type RuleSample, type ScopeColumn } from "./conditionsdialog.ts";
 
@@ -78,16 +76,16 @@ type Evaluated = { readonly version: number; readonly preview: readonly StoredRu
 type Reader = { readonly inputsOf: (rule: Rule) => RuleCells[]; readonly columnLabel: (column: number) => string };
 
 /** A table with `${…}` cells shows what its expressions give: nothing read of it is kept, they change without its text */
-const hasExpressions = (table: Table): boolean => table.rows.some((r) => r.cells.some((c) => c.includes("${")));
+const hasExpressions = (table: TableModel): boolean => table.rows.some((r) => r.cells.some((c) => c.content.includes("${")));
 
 export class Conditions implements Feature {
   // Rules shown in a table instead of its own while the dialog (one at a time: the page's) edits them
   private preview: { readonly key: TableKey; readonly rules: readonly StoredRule[] } | undefined;
   // What a table's rules made of it, by the table (parsed tables are kept, so a table's text is one object)
-  private evaluated = new WeakMap<Table, Evaluated>();
+  private evaluated = new WeakMap<TableModel, Evaluated>();
   // A table's cells as rules read them, by the table: the looks and the dialog's sample read them alike, each change of
   // a rule in the dialog reading them again (20 000 cells: about 90 ms each time)
-  private readers = new WeakMap<Table, Reader>();
+  private readers = new WeakMap<TableModel, Reader>();
   // What went wrong, said once per page visit
   private readonly said = new Set<string>();
 
@@ -96,10 +94,11 @@ export class Conditions implements Feature {
   }
 
   /** A table's rules with the cells each applies to: body rows and columns, the pinned ones left out (ConditionsOffer) */
-  private ranges(table: Table): ReturnType<ConditionsOffer["ranges"]> {
+  private ranges(table: TableModel): ReturnType<ConditionsOffer["ranges"]> {
     const pins = this.host.pinsOf(table);
-    const columns = table.rows[0]?.cells.length ?? 0;
-    const rows: readonly [number, number] = [1 + pins.top, table.rows.length - 1 - pins.bottom];
+    const columns = table.columns.length;
+    // (Body rows from 1, as the markdown's)
+    const rows: readonly [number, number] = [1 + pins.top, table.rows.length - pins.bottom];
     const all: readonly [number, number] = [pins.left, columns - 1 - pins.right];
     const named = new Map(this.host.rowNames(table).map((r) => [r.name.toLowerCase(), r.row]));
     return this.rulesIn(table).flatMap((rule) => {
@@ -136,7 +135,7 @@ export class Conditions implements Feature {
   // ---- the rules of a table ----------------------------------------------------------------
 
   /** A table's rules in the order they apply: the table's and named rows', each column's */
-  private rulesIn(table: Table): StoredRule[] {
+  private rulesIn(table: TableModel): StoredRule[] {
     const own = rulesOf(this.host.attribute(table, RULES), { kind: "table" });
     const columns = [...this.host.columnAttributes(table, RULES)].flatMap(([column, text]) => rulesOf(text, { kind: "column", column }));
     return inOrder([...own, ...columns]);
@@ -153,13 +152,13 @@ export class Conditions implements Feature {
     return this.host.withColumnAttributes(this.host.withAttribute(table, RULES, rulesText(own)), RULES, texts);
   }
 
-  private canStore(table: Table): boolean {
+  private canStore(table: TableModel): boolean {
     return this.host.canStore(table, RULES);
   }
 
   // ---- looks ------------------------------------------------------------------------------------
 
-  looks(info: TableInfo, table: Table): TableLooks | undefined {
+  looks(info: TableInfo, table: TableModel): TableLooks | undefined {
     const preview = this.preview?.key === info.key ? this.preview.rules : undefined;
     const version = definitionsVersion();
     const known = this.evaluated.get(table);
@@ -169,7 +168,7 @@ export class Conditions implements Feature {
     return looks;
   }
 
-  private evaluate(info: TableInfo, table: Table, stored: readonly StoredRule[]): TableLooks | undefined {
+  private evaluate(info: TableInfo, table: TableModel, stored: readonly StoredRule[]): TableLooks | undefined {
     const rules = stored.filter((r): r is Rule => !isUnread(r));
     if (!rules.length) return undefined;
     const { inputsOf } = this.reader(info, table);
@@ -194,7 +193,7 @@ export class Conditions implements Feature {
    * A table's cells as rules read them, each read once (and kept for the table: `readers`): `inputsOf` a rule's cells (body only, pinned rows and
    * columns out; a whole table's as one range, or a range for each column where the rule says so)
    */
-  private reader(info: TableInfo, table: Table): Reader {
+  private reader(info: TableInfo, table: TableModel): Reader {
     const known = this.readers.get(table);
     if (known) return known;
     const reader = this.readerOf(info, table);
@@ -202,22 +201,20 @@ export class Conditions implements Feature {
     return reader;
   }
 
-  private readerOf(info: TableInfo, table: Table): Reader {
-    const rowCount = table.rows.length;
-    const header = table.rows[0]?.cells ?? [];
+  private readerOf(info: TableInfo, table: TableModel): Reader {
+    const header = table.columns.map((column) => column.header);
     const pins = this.host.pinsOf(table);
-    const bodyRows = Array.from({ length: Math.max(0, rowCount - 1 - pins.top - pins.bottom) }, (_, i) => i + 1 + pins.top);
+    // (Body rows from 1, as the markdown's)
+    const bodyRows = Array.from({ length: Math.max(0, table.rows.length - pins.top - pins.bottom) }, (_, i) => i + 1 + pins.top);
     const bodyColumns = header.map((_, c) => c).filter((c) => c >= pins.left && c < header.length - pins.right);
-    const keys = header.map((h) => columnKey(columnName(unescapeCell(h))));
+    const keys = header.map((h) => columnKey(columnName(h)));
     const types = this.host.offered<ColumnTypesOffer>("columnTypes");
-    const model = types && this.host.asModel(table);
     // Each cell read once, as asked
     const cells = new Map<string, Placed>();
     const rowCells = new Map<number, Record<string, ReturnType<typeof cellOf>>>();
     const cellAt = (row: number, column: number) => {
-      const raw = table.rows[row]?.cells[column] ?? "";
-      const text = this.host.shownText(info, { row, column }) ?? unescapeCell(withoutTags(raw)).trim();
-      const value = types && model ? types.valueOf(model, column, text) : text;
+      const text = this.host.shownText(info, { row, column }) ?? table.rows[row - 1]?.cells[column]?.content.trim() ?? "";
+      const value = types ? types.valueOf(table, column, text) : text;
       return cellOf(text, value, keys[column] ?? "");
     };
     const rowOf = (row: number) => {
@@ -250,7 +247,7 @@ export class Conditions implements Feature {
     // A whole table's rule applies to its columns as one range (as a spreadsheet's), or to each on its own where it says so
     const inputsOf = (rule: Rule): RuleCells[] =>
       rule.scope.kind === "table" && rule.perColumn ? bodyColumns.map((c) => ({ rule, cells: cellsOf({ kind: "column", column: c }) })) : [{ rule, cells: cellsOf(rule.scope) }];
-    return { inputsOf, columnLabel: (column) => columnName(unescapeCell(header[column] ?? "")) || `${column + 1}` };
+    return { inputsOf, columnLabel: (column) => columnName(header[column] ?? "") || `${column + 1}` };
   }
 
   /**
@@ -276,14 +273,14 @@ export class Conditions implements Feature {
   }
 
   /** A formula of one row for a row of the table, through the formulas module (off: none) */
-  private rowFormula(table: Table): (row: number, formula: string) => string | number | boolean | undefined {
+  private rowFormula(table: TableModel): (row: number, formula: string) => string | number | boolean | undefined {
     const formulas = this.host.offered<FormulasOffer>("formulas");
     const values = new Map<string, readonly Scalar[]>();
     return (row, formula) => {
       if (!formulas) return undefined;
       let list = values.get(formula);
       if (!list) {
-        list = formulas.rowValues(this.host.asModel(table), formula);
+        list = formulas.rowValues(table, formula);
         values.set(formula, list);
       }
       const value = list[row - 1];
@@ -300,11 +297,10 @@ export class Conditions implements Feature {
   private openDialog(shownInfo: TableInfo, added?: Rule): void {
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
     const table = info.model;
-    const header = table.rows[0]?.cells ?? [];
     const pins = this.host.pinsOf(table);
-    const columns: ScopeColumn[] = header
-      .map((h, column) => ({ column, name: columnName(unescapeCell(h)) || `${column + 1}` }))
-      .filter(({ column }) => column >= pins.left && column < header.length - pins.right);
+    const columns: ScopeColumn[] = table.columns
+      .map((each, column) => ({ column, name: columnName(each.header) || `${column + 1}` }))
+      .filter(({ column }) => column >= pins.left && column < table.columns.length - pins.right);
     const shown = () => this.host.tableFor(info.key) ?? info;
     const formulas = this.formulaHelpers(info);
     // The table in view, so a look under the dialog finds it
@@ -334,7 +330,7 @@ export class Conditions implements Feature {
     const formulas = this.host.offered<FormulasOffer>("formulas");
     if (!formulas) return undefined;
     // The table as it is now (the dialog put aside, its columns may have been renamed meanwhile)
-    const table = () => this.host.asModel(this.host.tableOf(this.host.tableFor(shownInfo.key) ?? shownInfo));
+    const table = () => this.host.tableOf(this.host.tableFor(shownInfo.key) ?? shownInfo);
     // Out of a function, how a condition refers to cells, in a line (the cell editor's longer help is of pointing in the table)
     return formulas.fieldHelpers(table, CONDITION_REFERENCES);
   }
@@ -342,7 +338,7 @@ export class Conditions implements Feature {
   private async save(info: TableInfo, rules: readonly StoredRule[]): Promise<void> {
     let result: WriteResult = "failed";
     try {
-      result = await this.host.writeModel(info, (table) => this.withRules(table, rules));
+      result = await this.host.writeTable(info, (table) => this.withRules(table, rules));
     } finally {
       // The rules the dialog showed in the table end with it: written, the table rendered anew shows them; not
       // written (a write that failed), the table shows its own again
@@ -370,7 +366,7 @@ export class Conditions implements Feature {
     if (axis !== "column") return [];
     const table = info.model;
     const pins = this.host.pinsOf(table);
-    const columns = table.rows[0]?.cells.length ?? 0;
+    const columns = table.columns.length;
     if (column < pins.left || column >= columns - pins.right) return [];
     const own = this.rulesIn(table).filter((r) => r.scope.kind === "column" && r.scope.column === column);
     const scope: RuleScope = { kind: "column", column };
@@ -416,7 +412,7 @@ export class Conditions implements Feature {
     if (!cells.length) return undefined;
     const table = info.model;
     const pins = this.host.pinsOf(table);
-    const columns = table.rows[0]?.cells.length ?? 0;
+    const columns = table.columns.length;
     const column = cells.every((c) => c.column === cells[0]!.column) ? cells[0]!.column : undefined;
     const scope: RuleScope = column !== undefined && column >= pins.left && column < columns - pins.right ? { kind: "column", column } : { kind: "table" };
     return {

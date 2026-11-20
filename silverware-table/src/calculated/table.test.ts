@@ -24,9 +24,14 @@ const EMPTY: TableModel = { columns: [], rows: [], attributes: NO_ATTRIBUTES };
 
 // The pins kept with the table, as a host keeps them in its attributes (a copy of the table keeps them: a symbol is spread)
 const PINNED = Symbol("pins");
-const PINS = {
+const PINS: { pinsOf(table: TableModel): Pins; withPins(table: TableModel, pins: Pins): TableModel } = {
   pinsOf: (table: TableModel): Pins => (table as TableModel & { [PINNED]?: Pins })[PINNED] ?? { top: 0, bottom: 0, left: 0, right: 0 },
-  withPins: (table: TableModel, pins: Pins): TableModel => ({ ...table, [PINNED]: pins }) as TableModel,
+  // (The table itself where its pins are the same, as the host's)
+  withPins: (table: TableModel, pins: Pins): TableModel => {
+    const was = PINS.pinsOf(table);
+    const same = was.top === pins.top && was.bottom === pins.bottom && was.left === pins.left && was.right === pins.right;
+    return same ? table : ({ ...table, [PINNED]: pins } as TableModel);
+  },
 };
 
 const headers = (table: TableModel) => table.columns.map(headerText);
@@ -44,6 +49,15 @@ describe("calculated tables", () => {
   it("writes a cell as a table's cell holds it, one line without spaces around, so it is the same read again", () => {
     const made = calculatedTable(EMPTY, { ...RESULT, body: [["Ann ", "two\nlines"]], totalRow: false }, {}, PINS);
     expect(contents(made)).toEqual([["Ann", "two lines"]]);
+  });
+
+  it("gives the table itself where it is as calculated, read from its markdown too: nothing to write", () => {
+    const made = calculatedTable(EMPTY, RESULT, {}, PINS);
+    expect(calculatedTable(made, RESULT, {}, PINS)).toBe(made);
+    const read = decode(parseTable("| Region | Sum of Revenue |\n|---|--:|\n| East | 120 |\n| West | \\#DIV/0! |\n| Total | 170 |"));
+    const pinned = PINS.withPins(read, { ...PINS.pinsOf(read), bottom: 1 });
+    expect(calculatedTable(pinned, RESULT, {}, PINS)).toBe(pinned);
+    expect(calculatedTable(pinned, { ...RESULT, body: [["East", "121"], ...RESULT.body.slice(1)] }, {}, PINS)).not.toBe(pinned);
   });
 
   it("keeps the headers the user renamed, by what each column stands for; a header's hashtags its column's", () => {

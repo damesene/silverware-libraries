@@ -7,7 +7,7 @@
 // and writes its attributes through its host, and hands in the pins'.
 import { columnOfHeader, headerText, matchColumns, modelHeads, withHeaderOf } from "../columns.ts";
 import { resultContent } from "../formulas/index.ts";
-import { type ModelColumn, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
+import { type ModelColumn, type ModelRow, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
 import type { Pins } from "../view.ts";
 
 /** A column of the result: what it stands for (kept through a refresh, its header named by the user), its header as made, its alignment */
@@ -93,9 +93,20 @@ export function calculatedTable(table: TableModel, calculated: Calculated, renam
     const was = kept.get(c);
     return was ? withHeaderOf(was, column) : column;
   });
-  const rows = calculated.body.map((cells) => ({ cells: cells.map((cell) => ({ content: resultContent(cell), attributes: NO_ATTRIBUTES })), attributes: NO_ATTRIBUTES }));
+  // A row as calculated: the table's own where it is the same (no attributes, the same contents)
+  const rows = calculated.body.map((cells, r): ModelRow => {
+    const contents = cells.map(resultContent);
+    const was = table.rows[r];
+    const same =
+      was?.attributes === NO_ATTRIBUTES &&
+      was.cells.length === contents.length &&
+      was.cells.every((cell, c) => cell.attributes === NO_ATTRIBUTES && cell.content === contents[c]);
+    return same ? was : { cells: contents.map((content) => ({ content, attributes: NO_ATTRIBUTES })), attributes: NO_ATTRIBUTES };
+  });
   const totals = { bottom: calculated.totalRow ? 1 : 0, right: calculated.totalColumns };
-  const result: TableModel = { ...table, columns, rows };
+  // The table itself where nothing changed: a table recalculated as it was is not written
+  const sameAll = <T>(made: readonly T[], had: readonly T[]) => made.length === had.length && made.every((item, i) => item === had[i]);
+  const result: TableModel = sameAll(columns, table.columns) && sameAll(rows, table.rows) ? table : { ...table, columns, rows };
   return pins.withPins(result, { ...pins.pinsOf(result), ...totals });
 }
 

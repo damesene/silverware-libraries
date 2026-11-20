@@ -56,9 +56,10 @@ export function columnOfHeader(text: string, align: Align, attributes: Attribute
   return { header: withoutHashtags(text), align, attributes: withAttributeIn(attributes, CORE, HASHTAGS_KEY, hashtags.length ? hashtags.join(" ") : undefined) };
 }
 
-/** A column with the header of `header` (its text, its hashtags) and its alignment, its other attributes its own */
+/** A column with the header of `header` (its text, its hashtags) and its alignment, its other attributes its own (the column itself where they are the same) */
 export function withHeaderOf(column: ModelColumn, header: ModelColumn): ModelColumn {
-  return { header: header.header, align: header.align, attributes: withAttributeIn(column.attributes, CORE, HASHTAGS_KEY, attributeIn(header.attributes, CORE, HASHTAGS_KEY)) };
+  const attributes = withAttributeIn(column.attributes, CORE, HASHTAGS_KEY, attributeIn(header.attributes, CORE, HASHTAGS_KEY));
+  return column.header === header.header && column.align === header.align && attributes === column.attributes ? column : { header: header.header, align: header.align, attributes };
 }
 
 /** A model's columns as their heads: each header, and the column's own name */

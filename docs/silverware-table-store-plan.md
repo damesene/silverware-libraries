@@ -137,9 +137,9 @@ but kept as a pair, on what they are about. Their flat names
 
 - a column's attributes go with the column through moves, renames and
   deletes by the model's own operations (`followColumnMeta` goes);
-- a column's type is an attribute of the column, its value the type's name
-  with its parameters as written (`currency-usd`, `stars-10`): the type
-  registry reads the parameters as now (`readParams`);
+- a column's type is in an attribute of the column: the header's hashtags,
+  of which the type registry takes its type (`currency-usd`, `stars-10`) and
+  reads the parameters as now (`readParams`); see *Decided (2026-11-20)* 6;
 - a row's name is an attribute of the row;
 - an attribute may be declared `unique` (a name: one per table), so a copied
   row or cell leaves it out (`uniqueTags` goes);
@@ -501,7 +501,9 @@ is done, by what it took.
   (*Principles* 1), the markdown written exactly as now:
   - **A column's type is an attribute of the column.** The markdown codec
     writes it as the header's hashtag (`| Price #currency-usd |`) and reads
-    it back. Another store keeps it as it likes.
+    it back. Another store keeps it as it likes. (Refined 2026-11-20: the
+    attribute holds all of a header's hashtags, the type among them;
+    *Decided (2026-11-20)* 6.)
   - **A row's name is an attribute of the row.** The markdown codec keeps it
     in one of the row's cells' hidden tag, as now, only because a markdown
     row has no place of its own for it.
@@ -514,8 +516,8 @@ is done, by what it took.
   `source`; a transaction whether the document is open or not; contract tests
   for every store; `autoFormat` the markdown codec's, its path kept; history
   markers and Lua places the SilverBullet binding's; "document" and "model
-  row" in the interfaces, the numbers of rows unchanged; a type's attribute
-  its name with parameters as written.
+  row" in the interfaces, the numbers of rows unchanged; a type written as
+  its name with parameters (in the header's hashtags since 2026-11-20, 6).
 - **Silverware Chart onto the codec: a follow-up** (*After this plan*).
 
 ## Decided (2026-11-20, with the user)
@@ -529,6 +531,51 @@ is done, by what it took.
   (docs/silverware-agent.md); a CSV store not part of it (*After this plan*).
 - **Our own writes keep the model** (*A model made once, kept from our own
   writes*).
+- **Step 3's design, ahead of it** (so the step runs without stopping on
+  these):
+  1. **An attribute's value is text**, as `TableMeta` is now: what it means
+     is its owner's (the choice lists' JSON read by the column types). Data
+     of a module turned off passes untouched, the core and the codec knowing
+     no attribute's form, and every store keeps text alike.
+  2. **Columns and rows are their place in the model, no stable ids**: a
+     markdown table has nowhere to keep one (made anew on each outside edit,
+     it would only look stable), and formulas refer by place (`A1`) anyway.
+     Attributes are on the column or row, so a move takes them (*Principles*
+     3). `rowMap` and `columnMap` stay, **given by the model's operations**
+     (insert, move, delete, sort), no longer made by hand in modules.
+  3. **The header is no row of the model**: a column has its `header` (the
+     name's text) and its attributes; everything a header cell holds besides
+     (the column's own name `core.n`, its type, any other hidden tag) is an
+     attribute of the column, read from and written into the header cell by
+     the codec. Body rows are counted from 1, as decided.
+  4. **`TableSource` gives `TableModel`** (with its name and page), no
+     interface of the formulas' own: what `FormulaCells` reads off a cell's
+     text now (`formulaOf`, cell and row names) reads the model's attributes
+     (`formulas.f` on a cell). Silverware Database gives its items to
+     formulas as a `TableModel` (properties as columns, items as rows), as
+     its plan's *Room for Silverware Table* has it: one implementation of
+     formulas for tables, sources and databases.
+  5. **Every hidden tag is an attribute, whoever's**: the codec makes an
+     attribute (owner, key, text) of whatever it reads in a `<meta>`, its
+     owner's module loaded or not; a name without an owner (a tag typed by
+     hand, `<meta foo='x'>`) gets the empty owner and passes alike. The core
+     drops none unless an operation says so (`boundToContent`, *Remove
+     metadata*), as every tag is kept now.
+  6. **A header's hashtags are one attribute of the column**: the codec
+     takes **every** hashtag out of a header cell into one column attribute
+     (owner `core`, the hashtags in their order, as text), `header` the name
+     alone. Which of them is a type is not the codec's to know: only the
+     type registry knows (custom types from Space Lua among them), and a
+     codec asking it would import a domain and give another model of the
+     same text whenever types were defined anew, which the cache by text
+     cannot have. The column types' module reads its type from that
+     attribute and writes it there; other hashtags stay in it and are
+     written back. SilverBullet leaves hashtags out of a column's key and
+     tags nothing by them, so they are no part of the name. The binding still
+     hides only the hashtags the registry takes for a type. This refines the
+     decision of 2026-11-06 (a column's type an attribute of the column,
+     written by the codec as the header's hashtag): the type is in that
+     attribute, kept by its owner.
 
 ## Decided (2026-11-07, with the user)
 

@@ -15,7 +15,7 @@ Silverware Table's views and choices from Space Lua (both on the branch `feat/vi
 
 This plan is committed now, so the database is designed with views in mind; its implementation starts when views are on main.
 
-**Before Silverware Table's store refactor** (docs/silverware-table-store-plan.md on `refactor/table-store`; weighed 2026-11-07): the refactor is the table's insides, the database a plugin apart, so neither makes the other harder where the database takes the refactor's shapes from the start (*Layers*). What they share is moved into `shared/` right after views are merged, before either starts (step 2), so the refactor's long branch does not meet the moves on a rebase.
+**Before Silverware Table's store refactor** (docs/silverware-table-store-plan.md; weighed 2026-11-07): the refactor is the table's insides, the database a plugin apart, so neither makes the other harder where the database takes the refactor's shapes from the start (*Layers*). What they share is moved into `shared/` right after views are merged, before either starts (step 2), so the refactor's long branch does not meet the moves on a rebase.
 
 ## Layers: apart from SilverBullet and from where it is kept (decided 2026-11-07)
 
@@ -452,7 +452,7 @@ large deletion plans as many lists): to measure with a large database before cha
 
 1. **`feat/database` into `main`**: the platform and the page writer (`shared/platform.ts`, `shared/pages/`), which the
    other plugins are to stand on, are only on this branch; every week more makes the merge dearer.
-2. **The store plan brought up to date** (docs/silverware-table-store-plan.md on `refactor/table-store`): its status (it
+2. **The store plan brought up to date** (docs/silverware-table-store-plan.md): its status (it
    waits for views, which are on main), the platform and the writer as done, sources (`defineSource`) as its second store,
    its list of modules (views, calculated tables, choice lists by formula, sources came since), and its scope widened: the
    user's aim is that **no plugin depends on where it runs**, not the table alone.

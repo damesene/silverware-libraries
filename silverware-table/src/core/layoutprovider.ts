@@ -7,6 +7,7 @@
 import type { LayoutChanges, LayoutEntries, LayoutProvider } from "../../../shared/layout.ts";
 import { renderedTable, WIDGET_SELECTOR } from "../dom.ts";
 import { type Table, tableMetaOf } from "../markdown.ts";
+import type { TableModel } from "../model/model.ts";
 import type { WriteResult } from "./feature.ts";
 import { ownMeta } from "./metaaccess.ts";
 import { renderedMeta } from "./silverbullet/adapter.ts";
@@ -20,7 +21,7 @@ export type LayoutTables = {
   renderedRows(table: HTMLTableElement): readonly HTMLTableRowElement[];
   // Whether a widget is enhanced (known in the page's markdown), so it can be written
   enhanced(widget: HTMLElement): boolean;
-  write(widget: HTMLElement, change: (table: Table) => Table | undefined): Promise<WriteResult>;
+  write(widget: HTMLElement, change: (table: TableModel) => TableModel | undefined): Promise<WriteResult>;
   // The metadata setting
   metadataOn(): boolean;
 };

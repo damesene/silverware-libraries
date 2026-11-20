@@ -238,7 +238,7 @@ describe("Pasting from a spreadsheet", () => {
       controller.selectCells(info(), { row: 2, column: 0 }, { row: 2, column: 0 });
       cutKey();
       expect(edges()).toBe(1);
-      await controller.write(editor.querySelector<HTMLElement>(".sb-table-widget")!, (t) => ({ ...t, rows: t.rows.filter((_, i) => i !== 1) }));
+      await controller.writeMarkdown(controller.infoOf(editor.querySelector<HTMLElement>(".sb-table-widget")!)!, (t) => ({ ...t, rows: t.rows.filter((_, i) => i !== 1) }));
       await controller.scan();
       expect(edges()).toBe(0);
     });
@@ -247,7 +247,7 @@ describe("Pasting from a spreadsheet", () => {
       await setup("| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | |\n", { "silverware.table.metadata": true });
       controller.selectCells(info(), { row: 1, column: 0 }, { row: 1, column: 1 });
       cutKey();
-      await controller.write(editor.querySelector<HTMLElement>(".sb-table-widget")!, (t) => ({
+      await controller.writeMarkdown(controller.infoOf(editor.querySelector<HTMLElement>(".sb-table-widget")!)!, (t) => ({
         ...t,
         rows: t.rows.map((r, i) => (i === 1 ? { cells: [r.cells[0]!, "2 <meta formulas.f='=1+1'>"] } : r)),
       }));

@@ -244,8 +244,8 @@ export class Toolbar {
               title: "Unpin all rows and columns: they stay where they are, and scroll and sort with the others",
               icon: ICONS.unpin,
               run: () => {
-                const [w] = this.context.current(widget, info);
-                void host.write(w, (t) => t, { pins: NO_PINS });
+                const [, i] = this.context.current(widget, info);
+                void host.writeTable(i, (t) => t, { pins: NO_PINS });
               },
             },
           ]
@@ -256,8 +256,8 @@ export class Toolbar {
         title: "Align the table's markdown: its columns padded to one width, as the Long cells setting says",
         icon: ICONS.format,
         run: () => {
-          const [w] = this.context.current(widget, info);
-          void host.write(w, (t) => ({ ...t, padded: true }));
+          const [, i] = this.context.current(widget, info);
+          void host.writeMarkdown(i, (t) => ({ ...t, padded: true }));
         },
       },
       {

@@ -989,8 +989,9 @@ export interface TableHost extends ModelHost {
   /**
    * A table written as markdown (the change on its markdown): what works on how
    * markdown keeps a table, which no model expresses (Remove metadata: its
-   * metadata row and every hidden tag; a table padded), the core's alone until
-   * the markdown store does it (docs/silverware-table-store-plan.md, step 4)
+   * metadata row and every hidden tag; Format table: a table padded), the
+   * core's alone until the markdown store does it (step 4b, through the page
+   * writer); every other write is writeTable's
    */
   writeMarkdown(target: TableTarget, change: (table: Table) => Table | undefined, options?: WriteOptions): Promise<WriteResult>;
   /** As replaceTables, the changes on the tables' markdown (Remove metadata of a page) */
@@ -1022,8 +1023,6 @@ export interface TableHost extends ModelHost {
   rowOf(info: WidgetInfo, tr: HTMLTableRowElement): number;
   /** The header row and the shown body rows, in display order */
   shownRows(info: WidgetInfo): HTMLTableRowElement[];
-  /** Re-reads the table, applies `change` and writes it back as one edit */
-  write(widget: HTMLElement, change: (table: Table) => Table | undefined, options?: WriteOptions): Promise<WriteResult>;
   /** A table's visible box: the part of it not scrolled out of view */
   innerBox(widget: HTMLElement): Rect;
   /**

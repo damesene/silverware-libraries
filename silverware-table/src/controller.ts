@@ -75,7 +75,7 @@ import { CORE, metadataAfterEdit, metaName, metaPins, metaSort, withMetaPins, wi
 import { CELL_NAME_KEY, type CellNameAt, LINE_NAME_KEY, modelCellName, modelCellNames, modelColumnName, modelRowName, modelRowNames, type RowName, withModelName } from "./names.ts";
 import { ownMeta } from "./core/metaaccess.ts";
 import { withoutNewTagValues } from "./tagvalues.ts";
-import { reorderRows } from "./ops.ts";
+import { reorderRows } from "./model/ops.ts";
 import {
   cycleSort,
   DEFAULT_VIEW,
@@ -382,7 +382,10 @@ export class Controller implements TableHost {
       tablesLayoutProvider({
         renderedRows: (table) => this.rows.renderedRows(table),
         enhanced: (widget) => this.infos.has(widget),
-        write: (widget, change) => this.write(widget, change),
+        write: (widget, change) => {
+          const info = this.infos.get(widget);
+          return info ? this.writeTable(info, change) : Promise.resolve("failed" as const);
+        },
         metadataOn: () => this.metadataOn,
       }),
     );
@@ -545,7 +548,7 @@ export class Controller implements TableHost {
    * Whether a sorting may be stored in this table: the metadata setting is
    * on, or a sorting is stored already (it may change, its column too, or go)
    */
-  private sortStorable(table: Table): boolean {
+  private sortStorable(table: TableModel): boolean {
     return this.metadataOn || this.coreMeta.columnAttributes(table, "sort").size > 0;
   }
 
@@ -1024,7 +1027,7 @@ export class Controller implements TableHost {
     ];
     this.views.set(info.key, withoutSort(view));
     const position = new Map(order.map((row, i) => [row, i + 1]));
-    await this.write(widget, (t) => withMetaSort(reorderRows(t, order), undefined), {
+    await this.writeTable(info, (t) => withMetaSort(reorderRows(t, order), undefined), {
       rowMap: (r) => (r === 0 ? 0 : position.get(r)),
     });
     this.focusEditor(widget);
@@ -1521,10 +1524,10 @@ export class Controller implements TableHost {
   private async storeSort(key: TableKey): Promise<void> {
     const widget = this.widgetForKey(key);
     const info = widget && this.infos.get(widget);
-    if (this.stopped || !widget || !info || !this.sortStorable(parseTable(info.source))) return;
+    if (this.stopped || !widget || !info || !this.sortStorable(info.model)) return;
     const view = this.views.get(key) ?? DEFAULT_VIEW;
     const sort = view.sort ? { column: view.sort.column, direction: view.sort.direction } : undefined;
-    await this.write(widget, (t) => (sort && !this.sortStorable(t) ? t : withMetaSort(t, sort)));
+    await this.writeTable(info, (t) => (sort && !this.sortStorable(t) ? t : withMetaSort(t, sort)));
   }
 
   // ---- host API for features (core/feature.ts) ----------------------------
@@ -2652,21 +2655,6 @@ export class Controller implements TableHost {
   }
 
   // ---- writing markdown --------------------------------------------------
-
-  /**
-   * Re-reads the table from the page, applies `change`, then the write steps
-   * (formulas, metadata), and writes the result back as one edit. `change`
-   * returns undefined to abort.
-   */
-  async write(
-    widget: HTMLElement,
-    change: (table: Table) => Table | undefined,
-    options: WriteOptions = {},
-  ): Promise<WriteResult> {
-    const info = this.infos.get(widget);
-    if (!info) return "failed";
-    return this.writeAt(info, widget, change, options, false);
-  }
 
   writeTable(target: TableTarget, change: (table: TableModel) => TableModel | undefined, options: WriteOptions = {}): Promise<WriteResult> {
     return this.writeTo(target, this.modelChange(change, options), options, true);

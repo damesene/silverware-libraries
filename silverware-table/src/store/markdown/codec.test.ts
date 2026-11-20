@@ -89,6 +89,11 @@ describe("the markdown codec", () => {
       expect(md(encode(withCell(model, 2, 0, (c) => ({ ...c, content: "a | b" })), table))).toBe(md(piped));
     });
 
+    it("a cell's content, the row's cells past its header's kept", () => {
+      const wide = parseTable("| A | B |\n|---|---|\n| 1 | 2 | extra |");
+      expect(md(encode(withCell(decode(wide), 1, 0, (c) => ({ ...c, content: "x" })), wide))).toBe(md(setCell(wide, 1, 0, "x")));
+    });
+
     it("a row's name in the cell holding it as that cell's content changes", () => {
       const second = parseTable("| A | B |\n|---|---|\n| 1 | 2 <meta core.n='two'> |");
       const read = decode(second);

@@ -43,6 +43,8 @@ const models = new WeakMap<Table, TableModel>();
 // Each model decoded, the table it was read from (its form: padding, cells as written)
 const bases = new WeakMap<TableModel, Table>();
 const rows = new WeakMap<ModelRow, Row>();
+// A row's cells past its header's (no column's: SilverBullet shows none of them), kept as written when the row changes
+const beyond = new WeakMap<Row, readonly string[]>();
 const cells = new WeakMap<ModelCell, { readonly cell: string; readonly row: Row }>();
 const headers = new WeakMap<ModelColumn, string>();
 const tagsRead = new WeakMap<Attributes, { readonly cell: string; readonly inTags: ReadonlySet<string> }>();
@@ -99,6 +101,7 @@ export function decode(table: Table): TableModel {
     return column;
   });
   const modelRows = body.map((row): ModelRow => {
+    if (row.cells.length > table.align.length) beyond.set(row, row.cells.slice(table.align.length));
     // A row's name is the row's, in whichever of its cells holds it
     const named = rowNameIn(row.cells);
     const rowCells = table.align.map((_, c): ModelCell => {
@@ -271,7 +274,7 @@ export function encode(model: TableModel, base: Table): Table {
     }
     // As an edit of the row it was read from (its first cell read's): written as it was where its cells are (markdown.ts)
     const from = row.cells.map((cell) => cells.get(cell)?.row).find((r) => r !== undefined);
-    return from ? { ...from, cells: rowCells } : { cells: rowCells };
+    return from ? { ...from, cells: [...rowCells, ...(beyond.get(from) ?? [])] } : { cells: rowCells };
   });
   const baseHeader = base.rows[0];
   const headerRow: Row = !baseHeader ? { cells: headerCells } : headerCells.length === baseHeader.cells.length && headerCells.every((cell, c) => cell === baseHeader.cells[c]) ? baseHeader : { ...baseHeader, cells: headerCells };

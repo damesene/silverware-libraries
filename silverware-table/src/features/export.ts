@@ -59,9 +59,9 @@ export class Export implements Feature {
   private async copy(text: string, body: number, format: string): Promise<void> {
     try {
       await writeClipboard(this.host.doc, text);
-      void this.host.bridge.flash(`Silverware Table: copied ${body} row${body === 1 ? "" : "s"} as ${format}`, "info");
+      this.host.notify(`Silverware Table: copied ${body} row${body === 1 ? "" : "s"} as ${format}`, "info");
     } catch (e) {
-      void this.host.bridge.flash(`Silverware Table: could not copy (${String(e)})`, "error");
+      this.host.notify(`Silverware Table: could not copy (${String(e)})`, "error");
     }
   }
 }

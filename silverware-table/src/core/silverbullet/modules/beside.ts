@@ -39,11 +39,11 @@ export class BesideTables implements AdapterFeature {
   }
 
   private async cursorAfter(hint: number, source: string): Promise<void> {
-    const { bridge } = this.host;
-    const text = await bridge.getText();
+    const { editor } = this.host.platform;
+    const text = await editor.text();
     const range = locateBySource(text, hint, source);
     // A table at the page's end has no line after it: the cursor stays where it was
     if (!range || range.to >= text.length) return;
-    await bridge.moveCursor(range.to + 1);
+    await editor.moveCursor?.(range.to + 1);
   }
 }

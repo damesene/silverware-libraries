@@ -126,7 +126,7 @@ export class CellEditing {
     // A cell not changed by hand (a pivot's): said why, not opened; a feature's own way to change it instead (its settings)
     const fixed = beyond ? undefined : this.host.readOnly(this.host.tableOf(info), [ref]);
     if (fixed) {
-      void this.host.bridge.flash(`Silverware Table: ${fixed}`, "info");
+      this.host.notify(`Silverware Table: ${fixed}`, "info");
       this.host.editRefused(info, ref);
       return;
     }
@@ -381,7 +381,7 @@ export class CellEditing {
     if (!reopening && active.row === 0 && withoutTags(value) === "" && active.original !== "") {
       // SilverBullet would not show a column without a name
       value = active.original;
-      void this.host.bridge.flash("Silverware Table: a column needs a name; the old name was kept", "info");
+      this.host.notify("Silverware Table: a column needs a name; the old name was kept", "info");
     }
     // (Before it goes: the focus it has, kept for the keyboard)
     this.context.fieldClosing(active.field);
@@ -446,7 +446,7 @@ export class CellEditing {
           ...(row !== undefined && column !== undefined ? { focus: { row, column, ...(next?.select ? { select: true } : {}) } } : {}),
         },
       );
-      if (changedMeanwhile) void this.host.bridge.flash("Silverware Table: the table changed meanwhile, so it was not grown; type the value again", "info");
+      if (changedMeanwhile) this.host.notify("Silverware Table: the table changed meanwhile, so it was not grown; type the value again", "info");
     }
     // A feature may keep a cell's edit to write it later (the lazy module); a header's name is written at once
     const info = changed && closed.row > 0 ? this.host.infoOf(closed.widget) : undefined;
@@ -578,7 +578,7 @@ export class CellEditing {
     if (vertical) {
       if (from === 0) return;
       if (this.host.rearranged(info)) {
-        void this.host.bridge.flash(`Silverware Table: ${MOVE_BLOCKED.toLowerCase()}`, "info");
+        this.host.notify(`Silverware Table: ${MOVE_BLOCKED.toLowerCase()}`, "info");
         return;
       }
     }

@@ -19,7 +19,7 @@ const VIEW = (formula: string, name = "mine", body = "| x |\n|---|\n| old |") =>
 
 /** The page's tables as formulas see them, with views */
 function sourceOf(page: string, here = "Page", others?: Record<string, string>) {
-  const named = (text: string) => pageTablesOf(text).map((t) => ({ ...t, name: metaName(t.table) }));
+  const named = (text: string) => pageTablesOf(text).map((t) => ({ key: String(t.range.from), table: t.table, name: metaName(t.table) }));
   return pageTables(VIEW_CELLS, () => named(page), here, undefined, others && { pages: { tables: (p) => (p in others ? named(others[p]!) : undefined) } });
 }
 
@@ -120,7 +120,7 @@ describe("views in formulas", () => {
     expect(referredPages(VIEW_CELLS, parseTable(VIEW("=SORT([[Other]]tasks![#Data])")))).toEqual(new Set(["Other"]));
     const total = "| Total |\n|---|\n| 0 <meta formulas.f='=SUM(mine![hours])'> |";
     const page = `${TASKS}\n\n${VIEW("=SORT(tasks![#Data])")}\n\n${total}\n`;
-    const all = pageTablesOf(page).map((t) => ({ ...t, name: metaName(t.table) }));
-    expect(tablesWritten(VIEW_CELLS, all, all[0]!.range.text).length).toBe(3);
+    const all = pageTablesOf(page).map((t) => ({ key: String(t.range.from), table: t.table, name: metaName(t.table) }));
+    expect(tablesWritten(VIEW_CELLS, all, all[0]!.key).length).toBe(3);
   });
 });

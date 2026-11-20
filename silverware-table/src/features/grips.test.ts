@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import type { LineMenuGroup } from "../core/feature.ts";
-import { bodyTexts, buttonLabel, cell, clickOn, controller, editor, flush, key, menuButtons, PAGE, setup, text, useTablePage } from "../testing/page.ts";
+import { bridge, bodyTexts, buttonLabel, cell, clickOn, controller, editor, flush, key, menuButtons, PAGE, setup, text, useTablePage } from "../testing/page.ts";
 import { customSections } from "../../../shared/menuslots.ts";
 
 describe("Row and column grips", () => {
@@ -240,7 +240,7 @@ describe("Row and column grips", () => {
     const NAMED = `| Name | Price | Note |\n|---|---|---|\n| <meta core.n='pear'> | | a |\n| | <meta core.cn='fig_price'> | b |\n`;
     await setup(NAMED);
     const questions: string[] = [];
-    (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = (message: string) => {
+    bridge.confirm = (message: string) => {
       questions.push(message);
       return true;
     };

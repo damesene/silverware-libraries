@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { insertRowWith } from "../core/structure.ts";
 import { setCell } from "../ops.ts";
 import { memorySources } from "../sources.ts";
-import { cell, cellMenuItem, clickOn, controller, cursorMoves, editor, flashes, flush, key, renderPage, setText, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
+import { bridge, cell, cellMenuItem, clickOn, controller, cursorMoves, editor, flashes, flush, key, renderPage, setText, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 
 const ORDERS = [
   "| Region | Revenue |",
@@ -357,7 +357,7 @@ describe("Pivot tables", () => {
     it("is said to lose its source when that is deleted", async () => {
       await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.metadata": true });
       const questions: string[] = [];
-      (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = (message: string) => {
+      bridge.confirm = (message: string) => {
         questions.push(message);
         return false;
       };

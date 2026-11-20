@@ -37,7 +37,7 @@ import {
 } from "../conditions/index.ts";
 import { FormulaError, type FormulasOffer, isErrorText, type Scalar, scalarText } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
-import { parseTable, type Table, unescapeCell } from "../markdown.ts";
+import { type Table, unescapeCell } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
 import { withoutTags } from "../tags.ts";
 import type { FormulaHelpers } from "../formulafield.ts";
@@ -125,7 +125,7 @@ export class Conditions implements Feature {
     // (A column type defined anew may read a value otherwise; a formula condition another table)
     this.readers = new WeakMap();
     this.evaluated = new WeakMap();
-    for (const info of this.host.shownTables()) if (this.rulesIn(parseTable(info.source)).length) this.host.looksChanged(info);
+    for (const info of this.host.shownTables()) if (this.rulesIn(info.model).length) this.host.looksChanged(info);
   }
 
   pageLoaded(): void {
@@ -177,7 +177,7 @@ export class Conditions implements Feature {
       const said = `${info.key}\u0000${problem}`;
       if (this.said.has(said)) continue;
       this.said.add(said);
-      void this.host.bridge.flash(`Silverware Table: conditional formatting: ${problem}`, "error");
+      this.host.notify(`Silverware Table: conditional formatting: ${problem}`, "error");
     }
     if (!styles.size) return undefined;
     const looks: (CellRef & CellLook)[] = [];
@@ -297,7 +297,7 @@ export class Conditions implements Feature {
   /** The table's rules edited in the dialog; `added`: a new rule, its editor open */
   private openDialog(shownInfo: TableInfo, added?: Rule): void {
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
-    const table = parseTable(info.source);
+    const table = info.model;
     const header = table.rows[0]?.cells ?? [];
     const pins = this.host.pinsOf(table);
     const columns: ScopeColumn[] = header
@@ -356,7 +356,7 @@ export class Conditions implements Feature {
 
   /** Conditional formatting… in the ⋯ menu always; an icon in the toolbar too where the table has rules */
   toolbarButtons(info: TableInfo): ToolbarButton[] {
-    const table = parseTable(info.source);
+    const table = info.model;
     const count = this.rulesIn(table).length;
     const title = count ? `Conditional formatting: ${count} ${count === 1 ? "rule" : "rules"} (cells that look different by their values)` : "Conditional formatting: cells that look different by their values";
     const menu: ToolbarButton = { label: "Conditional formatting…", title, icon: ICONS.conditions, run: () => this.openDialog(info), ...(count ? { value: `${count}` } : {}) };
@@ -366,7 +366,7 @@ export class Conditions implements Feature {
   /** Conditional formatting in a column's menu (how its cells look): quick rules for the column, the table's rules, the column's cleared */
   lineMenu(info: TableInfo, { axis, at: column }: LineMenuTarget, menu: LineMenuBuilder): LineMenuGroup[] {
     if (axis !== "column") return [];
-    const table = parseTable(info.source);
+    const table = info.model;
     const pins = this.host.pinsOf(table);
     const columns = table.rows[0]?.cells.length ?? 0;
     if (column < pins.left || column >= columns - pins.right) return [];
@@ -390,7 +390,7 @@ export class Conditions implements Feature {
         label: own.length ? `Clear rules of this column (${own.length})` : "Clear rules of this column",
         icon: ICONS.clear,
         danger: true,
-        run: () => void this.save(info, this.rulesIn(parseTable((this.host.tableFor(info.key) ?? info).source)).filter((r) => !(r.scope.kind === "column" && r.scope.column === column))),
+        run: () => void this.save(info, this.rulesIn((this.host.tableFor(info.key) ?? info).model).filter((r) => !(r.scope.kind === "column" && r.scope.column === column))),
         ...(own.length ? {} : { disabled: "The column has no rules" }),
       },
     ];
@@ -412,7 +412,7 @@ export class Conditions implements Feature {
   /** Conditional formatting… in the cell menu: a new rule for the cells' column (all in one), else the table */
   cellMenuEntries(info: TableInfo, cells: readonly CellRef[]): CellMenuGroup | undefined {
     if (!cells.length) return undefined;
-    const table = parseTable(info.source);
+    const table = info.model;
     const pins = this.host.pinsOf(table);
     const columns = table.rows[0]?.cells.length ?? 0;
     const column = cells.every((c) => c.column === cells[0]!.column) ? cells[0]!.column : undefined;

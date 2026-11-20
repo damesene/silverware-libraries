@@ -28,7 +28,7 @@ import type { Dialog, ModelHost, TableInfo } from "../core/feature.ts";
 import { formulaField } from "../formulafield.ts";
 import { type FormulasOffer, withEquals } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
-import { escapeCell, parseTable, type Table, unescapeCell } from "../markdown.ts";
+import { escapeCell, type Table, unescapeCell } from "../markdown.ts";
 import { setCell } from "../ops.ts";
 import { withoutTags } from "../tags.ts";
 
@@ -63,7 +63,7 @@ export class ChoicesDialog {
   /** Opens the dialog for a column: a choice column's, or one to become one (nothing written until Save) */
   open(info: TableInfo, column: number): void {
     const { doc } = this.host;
-    const table = parseTable((this.host.tableFor(info.key) ?? info).source);
+    const table = (this.host.tableFor(info.key) ?? info).model;
     const header = table.rows[0]?.cells[column] ?? "";
     const columnName = unescapeCell(withoutTags(withColumnType(header, undefined)));
     const stored = this.host.metaOf(table);

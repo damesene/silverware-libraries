@@ -10,21 +10,19 @@
 // page left first), the edits are written into that page's file; the tab going
 // to the background, they are written at once; the tab closing, too, and the
 // browser asks whether to leave.
-import { type CellEditor, type Feature, type HeldEdit, type ModelHost, type PartTable, type PendingEdits, type TableInfo, type TableLooks, tablePartsOf, type ToolbarButton } from "../core/feature.ts";
-import { formatRule } from "../bridge.ts";
+import { type CellEditor, type Feature, type HeldEdit, type ModelHost, type PartTable, type PendingEdits, type TableInfo, type TableKey, type TableLooks, tablePartsOf, type ToolbarButton } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
-import { locateBySource, parseTable, serializeTable, type Table, unescapeCell } from "../markdown.ts";
+import { type Table, unescapeCell } from "../markdown.ts";
 import { setCell } from "../ops.ts";
 import { withoutTags } from "../tags.ts";
 
 // After a navigation started, what is held waits this long at most for the page loaded
 const LEAVING_MS = 5000;
 
-// What is held for a table: where it was (to find it in its page's text) and its cells' edits
+// What is held for a table: its page and key (to find it there) and its cells' edits
 type Held = {
   readonly page: string;
-  hint: number;
-  source: string;
+  readonly key: TableKey;
   // By "row:column"; `original` is the cell's markdown before the first edit held
   readonly edits: Map<string, HeldEdit>;
 };
@@ -67,7 +65,7 @@ class LazyTable {
   /** The switch: on, cells edited are written later; off, what is held is written at once */
   toolbarButtons(info: TableInfo): ToolbarButton[] {
     // A table none of whose cells is edited by hand (a pivot's): nothing to hold
-    if (!this.on && this.host.readOnlyBody(parseTable(info.source))) return [];
+    if (!this.on && this.host.readOnlyBody(info.model)) return [];
     const unsaved = this.held?.edits.size ?? 0;
     return [
       {
@@ -104,7 +102,7 @@ class LazyTable {
 
   holdCellEdit(info: TableInfo, edit: HeldEdit): boolean {
     if (!this.on) return false;
-    const held = this.held ?? { page: this.host.currentPage, hint: info.hint, source: info.source, edits: new Map() };
+    const held = this.held ?? { page: this.host.currentPage, key: info.key, edits: new Map() };
     const id = cellId(edit);
     // What a write checks is the markdown's cell: the original of the first edit held
     const original = held.edits.get(id)?.original ?? edit.original;
@@ -139,17 +137,13 @@ class LazyTable {
       for (const edit of edits) if (held.edits.get(cellId(edit)) === edit) held.edits.delete(cellId(edit));
       if (!held.edits.size) this.held = undefined;
     }
-    if (skipped) void this.host.bridge.flash(`Silverware Table: ${skipped} ${skipped === 1 ? "cell was" : "cells were"} changed elsewhere meanwhile, the edit there was not saved`, "error");
+    if (skipped) this.host.notify(`Silverware Table: ${skipped} ${skipped === 1 ? "cell was" : "cells were"} changed elsewhere meanwhile, the edit there was not saved`, "error");
     this.host.toolbarChanged();
   }
 
-  // Rendered anew (an edit elsewhere, or back in view): where it is now; written after the delay, if a flush found it gone
-  enhanced(info: TableInfo): void {
-    const held = this.held;
-    if (!held) return;
-    held.hint = info.hint;
-    held.source = info.source;
-    if (!this.host.editing) void this.module.schedule();
+  // Rendered anew (an edit elsewhere, or back in view): written after the delay, if a flush found it gone
+  enhanced(): void {
+    if (this.held && !this.host.editing) void this.module.schedule();
   }
 
   /** The held cells show what was typed (as text: the markdown renders once written), marked */
@@ -185,7 +179,7 @@ class LazyTable {
     const held = this.held;
     if (!held?.edits.size) return false;
     if (this.module.leaving()) return false;
-    if ((await this.host.bridge.getCurrentPage()) !== held.page) {
+    if ((await this.host.pageNameNow()) !== held.page) {
       await this.flushToPage(held);
       return false;
     }
@@ -198,22 +192,21 @@ class LazyTable {
 
   /** The page left: what was held for it is written into its file (SilverBullet saved it before loading the other) */
   private async flushToPage(held: Held): Promise<void> {
-    const { readPage, writePage } = this.host.bridge;
     const count = held.edits.size;
-    const lost = () => void this.host.bridge.flash(`Silverware Table: ${count} ${count === 1 ? "cell" : "cells"} edited on ${held.page} could not be saved`, "error");
-    if (!readPage || !writePage) return lost();
+    const lost = () => this.host.notify(`Silverware Table: ${count} ${count === 1 ? "cell" : "cells"} edited on ${held.page} could not be saved`, "error");
     try {
-      const text = await readPage(held.page);
-      const range = locateBySource(text, held.hint, held.source);
-      if (!range) return lost();
-      const { table, skipped } = applyEdits(parseTable(range.text), [...held.edits.values()]);
-      const format = await this.host.setting("autoFormat");
-      const markdown = serializeTable(format ? { ...table, padded: true } : table, await formatRule((name) => this.host.setting(name)));
-      await writePage(held.page, text.slice(0, range.from) + markdown + text.slice(range.to));
+      let skipped = 0;
+      const change = (table: Table) => {
+        const applied = applyEdits(table, [...held.edits.values()]);
+        skipped = applied.skipped;
+        return applied.table;
+      };
+      // Its table there by its key
+      if ((await this.host.replaceTables(held.page, [{ key: held.key, change }])) === "failed") return lost();
       this.held = undefined;
       const saved = count - skipped;
-      if (saved) void this.host.bridge.flash(`Silverware Table: saved ${saved} ${saved === 1 ? "cell" : "cells"} edited on ${held.page}`, "info");
-      if (skipped) void this.host.bridge.flash(`Silverware Table: ${skipped} ${skipped === 1 ? "cell" : "cells"} on ${held.page} changed elsewhere meanwhile, the edit there was not saved`, "error");
+      if (saved) this.host.notify(`Silverware Table: saved ${saved} ${saved === 1 ? "cell" : "cells"} edited on ${held.page}`, "info");
+      if (skipped) this.host.notify(`Silverware Table: ${skipped} ${skipped === 1 ? "cell" : "cells"} on ${held.page} changed elsewhere meanwhile, the edit there was not saved`, "error");
     } catch (e) {
       console.error("Silverware Table: could not save the cells held", e);
       lost();
@@ -292,7 +285,7 @@ export class Lazy implements Feature {
   keyDown(e: KeyboardEvent): boolean {
     const undo = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "z";
     const inField = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
-    const { undo: undoEdit } = this.host.bridge;
+    const { undoEdit } = this.host;
     if (!undo || inField || !this.holding().length || !undoEdit) return false;
     e.preventDefault();
     e.stopPropagation();

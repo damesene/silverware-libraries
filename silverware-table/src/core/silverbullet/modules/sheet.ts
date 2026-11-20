@@ -27,7 +27,7 @@
 // SilverBullet's navigation. Formulas of the board's tables read in the
 // sheet's addresses (addressFrame): a reference is to a record, so sorting a
 // table changes the address shown, not the value.
-import { CELL_MENU_ORDER, type AdapterFeature, type AddressFrame, type AlsoChanged, type CellArea, type CellEditor, type CellMenuGroup, type CellRef, type RenderedEditor, type TableHost, type TableInfo, type TableTarget, type ToolbarButton, type WidgetInfo, type WriteResult } from "../../feature.ts";
+import { CELL_MENU_ORDER, type AdapterFeature, type AddressFrame, type TableChange, type CellArea, type CellEditor, type CellMenuGroup, type CellRef, type RenderedEditor, type TableHost, type TableInfo, type TableTarget, type ToolbarButton, type WidgetInfo, type WriteResult } from "../../feature.ts";
 import { oncePerFrame } from "../../frame.ts";
 import { claimWindow, releaseWindow } from "../../overwindow.ts";
 import { DRAWN_CLASS, STAND_IN_CLASS, UI_CLASS } from "../../../dom.ts";
@@ -161,10 +161,13 @@ export class Sheet implements AdapterFeature {
   private watching: MutationObserver | undefined;
 
   constructor(private readonly host: TableHost) {
-    const { doc, bridge } = host;
-    this.renderer = new StaticCellRenderer(doc, (markdown) =>
-      bridge.markdownToHtml ? bridge.markdownToHtml(markdown) : Promise.reject(new Error("SilverBullet's markdown.markdownToHtml is not handed over")),
-    );
+    const { doc } = host;
+    // (The platform as it is when a table is drawn: a new one comes with Space Lua loaded again)
+    this.renderer = new StaticCellRenderer(doc, async (markdown) => {
+      const { renderer } = host.platform;
+      if (!renderer.markdownToHtml) throw new Error("SilverBullet's markdown.markdownToHtml is not handed over");
+      return renderer.markdownToHtml(markdown);
+    });
     this.queuePlace = oncePerFrame(doc, () => this.place());
     this.queueRefresh = oncePerFrame(doc, () => void this.refresh());
     this.letters = host.floating("div", "swt-sheet-letters");
@@ -328,7 +331,7 @@ export class Sheet implements AdapterFeature {
   private async refresh(): Promise<void> {
     const board = this.board;
     if (!board) return;
-    const text = await this.host.bridge.getText();
+    const text = await this.host.pageTextNow();
     if (this.board !== board) return;
     // A table of the board put on another sheet (its name typed in the toolbar), or the table alone put on one: the
     // board shows that sheet from now on
@@ -392,10 +395,9 @@ export class Sheet implements AdapterFeature {
     // anew); with a modifier the browser's (a new tab)
     widget.addEventListener("click", (e) => {
       const link = e.target instanceof Element ? e.target.closest<HTMLElement>("a[data-ref]") : null;
-      const navigate = this.host.bridge.navigate;
-      if (!link?.dataset.ref || !navigate || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      if (!link?.dataset.ref || !this.host.platform.editor.open || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
       e.preventDefault();
-      void navigate(link.dataset.ref);
+      this.host.navigate(link.dataset.ref);
     });
     widget.classList.add("swt-sheet-table");
     // At its place on the grid at once, not at the board's start until the next frame lays it out: the cell to edit
@@ -524,7 +526,7 @@ export class Sheet implements AdapterFeature {
   private async newSheet(): Promise<void> {
     const board = this.board;
     if (!board) return;
-    await this.switchTo(freeSheetName(this.host, await this.host.bridge.getText()), true);
+    await this.switchTo(freeSheetName(this.host, await this.host.pageTextNow()), true);
   }
 
   /** A tab's menu, above it: its name in the title (the pencil renames the sheet), Remove sheet */
@@ -592,7 +594,7 @@ export class Sheet implements AdapterFeature {
     if (!board || name === sheet) return undefined;
     const problem = validateSheetName(name);
     if (problem) return problem;
-    const text = await this.host.bridge.getText();
+    const text = await this.host.pageTextNow();
     const shown = !!board.sheet && sameSheet(board.sheet, sheet);
     // (Its own name in another case: renamed)
     const taken = sheetsOf(sheetTables(this.host, text)).some((s) => sameSheet(s.name, name) && !sameSheet(s.name, sheet)) || (board.fresh && !shown && !!board.sheet && sameSheet(board.sheet, name));
@@ -606,7 +608,7 @@ export class Sheet implements AdapterFeature {
     const last = tables[tables.length - 1];
     if (!last) return undefined;
     const renamed = (t: Table) => this.host.setMeta(t, SHEET_KEY, name);
-    const result = await this.host.writeTable(last.target, renamed, { also: tables.slice(0, -1).map((t) => ({ target: t.target, change: renamed })) });
+    const result = await this.host.writeTable(last.target, renamed, { also: tables.slice(0, -1).map((t) => ({ key: t.target.key, change: renamed })) });
     if (result === "written" && shown && this.board === board) board.sheet = name;
     return undefined;
   }
@@ -619,7 +621,7 @@ export class Sheet implements AdapterFeature {
   private async removeSheet(sheet: string): Promise<void> {
     const board = this.board;
     if (!board) return;
-    const text = await this.host.bridge.getText();
+    const text = await this.host.pageTextNow();
     const shown = !!board.sheet && sameSheet(board.sheet, sheet);
     const fresh = board.fresh && shown;
     // Shown: the board goes to the next tab first (else it would end, seeing no table of it left, as it reads the page)
@@ -635,7 +637,7 @@ export class Sheet implements AdapterFeature {
       if (!last) return;
       const off = (t: Table) => this.host.setMeta(this.host.setMeta(t, SHEET_KEY, undefined), AT_KEY, undefined);
       const bare = (t: Table) => [...this.host.metaOf(t).keys()].filter((k) => k.startsWith(WIDTH_PREFIX)).reduce((out, k) => this.host.setMeta(out, k, undefined), off(t));
-      await this.host.writeTable(last.target, off, { also: tables.slice(0, -1).map((t) => ({ target: t.target, change: bare })) });
+      await this.host.writeTable(last.target, off, { also: tables.slice(0, -1).map((t) => ({ key: t.target.key, change: bare })) });
     }
     if (ends && this.board === board) this.end();
   }
@@ -1042,7 +1044,7 @@ export class Sheet implements AdapterFeature {
     if (placed.at.row === at.row && placed.at.column === at.column) return "unchanged";
     const problem = this.validatePlaceFor(key, at);
     if (problem) {
-      void this.host.bridge.flash(`Silverware Table: the table cannot go to ${formatAt(at)}: ${problem}`, "info");
+      this.host.notify(`Silverware Table: the table cannot go to ${formatAt(at)}: ${problem}`, "info");
       return "failed";
     }
     return this.host.writeTable(info, (t) => this.host.setMeta(t, AT_KEY, formatAt(at)));
@@ -1208,7 +1210,7 @@ export class Sheet implements AdapterFeature {
   private async addTable(key: TableKey, at: SheetCell): Promise<void> {
     const board = this.board;
     if (!board) return;
-    const text = await this.host.bridge.getText();
+    const text = await this.host.pageTextNow();
     const keys = this.host.tableKeys(this.host.currentPage, text);
     const ranges = findTables(text);
     const range = ranges[keys.indexOf(key)];
@@ -1216,7 +1218,7 @@ export class Sheet implements AdapterFeature {
     const model = parseTable(range.text);
     const problem = this.validateAdd({ rows: model.rows.length, columns: model.align.length }, at);
     if (problem) {
-      void this.host.bridge.flash(`Silverware Table: the table cannot go to ${formatAt(at)}: it would cover ${problem}`, "info");
+      this.host.notify(`Silverware Table: the table cannot go to ${formatAt(at)}: it would cover ${problem}`, "info");
       return;
     }
     const from = this.host.getMeta(model, SHEET_KEY);
@@ -1346,7 +1348,7 @@ export class Sheet implements AdapterFeature {
     win.addEventListener("mousemove", this.showPicked, true);
     win.addEventListener("pointerdown", this.pickPress, true);
     const press = this.host.pressedWith === "touch" ? "tap the cell where its top left corner goes" : "click the cell where its top left corner goes; Esc cancels";
-    void this.host.bridge.flash(`Silverware Table: ${press}`, "info");
+    this.host.notify(`Silverware Table: ${press}`, "info");
   }
 
   private endPicking(): void {
@@ -1404,7 +1406,7 @@ export class Sheet implements AdapterFeature {
    */
   private async setColumnWidth(board: Board, column: number, width: number | undefined): Promise<void> {
     try {
-      const text = await this.host.bridge.getText();
+      const text = await this.host.pageTextNow();
       const keys = this.host.tableKeys(this.host.currentPage, text);
       const range = board.sheet
         ? sheetDataTable(this.host, sheetsOf(sheetTables(this.host, text)).find((s) => sameSheet(s.name, board.sheet!))?.tables ?? [])?.range
@@ -1609,7 +1611,7 @@ export class Sheet implements AdapterFeature {
     }
     if (!owner) {
       const into = this.wouldOverlap(owners[0]!.key, owners[0]!.cell);
-      void this.host.bridge.flash(`Silverware Table: the table cannot grow into ${into}, which overlaps it on the sheet already: check their places (at)`, "info");
+      this.host.notify(`Silverware Table: the table cannot grow into ${into}, which overlaps it on the sheet already: check their places (at)`, "info");
       return;
     }
     const cell = this.showCell(at);
@@ -1633,7 +1635,7 @@ export class Sheet implements AdapterFeature {
     const board = this.board;
     if (!board) return;
     if (!this.host.metadataEnabled) {
-      void this.host.bridge.flash("Silverware Table: a table on a sheet is kept in its metadata: turn on Store table metadata in the settings first", "info");
+      this.host.notify("Silverware Table: a table on a sheet is kept in its metadata: turn on Store table metadata in the settings first", "info");
       return;
     }
     const top = Math.max(0, at.row - 1);
@@ -1643,7 +1645,7 @@ export class Sheet implements AdapterFeature {
     const pageTables = findTables(this.host.pageText);
     if (!host || !pageTables.length) {
       // (An editor belongs to a table: none of the page's is in the document, far from the part of the page in view)
-      if (!last) void this.host.bridge.flash("Silverware Table: no table of the page is at hand to type with: add one here from the cell's menu (right-click), or close the sheet view near a table of the page", "info");
+      if (!last) this.host.notify("Silverware Table: no table of the page is at hand to type with: add one here from the cell's menu (right-click), or close the sheet view near a table of the page", "info");
       return;
     }
     const inWay = [...board.tables.values()].some((p) => {
@@ -1651,7 +1653,7 @@ export class Sheet implements AdapterFeature {
       return at.column >= e.left && at.column <= e.right && top + 1 >= e.top && top <= e.bottom;
     });
     if (inWay) {
-      void this.host.bridge.flash("Silverware Table: there is no room for a new table here (its header goes above the cell)", "info");
+      this.host.notify("Silverware Table: there is no room for a new table here (its header goes above the cell)", "info");
       return;
     }
     const cell = this.showCell(at);
@@ -1678,11 +1680,11 @@ export class Sheet implements AdapterFeature {
    */
   private async writeNew(at: SheetCell, typed: string, key: TableKey | undefined): Promise<"written" | "unchanged" | "failed"> {
     if (!this.board) return "failed";
-    const text = await this.host.bridge.getText();
+    const text = await this.host.pageTextNow();
     const trimmed = typed.trim();
     const value = trimmed.startsWith("'=") ? trimmed.slice(1) : trimmed;
     if (!trimmed.startsWith("'=") && isFormulaInput(trimmed)) {
-      void this.host.bridge.flash(
+      this.host.notify(
         "Silverware Table: saved as text, as a formula needs its table first: edit the cell in the sheet view and remove the ' to make it a formula",
         "info",
       );
@@ -1715,7 +1717,7 @@ export class Sheet implements AdapterFeature {
    * edit (`also`: a formula refers to another table by its name); `taken`:
    * the name given to it, which the joining table cannot have
    */
-  private sheetFor(board: Board, text: string): { sheet: string; taken: string[]; also: AlsoChanged | undefined } {
+  private sheetFor(board: Board, text: string): { sheet: string; taken: string[]; also: TableChange | undefined } {
     if (board.sheet) return { sheet: board.sheet, taken: [], also: undefined };
     const keys = this.host.tableKeys(this.host.currentPage, text);
     const alone = findTables(text)[keys.indexOf(board.alone)];
@@ -1726,18 +1728,18 @@ export class Sheet implements AdapterFeature {
       sheet,
       taken: [name],
       also: {
-        target: { key: board.alone, source: alone.text, hint: alone.from },
+        key: board.alone,
         change: (t: Table) => this.host.setMeta(this.host.setMeta(this.host.withTableName(t, name), SHEET_KEY, sheet), AT_KEY, "A1"),
       },
     };
   }
 
   /** A table alone's board written to be a sheet (sheetFor's `also`): the sheet's from now on, said so */
-  private becameSheet(board: Board, sheet: string, also: AlsoChanged | undefined, joined: string): void {
+  private becameSheet(board: Board, sheet: string, also: TableChange | undefined, joined: string): void {
     if (!also || this.board !== board) return;
     // Its tables, the one joining too, as the page has them
     board.sheet = sheet;
-    void this.host.bridge.flash(`Silverware Table: the table and ${joined} are on the sheet ${sheet} now (Ctrl+Z undoes it)`, "info");
+    this.host.notify(`Silverware Table: the table and ${joined} are on the sheet ${sheet} now (Ctrl+Z undoes it)`, "info");
   }
 
   /**
@@ -1778,7 +1780,7 @@ export class Sheet implements AdapterFeature {
       this.go(at, false);
       const name = this.host.tableName(parseTable(inWay.range.text));
       const what = `${data.length} row${data.length === 1 ? "" : "s"} and ${columns} column${columns === 1 ? "" : "s"}`;
-      void this.host.bridge.flash(`Silverware Table: there is no room here for the ${what} pasted: they would cover ${name ?? `the table at ${formatAt(inWay.at)}`}`, "info");
+      this.host.notify(`Silverware Table: there is no room here for the ${what} pasted: they would cover ${name ?? `the table at ${formatAt(inWay.at)}`}`, "info");
       return;
     }
     // The table takes the cell's place
@@ -1786,7 +1788,7 @@ export class Sheet implements AdapterFeature {
     const line = (cells: readonly string[]) => `| ${Array.from({ length: columns }, (_, c) => escapeCell((cells[c] ?? "").trim())).join(" | ")} |`;
     const markdown = [line(header), `|${"---|".repeat(columns)}`, ...body.map(line)].join("\n");
     // Empty header cells named as a new column is, each name once
-    await this.insertNew(await this.host.bridge.getText(), nameEmptyHeaders(parseTable(markdown)), { row: top, column: at.column }, undefined);
+    await this.insertNew(await this.host.pageTextNow(), nameEmptyHeaders(parseTable(markdown)), { row: top, column: at.column }, undefined);
   }
 
   /** The module's td over an empty cell (the one selected or edited), where that cell is now */

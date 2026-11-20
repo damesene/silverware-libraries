@@ -7,10 +7,8 @@
 // said once (until it is defined anew); an entry whose run throws or rejects
 // is said so too, the menu going on.
 import type { Feature, LineMenuBuilder, LineMenuGroup, LineMenuTarget, ModelHost, TableInfo } from "../core/feature.ts";
-import { locateBySource, parseTable } from "../markdown.ts";
 import { type MenuEntry, wrapRuns } from "../menu.ts";
 import { type MenuEntriesContext, type MenuEntriesDefinition, menuEntriesDefinitions } from "../menus/custom.ts";
-import { tableData } from "../tabledata.ts";
 
 const SLOTS = new Set(["clipboard", "edit", "insert", "columnType", "view", "look", "remove"]);
 // (No element of a definition's own: the builder makes none, and one that is no node would break the whole menu)
@@ -57,9 +55,7 @@ export class CustomMenus implements Feature {
   lineMenu(info: TableInfo, target: LineMenuTarget, menu: LineMenuBuilder): LineMenuGroup[] {
     const definitions = menuEntriesDefinitions();
     if (!definitions.length) return [];
-    const table = parseTable(info.source);
-    const place = locateBySource(this.host.pageText, info.hint, info.source) ?? { from: info.hint, to: info.hint + info.source.length };
-    const data = tableData(table, place, this.host.tableName(table), (column) => this.host.columnName(table, column));
+    const data = this.host.tableData(info);
     // Each definition its own copy: one changing it (sorting the rows) changes nothing the next is given
     const contextOf = (): MenuEntriesContext => ({
       axis: target.axis,
@@ -127,6 +123,6 @@ export class CustomMenus implements Feature {
     if (!ran && this.said.has(definition)) return;
     if (!ran) this.said.add(definition);
     console.error(`Silverware Table: menu entries ${definition.name}: ${problem}`);
-    void this.host.bridge.flash(`Silverware Table: the menu entries ${definition.name} ${ran ? "failed" : "are not shown"}: ${problem}`, "error");
+    this.host.notify(`Silverware Table: the menu entries ${definition.name} ${ran ? "failed" : "are not shown"}: ${problem}`, "error");
   }
 }

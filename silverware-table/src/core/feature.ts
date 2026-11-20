@@ -3,27 +3,36 @@
 // state and listeners and works through the host.
 import type { TableKey } from "./tables.ts";
 export type { TableKey } from "./tables.ts";
+export type { StoredTable, TableRevision } from "./store.ts";
 import type { TableParts } from "./parts.ts";
 export type { PartTable, TablePart, TableParts } from "./parts.ts";
 export { tablePartsOf } from "./parts.ts";
-import type { Bridge, FeatureName, SETTINGS, SettingValue } from "../bridge.ts";
+import type { FeatureName, SETTINGS, SettingValue } from "../bridge.ts";
+import type { TablePlatform } from "./platform.ts";
+import type { StoredTable, TableRevision } from "./store.ts";
 import type { Dialog, DialogOptions } from "./dialog.ts";
 import type { Rect } from "./geometry.ts";
 
 export type { Dialog, DialogOptions } from "./dialog.ts";
 export type { Rect } from "./geometry.ts";
 import type { IndexMap } from "../ops.ts";
-import type { OtherPages, PageTable, Table } from "../markdown.ts";
+import type { Table } from "../markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "../menu.ts";
 import type { MenuBuilder, MenuGroup, MenuSection } from "../../../shared/menuslots.ts";
 import type { CellNameAt, RowName } from "../names.ts";
 import type { Pins, ViewState } from "../view.ts";
+import type { TableData } from "../tabledata.ts";
 
 /** A table shown, in model terms (what modules get): where it is in the page, its shape, its pins */
 export type TableInfo = {
   // The table's markdown when it was rendered: the editor only reuses a
-  // rendered table while its markdown stays exactly the same
+  // rendered table while its markdown stays exactly the same (the core's and
+  // the store's: modules read `model` and compare `revision`)
   readonly source: string;
+  /** The table as rendered */
+  readonly model: Table;
+  /** Its model's revision: equal, the same model (a module's state kept for it compares it) */
+  readonly revision: TableRevision;
   readonly hint: number;
   readonly key: TableKey;
   readonly columns: number;
@@ -425,7 +434,6 @@ export type ToolbarButton = {
 /** A place in the page's text (the cursor's), as an offset */
 export type TextPosition = { readonly position: number };
 
-export type AlsoChanged = { readonly target: TableTarget; readonly change: (table: Table) => Table };
 
 export type WriteOptions = {
   // The cell to edit once the table is rendered again
@@ -444,7 +452,7 @@ export type WriteOptions = {
   readonly claims?: boolean;
   // Other tables changed in the same edit (a table alone put on the sheet another table joins; a sheet's tables
   // renamed with it)
-  readonly also?: readonly AlsoChanged[];
+  readonly also?: readonly TableChange[];
 };
 
 /**
@@ -476,8 +484,28 @@ export type ColumnsMeasure = { readonly columns: readonly ColumnMeasure[]; reado
  */
 export type ColumnWidths = { readonly widths: ReadonlyMap<number, number>; readonly box?: number };
 
-/** The page a write edits: its text as read for it, its tables, and where the edited table is */
-export type WritePage = { readonly text: string; readonly tables: readonly PageTable[]; readonly from: number };
+/**
+ * The page a write edits: its tables in order (as the features before have changed them so far), its tables as read
+ * for the write, the edited table's key; its text as read, for formulas written outside its tables (until the store
+ * keeps such places: docs/silverware-table-store-plan.md, step 4)
+ */
+export type WritePage = { readonly text: string; readonly tables: readonly KeyedTable[]; readonly read: readonly KeyedTable[]; readonly key: TableKey };
+
+/** A table's change, by its key: the table as it is now to the table as written */
+export type TableChange = { readonly key: TableKey; readonly change: (model: Table) => Table };
+
+/** A table of the page by its key, with its model: one a write reads, or another it changes in the same edit (otherTablesWritten) */
+export type KeyedTable = { readonly key: TableKey; readonly model: Table };
+
+/**
+ * The other pages formulas can read (the pageLinks module reads them): the tables of each as read (null: no such
+ * page; undefined: not read, formulas referring to it keep their results), and a count that changes whenever one is
+ * read
+ */
+export type OtherPages = {
+  readonly tables: (page: string) => readonly StoredTable[] | null | undefined;
+  readonly version: number;
+};
 
 /** An edit as features' write steps see it: how rows and columns moved, and the page */
 export type WriteEdit = WriteOptions & { readonly page: WritePage };
@@ -582,7 +610,44 @@ export type NamingTarget =
  */
 export interface ModelHost {
   readonly doc: Document;
-  readonly bridge: Bridge;
+  /** Tells the user (a notification); `timeout` 0: shown until closed */
+  notify(message: string, type?: "info" | "error", options?: { readonly timeout?: number }): void;
+  /** Opens a reference where the platform opens one (a page, a hashtag's page: a link in a table drawn by a module) */
+  navigate(ref: string): void;
+
+  // What a module asks of the platform besides tables (the store's: `tables`, `pageTables`, `replaceTables`): until
+  // the store plan's step 4 (an insert's place, docs/silverware-table-store-plan.md), nothing else reaches a module
+  /** The open page's name now */
+  pageNameNow(): Promise<string>;
+  /** Where the cursor is in the open page's text; undefined: the platform does not say */
+  cursorNow(): Promise<number | undefined>;
+  /** The editor's own undo of its last edit; undefined: the platform has none */
+  readonly undoEdit: (() => Promise<void>) | undefined;
+  /** A document's tables in order (a page's name), as it is now: the open page's in the editor, another's in the space; null: not there, or not read */
+  tables(document: string): Promise<readonly StoredTable[] | null>;
+  /**
+   * A document's tables changed in one edit, by their keys (the open page's: one step of its undo; another's written
+   * whole), each change given the table as it is now, written as every write writes tables (autoFormat); no module's
+   * write step taking part (a page command over every table, edits held for a page left). "failed" where one of the
+   * tables is not in the document (or it is not there)
+   */
+  replaceTables(document: string, changes: readonly TableChange[]): Promise<WriteResult>;
+  /**
+   * The open page's tables in order, as last read (pageText): the same list while that text is (a module's state kept
+   * for the page compares it), a table of the page found in it by its key
+   */
+  pageTables(): readonly StoredTable[];
+  /**
+   * A table shown as data, as `silverware.table.tables` gives it (its name, columns, cells, its place in the page's
+   * text as last read): what a user's script is handed (custom menu entries)
+   */
+  tableData(info: TableInfo): TableData;
+  /** Whether other pages are read (none where the platform reads no page but the open one): formulas and pivots referring to one */
+  readonly readsOtherPages: boolean;
+  /** Every page's name (none where the platform lists none): what a page is picked from */
+  pageNames(): Promise<readonly string[]>;
+  /** A setting by its path, `fallback` where it has none: a module's own of an open form (Excel's functions), not in SETTINGS */
+  configured(path: string, fallback: unknown): Promise<unknown>;
   /** Whether a node is in one of Silverware Table's floating controls (toolbar, grips, menus): one the core made */
   isFloating(node: Node): boolean;
   /**
@@ -604,7 +669,7 @@ export interface ModelHost {
    * table's, made before it is written (newTableKey), for what the caller
    * keeps for it meanwhile. No other table's key changes, wherever it goes.
    */
-  insertTable(table: Table, after?: TableTarget | TextPosition, also?: AlsoChanged, key?: TableKey): Promise<WriteResult>;
+  insertTable(table: Table, after?: TableTarget | TextPosition, also?: TableChange, key?: TableKey): Promise<WriteResult>;
   /**
    * Deletes a table from the page in one edit, as Delete table in its ⋯ menu
    * does; `unasked`: no question, unless something goes with it (formulas
@@ -615,13 +680,6 @@ export interface ModelHost {
   newTableKey(): TableKey;
   /** A table shown, by its key, as it is now (rendered anew after a write: its new info) */
   tableFor(key: TableKey): TableInfo | undefined;
-  /**
-   * The keys of a page's tables in its text (as read now: bridge.getText), in
-   * the order findTables gives them: a table found in the text by its key. How
-   * tables are told apart is the core's (core/tables.ts): a key is made by it
-   * only, never from a table's place
-   */
-  tableKeys(page: string, text: string): readonly TableKey[];
   /** A module's part for a table (its tableParts), made the first time it is asked for */
   tablePart<P extends object>(owner: Feature, key: TableKey): P | undefined;
   /** A module's parts made so far: what it does for every table (flushing what each holds) */
@@ -753,12 +811,10 @@ export interface ModelHost {
   takeEditor(): { readonly key: TableKey; readonly row: number; readonly column: number; readonly save: (table: Table) => Table | undefined } | undefined;
   /** Closes the cell editor saving, as leaving it does (an edit a feature holds stays held), the focus left where it is */
   saveEditing(): Promise<void>;
-  /** Asks the user (SilverBullet's dialog, else the browser's) */
+  /** Asks the user before a destructive change (SilverBullet's dialog, else the browser's) */
   ask(question: string): Promise<boolean>;
   /** The table as edited: its markdown with the edits features hold (pendingEdits), what a cell's editor starts from */
   tableOf(info: TableInfo): Table;
-  /** The page's text as last read */
-  readonly pageText: string;
   /** The name of the page shown */
   readonly currentPage: string;
   /** The other pages a feature read for formulas (pageLinks); undefined: none reads them */
@@ -911,6 +967,19 @@ export interface ModelHost {
 
 /** What the core offers the adapter's modules (src/core/silverbullet/modules/): the model host and the rendering */
 export interface TableHost extends ModelHost {
+  /** The platform (core/platform.ts): the adapter is the host's side, which the modules' host functions stand for */
+  readonly platform: TablePlatform;
+  /** The page's text as last read */
+  readonly pageText: string;
+  /** The open page's text as the editor has it now */
+  pageTextNow(): Promise<string>;
+  /**
+   * The keys of a page's tables in its text (as read now: pageTextNow), in
+   * the order findTables gives them: a table found in the text by its key. How
+   * tables are told apart is the core's (core/tables.ts): a key is made by it
+   * only, never from a table's place
+   */
+  tableKeys(page: string, text: string): readonly TableKey[];
   infoOf(widget: HTMLElement): WidgetInfo | undefined;
   /** The rendered table a key belongs to, if it is enhanced and on screen */
   widgetForKey(key: TableKey): HTMLElement | undefined;
@@ -1127,7 +1196,7 @@ export interface Feature {
    * referring to the edited table); `edit.page.tables` has those features
    * before it changed. `after` undefined: the table is deleted (Delete table)
    */
-  otherTablesWritten?(before: Table, after: Table | undefined, edit: WriteEdit): readonly PageTable[];
+  otherTablesWritten?(before: Table, after: Table | undefined, edit: WriteEdit): readonly KeyedTable[];
   /**
    * Other places of the page's text, outside its tables, the write changes
    * too, in the same edit (formulas written in the text, referring to the

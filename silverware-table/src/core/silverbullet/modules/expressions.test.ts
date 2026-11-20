@@ -7,10 +7,8 @@ describe("${…} cells", () => {
 
   it("re-evaluates ${…} cells once the page is indexed", async () => {
     // the fake render shows the expression source; SilverBullet would show a stale value
-    await setup("| N | Sum |\n|---|---|\n| a | 1 |\n| b | ${S()} |\n| c | x ${S()} |\n");
     let sum = 42;
-    (controller as unknown as { bridge: Record<string, unknown> }).bridge.evalExpression = (e: string) =>
-      e === "S()" ? sum : undefined;
+    await setup("| N | Sum |\n|---|---|\n| a | 1 |\n| b | ${S()} |\n| c | x ${S()} |\n", {}, { evalExpression: (e) => (e === "S()" ? sum : undefined) });
     vi.useFakeTimers();
     const indexed = async (page: string) => {
       await controller.pageIndexed(page);
@@ -28,8 +26,7 @@ describe("${…} cells", () => {
   });
 
   it("keeps an open cell editor focused when ${…} cells are re-evaluated", async () => {
-    await setup("| N | Sum |\n|---|---|\n| a | 1 |\n| b | 2 |\n| total | ${S()} |\n");
-    (controller as unknown as { bridge: Record<string, unknown> }).bridge.evalExpression = () => 3;
+    await setup("| N | Sum |\n|---|---|\n| a | 1 |\n| b | 2 |\n| total | ${S()} |\n", {}, { evalExpression: () => 3 });
     clickOn(cell(2, 1)); // b's Sum
     const field = editor.querySelector<HTMLInputElement>(".swt-cell-editor")!;
     field.value = "25";

@@ -20,22 +20,25 @@
 // can call), custom functions in custom.ts, which exist in registry.ts.
 export { type CalculatedBy, type CalculatedRead, type HeldFormulas, type CellNameAt, cellResult, PLAIN_CELLS, withEquals, cellsByName, errorCodeIn, type FormulaCells, formulaCount, forFormulas, hasFormulas, isErrorText, isFormulaInput, type RowName, rowsByName, type StoredFormula } from "./cell.ts";
 
+/** A table of a page as the formulas module is given one: what tells it apart (its key), and its model */
+export type PageTableModel = { readonly key: string; readonly model: import("../markdown.ts").Table };
+
 /**
  * What the formulas module offers other modules (ModelHost.offered("formulas")): its cells as the formulas read them;
- * `evaluate`: a formula calculated in no table, on the page's text (the Space Lua API's), a range as its values,
+ * `evaluate`: a formula calculated in no table, on a page's `tables` (the Space Lua API's), a range as its values,
  * and the other pages it read
  */
 export type FormulasOffer = {
   readonly cells: import("./cell.ts").FormulaCells;
-  readonly evaluate: (formula: string, text: string, page?: string) => Promise<{ readonly value: import("./values.ts").Value; readonly pages: readonly string[] }>;
-  /** The errors the formula cells of a page's tables show, calculated now on its text (the Space Lua API's errors), and the other pages read */
-  readonly errors: (text: string, page?: string) => Promise<{ readonly errors: readonly FormulaErrorAt[]; readonly pages: readonly string[] }>;
+  readonly evaluate: (formula: string, tables: readonly PageTableModel[], page?: string) => Promise<{ readonly value: import("./values.ts").Value; readonly pages: readonly string[] }>;
+  /** The errors the formula cells of a page's tables show, calculated now on them (the Space Lua API's errors), and the other pages read */
+  readonly errors: (tables: readonly PageTableModel[], page?: string) => Promise<{ readonly errors: readonly FormulaErrorAt[]; readonly pages: readonly string[] }>;
   /**
-   * What the name typed before `caret` in `formula` may be, on the page's `text`: its place in `formula` and the
+   * What the name typed before `caret` in `formula` may be, among a page's `tables`: its place in `formula` and the
    * choices; `table`, the table the formula is of (as a cell's formula is): its columns in [ ] and [@ ], its named
    * rows and cells, its own name's prefix, as a cell's formula has them
    */
-  readonly complete: (formula: string, caret: number, text: string, table?: import("../markdown.ts").Table) => import("./help.ts").FormulaChoices | undefined;
+  readonly complete: (formula: string, caret: number, tables: readonly PageTableModel[], table?: import("../markdown.ts").Table) => import("./help.ts").FormulaChoices | undefined;
   /** The function the caret is in, its syntax with the argument at the caret; undefined out of any */
   readonly help: (formula: string, caret: number) => import("./help.ts").FormulaHelp | undefined;
   /** Why a formula does not read (a ")" missing); undefined: it does */
@@ -55,7 +58,7 @@ export type FormulasOffer = {
   readonly view: (
     formula: string,
     table?: import("../markdown.ts").Table,
-    replace?: { readonly from: number; readonly table: import("../markdown.ts").Table },
+    replace?: { readonly key: string; readonly table: import("../markdown.ts").Table },
   ) => import("./values.ts").Grid | import("./values.ts").FormulaError | undefined;
   /**
    * The Functions dialog for a formula typed outside a cell (a view's dialog: the Functions dialog opens over it), its
@@ -79,14 +82,14 @@ export type FormulasOffer = {
 
 /**
  * A formula cell showing an error, as the formulas module's `errors` gives it: its table's name (none where
- * unnamed), its cell as formulas address it (`C3`), its column's key, where its row starts in the page's
- * text, its formula, and the error's code and why
+ * unnamed), its cell as formulas address it (`C3`), its column's key, where it is (`place`: its table's among the
+ * tables given, its row there, the header 0, and its column), its formula, and the error's code and why
  */
 export type FormulaErrorAt = {
   readonly table?: string;
   readonly cell: string;
   readonly column: string;
-  readonly at: number;
+  readonly place: { readonly table: number; readonly row: number; readonly column: number };
   readonly formula: string;
   readonly code: import("./values.ts").ErrorCode;
   readonly detail: string;

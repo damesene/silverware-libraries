@@ -39,9 +39,9 @@ export class ResultView {
     const values = [resultHeader(grid), ...resultRows(grid)];
     try {
       await writeClipboard(this.host.doc, clipboardText(values), clipboardHtml(values));
-      void this.host.bridge.flash(`Silverware Table: result copied (${resultSize(grid)})`, "info");
+      this.host.notify(`Silverware Table: result copied (${resultSize(grid)})`, "info");
     } catch {
-      void this.host.bridge.flash("Silverware Table: the result could not be copied", "error");
+      this.host.notify("Silverware Table: the result could not be copied", "error");
     }
   }
 

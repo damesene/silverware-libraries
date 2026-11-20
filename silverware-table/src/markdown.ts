@@ -313,16 +313,6 @@ export function metaAttribute(name: string, value: string): string {
 /** A table of a page: where it is, and its model */
 export type PageTable = { readonly range: TableRange; readonly table: Table };
 
-/**
- * The other pages formulas can read (the pageLinks module reads them): the tables of each
- * as read (null: no such page; undefined: not read, formulas referring to it
- * keep their results), and a count that changes whenever one is read
- */
-export type OtherPages = {
-  readonly tables: (page: string) => readonly PageTable[] | null | undefined;
-  readonly version: number;
-};
-
 /** The tables of a page's text, parsed */
 export function pageTablesOf(text: string): PageTable[] {
   return findTables(text).map((range) => ({ range, table: parseTable(range.text) }));

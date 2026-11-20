@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { STICKY_GAP } from "./core/layout.ts";
-import { PAGE, bodyTexts, cell, clickOn, controller, cursorMoves, editor, edits, flashes, flush, inInsertBand, key, pointInsert, press, renderPage, setText, setup, tableMenuItem, text, toolbarName, useTablePage, tableKey } from "./testing/page.ts";
+import { bridge, PAGE, bodyTexts, cell, clickOn, controller, cursorMoves, editor, edits, flashes, flush, inInsertBand, key, pointInsert, press, renderPage, setText, setup, tableMenuItem, text, toolbarName, useTablePage, tableKey } from "./testing/page.ts";
 import { insertRowWith, pinRowAt } from "./core/structure.ts";
 
 describe("Controller", () => {
@@ -581,7 +581,7 @@ describe("Controller", () => {
   it("applies the sorting to the markdown, once confirmed, and ends the sorting view", async () => {
     await setup(PAGE);
     let agree = false;
-    (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = () => agree;
+    bridge.confirm = () => agree;
     const sortQty = () => clickOn(cell(0, 1).querySelector(".swt-sort")!);
     sortQty();
     sortQty(); // Qty descending
@@ -812,9 +812,9 @@ describe("Controller", () => {
     const top = () => editor.querySelector<HTMLElement>(".sb-table-widget")!.getBoundingClientRect().top;
     // What SilverBullet's editor does while it measures a table rendered anew: the page jumps
     const jumpAfterWrite = () => {
-      const bridge = controller.bridge as { replaceRange: (from: number, to: number, insert: string) => unknown };
-      const replace = bridge.replaceRange.bind(bridge);
-      bridge.replaceRange = async (from, to, insert) => {
+      const watched = bridge as unknown as { replaceRange: (from: number, to: number, insert: string) => unknown };
+      const replace = watched.replaceRange.bind(watched);
+      watched.replaceRange = async (from, to, insert) => {
         await replace(from, to, insert);
         scroller.scrollTop = 0;
         setTimeout(() => {
@@ -1080,7 +1080,7 @@ describe("Delete table", () => {
 
   const answer = (yes: boolean) => {
     const questions: string[] = [];
-    (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = (message: string) => {
+    bridge.confirm = (message: string) => {
       questions.push(message);
       return yes;
     };

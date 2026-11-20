@@ -7,7 +7,7 @@ import * as domain from "../formulas/index.ts";
 import * as page from "../formulas/page.ts";
 import { type ExcelTable, excelFormula as excelFormulaOf } from "../excel/formulas.ts";
 import type { ExcelTemplates } from "../excel/functions.ts";
-import type { OtherPages, PageTable, Table } from "../markdown.ts";
+import type { PageTable, Table } from "../markdown.ts";
 import { attributeName, metaName, metaPins, metaValue, withMetaPins } from "../meta.ts";
 import { calculatedTable, viewCalculated } from "../calculated/index.ts";
 import { cellNamesIn, rowNamesIn, withCellName } from "../names.ts";
@@ -35,7 +35,11 @@ export const VIEW_CELLS: domain.FormulaCells = {
   },
 };
 
-const named = (tables: readonly PageTable[]) => tables.map((t) => ({ ...t, name: metaName(t.table) }));
+// A text's tables as the domain takes them: each told apart by where it starts (the module gives its key), named
+const named = (tables: readonly PageTable[]) => tables.map((t) => ({ key: String(t.range.from), table: t.table, name: metaName(t.table) }));
+
+/** Other pages' tables as the tests have them, by page (null: no such page; undefined: not read) */
+type OtherPages = { readonly tables: (page: string) => readonly PageTable[] | null | undefined };
 
 export const formulaOf = (cell: string) => CELLS.formulaOf(cell);
 export const formulaCell = (value: string, formula: string, name?: string) => withCellName(CELLS.formulaCell(value, formula), name);
@@ -72,7 +76,7 @@ export const pageTables = (
   others?: OtherPages,
   spaceSource?: (name: string) => Table | null | undefined,
 ) =>
-  page.pageTables(CELLS, () => named(tables()), here, replace && { ...replace, name: metaName(replace.table) }, {
+  page.pageTables(CELLS, () => named(tables()), here, replace && { key: String(replace.from), table: replace.table, name: metaName(replace.table) }, {
     ...(others && {
       pages: {
         tables: (name: string) => {
@@ -85,6 +89,6 @@ export const pageTables = (
   });
 export const pageNameChoices = (tables: readonly PageTable[]) => page.pageNameChoices(CELLS, named(tables));
 export const ownNameChoices = (table: Table) => page.ownNameChoices(CELLS, table);
-export const tablesWritten = (all: readonly PageTable[], source: string) => page.tablesWritten(CELLS, named(all), source);
+export const tablesWritten = (all: readonly PageTable[], source: string) => page.tablesWritten(CELLS, named(all), String(all.find((t) => t.range.text === source)?.range.from ?? ""));
 export const excelFormula = (formula: string, table: Table, row: number, column: number, templates?: ExcelTemplates, structured?: ExcelTable["structured"]) =>
   excelFormulaOf(formula, { table, name: metaName(table), cells: CELLS, ...(structured ? { structured } : {}) }, row, column, templates);

@@ -380,7 +380,7 @@ export class Toolbar {
                     icon: ICONS.clear,
                     title: clear.label,
                     // (The menu closed: a refusal said as a notification, as its field would show it)
-                    run: () => void n.naming!.save("").then((why) => why && host.bridge.flash(`Silverware Table: ${why}`, "info")),
+                    run: () => void n.naming!.save("").then((why) => why && host.notify(`Silverware Table: ${why}`, "info")),
                     ...(n.naming.name && !n.naming.disabled ? {} : { disabled: n.naming.disabled ?? n.label }),
                   },
                 ]

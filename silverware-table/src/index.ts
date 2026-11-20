@@ -3,6 +3,7 @@
 import { applyLayers } from "../../shared/layers.ts";
 import { customSeries, customSeriesAnew, defineCustomSeries } from "./autofill/index.ts";
 import { type Bridge, listOf, missingBridgeFunctions } from "./bridge.ts";
+import { tablePlatform } from "./host/silverbullet/platform.ts";
 import { Controller } from "./controller.ts";
 import { customTypes } from "./columntypes/custom.ts";
 import { customTypesAnew, defineCustomTypes } from "./columntypes/registry.ts";
@@ -13,7 +14,7 @@ import { defineFormulaPlaces as defineFormulaPlacesIn, type FormulaPlaces } from
 import { isError, isRange, type Scalar, single, TimeValue, type Value } from "./formulas/values.ts";
 import { customFunctionsAnew, defineCustomFunctions } from "./formulas/registry.ts";
 import { addWriteListener, type WriteListener, writeListenersAnew } from "./core/writelisteners.ts";
-import { pageTablesOf } from "./markdown.ts";
+import { cellSourceOffset, findTables, pageTablesOf } from "./markdown.ts";
 import { metaName } from "./meta.ts";
 import { columnNameIn } from "./names.ts";
 import { type TableData, tableData } from "./tabledata.ts";
@@ -89,7 +90,9 @@ async function calculated(formula: string, text?: string, page?: string): Promis
   const formulas = controller?.offered<FormulasOffer>("formulas");
   if (!controller || !formulas) return undefined;
   const written = String(formula);
-  const { value, pages } = await formulas.evaluate(written, text ?? (await controller.bridge.getText()), page === undefined ? undefined : String(page));
+  const named = page === undefined ? undefined : String(page);
+  const tables = controller.tablesOfText(text ?? (await controller.platform.editor.text()), named);
+  const { value, pages } = await formulas.evaluate(written, tables, named);
   const list = isRange(value) && (value.length !== 1 || givesList(withEquals(written).formula.trim()));
   return { value: list ? value : single(value), pages };
 }
@@ -176,15 +179,21 @@ export function formulaPagesIn(rows: unknown): string[] {
 export async function formulaErrorsIn(pages: unknown): Promise<{ readonly errors: readonly FormulaErrorRecord[]; readonly error?: EvaluatedError; readonly pages: readonly string[] }> {
   const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
   const formulas = controller?.offered<FormulasOffer>("formulas");
-  if (!formulas) return { errors: [], error: FORMULAS_OFF, pages: [] };
+  if (!controller || !formulas) return { errors: [], error: FORMULAS_OFF, pages: [] };
   const errors: FormulaErrorRecord[] = [];
   const read = new Set<string>();
   for (const item of listOf(pages)) {
     const { page, text } = (item ?? {}) as { page?: unknown; text?: unknown };
     if (typeof page !== "string" || typeof text !== "string") continue;
-    const found = await formulas.errors(text, page);
+    const found = await formulas.errors(controller.tablesOfText(text, page), page);
     for (const other of found.pages) read.add(other);
-    for (const { at, ...error } of found.errors) errors.push({ page, ref: `${page}@${at}`, ...error });
+    // Where its cell's text starts in the page's: its table's place in the text, the cell's in the table's markdown
+    const ranges = findTables(text);
+    for (const { place, ...error } of found.errors) {
+      const range = ranges[place.table];
+      const at = range ? range.from + cellSourceOffset(range.text, place.row, place.column) : 0;
+      errors.push({ page, ref: `${page}@${at}`, ...error });
+    }
   }
   return { errors, pages: [...read] };
 }
@@ -223,12 +232,12 @@ export type FormulaCompletion = {
 export function completions(formula: string, text: string, caret?: number): { readonly typed: number; readonly choices: readonly FormulaCompletion[] } | undefined {
   const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
   const formulas = controller?.offered<FormulasOffer>("formulas");
-  if (!formulas) return undefined;
+  if (!controller || !formulas) return undefined;
   const written = String(formula);
   // A formula without its "=" read as one with it
   const lead = written.trimStart().startsWith("=") ? "" : "=";
   const at = lead.length + Math.max(0, Math.min(written.length, caret ?? written.length));
-  const found = formulas.complete(lead + written, at, String(text));
+  const found = formulas.complete(lead + written, at, controller.tablesOfText(String(text)));
   if (!found || found.choices.length === 0) return undefined;
   const choices = found.choices.map((choice): FormulaCompletion => {
     const fn = choice.kind === "function" ? functionNamed(choice.name) : undefined;
@@ -396,13 +405,15 @@ export function init(bridge: Bridge, sources: SourceProvider = spaceSources): vo
   }
   // A source that failed is said once until it changes (SilverBullet's sources: another host gives its own)
   if (sources === spaceSources) spaceSources.connect((message) => void bridge.flash(message, "error"));
+  // What the core asks of SilverBullet, made of the bridge (host/silverbullet/platform.ts)
+  const platform = tablePlatform(bridge, document);
   const global = globalThis as unknown as Record<string, Controller | undefined>;
   const existing = global[GLOBAL_KEY];
   if (existing) {
-    existing.setBridge(bridge);
+    existing.setPlatform(platform);
     return;
   }
-  const controller = new Controller(document, bridge, sources);
+  const controller = new Controller(document, platform, sources);
   global[GLOBAL_KEY] = controller;
   controller.start();
 }

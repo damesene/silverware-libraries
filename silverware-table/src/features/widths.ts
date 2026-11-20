@@ -29,10 +29,10 @@
 // the table moving as it gets narrower, cannot feed back into them. The widths
 // are the module's (columnWidths); the core shows them, and the handles (a
 // handle layer per table, as every table's headers have them).
-import type { ColumnsMeasure, ColumnWidths, Feature, HandleLayer, LineMenuBuilder, LineMenuGroup, LineMenuTarget, ModelHost, PartTable, TableInfo, TableKey, ToolbarButton, WriteEdit } from "../core/feature.ts";
+import type { ColumnsMeasure, ColumnWidths, Feature, HandleLayer, LineMenuBuilder, LineMenuGroup, LineMenuTarget, ModelHost, PartTable, TableInfo, TableKey, TableRevision, ToolbarButton, WriteEdit } from "../core/feature.ts";
 import { tablePartsOf } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
-import { parseTable, type Table } from "../markdown.ts";
+import type { Table } from "../markdown.ts";
 
 // The narrowest a column can be dragged to, in pixels
 const MIN_WIDTH = 80;
@@ -144,7 +144,7 @@ class TableWidths {
   private viewed = new Map<number, number | undefined>();
   private viewedBox: { readonly box: number | undefined } | undefined;
   // The widths stored in the table as last read (parsing a large table for its metadata row on every view is slow)
-  private stored: { readonly source: string; readonly widths: ReadonlyMap<number, number>; readonly box: number | undefined } | undefined;
+  private stored: { readonly revision: TableRevision; readonly widths: ReadonlyMap<number, number>; readonly box: number | undefined } | undefined;
   // Its handles
   private readonly handles: HandleLayer;
 
@@ -161,8 +161,8 @@ class TableWidths {
 
   /** Its columns' widths and their box: those set for the view, else those stored */
   layoutOf(info: TableInfo): { readonly widths: Map<number, number>; readonly box: number | undefined } {
-    if (this.stored?.source !== info.source) {
-      const table = parseTable(info.source);
+    if (this.stored?.revision !== info.revision) {
+      const table = info.model;
       const read = new Map<number, number>();
       for (const [column, value] of this.host.columnsMeta(table, "size")) {
         const n = Number(value);
@@ -170,7 +170,7 @@ class TableWidths {
         if (Number.isFinite(n) && n > 0) read.set(column, Math.round(n));
       }
       const box = Number(this.host.getMeta(table, BOX_KEY));
-      this.stored = { source: info.source, widths: read, box: Number.isFinite(box) && box > 0 ? box : undefined };
+      this.stored = { revision: info.revision, widths: read, box: Number.isFinite(box) && box > 0 ? box : undefined };
     }
     const widths = new Map(this.stored.widths);
     for (const [column, width] of this.viewed) {
@@ -233,7 +233,7 @@ class TableWidths {
     // Reset column widths offered or not
     this.host.toolbarChanged();
     // What the table can take (the metadata setting off: only where it has it stored); the rest is the view's
-    const table = parseTable(info.source);
+    const table = info.model;
     const stored = [...set.keys()].filter((column) => set.get(column) === undefined || this.host.canStoreMeta(table, "size", { column }));
     const boxStored = box === undefined || this.host.canStoreMeta(table, BOX_KEY);
     if (!stored.length && !boxStored) return;

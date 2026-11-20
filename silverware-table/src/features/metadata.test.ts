@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { STORE_SORT_DELAY_MS } from "../controller.ts";
 import { parseTable } from "../markdown.ts";
-import { PAGE, bodyTexts, buttonLabel, cell, cellMenuItem, clickOn, controller, editor, flashes, flush, key, menuButtons, nameInMenu, setup, tableMenuItem, text, toolbarName, useTablePage } from "../testing/page.ts";
+import { bridge, PAGE, bodyTexts, buttonLabel, cell, cellMenuItem, clickOn, controller, editor, flashes, flush, key, menuButtons, nameInMenu, setup, tableMenuItem, text, toolbarName, useTablePage } from "../testing/page.ts";
 
 describe("Table metadata", () => {
   useTablePage();
@@ -166,7 +166,7 @@ describe("Table metadata", () => {
     const remove = () => tableMenuItem(/^Remove metadata$/)!;
     let agree = false;
     const questions: string[] = [];
-    (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = (message: string) => {
+    bridge.confirm = (message: string) => {
       questions.push(message);
       return agree;
     };
@@ -184,7 +184,6 @@ describe("Table metadata", () => {
     await setup(`${META_PAGE}\n${META_PAGE.replace("Qty:desc", "Name:asc")}`);
     const asked: string[] = [];
     let answer = false;
-    const bridge = (controller as unknown as { bridge: Record<string, unknown> }).bridge;
     bridge.confirm = (message: string) => {
       asked.push(message);
       return answer;
@@ -198,10 +197,30 @@ describe("Table metadata", () => {
     expect(flashes).toEqual(["Silverware Table: removed the metadata of 2 table(s)"]);
   });
 
+  it("writes the tables the command removes metadata from as any edit writes them: aligned with auto-format on", async () => {
+    // (One table's Remove metadata is a write as any other: the page's command writes alike)
+    const written = async (all: boolean) => {
+      controller.stop();
+      document.body.replaceChildren();
+      await setup(META_PAGE, { "silverware.table.autoFormat": true });
+      bridge.confirm = () => true;
+      if (all) await controller.removeAllMetadata();
+      else {
+        tableMenuItem(/^Remove metadata$/)!.click();
+        await flush();
+      }
+      return text;
+    };
+    const one = await written(false);
+    expect(one).not.toContain("<meta");
+    expect(one).not.toBe("| Name | Qty |\n|---|---|\n| Pear | 3 |\n| apple | 10 |\n");
+    expect(await written(true)).toBe(one);
+  });
+
   it("shows the rows as written once the metadata with their sorting is removed", async () => {
     await setup(META_PAGE);
     expect(bodyTexts()).toEqual(["apple", "Pear"]); // stored: Qty descending
-    (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = () => true;
+    bridge.confirm = () => true;
     tableMenuItem(/^Remove metadata$/)!.click();
     await flush();
     await controller.scan();
@@ -213,7 +232,7 @@ describe("Table metadata", () => {
     controller.stop();
     document.body.replaceChildren();
     await setup(META_PAGE);
-    (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = () => true;
+    bridge.confirm = () => true;
     await controller.removeAllMetadata();
     await controller.scan();
     expect(bodyTexts()).toEqual(["Pear", "apple"]);
@@ -227,7 +246,7 @@ describe("Table metadata", () => {
     const WITH_COLUMNS = PAGE_TAGS.replace("core.name='fruit'>", "core.name='fruit' core.-c-qty.sort='desc' filters.-c-who.condition='p'>");
     const answering = (answer: boolean) => {
       const questions: string[] = [];
-      (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = (message: string) => {
+      bridge.confirm = (message: string) => {
         questions.push(message);
         return answer;
       };
@@ -287,7 +306,7 @@ describe("Table metadata", () => {
     const page = `| Name | Qty |\n|---|---|\n| Pear <meta core.n='pear'> | 3 |\n| Total | 3 <meta formulas.f='=SUM([Qty])'> |\n`;
     await setup(page, { "silverware.table.modules.formulas.enabled": false });
     const questions: string[] = [];
-    (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = (message: string) => {
+    bridge.confirm = (message: string) => {
       questions.push(message);
       return true;
     };
@@ -301,7 +320,7 @@ describe("Table metadata", () => {
   it("asks without naming anyone when the metadata row holds nothing", async () => {
     await setup("| A |\n|---|\n| 1 |\n| <meta core.table> |\n");
     const questions: string[] = [];
-    (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = (message: string) => {
+    bridge.confirm = (message: string) => {
       questions.push(message);
       return true;
     };
@@ -314,7 +333,7 @@ describe("Table metadata", () => {
     const page = `| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Total | 3 <meta formulas.f='=SUM([Qty])'> |\n| <meta core.table core.-c-qty.sort='desc'> |\n`;
     await setup(page);
     const questions: string[] = [];
-    (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = (message: string) => {
+    bridge.confirm = (message: string) => {
       questions.push(message);
       return true;
     };
@@ -328,7 +347,7 @@ describe("Table metadata", () => {
     document.body.replaceChildren();
     await setup(`| A |\n|---|\n| 1 |\n| 2 <meta formulas.f='=A1*2'> |\n`);
     const asked: string[] = [];
-    (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = (message: string) => {
+    bridge.confirm = (message: string) => {
       asked.push(message);
       return true;
     };

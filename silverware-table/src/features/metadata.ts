@@ -10,7 +10,7 @@ import { FEATURE_NAMES, MODULE_LABELS } from "../bridge.ts";
 import { CELL_MENU_ORDER, type CellMenuGroup, type CellRef, type Feature, type ModelHost, type ToolbarButton, type TableInfo } from "../core/feature.ts";
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
-import { findTables, minimalEdit, parseTable, serializeTable, type Table } from "../markdown.ts";
+import type { Table } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
 import { columnsAttributes } from "../meta.ts";
 import { CORE } from "../metanames.ts";
@@ -108,7 +108,7 @@ export class Metadata implements Feature {
   constructor(private readonly host: ModelHost) {}
 
   toolbarButtons(info: TableInfo): ToolbarButton[] {
-    if (!hasMetadata(parseTable(info.source))) return [];
+    if (!hasMetadata(info.model)) return [];
     return [
       {
         label: "Remove metadata",
@@ -137,7 +137,7 @@ export class Metadata implements Feature {
 
   /** Remove metadata for a part of the table, where it has some */
   private partEntry(info: TableInfo, part: MetadataPart, what: string): MenuEntry | undefined {
-    if (!hasMetadata(partOf(parseTable(info.source), part))) return undefined;
+    if (!hasMetadata(partOf(info.model, part))) return undefined;
     return {
       kind: "item",
       label: "Remove metadata",
@@ -150,12 +150,12 @@ export class Metadata implements Feature {
 
   /** Removes the metadata of a part of a table, once confirmed */
   private async removeFromPart(shownInfo: TableInfo, part: MetadataPart, what: string): Promise<void> {
-    const shown = partOf(parseTable(shownInfo.source), part);
+    const shown = partOf(shownInfo.model, part);
     const owners = metadataOwners([shown]);
     if (!(await this.host.ask(`Remove the metadata of ${what}${whose(owners, what.startsWith("this ") ? "it" : "them")}? ${KEPT} Ctrl+Z brings it back.`))) return;
     // The table as rendered now: the dialog may have outlived the rendering it was asked from
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
-    if (columnsAttributes(parseTable(info.source), part.columns).length) this.host.forgetStoredView(info.key);
+    if (columnsAttributes(info.model, part.columns).length) this.host.forgetStoredView(info.key);
     await this.host.writeTable(info, (table) => withoutMetadataOf(table, part));
     // The dialog took the focus: back to the editor, so Ctrl+Z works right away
     this.host.focusPage();
@@ -167,12 +167,12 @@ export class Metadata implements Feature {
    * its cells, which keep their results as plain values
    */
   private async removeFromTable(shownInfo: TableInfo): Promise<void> {
-    const shown = parseTable(shownInfo.source);
+    const shown = shownInfo.model;
     const owners = metadataOwners([shown]);
     if (!(await this.host.ask(`Remove this table's metadata${whose(owners, "it")}? ${KEPT} Ctrl+Z brings it back.`))) return;
     // The table as rendered now: the dialog may have outlived the rendering it was asked from
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
-    if (parseTable(info.source).meta) this.host.forgetStoredView(info.key);
+    if (info.model.meta) this.host.forgetStoredView(info.key);
     await this.host.writeTable(info, withoutMetadata);
     // The dialog took the focus: back to the editor, so Ctrl+Z works right away
     this.host.focusPage();
@@ -180,38 +180,23 @@ export class Metadata implements Feature {
 
   /** Removes the metadata of all tables on the current page, once confirmed */
   async removeFromPage(): Promise<void> {
-    const { bridge } = this.host;
-    const text = await bridge.getText();
-    // From the last table up, so the earlier ones keep their positions
-    const tables = findTables(text)
-      .filter((range) => {
-        return hasMetadata(parseTable(range.text));
-      })
-      .reverse();
+    const { host } = this;
+    const page = await host.pageNameNow();
+    const tables = ((await host.tables(page)) ?? []).filter((t) => hasMetadata(t.model));
     if (tables.length === 0) {
-      void bridge.flash("Silverware Table: no table on this page has metadata", "info");
+      host.notify("Silverware Table: no table on this page has metadata", "info");
       return;
     }
-    const models = tables.map((range) => parseTable(range.text));
-    const owners = metadataOwners(models);
+    const owners = metadataOwners(tables.map((t) => t.model));
     const question =
       `Remove the metadata of ${tables.length === 1 ? "the 1 table" : `all ${tables.length} tables`} on this page` +
       `${whose(owners, tables.length === 1 ? "it" : "them")}? ${KEPT} Ctrl+Z brings it back.`;
     if (!(await this.host.ask(question))) return;
-    // One edit over the span of all those tables, so one Ctrl+Z undoes it
-    const from = tables[tables.length - 1]!.from;
-    const to = tables[0]!.to;
-    let span = text.slice(from, to);
-    const keys = this.host.tableKeys(await bridge.getCurrentPage(), text);
-    for (const range of tables) {
-      const table = parseTable(range.text);
-      if (table.meta) this.host.forgetStoredView(keys[range.ordinal]!);
-      span = span.slice(0, range.from - from) + serializeTable(withoutMetadata(table)) + span.slice(range.to - from);
-    }
-    const edit = minimalEdit(text.slice(from, to), span);
-    await bridge.replaceRange(from + edit.from, from + edit.to, edit.insert);
+    for (const t of tables) if (t.model.meta) host.forgetStoredView(t.key);
+    // One edit of all those tables, so one Ctrl+Z undoes it
+    await host.replaceTables(page, tables.map((t) => ({ key: t.key, change: withoutMetadata })));
     // The dialog took the focus: back to the editor, so Ctrl+Z works right away
     this.host.focusPage();
-    void bridge.flash(`Silverware Table: removed the metadata of ${tables.length} table(s)`, "info");
+    host.notify(`Silverware Table: removed the metadata of ${tables.length} table(s)`, "info");
   }
 }

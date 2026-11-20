@@ -23,14 +23,15 @@ export class History implements AdapterFeature {
     to: number,
     change: { readonly from: number; readonly to: number },
   ): Promise<((editFrom: number, lengthChange: number, moved: (pos: number, after: boolean) => number) => void) | undefined> {
-    const { bridge } = this.host;
-    if (!bridge.setSelection) return undefined;
+    const { editor } = this.host.platform;
+    const select = editor.select?.bind(editor);
+    if (!select) return undefined;
     // Right after the table, else right before it; one the edit does not reach first
     const places = [to < text.length ? to + 1 : undefined, from > 0 ? from - 1 : undefined].filter((p) => p !== undefined);
     const reached = (p: number) => p >= change.from && p <= change.to;
     const marker = places.find((p) => !reached(p)) ?? places[0];
     if (marker === undefined) return undefined;
-    await bridge.setSelection(marker, marker);
+    await select(marker, marker);
     // None it does not reach (a table at the page's start, a row added at its end): after the edit, after what it inserted
     const moveAfter = reached(marker);
     if (!moveAfter) this.remember(marker);
@@ -38,18 +39,18 @@ export class History implements AdapterFeature {
     // where it reached it), by its own parts only: other plugins' edits with it are elsewhere in the page
     return (_editFrom, _lengthChange, moved) => {
       const at = moved(marker, moveAfter);
-      if (moveAfter) void bridge.setSelection!(at, at);
+      if (moveAfter) void select(at, at);
       this.remember(at);
     };
   }
 
   keyDown(e: KeyboardEvent): boolean {
-    const { bridge } = this.host;
+    const { editor } = this.host.platform;
     const mod = (e.ctrlKey || e.metaKey) && !e.altKey;
     const key = e.key.toLowerCase();
     const step = mod && key === "z" ? (e.shiftKey ? "redo" : "undo") : mod && key === "y" && !e.shiftKey ? "redo" : undefined;
     const inEditor = e.target instanceof Element && !!e.target.closest(EDITOR_SELECTOR);
-    if (!step || !inEditor || !bridge[step] || !bridge.getCursor) return false;
+    if (!step || !inEditor || !editor[step] || !editor.cursor) return false;
     e.preventDefault();
     e.stopPropagation();
     void this.step(step);
@@ -62,12 +63,12 @@ export class History implements AdapterFeature {
   }
 
   private async step(step: "undo" | "redo"): Promise<void> {
-    const { bridge, doc } = this.host;
+    const { platform, doc } = this.host;
     const editor = doc.querySelector<HTMLElement>(EDITOR_SELECTOR);
     const scroller = editor && this.host.scrollParentOf(editor);
     const top = scroller?.scrollTop;
-    await bridge[step]!();
-    const cursor = await bridge.getCursor!();
+    await platform.editor[step]!();
+    const cursor = await platform.editor.cursor!();
     if (!scroller || top === undefined || !this.markers.has(cursor)) return;
     // After the editor's own scroll, which runs in the next animation frame
     const restore = () => {

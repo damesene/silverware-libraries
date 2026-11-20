@@ -245,9 +245,11 @@ export class Controller implements TableHost {
   // The tables marked (TableHost.tableMark), by mark
   private readonly tableMarks = new Map<string, Set<string>>();
   // Steps every write goes through after the edit, in this order
-  // The core's write steps: the columns' attributes follow their columns, pins are stored (as far as they may be)
+  // The core's write steps: the columns' attributes follow their columns (a write of the model's has them on its
+  // columns already: followed by name again, where headers repeat, they would move twice), pins are stored (as far as
+  // they may be)
   private readonly writeSteps: readonly WriteStep[] = [
-    (before, after, options) => metadataAfterEdit(before, after, options, (edge) => this.canPin(before, edge)),
+    (before, after, options, byModel) => metadataAfterEdit(before, after, options, (edge) => this.canPin(before, edge), !byModel),
   ];
 
   constructor(
@@ -2685,18 +2687,23 @@ export class Controller implements TableHost {
   ): Promise<WriteResult> {
     const info = this.infos.get(widget);
     if (!info) return "failed";
-    return this.writeAt(info, widget, change, options);
+    return this.writeAt(info, widget, change, options, false);
   }
 
   writeTable(target: TableTarget, change: (table: TableModel) => TableModel | undefined, options: WriteOptions = {}): Promise<WriteResult> {
-    return this.writeMarkdown(target, this.modelChange(change, options), options);
+    return this.writeTo(target, this.modelChange(change, options), options, true);
   }
 
   writeMarkdown(target: TableTarget, change: (table: Table) => Table | undefined, options: WriteOptions = {}): Promise<WriteResult> {
+    return this.writeTo(target, change, options, false);
+  }
+
+  /** A write of a table by its target (`byModel`: a change of the model's, modelChange) */
+  private writeTo(target: TableTarget, change: (table: Table) => Table | undefined, options: WriteOptions, byModel: boolean): Promise<WriteResult> {
     // Rendered: written as its widget's, so the view stays where it was
     const widget = this.widgetForKey(target.key);
     const info = widget && this.infos.get(widget);
-    return info && info.source === target.source ? this.writeAt(info, widget, change, options) : this.writeAt(target, undefined, change, options);
+    return info && info.source === target.source ? this.writeAt(info, widget, change, options, byModel) : this.writeAt(target, undefined, change, options, byModel);
   }
 
   /**
@@ -2707,7 +2714,11 @@ export class Controller implements TableHost {
     return (table) => {
       const before = decode(table);
       const edited = change(before);
-      return edited && encode(withAttributeRules(before, edited, this.attributeRules(), options.rowMap, options.columnMap), table);
+      // (A column the edit deleted, by its column map, takes its attributes with it; one gone that it does not say went
+      // keeps them, as written: a calculated table's column, to come back)
+      const { columnMap } = options;
+      const deleted = columnMap && ((column: number) => columnMap(column) === undefined);
+      return edited && encode(withAttributeRules(before, edited, this.attributeRules(), options.rowMap, columnMap), table, deleted);
     };
   }
 
@@ -2786,7 +2797,7 @@ export class Controller implements TableHost {
    * saved first, as a press elsewhere would: kept open, a table drawn for its
    * key (the sheet's) would not be drawn anew under it
    */
-  private async writeAt(given: TableTarget, shown: HTMLElement | undefined, change: (table: Table) => Table | undefined, options: WriteOptions): Promise<WriteResult> {
+  private async writeAt(given: TableTarget, shown: HTMLElement | undefined, change: (table: Table) => Table | undefined, options: WriteOptions, byModel: boolean): Promise<WriteResult> {
     const key = given.key;
     if (options.focus && this.cellEditor.active?.key === key) await this.saveEditing();
     const before = this.writing.get(key);
@@ -2795,7 +2806,7 @@ export class Controller implements TableHost {
     this.writing.set(key, mine);
     if (before) await before;
     try {
-      return await this.writeNow(given, this.widgetForKey(key) ?? shown, change, options);
+      return await this.writeNow(given, this.widgetForKey(key) ?? shown, change, options, byModel);
     } finally {
       if (this.writing.get(key) === mine) this.writing.delete(key);
       release();
@@ -2824,7 +2835,7 @@ export class Controller implements TableHost {
     return { info: { key: given.key, source: now.source, hint: now.hint }, range: found, options };
   }
 
-  private async writeNow(given: TableTarget, widget: HTMLElement | undefined, change: (table: Table) => Table | undefined, asked: WriteOptions): Promise<WriteResult> {
+  private async writeNow(given: TableTarget, widget: HTMLElement | undefined, change: (table: Table) => Table | undefined, asked: WriteOptions, byModel: boolean): Promise<WriteResult> {
     try {
       // What the write needs read is read before the page's text (other pages,
       // which take a while), so the text the edit is computed from is not stale
@@ -2863,7 +2874,7 @@ export class Controller implements TableHost {
       let stepped = editedModel;
       for (const feature of this.features) if (feature.writeStep) stepped = feature.writeStep(beforeModel, stepped, edit);
       let changed = encode(stepped, edited);
-      changed = this.writeSteps.reduce((table, step) => step(before, table, options), changed);
+      changed = this.writeSteps.reduce((table, step) => step(before, table, options, byModel), changed);
       changed = this.withoutNewTags(before, changed, options, taken);
       const changedModel = decode(changed);
       const serialize = await this.serializer();

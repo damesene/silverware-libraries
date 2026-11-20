@@ -219,11 +219,11 @@ const NO_TABLE: Table = { indent: "", align: [], rows: [], padded: false };
 /**
  * The metadata row's attributes of the columns of `base` none of the model's
  * columns comes from (their attributes made from those read: renamed, moved,
- * written over as a calculated table's are): kept as written, for a write's
- * step to say whether the column went (a column map) or may come back (a
- * calculated table's column, matched by its name)
+ * written over as a calculated table's are): kept as written, the column to
+ * come back (a calculated table's, matched by its name), unless `deleted`
+ * says it went (a write's column map)
  */
-function metaOfColumnsGone(model: TableModel, base: Table): Record<string, string> {
+function metaOfColumnsGone(model: TableModel, base: Table, deleted: (column: number) => boolean): Record<string, string> {
   const read = models.get(base);
   if (!read || !base.meta) return {};
   const reached = new Set<Attributes>();
@@ -234,12 +234,16 @@ function metaOfColumnsGone(model: TableModel, base: Table): Record<string, strin
       break;
     }
   }
-  const gone = new Set(read.columns.flatMap((column, c) => (column.attributes.size === 0 || reached.has(column.attributes) ? [] : [c])));
+  const gone = new Set(read.columns.flatMap((column, c) => (column.attributes.size === 0 || reached.has(column.attributes) || deleted(c) ? [] : [c])));
   return Object.fromEntries(columnsAttributes(base, gone).map((name) => [name, base.meta![name]!]));
 }
 
-/** A model written back as a markdown table, `base` the table it was read from (its form: indent, padding, its rows as written) */
-export function encode(model: TableModel, base: Table): Table {
+/**
+ * A model written back as a markdown table, `base` the table it was read from
+ * (its form: indent, padding, its rows as written); `deleted`: the columns of
+ * `base` that went, their attributes with them (metaOfColumnsGone)
+ */
+export function encode(model: TableModel, base: Table, deleted: (column: number) => boolean = () => false): Table {
   if (models.get(base) === model) return base;
   // A header cell: as read, else its text and hashtags with its own tags (its own name, tags typed into it)
   const inHeader = (owner: string, key: string, read: ReadonlySet<string> | undefined) => (owner === CORE && key === LINE_NAME_KEY) || !!read?.has(attributeName(owner, key));
@@ -285,7 +289,7 @@ export function encode(model: TableModel, base: Table): Table {
   });
   const baseHeader = base.rows[0];
   const headerRow: Row = !baseHeader ? { cells: headerCells } : headerCells.length === baseHeader.cells.length && headerCells.every((cell, c) => cell === baseHeader.cells[c]) ? baseHeader : { ...baseHeader, cells: headerCells };
-  const meta = columnsMetaNamed(headsOf(headerCells), byColumn, { ...columnsMetaOf(base).orphans, ...metaOfColumnsGone(model, base) });
+  const meta = columnsMetaNamed(headsOf(headerCells), byColumn, { ...columnsMetaOf(base).orphans, ...metaOfColumnsGone(model, base, deleted) });
   const same = (a: Readonly<Record<string, string>>, b: Readonly<Record<string, string>> | undefined) =>
     !!b && Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([k, v]) => b[k] === v);
   return {

@@ -285,8 +285,10 @@ export function metadataAfterEdit(
   after: Table,
   edit: { readonly columnMap?: (column: number) => number | undefined; readonly pins?: Pins },
   canPin: (edge: keyof typeof PIN_KEYS) => boolean = () => true,
+  // Whether the columns' attributes are followed by their names (a markdown edit's); else they are on their columns already
+  follows = true,
 ): Table {
-  const followed = followColumnMeta(before, after, edit.columnMap);
+  const followed = follows ? followColumnMeta(before, after, edit.columnMap) : after;
   if (!edit.pins) return followed;
   const kept = metaPins(followed);
   const pins = edit.pins;

@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { cell, controller, editor, flush, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 import { movedEdge, movedTableEdge, wholePixels, widthsAfterEdit } from "./widths.ts";
+import { deleteColumn, moveColumn } from "../model/ops.ts";
 
 describe("movedTableEdge", () => {
   const columns = (...widths: number[]) => widths.map((width) => ({ width, min: 80 }));
@@ -242,6 +243,24 @@ describe("Column widths", () => {
     expect(text).toContain("widths.-c-price.size='100'");
     expect(text).toContain("widths.-c-x.size='100'");
     expect(text).toContain("widths.box='200'");
+  });
+
+  it("moves each width with its column once, a write of the model's: three columns of the same name", async () => {
+    const page = "| x | x | x |\n|---|---|---|\n| 1 | 2 | 3 |\n";
+    await setup(`${page}| <meta core.table widths.-c-x.size='100' widths.-c-x:2.size='200' widths.-c-x:3.size='200' widths.box='500'> |\n`, { "silverware.table.metadata": true });
+    await controller.writeTable(controller.shownTables()[0]!, (t) => moveColumn(t, 0, 2), { columnMap: (c) => (c === 0 ? 2 : c - 1) });
+    expect(text).toContain("| 2 | 3 | 1 |");
+    // (The first of the name `x` or `x:1`, read the same)
+    expect(text).toMatch(/widths\.-c-x(:1)?\.size='200'/);
+    expect(text).toMatch(/widths\.-c-x:2\.size='200'/);
+    expect(text).toMatch(/widths\.-c-x:3\.size='100'/);
+  });
+
+  it("takes a deleted column's width with it, a write of the model's", async () => {
+    await setup(`| A | B | C |\n|---|---|---|\n| 1 | 2 | 3 |\n| <meta core.table widths.-c-a.size='100' widths.-c-b.size='150' widths.-c-c.size='100' widths.box='350'> |\n`, { "silverware.table.metadata": true });
+    await controller.writeTable(controller.shownTables()[0]!, (t) => deleteColumn(t, 1), { columnMap: (c) => (c === 1 ? undefined : c > 1 ? c - 1 : c) });
+    expect(text).toContain("| 1 | 3 |");
+    expect(text).not.toContain("-c-b.");
   });
 
   it("makes a table automatic again when one column is left", async () => {

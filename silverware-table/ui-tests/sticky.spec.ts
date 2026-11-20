@@ -217,7 +217,7 @@ test.describe("The held header", () => {
     await page.evaluate(() => (document.querySelector(".cm-scroller")!.scrollTop = 913));
     await expect(table(page).locator("thead")).toHaveClass(/swt-stuck/);
     const view = await page.locator(".cm-scroller").evaluate((s) => s.getBoundingClientRect().top);
-    await expectCovered(page, view);
+    await expectCovered(page, view + (await topShadow(page)));
   });
 
   test("full screen, a theme collapsing the table's borders: no row shows above the held header", async ({ page }) => {
@@ -235,6 +235,17 @@ test.describe("The held header", () => {
     await expectCovered(page, top);
   });
 });
+
+// The shadow SilverBullet's edge (after 2.12.1) fades in at the editor's top as its page scrolls (`#sb-editor::before`,
+// over our cover as it should be): its height, 0 where there is none
+async function topShadow(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const editor = document.querySelector("#sb-editor");
+    if (!editor) return 0;
+    const before = getComputedStyle(editor, "::before");
+    return before.content === "none" ? 0 : Math.ceil(parseFloat(before.height) || 0);
+  });
+}
 
 // From `top` down to the held header's top (but the columns' letters, which are drawn there), the page's color
 // alone: read from the pixels, as what failed was the browser not painting a cover it had

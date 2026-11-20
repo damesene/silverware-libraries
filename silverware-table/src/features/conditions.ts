@@ -38,6 +38,7 @@ import {
 import { FormulaError, type FormulasOffer, isErrorText, type Scalar, scalarText } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import { type Table, unescapeCell } from "../markdown.ts";
+import type { TableModel } from "../model/model.ts";
 import type { MenuEntry } from "../menu.ts";
 import { withoutTags } from "../tags.ts";
 import type { FormulaHelpers } from "../formulafield.ts";
@@ -142,7 +143,7 @@ export class Conditions implements Feature {
   }
 
   /** The table with these rules (in this order) stored: the table's and rows' on it, each column's on its column */
-  private withRules(table: Table, rules: readonly StoredRule[]): Table {
+  private withRules(table: TableModel, rules: readonly StoredRule[]): TableModel {
     const ordered = rules.length > 1 ? numbered(rules) : rules.map((r) => (isUnread(r) ? r : (({ at: _, ...rest }) => rest)(r)));
     const own = ordered.filter((r) => r.scope.kind !== "column");
     const columns = new Map<number, StoredRule[]>();
@@ -341,7 +342,7 @@ export class Conditions implements Feature {
   private async save(info: TableInfo, rules: readonly StoredRule[]): Promise<void> {
     let result: WriteResult = "failed";
     try {
-      result = await this.host.writeTable(info, (table) => this.withRules(table, rules));
+      result = await this.host.writeModel(info, (table) => this.withRules(table, rules));
     } finally {
       // The rules the dialog showed in the table end with it: written, the table rendered anew shows them; not
       // written (a write that failed), the table shows its own again

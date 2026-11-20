@@ -151,7 +151,7 @@ export class Views implements Feature {
         attention: !!state,
         title: typeof state === "string" ? state : state ? "Refresh view: it is out of date (what it reads was changed outside Silverware Table)" : "Refresh view (it is up to date)",
         // A write of the view calculates it anew (the formulas module's write step)
-        run: () => void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => t),
+        run: () => void this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => t),
       },
     ];
   }
@@ -271,7 +271,7 @@ export class Views implements Feature {
     const formula = this.formulaOf(model);
     if (formula === undefined) return;
     this.dialog(formula, this.host.tableName(table) ?? "", "Save", (f) => this.result(f, model), (changed, name) => {
-      void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.host.withTableName(this.host.withAttribute(t, "formula", withEquals(changed).formula), name || undefined));
+      void this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => this.host.withTableName(this.host.withAttribute(t, "formula", withEquals(changed).formula), name || undefined));
     }, this.blocked(table), table);
   }
 }

@@ -237,7 +237,7 @@ class TableWidths {
     const stored = [...set.keys()].filter((column) => set.get(column) === undefined || this.host.canStore(table, "size", { column }));
     const boxStored = box === undefined || this.host.canStore(table, BOX_KEY);
     if (!stored.length && !boxStored) return;
-    const result = await this.host.writeTable(info, (t) => {
+    const result = await this.host.writeModel(info, (t) => {
       const widths = this.host.columnAttributes(t, "size");
       for (const [column, width] of set) {
         if (width === undefined) widths.delete(column);

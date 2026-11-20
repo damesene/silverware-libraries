@@ -192,7 +192,7 @@ export class Names implements Feature {
       });
       if (taken) return `another table on this page is named ${name}`;
     }
-    await this.host.writeTable(info, (t) => this.host.withTableName(t, name === "" ? undefined : name));
+    await this.host.writeModel(info, (t) => this.host.withTableName(t, name === "" ? undefined : name));
     this.host.focusPage();
     return undefined;
   }
@@ -209,7 +209,7 @@ export class Names implements Feature {
     if (problem) return problem;
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
     // Renamed where the name is (a column inserted or moved may have taken it out of the first cell)
-    await this.host.writeTable(info, (t) => this.host.withRowName(t, row, name || undefined));
+    await this.host.writeModel(info, (t) => this.host.withRowName(t, row, name || undefined));
     this.host.focusPage();
     return undefined;
   }
@@ -231,7 +231,7 @@ export class Names implements Feature {
     }
     if (problem) return problem;
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
-    await this.host.writeTable(info, (t) => this.host.withCellName(t, row, column, name || undefined));
+    await this.host.writeModel(info, (t) => this.host.withCellName(t, row, column, name || undefined));
     this.host.focusPage();
     return undefined;
   }
@@ -249,7 +249,7 @@ export class Names implements Feature {
       headers.some((_, c) => c !== column && (this.host.columnName(table, c)?.toLowerCase() === name.toLowerCase() || columnIdOf(headers, c)?.name === name.toLowerCase()));
     if (problem || taken) return problem ?? `another column of this table is named ${name}`;
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
-    await this.host.writeTable(info, (t) => this.host.withColumnName(t, column, name || undefined));
+    await this.host.writeModel(info, (t) => this.host.withColumnName(t, column, name || undefined));
     this.host.focusPage();
     return undefined;
   }

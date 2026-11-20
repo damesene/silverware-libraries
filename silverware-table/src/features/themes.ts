@@ -144,7 +144,7 @@ export class Themes implements Feature {
   /** The table's own choices written into its metadata row, as one edit (undefined: the setting's again) */
   private async choose(shownInfo: TableInfo, choices: Readonly<Record<string, string | undefined>>): Promise<void> {
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
-    await this.host.writeTable(info, (table) => Object.entries(choices).reduce((t, [key, value]) => this.host.withAttribute(t, key, value), table));
+    await this.host.writeModel(info, (table) => Object.entries(choices).reduce((t, [key, value]) => this.host.withAttribute(t, key, value), table));
     this.host.focusPage();
   }
 }

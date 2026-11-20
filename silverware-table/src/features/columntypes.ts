@@ -9,7 +9,6 @@ import { type CellEditor, type CellLook, type CellRef, type Feature, HEADER_ICON
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget, StoredTable } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
 import type { MenuDetail, MenuEntry } from "../menu.ts";
-import { setCell } from "../ops.ts";
 import { escapeCell, type Table, unescapeCell } from "../markdown.ts";
 import type { TableModel } from "../model/model.ts";
 import { withoutTags } from "../tags.ts";
@@ -35,7 +34,7 @@ import {
 } from "../columntypes/index.ts";
 import { FormulaError, formulaSources, formulaTableNames, type FormulasOffer, type HeldFormulas, type HeldFormulasOffer } from "../formulas/index.ts";
 import { sameTableName } from "../namerules.ts";
-import { ChoicesDialog } from "./choicesdialog.ts";
+import { ChoicesDialog, withTypeOf } from "./choicesdialog.ts";
 
 /** A type's icon, or a tag for a type without one */
 function iconOf(type: ColumnType): string {
@@ -234,8 +233,7 @@ export class ColumnTypes implements Feature {
     if (axis !== "column") return [];
     const table = this.host.asModel(info.model);
     const current = this.typeOf(table, column);
-    const setType = (tag: string | undefined) => () =>
-      void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => setCell(t, 0, column, withColumnType(t.rows[0]?.cells[column] ?? "", tag)));
+    const setType = (tag: string | undefined) => () => void this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => withTypeOf(this.host, t, column, tag));
     const choices: MenuEntry[] = [
       { kind: "item", label: "No type", icon: ICONS.clear, checked: !current, run: setType(undefined) },
       { kind: "separator" },
@@ -297,9 +295,8 @@ export class ColumnTypes implements Feature {
       if (name !== undefined) users.set(name, [...(users.get(name) ?? []), each.header || "(no name)"]);
     });
     const taken = choiceListOf(this.host.columnHashtags(table, column));
-    const write = (change: (t: Table) => Table) => void this.host.writeTable(this.host.tableFor(info.key) ?? info, change);
     // The list taken for the column: its header naming it
-    const take = (name: string) => () => write((t) => setCell(t, 0, column, withColumnType(t.rows[0]?.cells[column] ?? "", `choice-${name}`)));
+    const take = (name: string) => () => void this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => withTypeOf(this.host, t, column, `choice-${name}`));
     const stored = this.host.attributes(table);
     return listNames(stored).map((name): MenuEntry => {
       const used = users.get(name);
@@ -336,10 +333,10 @@ export class ColumnTypes implements Feature {
       const columns = used.length === 1 ? `the column ${used[0]}` : `the columns ${used.join(", ")}`;
       if (!(await this.host.ask(`Delete the list ${name}? ${columns[0]!.toUpperCase()}${columns.slice(1)} take${used.length === 1 ? "s" : ""} it and will have no type; the cells stay as written.`))) return;
     }
-    void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => {
+    void this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => {
       let table = this.host.withAttribute(t, listKey(name), undefined);
-      table.rows[0]?.cells.forEach((cell, c) => {
-        if (choiceListOf(unescapeCell(cell)) === name) table = setCell(table, 0, c, withColumnType(cell, undefined));
+      table.columns.forEach((_, c) => {
+        if (choiceListOf(this.host.columnHashtags(table, c)) === name) table = withTypeOf(this.host, table, c, undefined);
       });
       return table;
     });

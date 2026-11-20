@@ -28,10 +28,8 @@ import type { Dialog, ModelHost, TableInfo } from "../core/feature.ts";
 import { formulaField } from "../formulafield.ts";
 import { type FormulasOffer, withEquals } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
-import { escapeCell, type Table, unescapeCell } from "../markdown.ts";
 import type { TableModel } from "../model/model.ts";
-import { setCell } from "../ops.ts";
-import { withoutTags } from "../tags.ts";
+import { withContentAt } from "../model/ops.ts";
 
 /** Where a choice column's values come from: its own values, a list of the table's own, a formula (a source's among them) */
 type Way = "column" | "list" | "formula";
@@ -42,8 +40,10 @@ type ValueRow = { readonly original: string | undefined; readonly field: HTMLInp
 /** How many of the values a formula gives the dialog shows */
 const SHOWN = 200;
 
-/** A cell's text as a value: without its hidden tags, unescaped, trimmed */
-const textOf = (cell: string): string => unescapeCell(withoutTags(cell)).trim();
+/** The table with a column's type set to `tag` (none: no type), its other hashtags kept */
+export function withTypeOf(host: Pick<ModelHost, "columnHashtags" | "withColumnHashtags">, table: TableModel, column: number, tag: string | undefined): TableModel {
+  return host.withColumnHashtags(table, column, withColumnType(host.columnHashtags(table, column) ?? "", tag));
+}
 
 // Why the ways that need formulas cannot be picked while the formulas module is off
 const FORMULAS_OFF = "it is calculated by the formulas module, which is off: turn it on in the settings";
@@ -64,19 +64,19 @@ export class ChoicesDialog {
   /** Opens the dialog for a column: a choice column's, or one to become one (nothing written until Save) */
   open(info: TableInfo, column: number): void {
     const { doc } = this.host;
-    const table = (this.host.tableFor(info.key) ?? info).model;
-    const header = table.rows[0]?.cells[column] ?? "";
-    const columnName = unescapeCell(withoutTags(withColumnType(header, undefined)));
+    const table = this.host.asModel((this.host.tableFor(info.key) ?? info).model);
+    const hashtags = this.host.columnHashtags(table, column);
+    const columnName = table.columns[column]?.header ?? "";
     const stored = this.host.attributes(table);
     const formulas = this.host.offered<FormulasOffer>("formulas");
-    const was = choiceListOf(unescapeCell(header));
+    const was = choiceListOf(hashtags);
     // The list the column names, kept in the table (one that does not read is replaced: its values start from the column's)
     const kept = was !== undefined && stored.has(listKey(was));
     const keptFormula = kept ? listFormula(stored.get(listKey(was!))) : undefined;
     const list = kept && keptFormula === undefined ? readChoiceList(stored.get(listKey(was!))) : undefined;
     const taken = listNames(stored).filter((name) => name !== was || !kept);
     // The column's values, each once
-    const present = (): string[] => distinctValues(table.rows.slice(1).map((row) => textOf(row.cells[column] ?? "")).filter((text) => text !== ""));
+    const present = (): string[] => distinctValues(table.rows.map((row) => row.cells[column]?.content.trim() ?? "").filter((text) => text !== ""));
 
     const rows: ValueRow[] = [];
     const values = el(doc, "div", "swt-choices-values");
@@ -86,7 +86,7 @@ export class ChoicesDialog {
     // A list needs the metadata setting, but where the column's is kept already
     const storable = kept || this.host.canStore(table, listKey(nameField.value));
     // A column of a list (or one becoming a choice column, where a list can be kept) starts on its list, `#choice` on the column's values
-    const plainChoice = was === undefined && isChoice(columnTypeOf(unescapeCell(header)));
+    const plainChoice = was === undefined && isChoice(columnTypeOf(hashtags));
     let way: Way = keptFormula !== undefined ? "formula" : storable && !plainChoice ? "list" : "column";
     const tagHint = el(doc, "span", "swt-choices-tag");
     const showTag = () => (tagHint.textContent = `#choice-${nameField.value.trim().toLowerCase()}`);
@@ -179,7 +179,7 @@ export class ChoicesDialog {
     // A formula of one's own: a source of the space read as one (=@projects), as any other
     let formula = keptFormula ?? "";
     const formulaPart = formulas
-      ? formulaField(doc, formulas.fieldHelpers(() => this.host.asModel(table)), formula, (v) => {
+      ? formulaField(doc, formulas.fieldHelpers(() => table), formula, (v) => {
           formula = v;
           showPreview();
         }, { label: "Formula", focus: "formula", placeholder: "=@projects" })
@@ -208,7 +208,7 @@ export class ChoicesDialog {
     const save = () => {
       if (way === "column") {
         this.dialog?.close();
-        void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => setCell(t, 0, column, withColumnType(t.rows[0]?.cells[column] ?? "", "choice")));
+        void this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => withTypeOf(this.host, t, column, "choice"));
         return;
       }
       const name = nameField.value.trim().toLowerCase();
@@ -228,7 +228,7 @@ export class ChoicesDialog {
             )
           : new Map<string, string>();
       this.dialog?.close();
-      void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.written(t, column, was, kept, name, value ?? writeChoiceList(listed), renamed));
+      void this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => this.written(t, column, was, kept, name, value ?? writeChoiceList(listed), renamed));
     };
     const saveButton = el(doc, "button", { class: "swt-dialog-primary", text: "Save", run: save });
     const cancel = el(doc, "button", { class: "swt-dialog-button", text: "Cancel", run: () => this.close() });
@@ -293,15 +293,15 @@ export class ChoicesDialog {
   }
 
   /** The values a list's formula gives the table now (as the column will check them), or why it gives none */
-  private preview(table: Table, formula: string, formulas: FormulasOffer | undefined): readonly string[] | string {
+  private preview(table: TableModel, formula: string, formulas: FormulasOffer | undefined): readonly string[] | string {
     if (!formulas) return `No values: ${FORMULAS_OFF}`;
     if (formula.trim() === "=" || formula.trim() === "=@") return "Type a formula";
-    const read = this.read(this.host.asModel(table), formula);
+    const read = this.read(table, formula);
     return read.values ?? `The column checks nothing: its formula ${read.problem ?? "gives no values"}`;
   }
 
   /** Why a list cannot be named so, or undefined */
-  private validateName(table: Table, name: string, taken: readonly string[]): string | undefined {
+  private validateName(table: TableModel, name: string, taken: readonly string[]): string | undefined {
     if (!LIST_NAME_RE.test(name)) return "A list's name is lower case letters (a to z) and digits, words joined by dashes, starting with a letter.";
     if (taken.includes(name)) return `The table has a list named ${name} already.`;
     if (!this.host.canStore(table, listKey(name))) return "Lists are kept in the table's metadata: turn on Store table metadata in the settings to save one.";
@@ -333,18 +333,19 @@ export class ChoicesDialog {
    * that took it (and the column's own) naming it, the values renamed in their
    * cells (but a cell a feature computes: a formula's)
    */
-  private written(t: Table, column: number, was: string | undefined, kept: boolean, name: string, value: string, renamed: ReadonlyMap<string, string>): Table {
+  private written(t: TableModel, column: number, was: string | undefined, kept: boolean, name: string, value: string, renamed: ReadonlyMap<string, string>): TableModel {
     let table = t;
     if (was !== undefined && kept && was !== name) table = this.host.withAttribute(table, listKey(was), undefined);
     table = this.host.withAttribute(table, listKey(name), value);
-    const columns = (table.rows[0]?.cells ?? []).flatMap((header, c) => (c === column || (was !== undefined && choiceListOf(unescapeCell(header)) === was) ? [c] : []));
+    const columns = table.columns.flatMap((_, c) => (c === column || (was !== undefined && choiceListOf(this.host.columnHashtags(table, c)) === was) ? [c] : []));
     for (const c of columns) {
-      table = setCell(table, 0, c, withColumnType(table.rows[0]?.cells[c] ?? "", `choice-${name}`));
+      table = withTypeOf(this.host, table, c, `choice-${name}`);
       if (!renamed.size) continue;
-      for (let r = 1; r < table.rows.length; r++) {
-        const raw = table.rows[r]!.cells[c] ?? "";
-        const to = renamed.get(textOf(raw).toLowerCase());
-        if (to !== undefined && !this.host.cellKeptBy(raw)) table = setCell(table, r, c, this.host.keepTags(escapeCell(to), raw));
+      for (let r = 1; r <= table.rows.length; r++) {
+        const cell = table.rows[r - 1]!.cells[c];
+        const to = cell && renamed.get(cell.content.trim().toLowerCase());
+        // (Its attributes kept: a formula's cell is left, a feature computes it)
+        if (cell && to !== undefined && !this.host.cellKeptBy(this.host.fromModel(cell))) table = withContentAt(table, r, c, to);
       }
     }
     return table;

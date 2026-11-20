@@ -954,6 +954,8 @@ export interface ModelHost {
   cellNames(table: Table | TableModel): readonly CellNameAt[];
   /** A column's hashtags (its header's, its type among them), as text: the core's attribute; undefined: none */
   columnHashtags(table: TableModel, column: number): string | undefined;
+  /** The table with a column's hashtags (undefined or empty: none); a header's text, not metadata: no setting */
+  withColumnHashtags(table: TableModel, column: number, hashtags: string | undefined): TableModel;
   /** Tables changed outside the page (another page read anew): features check them again */
   tablesChanged(): void;
   /** What deleting a column also removes, by the features (names of rows and cells in it) */

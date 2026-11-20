@@ -1104,7 +1104,7 @@ export class Formulas implements Feature {
           ? "Recalculate: some formula results are out of date (the table was changed outside Silverware Table, TODAY() moved on, or a custom function changed)"
           : "Recalculate the formulas (their results are up to date)",
         // A write recalculates: an edit that changes nothing else
-        run: () => void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => t),
+        run: () => void this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => t),
       },
     ];
   }

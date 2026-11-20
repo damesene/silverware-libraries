@@ -620,6 +620,12 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      row's, so deleting the column whose cell held it keeps it (written in
      the row's first cell left); deleting a column asks only about the
      cells' names it takes (library page updated).
+     Then the modules whose writes set attributes and names (themes,
+     filters, widths, conditions, names, views, pivot, sheets, lazy, the
+     formulas' Recalculate), and the column types with the Choices dialog
+     wholly: a column's type written into its hashtags
+     (`host.withColumnHashtags`, a header's text, so no setting), a list's
+     values renamed in its cells by their content.
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

@@ -530,7 +530,7 @@ export class Pivot implements Feature {
       // A source moved to another page: that page read anew before the write (pageLinks reads the pages of the pivot as it was)
       const page = this.pageOf(changed);
       const read = page === undefined ? undefined : this.host.offered<PageLinksOffer>("pageLinks")?.readPages([page], true);
-      void Promise.resolve(read).then(() => this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.host.fromModel(this.withDefinition(this.host.asModel(t), changed), t)));
+      void Promise.resolve(read).then(() => this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => this.withDefinition(t, changed)));
     });
   }
 
@@ -561,7 +561,7 @@ export class Pivot implements Feature {
         attention: state !== false,
         title: problem ?? (state ? `Refresh pivot: it is out of date (${this.changedWhere(info)})` : "Refresh pivot (it is up to date)"),
         // A write of the pivot calculates it anew (writeStep)
-        run: () => void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => t),
+        run: () => void this.host.writeModel(this.host.tableFor(info.key) ?? info, (t) => t),
       },
     ];
   }

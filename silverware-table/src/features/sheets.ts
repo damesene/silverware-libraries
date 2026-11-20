@@ -130,7 +130,7 @@ export class Sheets implements Feature {
     const at = mine && free(mine.at) ? mine.at : placeBelow(others);
     const own = this.host.tableName(table);
     const tableName = own ?? freeNameOf(this.host, page.map((t) => t.model));
-    const result = await this.host.writeTable(info, (t: Table) =>
+    const result = await this.host.writeModel(info, (t) =>
       this.host.withAttribute(this.host.withAttribute(this.host.withTableName(t, tableName), SHEET_KEY, target?.name ?? name), AT_KEY, formatAt(at)),
     );
     if (result === "written" && !own) this.host.notify(`Silverware Table: the table is named ${tableName}, as the sheet's other tables refer to its cells by it (${tableName}!B2)`, "info");
@@ -139,7 +139,7 @@ export class Sheets implements Feature {
 
   /** Off the sheet: its `sheet` and `at` go, its name stays (the sheet's own data, if it kept it, goes on: writeStep) */
   private async remove(shown: TableInfo): Promise<void> {
-    await this.host.writeTable(this.host.tableFor(shown.key) ?? shown, (t: Table) => this.host.withAttribute(this.host.withAttribute(t, SHEET_KEY, undefined), AT_KEY, undefined));
+    await this.host.writeModel(this.host.tableFor(shown.key) ?? shown, (t) => this.host.withAttribute(this.host.withAttribute(t, SHEET_KEY, undefined), AT_KEY, undefined));
   }
 
   /** The table written: the sheet's own data taken, or handed on, where the write makes it the sheet's first table, or no longer */

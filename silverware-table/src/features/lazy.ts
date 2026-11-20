@@ -187,7 +187,7 @@ class LazyTable {
     // Not rendered (scrolled far out of view): written once it is (enhanced), or when the page is left;
     // a cell opened meanwhile: written once it closes (a write now would render the table anew under it)
     if (!target || this.host.editing) return false;
-    return (await this.host.writeTable(target, (table) => table)) === "written";
+    return (await this.host.writeModel(target, (table) => table)) === "written";
   }
 
   /** The page left: what was held for it is written into its file (SilverBullet saved it before loading the other) */

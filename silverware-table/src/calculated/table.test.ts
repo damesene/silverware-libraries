@@ -41,6 +41,11 @@ describe("calculated tables", () => {
     expect(PINS.pinsOf(made)).toMatchObject({ bottom: 1, right: 0 });
   });
 
+  it("writes a cell as a table's cell holds it, one line without spaces around, so it is the same read again", () => {
+    const made = calculatedTable(EMPTY, { ...RESULT, body: [["Ann ", "two\nlines"]], totalRow: false }, {}, PINS);
+    expect(contents(made)).toEqual([["Ann", "two lines"]]);
+  });
+
   it("keeps the headers the user renamed, by what each column stands for; a header's hashtags its column's", () => {
     const made = calculatedTable(EMPTY, RESULT, { "value:SUM([revenue])": "Revenue #euro" }, PINS);
     expect(headers(made)).toEqual(["Region", "Revenue #euro"]);

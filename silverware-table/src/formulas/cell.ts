@@ -151,6 +151,15 @@ export function cellResult(text: string): string {
   return code ? `\\${code}` : text;
 }
 
+/**
+ * A result as a table's cell holds it as its content (cellResult): one line,
+ * no spaces around it, as a table's cell is a line of its row (what a cell
+ * holds is the same written and read again: a result kept up to date)
+ */
+export function resultContent(text: string): string {
+  return cellResult(text.replace(/\r?\n/g, " ").trim());
+}
+
 export function hasFormulas(cells: FormulaCells, table: TableModel): boolean {
   return table.rows.some((row) => row.cells.some((cell) => cells.formulaOf(cell) !== undefined));
 }

@@ -4,7 +4,7 @@ import { columnName, type ColumnHead, modelHeads } from "../columns.ts";
 import { type ModelCell, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
 import { withCellAt } from "../model/ops.ts";
 import { asNumber } from "../../../shared/filter.ts";
-import { type CalculatedBy, cellResult, cellsByName, errorCodeIn, type FormulaCells, hasFormulas, PLAIN_CELLS, rowsByName, withEquals } from "./cell.ts";
+import { type CalculatedBy, cellsByName, errorCodeIn, type FormulaCells, hasFormulas, PLAIN_CELLS, resultContent, rowsByName, withEquals } from "./cell.ts";
 import { dateArithmetic, parseDate } from "./dates.ts";
 import { type Node, parse, refersToOwnData, wholeColumnNames } from "./parser.ts";
 import { type Area, areaText, cellName, formulaOutside, referencedColumn, type SourceRef, tablePrefix, type TableRef } from "./references.ts";
@@ -382,7 +382,7 @@ class Sheet {
     const rows = this.table.rows.map((row, r) => {
       const written = row.cells.map((cell, c) => {
         const stored = cells.formulaOf(cell);
-        return stored ? cells.formulaCell(cellResult(this.text(r, c, stored.formula)), stored.formula, cell) : cell;
+        return stored ? cells.formulaCell(resultContent(this.text(r, c, stored.formula)), stored.formula, cell) : cell;
       });
       return written.every((cell, c) => cell === row.cells[c]) ? row : { ...row, cells: written };
     });
@@ -764,7 +764,7 @@ export function recalculate(table: TableModel, { cells, tables, name }: Calculat
       if (!stored || (book.notRead(stored.formula) && stored.value.trim() !== "")) return;
       // Up to date when the result written is the one calculated: the cell stays as it is
       // (An error written so that it is no hashtag: one written before as `#REF!` is out of date)
-      const text = cellResult(sheet.text(r, c, stored.formula));
+      const text = resultContent(sheet.text(r, c, stored.formula));
       if (text === stored.value) return;
       result = withCellAt(result, r + 1, c, cells.formulaCell(text, stored.formula, cell));
     });

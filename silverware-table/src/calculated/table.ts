@@ -6,7 +6,7 @@
 // shown is as calculated now. Pure: the module that calculates the table reads
 // and writes its attributes through its host, and hands in the pins'.
 import { columnOfHeader, headerText, matchColumns, modelHeads, withHeaderOf } from "../columns.ts";
-import { cellResult } from "../formulas/index.ts";
+import { resultContent } from "../formulas/index.ts";
 import { type ModelColumn, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
 import type { Pins } from "../view.ts";
 
@@ -93,7 +93,7 @@ export function calculatedTable(table: TableModel, calculated: Calculated, renam
     const was = kept.get(c);
     return was ? withHeaderOf(was, column) : column;
   });
-  const rows = calculated.body.map((cells) => ({ cells: cells.map((cell) => ({ content: cellResult(cell), attributes: NO_ATTRIBUTES })), attributes: NO_ATTRIBUTES }));
+  const rows = calculated.body.map((cells) => ({ cells: cells.map((cell) => ({ content: resultContent(cell), attributes: NO_ATTRIBUTES })), attributes: NO_ATTRIBUTES }));
   const totals = { bottom: calculated.totalRow ? 1 : 0, right: calculated.totalColumns };
   const result: TableModel = { ...table, columns, rows };
   return pins.withPins(result, { ...pins.pinsOf(result), ...totals });

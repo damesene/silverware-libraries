@@ -85,6 +85,13 @@ describe("formulas in cells", () => {
     expect(recalculate(table).rows[2]!.cells[1]).toBe(`big <meta formulas.f='=IF(A2&gt;1,"big","")'>`);
   });
 
+  it("writes a result as a cell holds it, without spaces around, so it is up to date once written", () => {
+    const table = recalculate(parseTable(`| A |\n|---|\n| ${formulaCell("", '="p"&" "&"q "')} |\n`));
+    expect(table.rows[1]!.cells[0]).toMatch(/^p q <meta/);
+    const read = parseTable(serializeTable(table));
+    expect(recalculate(read)).toBe(read);
+  });
+
   it("reads a formula written in quotes, as tables before apostrophes have it", () => {
     expect(formulaOf('19 <meta formulas.f="=IF(A1&gt;1,&quot;it&#39;s&quot;,&quot;c&quot;)">')?.formula).toBe(`=IF(A1>1,"it's","c")`);
   });

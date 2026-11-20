@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseTable, serializeTable } from "./markdown.ts";
-import { parseClipboardCells, pasteCells, planPaste } from "./paste.ts";
+import { cellWrittenOver } from "./model/rules.ts";
+import { moveCells, parseClipboardCells, pasteCells, planPaste } from "./paste.ts";
 import { decode, encode } from "./store/markdown/codec.ts";
 import { CELLS } from "./testing/formulas.ts";
 import { NO_PINS } from "./view.ts";
@@ -124,5 +125,17 @@ describe("pasting cells", () => {
     expect(paste([["x"], ["y"]], { row: 3, column: 0 }, false, { ...NO_PINS, bottom: 1 })).toEqual({
       error: "there are no rows below the rows pinned to the bottom to paste into",
     });
+  });
+});
+
+describe("moving cells", () => {
+  const RULES = { boundToContent: [{ owner: "formulas", key: "f" }], unique: [{ owner: "core", key: "cn" }] };
+
+  it("takes a formula from the cell it leaves, even one whose result is empty, the name there staying", () => {
+    const TABLE = parseTable("| A | B |\n|---|---|\n| 1 | <meta formulas.f='=\"\"' core.cn='x'> |\n| 2 | |");
+    const plan = planPaste(decode(TABLE), NO_PINS, { row: 2, column: 1 }, [[""]], false);
+    if ("error" in plan) throw new Error(plan.error);
+    const moved = moveCells(decode(TABLE), [[{ row: 1, column: 1 }]], plan, (cell, over) => cellWrittenOver(cell, over, RULES));
+    expect(serializeTable(encode(moved, TABLE))).toBe("| A | B |\n|---|---|\n| 1 | <meta core.cn='x'> |\n| 2 | <meta formulas.f='=\"\"'> |");
   });
 });

@@ -189,15 +189,18 @@ export function pasteCells(table: TableModel, plan: PastePlan, data: readonly (r
 /**
  * The table with cells moved (cut, then pasted): the cells cut (rows of the
  * markdown and columns, as they were cut: rows as shown, columns left to
- * right) emptied, their attributes staying (names), then written where the
- * plan puts them, over what is there (as a spreadsheet moves cells), as
+ * right) emptied as `placed` writes an empty cell over them (their formula
+ * gone, even one whose result is empty; their names staying), then written
+ * where the plan puts them, over what is there (as a spreadsheet moves cells), as
  * `placed` writes a cell over another (its content and its formula with it,
  * the name there staying). Body cells only: the plan starts under the header.
  */
 export function moveCells(table: TableModel, sources: readonly (readonly { row: number; column: number }[])[], plan: PastePlan, placed: (moved: ModelCell, over: ModelCell) => ModelCell): TableModel {
   const moved = sources.map((row) => row.map((ref) => table.rows[ref.row - 1]?.cells[ref.column] ?? EMPTY_CELL));
   let result = table;
-  for (const row of sources) for (const ref of row) if (ref.row > 0) result = withContentAt(result, ref.row, ref.column, "");
+  sources.forEach((row, i) => row.forEach((ref, j) => {
+    if (ref.row > 0) result = withCellAt(result, ref.row, ref.column, placed(EMPTY_CELL, moved[i]![j]!));
+  }));
   for (let k = 0; k < plan.newColumns.count; k++) result = insertColumn(result, plan.newColumns.at + k);
   for (let k = 0; k < plan.newRows.count; k++) result = insertRow(result, plan.newRows.at + k);
   moved.forEach((cells, i) => {

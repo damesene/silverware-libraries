@@ -17,7 +17,7 @@
 // names.ts writes it), so a changed table reads as before. What the metadata
 // row has of no column found (a header renamed by hand) is kept as written.
 import { headerHashtags, withoutHashtags } from "../../columns.ts";
-import { escapeCell, type Row, type Table, unescapeCell } from "../../markdown.ts";
+import { escapeCell, type Row, serializeTable, type Table, unescapeCell } from "../../markdown.ts";
 import { columnsMetaNamed, columnsMetaOf } from "../../meta.ts";
 import { attributeName, CORE, escapedForRegExp, splitAttributeName } from "../../metanames.ts";
 import {
@@ -183,6 +183,12 @@ function withHashtags(cell: string, hashtags: readonly string[]): string {
   const kept = had.reduce((text, tag) => (hashtags.includes(tag) ? text : text.replace(new RegExp(String.raw`(^|\s)${escapedForRegExp(tag)}(?=\s|$)`), "$1")), cell);
   const added = hashtags.filter((tag) => !had.includes(tag));
   return [kept.replace(/\s+/g, " ").trim(), ...added].join(" ");
+}
+
+/** The table's header and `rows` (its rows, the first 1, in that order) as plain markdown: no hidden tags, no metadata row */
+export function plainMarkdown(table: Table, rows: readonly number[]): string {
+  const plain = (row: number) => ({ cells: (table.rows[row]?.cells ?? []).map(withoutTags) });
+  return serializeTable({ indent: "", align: table.align, padded: table.padded, rows: [plain(0), ...rows.map(plain)] });
 }
 
 /** A model written back as a markdown table, `base` the table it was read from (its form: indent, padding, its rows as written) */

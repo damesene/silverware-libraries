@@ -643,6 +643,8 @@ export interface ModelHost {
    * text as last read): what a user's script is handed (custom menu entries)
    */
   tableData(info: TableInfo): TableData;
+  /** A table's header and `rows` (its rows, the first 1, in that order) as plain markdown, as any renderer shows them: no hidden data, no metadata row (Copy as Markdown) */
+  plainMarkdown(table: Table, rows: readonly number[]): string;
   /** Whether other pages are read (none where the platform reads no page but the open one): formulas and pivots referring to one */
   readonly readsOtherPages: boolean;
   /** Every page's name (none where the platform lists none): what a page is picked from */

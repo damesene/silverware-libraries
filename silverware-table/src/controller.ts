@@ -26,6 +26,7 @@ import type { StoredTable } from "./core/store.ts";
 import type { AttributePlace, TableModel } from "./model/model.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
+import { plainMarkdown } from "./store/markdown/codec.ts";
 import { SettingsDialog } from "./settings.ts";
 import { Metadata } from "./features/metadata.ts";
 import { featureEntries } from "./modules.ts";
@@ -562,6 +563,10 @@ export class Controller implements TableHost {
 
   tables(document: string): Promise<readonly StoredTable[] | null> {
     return this.store.tables(document);
+  }
+
+  plainMarkdown(table: Table, rows: readonly number[]): string {
+    return plainMarkdown(table, rows);
   }
 
   tableData(info: TableInfo): TableData {

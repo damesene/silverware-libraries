@@ -5,8 +5,7 @@
 // columns' (`withHeader`). A cell's content set keeps its attributes: which of
 // them an edit ends is the core's write step's (an attribute bound to its
 // content).
-import type { Align } from "../markdown.ts";
-import { type ModelCell, type ModelColumn, type ModelRow, NO_ATTRIBUTES, type TableModel } from "./model.ts";
+import { type Align, type ModelCell, type ModelColumn, type ModelRow, NO_ATTRIBUTES, type TableModel } from "./model.ts";
 
 // Where a row or column of the table before an edit is after it; undefined: deleted
 export type IndexMap = (index: number) => number | undefined;

@@ -589,6 +589,15 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      column gone, kept to come back): whether it went is the write's to say
      by its column map, as now (`followColumnMeta` in the core's write step),
      which 4c keeps.
+   - **4b, the host in model terms (2026-11-20)**: the names' functions
+     (`writtenTableName`, `withTableName`, `columnName`, `rowName`,
+     `cellName`, their setters, `canName`) take the model too: on it a name
+     is the core's attribute where it is about (a table's `core.name`, a
+     column's and a row's `core.n`, a cell's `core.cn`: `modelColumnName`,
+     `modelRowName`, `modelCellName`, `withModelName` in names.ts), set as
+     the writers of names set them (only a table's name through the metadata
+     setting, as before). `Align` is the model's (markdown.ts re-exports it),
+     so the model imports nothing of the markdown.
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

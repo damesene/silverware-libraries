@@ -913,20 +913,24 @@ export interface ModelHost {
   /** What the features say the table is (Feature.tableBadges), in their order */
   tableBadges(info: TableInfo): readonly TableBadge[];
   /** A table's name as written, valid or not */
-  writtenTableName(table: Table): string | undefined;
+  writtenTableName(table: Table | TableModel): string | undefined;
   /** The table named so (undefined: unnamed) */
   withTableName(table: Table, name: string | undefined): Table;
-  /** A column's fixed name, its header's (apart from the header's text) */
-  columnName(table: Table, column: number): string | undefined;
+  withTableName(table: TableModel, name: string | undefined): TableModel;
+  /** A column's fixed name (apart from its header's text) */
+  columnName(table: Table | TableModel, column: number): string | undefined;
   withColumnName(table: Table, column: number, name: string | undefined): Table;
-  /** A body row's name (of the markdown: header 0) */
-  rowName(table: Table, row: number): string | undefined;
+  withColumnName(table: TableModel, column: number, name: string | undefined): TableModel;
+  /** A body row's name (rows from 1: the header 0) */
+  rowName(table: Table | TableModel, row: number): string | undefined;
   withRowName(table: Table, row: number, name: string | undefined): Table;
+  withRowName(table: TableModel, row: number, name: string | undefined): TableModel;
   /** A body cell's name */
-  cellName(table: Table, row: number, column: number): string | undefined;
+  cellName(table: Table | TableModel, row: number, column: number): string | undefined;
   withCellName(table: Table, row: number, column: number, name: string | undefined): Table;
+  withCellName(table: TableModel, row: number, column: number, name: string | undefined): TableModel;
   /** Whether a name may be given there: the metadata setting on, or one is there already (renamed or removed) */
-  canName(table: Table, target: NamingTarget): boolean;
+  canName(table: Table | TableModel, target: NamingTarget): boolean;
   /** Whether rows (columns) may be pinned at that edge: the metadata setting on, or the table has pins there already */
   canPin(table: Table | TableModel, edge: "top" | "bottom" | "left" | "right"): boolean;
   /** The rows and columns pinned at each edge of a table, as its attributes have them */

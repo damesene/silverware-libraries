@@ -262,7 +262,7 @@ export function modelTableName(model: TableModel): string | undefined {
 }
 
 /** The table's name as written, valid or not */
-export function writtenName(table: Table): string | undefined {
+export function writtenName(table: Table | TableModel): string | undefined {
   return metaValue(table, CORE, "name");
 }
 

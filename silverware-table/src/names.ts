@@ -9,7 +9,7 @@
 // `<meta core.n='pear' core.cn='first'>`. SilverBullet does not show the tag,
 // and leaves it out of the column's key in its index (verified), so queries
 // see the header as before. Modules read and write names through the host.
-import { attributeIn, type TableModel } from "./model/model.ts";
+import { attributeIn, attributesAt, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt } from "./model/model.ts";
 import { metaAttribute, type Table, unescapeMetaValue } from "./markdown.ts";
 import { attributeName, CORE, escapedForRegExp } from "./metanames.ts";
 import { setCell } from "./ops.ts";
@@ -128,7 +128,25 @@ export type RowName = { readonly name: string; readonly row: number; readonly co
 /** A named body cell: its name as written, its row of the markdown (header 0) and column */
 export type CellNameAt = { readonly name: string; readonly row: number; readonly column: number };
 
-/** A table's named rows, in their order */
+/** A model's column's own name, a row's (`row` from 1), a body cell's: the core's attributes there */
+export function modelColumnName(model: TableModel, column: number): string | undefined {
+  return attributeIn(attributesAt(model, { column }) ?? NO_ATTRIBUTES, CORE, LINE_NAME_KEY);
+}
+
+export function modelRowName(model: TableModel, row: number): string | undefined {
+  return attributeIn(attributesAt(model, { row }) ?? NO_ATTRIBUTES, CORE, LINE_NAME_KEY);
+}
+
+export function modelCellName(model: TableModel, row: number, column: number): string | undefined {
+  return attributeIn(attributesAt(model, { row, column }) ?? NO_ATTRIBUTES, CORE, CELL_NAME_KEY);
+}
+
+/** A model with a column's, a row's or a cell's name set (undefined: unnamed); the core's attribute, written by a store where it keeps names */
+export function withModelName(model: TableModel, at: { readonly column: number; readonly row?: undefined } | { readonly row: number; readonly column?: number }, name: string | undefined): TableModel {
+  const key = at.row !== undefined && at.column !== undefined ? CELL_NAME_KEY : LINE_NAME_KEY;
+  return withAttributesAt(model, at, (attributes) => withAttributeIn(attributes, CORE, key, name || undefined));
+}
+
 /** A model's named rows, in their order (rows from 1, as the markdown's body) */
 export function modelRowNames(model: TableModel): { readonly name: string; readonly row: number }[] {
   return model.rows.flatMap((r, i) => {
@@ -147,6 +165,7 @@ export function modelCellNames(model: TableModel): CellNameAt[] {
   );
 }
 
+/** A table's named rows, in their order */
 export function rowNamesIn(table: Table): RowName[] {
   return table.rows.flatMap((r, row) => {
     const named = row === 0 ? undefined : rowNameIn(r.cells);

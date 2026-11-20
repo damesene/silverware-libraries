@@ -70,7 +70,7 @@ import {
 import type { MenuBack, MenuEntry, MenuNaming } from "./menu.ts";
 import { floatingMenu, focusMenu } from "./core/menu.ts";
 import { CORE, attributeName, metadataAfterEdit, metaName, modelTableName, metaPins, metaSort, withMetaPins, withMetaSort, writtenName } from "./meta.ts";
-import { CELL_NAME, type CellNameAt, cellNameOf, cellNamesIn, LINE_NAME, columnNameIn, modelCellNames, modelRowNames, type RowName, rowNameIn, rowNamesIn, withCellNameIn, withColumnNameIn, withRowNameIn } from "./names.ts";
+import { CELL_NAME, type CellNameAt, cellNameOf, cellNamesIn, LINE_NAME, columnNameIn, modelCellName, modelCellNames, modelColumnName, modelRowName, modelRowNames, type RowName, rowNameIn, rowNamesIn, withCellNameIn, withColumnNameIn, withModelName, withRowNameIn } from "./names.ts";
 import { ownMeta } from "./core/metaaccess.ts";
 import { withoutNewTagValues } from "./tagvalues.ts";
 import { keepTags } from "./tags.ts";
@@ -788,7 +788,7 @@ export class Controller implements TableHost {
     return this.coreMeta.canStore(table as TableModel, key, at);
   }
 
-  canName(table: Table, target: NamingTarget): boolean {
+  canName(table: Table | TableModel, target: NamingTarget): boolean {
     if (this.metadataOn) return true;
     switch (target.kind) {
       case "table":
@@ -845,36 +845,46 @@ export class Controller implements TableHost {
     return this.features.flatMap((feature) => feature.tableBadges?.(info) ?? []);
   }
 
-  writtenTableName(table: Table): string | undefined {
+  writtenTableName(table: Table | TableModel): string | undefined {
     return writtenName(table);
   }
 
-  withTableName(table: Table, name: string | undefined): Table {
-    return this.coreMeta.withAttribute(table, "name", name);
+  withTableName(table: Table, name: string | undefined): Table;
+  withTableName(table: TableModel, name: string | undefined): TableModel;
+  withTableName(table: Table | TableModel, name: string | undefined): Table | TableModel {
+    return this.coreMeta.withAttribute(table as TableModel, "name", name);
   }
 
-  columnName(table: Table, column: number): string | undefined {
-    return columnNameIn(table, column);
+  columnName(table: Table | TableModel, column: number): string | undefined {
+    return "columns" in table ? modelColumnName(table, column) : columnNameIn(table, column);
   }
 
-  withColumnName(table: Table, column: number, name: string | undefined): Table {
-    return withColumnNameIn(table, column, name);
+  withColumnName(table: Table, column: number, name: string | undefined): Table;
+  withColumnName(table: TableModel, column: number, name: string | undefined): TableModel;
+  withColumnName(table: Table | TableModel, column: number, name: string | undefined): Table | TableModel {
+    return "columns" in table ? withModelName(table, { column }, name) : withColumnNameIn(table, column, name);
   }
 
-  rowName(table: Table, row: number): string | undefined {
-    return row === 0 ? undefined : rowNameIn(table.rows[row]?.cells ?? [])?.name;
+  rowName(table: Table | TableModel, row: number): string | undefined {
+    if (row === 0) return undefined;
+    return "columns" in table ? modelRowName(table, row) : rowNameIn(table.rows[row]?.cells ?? [])?.name;
   }
 
-  withRowName(table: Table, row: number, name: string | undefined): Table {
-    return withRowNameIn(table, row, name);
+  withRowName(table: Table, row: number, name: string | undefined): Table;
+  withRowName(table: TableModel, row: number, name: string | undefined): TableModel;
+  withRowName(table: Table | TableModel, row: number, name: string | undefined): Table | TableModel {
+    return "columns" in table ? withModelName(table, { row }, name) : withRowNameIn(table, row, name);
   }
 
-  cellName(table: Table, row: number, column: number): string | undefined {
-    return row === 0 ? undefined : cellNameOf(table.rows[row]?.cells[column] ?? "");
+  cellName(table: Table | TableModel, row: number, column: number): string | undefined {
+    if (row === 0) return undefined;
+    return "columns" in table ? modelCellName(table, row, column) : cellNameOf(table.rows[row]?.cells[column] ?? "");
   }
 
-  withCellName(table: Table, row: number, column: number, name: string | undefined): Table {
-    return withCellNameIn(table, row, column, name);
+  withCellName(table: Table, row: number, column: number, name: string | undefined): Table;
+  withCellName(table: TableModel, row: number, column: number, name: string | undefined): TableModel;
+  withCellName(table: Table | TableModel, row: number, column: number, name: string | undefined): Table | TableModel {
+    return "columns" in table ? withModelName(table, { row, column }, name) : withCellNameIn(table, row, column, name);
   }
 
   rowNames(table: Table): readonly RowName[];

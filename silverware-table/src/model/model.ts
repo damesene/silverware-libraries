@@ -8,7 +8,9 @@
 // Immutable: an edit makes a new version, sharing what it did not change, so
 // a write, an undo and a module may each hold a version that never changes
 // under them.
-import type { Align } from "../markdown.ts";
+
+/** A column's alignment */
+export type Align = "" | "left" | "center" | "right";
 
 /** Whose an attribute is: a module's name in lowercase, the core's (`core`), or none (`""`: a tag typed by hand without one) */
 export type Owner = string;

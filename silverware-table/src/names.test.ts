@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { decode } from "./store/markdown/codec.ts";
+import { decode, encode } from "./store/markdown/codec.ts";
 import { columnIdOf, columnKey, findColumn, headsOf } from "./columns.ts";
 import {
   referencedColumn,
 } from "./formulas/index.ts";
 import { formulaCell, formulaOf, recalculate } from "./testing/formulas.ts";
-import { parseMetaRow, parseTable } from "./markdown.ts";
+import { parseMetaRow, parseTable, serializeTable } from "./markdown.ts";
 import { validateName } from "./namerules.ts";
-import { cellNamesIn, modelCellNames, modelRowNames, nameOf, rowNamesIn, withCellName, withName, withoutName } from "./names.ts";
+import { cellNamesIn, modelCellName, modelCellNames, modelColumnName, modelRowName, modelRowNames, nameOf, rowNamesIn, withCellName, withCellNameIn, withColumnNameIn, withModelName, withName, withoutName, withRowNameIn } from "./names.ts";
 
 describe("names in cells", () => {
   it("reads, writes and removes a cell's name, keeping its text", () => {
@@ -78,5 +78,17 @@ describe("names on the model", () => {
     const model = decode(table);
     expect(modelRowNames(model)).toEqual(rowNamesIn(table).map(({ name, row }) => ({ name, row })));
     expect(modelCellNames(model)).toEqual(cellNamesIn(table));
+  });
+
+  it("are read where they are, and set as the writers of names write them", () => {
+    const table = parseTable("| Item <meta core.n='item'> | Price |\n|---|---|\n| Pear <meta core.n='pear'> | 3 <meta core.cn='p3'> |\n| Fig | 2 |");
+    const model = decode(table);
+    expect([modelColumnName(model, 0), modelRowName(model, 1), modelCellName(model, 1, 1), modelRowName(model, 2)]).toEqual(["item", "pear", "p3", undefined]);
+    const md = (changed: typeof model) => serializeTable(encode(changed, table));
+    expect(md(withModelName(model, { column: 1 }, "price"))).toBe(serializeTable(withColumnNameIn(table, 1, "price")));
+    expect(md(withModelName(model, { row: 2 }, "fig"))).toBe(serializeTable(withRowNameIn(table, 2, "fig")));
+    expect(md(withModelName(model, { row: 1 }, undefined))).toBe(serializeTable(withRowNameIn(table, 1, undefined)));
+    expect(md(withModelName(model, { row: 2, column: 1 }, "two"))).toBe(serializeTable(withCellNameIn(table, 2, 1, "two")));
+    expect(md(withModelName(model, { row: 1, column: 1 }, ""))).toBe(serializeTable(withCellNameIn(table, 1, 1, undefined)));
   });
 });

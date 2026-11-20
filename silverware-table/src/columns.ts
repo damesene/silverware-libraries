@@ -56,6 +56,30 @@ export function columnOfHeader(text: string, align: Align, attributes: Attribute
   return { header: withoutHashtags(text), align, attributes: withAttributeIn(attributes, CORE, HASHTAGS_KEY, hashtags.length ? hashtags.join(" ") : undefined) };
 }
 
+/**
+ * Whether a column's header is empty: no text, no hashtags, no name of its own
+ * (an empty header cell, which SilverBullet renders none of, the header then
+ * shifted against the data)
+ */
+function emptyHeader(column: ModelColumn): boolean {
+  return headerText(column) === "" && attributeIn(column.attributes, CORE, LINE_NAME_KEY) === undefined;
+}
+
+/** Names every column with an empty header "Column N" (N its place, or the next free number) */
+export function nameEmptyHeaders(model: TableModel): TableModel {
+  if (!model.columns.some(emptyHeader)) return model;
+  const names = new Set(model.columns.map((c) => c.header));
+  const columns = model.columns.map((column, i): ModelColumn => {
+    if (!emptyHeader(column)) return column;
+    let n = i + 1;
+    while (names.has(`Column ${n}`)) n++;
+    const header = `Column ${n}`;
+    names.add(header);
+    return { ...column, header };
+  });
+  return { ...model, columns };
+}
+
 /** A column with the header of `header` (its text, its hashtags) and its alignment, its other attributes its own (the column itself where they are the same) */
 export function withHeaderOf(column: ModelColumn, header: ModelColumn): ModelColumn {
   const attributes = withAttributeIn(column.attributes, CORE, HASHTAGS_KEY, attributeIn(header.attributes, CORE, HASHTAGS_KEY));

@@ -58,10 +58,9 @@ describe("the model's operations, written back as the markdown's are", () => {
     expect(ops.withContentAt(model, 3, 1, "7")).toBe(model);
   });
 
-  it("a header set, empty headers named, a new column named past the others", () => {
+  it("a header set, a new column named past the others", () => {
     expect(written((m) => ops.withHeader(m, 2, "Notes"))).toBe(md(markdown.setCell(TABLE, 0, 2, "Notes")));
     const empty = parseTable("| A |  | Column 2 |\n|---|---|---|\n| 1 | 2 | 3 |");
-    expect(written((m) => ops.nameEmptyHeaders(m), empty)).toBe(md(markdown.nameEmptyHeaders(empty)));
     expect(ops.newColumnName(decode(empty))).toBe(markdown.newColumnName(empty));
   });
 

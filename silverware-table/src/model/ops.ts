@@ -5,7 +5,7 @@
 // columns' (`withHeader`). A cell's content set keeps its attributes: which of
 // them an edit ends is the core's write step's (an attribute bound to its
 // content).
-import { type Align, type ModelCell, type ModelColumn, type ModelRow, NO_ATTRIBUTES, type TableModel } from "./model.ts";
+import { type Align, type ModelCell, type ModelRow, NO_ATTRIBUTES, type TableModel } from "./model.ts";
 
 // Where a row or column of the table before an edit is after it; undefined: deleted
 export type IndexMap = (index: number) => number | undefined;
@@ -107,21 +107,6 @@ export function newColumnName(model: TableModel): string {
   let n = model.columns.length + 1;
   while (names.has(`Column ${n}`)) n++;
   return `Column ${n}`;
-}
-
-/** Names every column with an empty header "Column N" (N its place, or the next free number) */
-export function nameEmptyHeaders(model: TableModel): TableModel {
-  if (!model.columns.some((c) => c.header === "")) return model;
-  const names = new Set(model.columns.map((c) => c.header));
-  const columns = model.columns.map((column, i): ModelColumn => {
-    if (column.header !== "") return column;
-    let n = i + 1;
-    while (names.has(`Column ${n}`)) n++;
-    const header = `Column ${n}`;
-    names.add(header);
-    return { ...column, header };
-  });
-  return { ...model, columns };
 }
 
 /** Inserts a column so that it becomes column `at`, its header made (newColumnName), its cells empty */

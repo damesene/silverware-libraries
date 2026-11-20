@@ -24,7 +24,7 @@ import { markTable, renderedMeta, SilverBulletAdapter } from "./core/silverbulle
 import type { TablePlatform } from "./core/platform.ts";
 import type { StoredTable } from "./core/store.ts";
 import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt } from "./model/model.ts";
-import { HASHTAGS_KEY } from "./columns.ts";
+import { HASHTAGS_KEY, nameEmptyHeaders } from "./columns.ts";
 import { type AttributeRules, cellWrittenOver, withAttributeRules } from "./model/rules.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
@@ -74,7 +74,7 @@ import { CORE, metadataAfterEdit, metaName, metaPins, metaSort, withMetaPins, wi
 import { CELL_NAME_KEY, type CellNameAt, LINE_NAME_KEY, modelCellName, modelCellNames, modelColumnName, modelRowName, modelRowNames, type RowName, withModelName } from "./names.ts";
 import { ownMeta } from "./core/metaaccess.ts";
 import { withoutNewTagValues } from "./tagvalues.ts";
-import { nameEmptyHeaders, reorderRows } from "./ops.ts";
+import { reorderRows } from "./ops.ts";
 import {
   cycleSort,
   DEFAULT_VIEW,
@@ -1311,7 +1311,8 @@ export class Controller implements TableHost {
         this.notify(NOT_SAVED, "error");
         return;
       }
-      const edit = minimalEdit(range.text, serializeTable(nameEmptyHeaders(parseTable(range.text))));
+      const table = parseTable(range.text);
+      const edit = minimalEdit(range.text, serializeTable(encode(nameEmptyHeaders(decode(table)), table)));
       await this.platform.editor.replace(range.from + edit.from, range.from + edit.to, edit.insert);
     } catch (e) {
       console.error("Silverware Table: could not name the columns", e);

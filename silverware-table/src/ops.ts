@@ -98,22 +98,6 @@ export function newColumnName(table: Table): string {
   return `Column ${n}`;
 }
 
-/** Names every empty header cell "Column N" (N its position, or the next free number) */
-export function nameEmptyHeaders(table: Table): Table {
-  const header = table.rows[0];
-  if (!header) return table;
-  const names = new Set(header.cells);
-  const cells = header.cells.map((cell, i) => {
-    if (cell !== "") return cell;
-    let n = i + 1;
-    while (names.has(`Column ${n}`)) n++;
-    const name = `Column ${n}`;
-    names.add(name);
-    return name;
-  });
-  return { ...table, rows: [{ ...header, cells }, ...table.rows.slice(1)] };
-}
-
 /** Inserts a column so that it becomes column `at`, with a generated header */
 export function insertColumn(table: Table, at: number): Table {
   const column = Math.max(0, Math.min(at, table.align.length));

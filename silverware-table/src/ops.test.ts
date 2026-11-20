@@ -12,7 +12,6 @@ import {
   moveColumns,
   moveRow,
   moveRows,
-  nameEmptyHeaders,
   setAlign,
 } from "./ops.ts";
 
@@ -47,13 +46,6 @@ describe("row operations", () => {
 describe("column operations", () => {
   it("inserts a column with a generated header", () => {
     expect(md(insertColumn(base, 1))).toBe("| A | Column 3 | B |\n|---|---|---|\n| 1 | | 2 |\n| 3 | | 4 |");
-  });
-
-  it("names empty header cells after their position", () => {
-    const t = parseTable("| A | | Column 3 | |\n|---|---|---|---|\n| 1 | 2 | 3 | 4 |");
-    expect(nameEmptyHeaders(t).rows[0]?.cells).toEqual(["A", "Column 2", "Column 3", "Column 4"]);
-    const clash = parseTable("| Column 2 | |\n|---|---|\n| 1 | 2 |");
-    expect(nameEmptyHeaders(clash).rows[0]?.cells).toEqual(["Column 2", "Column 3"]);
   });
 
   it("generates a header name that is not taken", () => {

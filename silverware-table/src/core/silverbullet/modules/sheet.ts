@@ -27,6 +27,7 @@
 // SilverBullet's navigation. Formulas of the board's tables read in the
 // sheet's addresses (addressFrame): a reference is to a record, so sorting a
 // table changes the address shown, not the value.
+import { nameEmptyHeaders } from "../../../columns.ts";
 import type { TableModel } from "../../../model/model.ts";
 import { CELL_MENU_ORDER, type AdapterFeature, type AddressFrame, type TableChange, type CellArea, type CellEditor, type CellMenuGroup, type CellRef, type RenderedEditor, type TableHost, type TableInfo, type TableTarget, type ToolbarButton, type WidgetInfo, type WriteResult } from "../../feature.ts";
 import { oncePerFrame } from "../../frame.ts";
@@ -39,7 +40,6 @@ import { ICONS } from "../../../icons.ts";
 import { escapeCell, findTables, pageTablesOf, parseTable, type TableRange } from "../../../markdown.ts";
 import { sameTableName } from "../../../namerules.ts";
 import { AT_KEY, formatAt, freeNameOf, freeSheetName, SHEET_KEY, WIDTH_PREFIX, sameSheet, type SheetCell, canPlace, sheetDataTable, type SheetPlace, validateSheetName, sheetOfTable, sheetsOf, sheetTablesOf, sheetWidths } from "../../../sheet/page.ts";
-import { nameEmptyHeaders } from "../../../ops.ts";
 import { parseClipboardCells } from "../../../paste.ts";
 import { validatePlace, roomFor } from "../../../sheet/layout.ts";
 import { watchPress } from "../../press.ts";
@@ -1803,7 +1803,7 @@ export class Sheet implements AdapterFeature {
     const line = (cells: readonly string[]) => `| ${Array.from({ length: columns }, (_, c) => escapeCell((cells[c] ?? "").trim())).join(" | ")} |`;
     const markdown = [line(header), `|${"---|".repeat(columns)}`, ...body.map(line)].join("\n");
     // Empty header cells named as a new column is, each name once
-    await this.insertNew(await this.host.pageTextNow(), this.host.asModel(nameEmptyHeaders(parseTable(markdown))), { row: top, column: at.column }, undefined);
+    await this.insertNew(await this.host.pageTextNow(), nameEmptyHeaders(this.modelOf(markdown)), { row: top, column: at.column }, undefined);
   }
 
   /** The module's td over an empty cell (the one selected or edited), where that cell is now */

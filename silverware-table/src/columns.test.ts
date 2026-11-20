@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { columnIdOf, columnKey, findColumn, followColumn, headsOf, matchColumns, sameColumnId } from "./columns.ts";
+import { columnIdOf, columnKey, findColumn, followColumn, headsOf, matchColumns, nameEmptyHeaders, sameColumnId } from "./columns.ts";
+import { parseTable, serializeTable } from "./markdown.ts";
+import { decode, encode } from "./store/markdown/codec.ts";
 
 describe("columnKey", () => {
   it("keys a column as SilverBullet's index does", () => {
@@ -90,5 +92,21 @@ describe("columns by name", () => {
     expect(followColumn(headers, headsOf(["Name", "Unit price", "qty"]), id, (c) => (c === 1 ? undefined : c > 1 ? c - 1 : c))).toBeNull();
     expect(followColumn(headers, headers, { name: "Nope", nth: 1 })).toBeUndefined();
     expect(sameColumnId({ name: "Unit price", nth: 1 }, { name: "unit_price", nth: 1 })).toBe(true);
+  });
+});
+
+describe("empty headers", () => {
+  const named = (markdown: string) => {
+    const table = parseTable(markdown);
+    return serializeTable(encode(nameEmptyHeaders(decode(table)), table)).split("\n")[0];
+  };
+
+  it("are named after their place, or the next free number", () => {
+    expect(named("| A | | Column 3 | |\n|---|---|---|---|\n| 1 | 2 | 3 | 4 |")).toBe("| A | Column 2 | Column 3 | Column 4 |");
+    expect(named("| Column 2 | |\n|---|---|\n| 1 | 2 |")).toBe("| Column 2 | Column 3 |");
+  });
+
+  it("are not a header of hashtags alone, nor one holding only its column's name", () => {
+    expect(named("| #stars | <meta core.n='x'> | |\n|---|---|---|\n| 1 | 2 | 3 |")).toBe("| #stars | <meta core.n='x'> | Column 3 |");
   });
 });

@@ -1,6 +1,9 @@
 // A table's theme as it is drawn: its colors where SilverBullet paints a table's cells otherwise
 import type { Locator, Page } from "@playwright/test";
-import { expect, setPage, setSettings, stableBox, table, test } from "./helpers.ts";
+import { expect, setSettings, stableBox, startingOn, table, test } from "./helpers.ts";
+
+// Six rows, the striped ones among them
+const SIX_ROWS = `# Test\n\n| Name | Qty |\n|---|---|\n${Array.from({ length: 6 }, (_, i) => `| Row ${i + 1} | ${i * 3} |`).join("\n")}\n\nAfter\n`;
 
 /**
  * The color the screen shows in a cell, its fill as drawn: at its middle's height (away from a theme's lines between
@@ -22,10 +25,10 @@ async function fillOf(page: Page, cell: Locator): Promise<string> {
   }, shot.toString("base64"));
 }
 
-test("the row under the pointer in a theme's tint, apart from the striped rows and the plain ones alike", async ({ page }) => {
+// (On a page of its own: one set after another's table showed, the test waited on that table, slate too, and hovered
+// where its row was before the page's own was drawn)
+test("the row under the pointer in a theme's tint, apart from the striped rows and the plain ones alike", startingOn(SIX_ROWS), async ({ page }) => {
   await setSettings(page, { "silverware.table.modules.themes.theme": "slate" });
-  const rows = Array.from({ length: 6 }, (_, i) => `| Row ${i + 1} | ${i * 3} |`).join("\n");
-  await setPage(page, `# Test\n\n| Name | Qty |\n|---|---|\n${rows}\n\nAfter\n`);
   await expect(table(page)).toHaveAttribute("data-swt-theme", "slate");
   const cellOf = (row: number) => table(page).locator(`tr[data-swt-row="${row}"] > td`).nth(1);
   // (The pointer away: no row under it)

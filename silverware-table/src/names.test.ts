@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { decode } from "./store/markdown/codec.ts";
 import { columnIdOf, columnKey, findColumn, headsOf } from "./columns.ts";
 import {
   referencedColumn,
@@ -6,7 +7,7 @@ import {
 import { formulaCell, formulaOf, recalculate } from "./testing/formulas.ts";
 import { parseMetaRow, parseTable } from "./markdown.ts";
 import { validateName } from "./namerules.ts";
-import { nameOf, withCellName, withName, withoutName } from "./names.ts";
+import { cellNamesIn, modelCellNames, modelRowNames, nameOf, rowNamesIn, withCellName, withName, withoutName } from "./names.ts";
 
 describe("names in cells", () => {
   it("reads, writes and removes a cell's name, keeping its text", () => {
@@ -68,5 +69,14 @@ describe("a column's fixed name", () => {
   it("is what [name] reads, after the header is renamed too", () => {
     const table = parseTable(`| Cost <meta core.n='price'> | Total |\n|---|---|\n| 3 | ${formulaCell("", "=SUM([price])")} |`);
     expect(formulaOf(recalculate(table).rows[1]!.cells[1]!)!.value).toBe("3");
+  });
+});
+
+describe("names on the model", () => {
+  it("are those the markdown has: rows' and cells', as their rows (from 1) and columns", () => {
+    const table = parseTable("| Item | Price |\n|---|---|\n| Pear <meta core.n='pear'> | 3 <meta core.cn='p3'> |\n| Fig | 2 |\n| x | 1 <meta core.n='last' core.cn='one'> |");
+    const model = decode(table);
+    expect(modelRowNames(model)).toEqual(rowNamesIn(table).map(({ name, row }) => ({ name, row })));
+    expect(modelCellNames(model)).toEqual(cellNamesIn(table));
   });
 });

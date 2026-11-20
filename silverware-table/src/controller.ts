@@ -23,7 +23,7 @@ import { writingClipboard } from "../../shared/clipboard.ts";
 import { markTable, renderedMeta, SilverBulletAdapter } from "./core/silverbullet/adapter.ts";
 import type { TablePlatform } from "./core/platform.ts";
 import type { StoredTable } from "./core/store.ts";
-import type { AttributePlace, TableModel } from "./model/model.ts";
+import type { AttributePlace, ModelCell, TableModel } from "./model/model.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
 import { decode, plainMarkdown } from "./store/markdown/codec.ts";
@@ -68,8 +68,8 @@ import {
 } from "./markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "./menu.ts";
 import { floatingMenu, focusMenu } from "./core/menu.ts";
-import { CORE, attributeName, metadataAfterEdit, metaName, metaPins, metaSort, withMetaPins, withMetaSort, writtenName } from "./meta.ts";
-import { CELL_NAME, type CellNameAt, cellNameOf, cellNamesIn, LINE_NAME, columnNameIn, type RowName, rowNameIn, rowNamesIn, withCellNameIn, withColumnNameIn, withRowNameIn } from "./names.ts";
+import { CORE, attributeName, metadataAfterEdit, metaName, modelTableName, metaPins, metaSort, withMetaPins, withMetaSort, writtenName } from "./meta.ts";
+import { CELL_NAME, type CellNameAt, cellNameOf, cellNamesIn, LINE_NAME, columnNameIn, modelCellNames, modelRowNames, type RowName, rowNameIn, rowNamesIn, withCellNameIn, withColumnNameIn, withRowNameIn } from "./names.ts";
 import { ownMeta } from "./core/metaaccess.ts";
 import { withoutNewTagValues } from "./tagvalues.ts";
 import { keepTags } from "./tags.ts";
@@ -746,13 +746,15 @@ export class Controller implements TableHost {
   // (The owner's functions take either form of a table, their overloads one at a time: `as TableModel` hands either on)
   attribute(table: Table, key: string, at?: { readonly column: number }): string | undefined;
   attribute(table: TableModel, key: string, at?: AttributePlace): string | undefined;
-  attribute(table: Table | TableModel, key: string, at?: AttributePlace): string | undefined {
+  attribute(cell: ModelCell, key: string): string | undefined;
+  attribute(table: Table | TableModel | ModelCell, key: string, at?: AttributePlace): string | undefined {
     return this.coreMeta.attribute(table as TableModel, key, at);
   }
 
   withAttribute(table: Table, key: string, value: string | undefined, at?: { readonly column: number }): Table;
   withAttribute(table: TableModel, key: string, value: string | undefined, at?: AttributePlace): TableModel;
-  withAttribute(table: Table | TableModel, key: string, value: string | undefined, at?: AttributePlace): Table | TableModel {
+  withAttribute(cell: ModelCell, key: string, value: string | undefined): ModelCell;
+  withAttribute(table: Table | TableModel | ModelCell, key: string, value: string | undefined, at?: AttributePlace): Table | TableModel | ModelCell {
     return this.coreMeta.withAttribute(table as TableModel, key, value, at);
   }
 
@@ -776,7 +778,8 @@ export class Controller implements TableHost {
 
   canStore(table: Table, key: string, at?: { readonly column: number }): boolean;
   canStore(table: TableModel, key: string, at?: AttributePlace): boolean;
-  canStore(table: Table | TableModel, key: string, at?: AttributePlace): boolean {
+  canStore(cell: ModelCell, key: string): boolean;
+  canStore(table: Table | TableModel | ModelCell, key: string, at?: AttributePlace): boolean {
     return this.coreMeta.canStore(table as TableModel, key, at);
   }
 
@@ -835,8 +838,8 @@ export class Controller implements TableHost {
     return this.coreMeta.withCellTag(cell, key, value);
   }
 
-  tableName(table: Table): string | undefined {
-    return metaName(table);
+  tableName(table: Table | TableModel): string | undefined {
+    return "columns" in table ? modelTableName(table) : metaName(table);
   }
 
   tableBadges(info: TableInfo): readonly TableBadge[] {
@@ -875,12 +878,14 @@ export class Controller implements TableHost {
     return withCellNameIn(table, row, column, name);
   }
 
-  rowNames(table: Table): readonly RowName[] {
-    return rowNamesIn(table);
+  rowNames(table: Table): readonly RowName[];
+  rowNames(table: TableModel): readonly { readonly name: string; readonly row: number }[];
+  rowNames(table: Table | TableModel): readonly { readonly name: string; readonly row: number }[] {
+    return "columns" in table ? modelRowNames(table) : rowNamesIn(table);
   }
 
-  cellNames(table: Table): readonly CellNameAt[] {
-    return cellNamesIn(table);
+  cellNames(table: Table | TableModel): readonly CellNameAt[] {
+    return "columns" in table ? modelCellNames(table) : cellNamesIn(table);
   }
 
   tablesChanged(): void {

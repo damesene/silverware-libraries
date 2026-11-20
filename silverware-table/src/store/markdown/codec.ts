@@ -31,14 +31,12 @@ import {
   NO_ATTRIBUTES,
   type TableModel,
 } from "../../model/model.ts";
-import { rowNameIn, withCellName, withName } from "../../names.ts";
+import { CELL_NAME_KEY, LINE_NAME, LINE_NAME_KEY, rowNameIn, withCellName, withName } from "../../names.ts";
 import { cellTags, withoutTags } from "../../tags.ts";
 import { tagAttributes, withTagValue } from "../../tagvalues.ts";
 
 /** A column's hashtags (its header's), as text: its type among them (the column types' module reads it) */
 export const HASHTAGS_KEY = "hashtags";
-/** A column's own name, a row's name (in a cell's tag: `core.n`) */
-const NAME_KEY = "n";
 
 // What the codec read each part of the model from, so what is unchanged is
 // written as it was: a table's model; a row's markdown; a cell's markdown; a
@@ -81,7 +79,6 @@ function merged(a: Attributes, b: Attributes): Attributes {
   return all;
 }
 
-const LINE_NAME = attributeName(CORE, NAME_KEY);
 
 /** A table read into the model (the same model for the same table) */
 export function decode(table: Table): TableModel {
@@ -114,7 +111,7 @@ export function decode(table: Table): TableModel {
       cells.set(cell, { cell: raw, row });
       return cell;
     });
-    const attributes: Attributes = named ? new Map([[CORE, new Map([[NAME_KEY, named.name]])]]) : NO_ATTRIBUTES;
+    const attributes: Attributes = named ? new Map([[CORE, new Map([[LINE_NAME_KEY, named.name]])]]) : NO_ATTRIBUTES;
     const modelRow: ModelRow = { cells: rowCells, attributes };
     rows.set(modelRow, row);
     return modelRow;
@@ -147,8 +144,8 @@ function changesSinceRead(attributes: Attributes): { readonly read: { readonly c
 
 /** An attribute set in a cell's markdown as the writers before the model set it: a name in the names' one tag, else in the tag that has it */
 function withTagged(cell: string, owner: string, key: string, value: string | undefined): string {
-  if (owner === CORE && key === NAME_KEY) return withName(cell, value);
-  if (owner === CORE && key === "cn") return withCellName(cell, value);
+  if (owner === CORE && key === LINE_NAME_KEY) return withName(cell, value);
+  if (owner === CORE && key === CELL_NAME_KEY) return withCellName(cell, value);
   return withTagValue(cell, attributeName(owner, key), value);
 }
 
@@ -195,7 +192,7 @@ export function plainMarkdown(table: Table, rows: readonly number[]): string {
 export function encode(model: TableModel, base: Table): Table {
   if (models.get(base) === model) return base;
   // A header cell: as read, else its text and hashtags with its own tags (its own name, tags typed into it)
-  const inHeader = (owner: string, key: string, read: ReadonlySet<string> | undefined) => (owner === CORE && key === NAME_KEY) || !!read?.has(attributeName(owner, key));
+  const inHeader = (owner: string, key: string, read: ReadonlySet<string> | undefined) => (owner === CORE && key === LINE_NAME_KEY) || !!read?.has(attributeName(owner, key));
   const headerCells = model.columns.map((column) => {
     const read = headers.get(column);
     if (read !== undefined) return read;
@@ -222,7 +219,7 @@ export function encode(model: TableModel, base: Table): Table {
     if (read) return read;
     const rowCells = row.cells.map((cell) => cells.get(cell)?.cell ?? cellMarkdown(cell.content, cell.attributes, () => true));
     // Its name in the cell holding it, else its first
-    const name = attributeIn(row.attributes, CORE, NAME_KEY);
+    const name = attributeIn(row.attributes, CORE, LINE_NAME_KEY);
     const at = rowNameIn(rowCells);
     if (at?.name !== name && rowCells.length) {
       const column = at?.column ?? 0;

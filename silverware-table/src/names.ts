@@ -9,13 +9,17 @@
 // `<meta core.n='pear' core.cn='first'>`. SilverBullet does not show the tag,
 // and leaves it out of the column's key in its index (verified), so queries
 // see the header as before. Modules read and write names through the host.
+import { attributeIn, type TableModel } from "./model/model.ts";
 import { metaAttribute, type Table, unescapeMetaValue } from "./markdown.ts";
-import { attributeName, escapedForRegExp } from "./metanames.ts";
+import { attributeName, CORE, escapedForRegExp } from "./metanames.ts";
 import { setCell } from "./ops.ts";
 
 // The names' attributes: the core's (meta.ts makes their names)
-export const LINE_NAME = attributeName("core", "n");
-export const CELL_NAME = attributeName("core", "cn");
+/** The core's keys of names: a line's (a column's own in its header, a row's in one of its cells), a cell's */
+export const LINE_NAME_KEY = "n";
+export const CELL_NAME_KEY = "cn";
+export const LINE_NAME = attributeName(CORE, LINE_NAME_KEY);
+export const CELL_NAME = attributeName(CORE, CELL_NAME_KEY);
 
 const NAME_ATTRIBUTES = `(?:${escapedForRegExp(LINE_NAME)}|${escapedForRegExp(CELL_NAME)})`;
 // A tag of names only: both, in any order (a formula's tag is another)
@@ -125,6 +129,24 @@ export type RowName = { readonly name: string; readonly row: number; readonly co
 export type CellNameAt = { readonly name: string; readonly row: number; readonly column: number };
 
 /** A table's named rows, in their order */
+/** A model's named rows, in their order (rows from 1, as the markdown's body) */
+export function modelRowNames(model: TableModel): { readonly name: string; readonly row: number }[] {
+  return model.rows.flatMap((r, i) => {
+    const name = attributeIn(r.attributes, CORE, LINE_NAME_KEY);
+    return name ? [{ name, row: i + 1 }] : [];
+  });
+}
+
+/** A model's named body cells, in their order (rows from 1) */
+export function modelCellNames(model: TableModel): CellNameAt[] {
+  return model.rows.flatMap((r, i) =>
+    r.cells.flatMap((cell, column) => {
+      const name = attributeIn(cell.attributes, CORE, CELL_NAME_KEY);
+      return name ? [{ name, row: i + 1, column }] : [];
+    }),
+  );
+}
+
 export function rowNamesIn(table: Table): RowName[] {
   return table.rows.flatMap((r, row) => {
     const named = row === 0 ? undefined : rowNameIn(r.cells);

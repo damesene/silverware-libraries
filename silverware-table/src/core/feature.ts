@@ -9,7 +9,7 @@ export type { PartTable, TablePart, TableParts } from "./parts.ts";
 export { tablePartsOf } from "./parts.ts";
 import type { FeatureName, SETTINGS, SettingValue } from "../bridge.ts";
 import type { TablePlatform } from "./platform.ts";
-import type { AttributePlace, TableModel } from "../model/model.ts";
+import type { AttributePlace, ModelCell, TableModel } from "../model/model.ts";
 import type { StoredTable, TableRevision } from "./store.ts";
 import type { Dialog, DialogOptions } from "./dialog.ts";
 import type { Rect } from "./geometry.ts";
@@ -891,6 +891,11 @@ export interface ModelHost {
    */
   canStore(table: Table, key: string, at?: { readonly column: number }): boolean;
   canStore(table: TableModel, key: string, at?: AttributePlace): boolean;
+  // A cell of the model given alone (a formula's cell as the formulas read and make one): its attribute, the cell with
+  // it set, whether it may be stored there
+  attribute(cell: ModelCell, key: string): string | undefined;
+  withAttribute(cell: ModelCell, key: string, value: string | undefined): ModelCell;
+  canStore(cell: ModelCell, key: string): boolean;
   /**
    * Whether the module may write its attribute of the key into this cell's
    * hidden tags: the setting on, or the cell has it (with the setting off, a
@@ -904,7 +909,7 @@ export interface ModelHost {
 
   // What every part reads and the core keeps: the names of tables, columns, rows and cells
   /** A table's name, if it has a valid one */
-  tableName(table: Table): string | undefined;
+  tableName(table: Table | TableModel): string | undefined;
   /** What the features say the table is (Feature.tableBadges), in their order */
   tableBadges(info: TableInfo): readonly TableBadge[];
   /** A table's name as written, valid or not */
@@ -930,8 +935,9 @@ export interface ModelHost {
   withPins(table: Table, pins: Pins): Table;
   /** A table's named rows, in their order */
   rowNames(table: Table): readonly RowName[];
+  rowNames(table: TableModel): readonly { readonly name: string; readonly row: number }[];
   /** A table's named body cells, in their order */
-  cellNames(table: Table): readonly CellNameAt[];
+  cellNames(table: Table | TableModel): readonly CellNameAt[];
   /** Tables changed outside the page (another page read anew): features check them again */
   tablesChanged(): void;
   /** What deleting a column also removes, by the features (names of rows and cells in it) */

@@ -53,6 +53,19 @@ describe("a module's own metadata", () => {
       expect(filters.withAttribute(model, "x", "1", { row: 9, column: 0 })).toBe(model);
     });
 
+    it("a cell given alone: its attribute, the cell with it set (the setting off, only where it has one)", () => {
+      const formulas = ownMeta("formulas", () => true);
+      const cell = decode(parseTable("| A |\n|---|\n| 3 <meta formulas.f='=1+2'> |")).rows[0]!.cells[0]!;
+      expect(formulas.attribute(cell, "f")).toBe("=1+2");
+      expect(ownMeta("filters", () => true).attribute(cell, "f")).toBeUndefined();
+      expect(formulas.attribute(formulas.withAttribute(cell, "f", "=2+2"), "f")).toBe("=2+2");
+      expect(formulas.withAttribute(cell, "f", "=1+2")).toBe(cell);
+      const off = ownMeta("formulas", () => false);
+      expect(off.canStore(cell, "f")).toBe(true);
+      expect(off.canStore({ content: "1", attributes: new Map() }, "f")).toBe(false);
+      expect(off.withAttribute({ content: "1", attributes: new Map() }, "f", "=1").attributes.size).toBe(0);
+    });
+
     it("with the metadata setting off: what it has may change or go, nothing new is added", () => {
       const filters = ownMeta("filters", () => false);
       expect(filters.canStore(model, "condition", { column: 0 })).toBe(true);

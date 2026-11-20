@@ -521,6 +521,18 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      from its tag), the model's columns will give theirs (the header, the
      fixed name its attribute). What the formulas' domain moves onto the
      model stands on it.
+   - **The formulas' domain onto the model, how (2026-11-20)**: one change,
+     as its types run through every user (formulas/, calculated/, pivot/,
+     excel/formulas.ts; the modules formulas, views, pivot, pageLinks,
+     excel, conditions, sources; the Lua API in index.ts). `FormulaCells`
+     takes and gives `ModelCell`s (a formula its cell's attribute
+     `formulas.f`, its result the cell's content, unescaped); a table is a
+     `TableModel` wherever the domain has one (`TableSource` gives models,
+     decided 4), its columns found by their heads; rows keep their numbers
+     (the header 0, the body from 1: `rowMap`, references), the model's
+     row r being `rows[r - 1]`. The formulas module converts where it
+     meets the core (`asModel` of the tables a hook gives, `encode` of
+     what it gives back) until the hooks take the model.
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

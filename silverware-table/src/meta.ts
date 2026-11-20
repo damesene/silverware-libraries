@@ -9,7 +9,7 @@
 import { type ColumnId, columnIdOf, findColumn, matchColumns, type ColumnHead, headsOf } from "./columns.ts";
 import type { Row, Table, TableMeta } from "./markdown.ts";
 import { attributeName, COLUMN_ATTRIBUTE_RE, COLUMN_MARK, CORE, type Owner, splitAttributeName } from "./metanames.ts";
-import { type Attributes, attributeIn, NO_ATTRIBUTES, withAttributeIn } from "./model/model.ts";
+import { type Attributes, attributeIn, NO_ATTRIBUTES, type TableModel, withAttributeIn } from "./model/model.ts";
 import { validateTableName } from "./namerules.ts";
 import type { SortDirection } from "../../shared/compare.ts";
 import { NO_PINS, type Pins } from "./view.ts";
@@ -251,6 +251,12 @@ export function hasMetaPins(table: Table): boolean {
 /** The table's name, if it has a valid one */
 export function metaName(table: Table): string | undefined {
   const name = metaValue(table, CORE, "name")?.trim();
+  return name && !validateTableName(name) ? name : undefined;
+}
+
+/** A model's name, if it has a valid one */
+export function modelTableName(model: TableModel): string | undefined {
+  const name = attributeIn(model.attributes, CORE, "name")?.trim();
   return name && !validateTableName(name) ? name : undefined;
 }
 

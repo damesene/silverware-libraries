@@ -7,7 +7,7 @@
 // has may change or go, none is added (`enabled`: whether the setting is on).
 import { attributeName, columnAttributeOf, columnValues, hasMetaNamed, metaValue, metaValuesOf, type Owner, withColumnValues, withMetaValue } from "../meta.ts";
 import type { Table } from "../markdown.ts";
-import { attributeIn, type AttributePlace, attributesAt, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt } from "../model/model.ts";
+import { attributeIn, type AttributePlace, attributesAt, type ModelCell, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt } from "../model/model.ts";
 import { tagValue, withTagValue } from "../tagvalues.ts";
 import type { ModelHost } from "./feature.ts";
 
@@ -17,7 +17,9 @@ export type OwnMeta = Pick<
 >;
 
 /** Whether a table is the model (else markdown's `Table`) */
-const isModel = (table: Table | TableModel): table is TableModel => "columns" in table;
+const isModel = (table: Table | TableModel | ModelCell): table is TableModel => "columns" in table;
+/** Whether it is a cell of the model given alone */
+const isCell = (target: Table | TableModel | ModelCell): target is ModelCell => "content" in target;
 
 export function ownMeta(owner: Owner, enabled: () => boolean): OwnMeta {
   // Whether the table may have this attribute: the setting on, or it has it already
@@ -28,15 +30,25 @@ export function ownMeta(owner: Owner, enabled: () => boolean): OwnMeta {
   const storableInModel = (model: TableModel, key: string, at?: AttributePlace) => !!attributesAt(model, at) && (enabled() || inModel(model, key, at) !== undefined);
   const withInModel = (model: TableModel, key: string, value: string | undefined, at?: AttributePlace) =>
     value !== undefined && !storableInModel(model, key, at) ? model : withAttributesAt(model, at, (attributes) => withAttributeIn(attributes, owner, key, value));
+  // A cell given alone: its attribute; may it hold one (the setting on, or it has it)
+  const storableInCell = (cell: ModelCell, key: string) => enabled() || attributeIn(cell.attributes, owner, key) !== undefined;
   function attribute(table: Table, key: string, at?: { readonly column: number }): string | undefined;
   function attribute(table: TableModel, key: string, at?: AttributePlace): string | undefined;
-  function attribute(table: Table | TableModel, key: string, at?: AttributePlace): string | undefined {
+  function attribute(cell: ModelCell, key: string): string | undefined;
+  function attribute(table: Table | TableModel | ModelCell, key: string, at?: AttributePlace): string | undefined {
+    if (isCell(table)) return attributeIn(table.attributes, owner, key);
     if (isModel(table)) return inModel(table, key, at);
     return at ? columnValues(table, owner, key).get(at.column!) : metaValue(table, owner, key);
   }
   function withAttribute(table: Table, key: string, value: string | undefined, at?: { readonly column: number }): Table;
   function withAttribute(table: TableModel, key: string, value: string | undefined, at?: AttributePlace): TableModel;
-  function withAttribute(table: Table | TableModel, key: string, value: string | undefined, at?: AttributePlace): Table | TableModel {
+  function withAttribute(cell: ModelCell, key: string, value: string | undefined): ModelCell;
+  function withAttribute(table: Table | TableModel | ModelCell, key: string, value: string | undefined, at?: AttributePlace): Table | TableModel | ModelCell {
+    if (isCell(table)) {
+      if (value !== undefined && !storableInCell(table, key)) return table;
+      const attributes = withAttributeIn(table.attributes, owner, key, value);
+      return attributes === table.attributes ? table : { ...table, attributes };
+    }
     if (isModel(table)) return withInModel(table, key, value, at);
     const column = at && { column: at.column! };
     if (value !== undefined && !storable(table, nameOf(table, key, column))) return table;
@@ -55,14 +67,16 @@ export function ownMeta(owner: Owner, enabled: () => boolean): OwnMeta {
   }
   function canStore(table: Table, key: string, at?: { readonly column: number }): boolean;
   function canStore(table: TableModel, key: string, at?: AttributePlace): boolean;
-  function canStore(table: Table | TableModel, key: string, at?: AttributePlace): boolean {
+  function canStore(cell: ModelCell, key: string): boolean;
+  function canStore(table: Table | TableModel | ModelCell, key: string, at?: AttributePlace): boolean {
+    if (isCell(table)) return storableInCell(table, key);
     return isModel(table) ? storableInModel(table, key, at) : storable(table, nameOf(table, key, at && { column: at.column! }));
   }
   return {
     attribute,
     withAttribute,
-    attributes: (table) => (isModel(table) ? new Map(table.attributes.get(owner)) : metaValuesOf(table, owner)),
-    columnAttributes: (table, key) => {
+    attributes: (table: Table | TableModel) => (isModel(table) ? new Map(table.attributes.get(owner)) : metaValuesOf(table, owner)),
+    columnAttributes: (table: Table | TableModel, key: string) => {
       if (!isModel(table)) return columnValues(table, owner, key);
       const values = new Map<number, string>();
       table.columns.forEach((column, c) => {

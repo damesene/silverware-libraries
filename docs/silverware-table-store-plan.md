@@ -505,6 +505,15 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      through the model with the same change by those writers. Which change
      made a set of attributes is the model's (`attributeChangeOf`), so the
      codec writes a change where it was read.
+   - **The attribute API on the model (2026-11-20)**: `attribute`,
+     `withAttribute`, `canStore` take the model too, `at` a column, a row
+     (`row`, the first 1) or a cell (both); `attributes`,
+     `columnAttributes`, `withColumnAttributes` alike (`AttributePlace`,
+     `attributesAt`, `withAttributesAt` in model/model.ts). On a `Table`
+     they work as before (no path of the running code changed); a cell's
+     attribute set on the model is written by the codec as `withTagValue`
+     wrote it, so `getCellTag`, `withCellTag`, `canStoreCellTag` go once
+     their one user, the formulas module, is on the model.
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data

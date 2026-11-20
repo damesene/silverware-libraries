@@ -9,6 +9,7 @@ export type { PartTable, TablePart, TableParts } from "./parts.ts";
 export { tablePartsOf } from "./parts.ts";
 import type { FeatureName, SETTINGS, SettingValue } from "../bridge.ts";
 import type { TablePlatform } from "./platform.ts";
+import type { AttributePlace, TableModel } from "../model/model.ts";
 import type { StoredTable, TableRevision } from "./store.ts";
 import type { Dialog, DialogOptions } from "./dialog.ts";
 import type { Rect } from "./geometry.ts";
@@ -857,17 +858,23 @@ export interface ModelHost {
   // What a module keeps in tables, its own only: the core makes each
   // attribute's name from the module's and its key (meta.ts), of a column
   // when `column` is given (it follows its column through edits). A module's
-  // own host has them for that module; the core's for the core.
-  /** The module's attribute of the table (of one column: `column`) */
+  // own host has them for that module; the core's for the core. Each takes the
+  // table as markdown (`Table`: the table's and its columns') or as the model
+  // (`TableModel`: also a row's, `row`, and a cell's, both), as a module moves
+  // onto the model (docs/silverware-table-store-plan.md, step 3)
+  /** The module's attribute of the table (of one column: `column`; on the model of a row, `row`, of a cell, both) */
   attribute(table: Table, key: string, at?: { readonly column: number }): string | undefined;
+  attribute(table: TableModel, key: string, at?: AttributePlace): string | undefined;
   /** The table with the module's attribute set (undefined: removed) */
   withAttribute(table: Table, key: string, value: string | undefined, at?: { readonly column: number }): Table;
+  withAttribute(table: TableModel, key: string, value: string | undefined, at?: AttributePlace): TableModel;
   /** The module's attributes of the table (not of its columns), by key */
-  attributes(table: Table): ReadonlyMap<string, string>;
+  attributes(table: Table | TableModel): ReadonlyMap<string, string>;
   /** The module's attribute of the key for each column that has it, by column */
-  columnAttributes(table: Table, key: string): Map<number, string>;
+  columnAttributes(table: Table | TableModel, key: string): Map<number, string>;
   /** The table with the module's attribute of the key on these columns (by column), and on no other */
   withColumnAttributes(table: Table, key: string, values: ReadonlyMap<number, string>): Table;
+  withColumnAttributes(table: TableModel, key: string, values: ReadonlyMap<number, string>): TableModel;
   /**
    * Whether the module may store this attribute in the table: the metadata
    * setting is on, or the table has it already (it may change or go; with the
@@ -875,6 +882,7 @@ export interface ModelHost {
    * leave it out)
    */
   canStore(table: Table, key: string, at?: { readonly column: number }): boolean;
+  canStore(table: TableModel, key: string, at?: AttributePlace): boolean;
   /**
    * Whether the module may write its attribute of the key into this cell's
    * hidden tags: the setting on, or the cell has it (with the setting off, a

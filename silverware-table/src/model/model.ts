@@ -72,3 +72,30 @@ export function withAttributeIn(attributes: Attributes, owner: Owner, key: strin
 export function attributeChangeOf(attributes: Attributes): AttributeChange | undefined {
   return madeFrom.get(attributes);
 }
+
+/** Where an attribute is: a column's (`column`), a body row's (`row`, the first 1), a cell's (both); none: the table's */
+export type AttributePlace = { readonly column: number; readonly row?: undefined } | { readonly row: number; readonly column?: number };
+
+/** The attributes at a place of the table; undefined: no such place */
+export function attributesAt(model: TableModel, at?: AttributePlace): Attributes | undefined {
+  if (!at) return model.attributes;
+  if (at.row === undefined) return model.columns[at.column]?.attributes;
+  const row = model.rows[at.row - 1];
+  return at.column === undefined ? row?.attributes : row?.cells[at.column]?.attributes;
+}
+
+/** The table with the attributes at a place made by `change` (no such place: as it was); unchanged: the same table */
+export function withAttributesAt(model: TableModel, at: AttributePlace | undefined, change: (attributes: Attributes) => Attributes): TableModel {
+  const current = attributesAt(model, at);
+  if (!current) return model;
+  const attributes = change(current);
+  if (attributes === current) return model;
+  if (!at) return { ...model, attributes };
+  if (at.row === undefined) return { ...model, columns: model.columns.map((c, i) => (i === at.column ? { ...c, attributes } : c)) };
+  const rows = model.rows.map((row, i) => {
+    if (i !== at.row - 1) return row;
+    if (at.column === undefined) return { ...row, attributes };
+    return { ...row, cells: row.cells.map((cell, c) => (c === at.column ? { ...cell, attributes } : cell)) };
+  });
+  return { ...model, rows };
+}

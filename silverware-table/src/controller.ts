@@ -23,6 +23,7 @@ import { writingClipboard } from "../../shared/clipboard.ts";
 import { markTable, renderedMeta, SilverBulletAdapter } from "./core/silverbullet/adapter.ts";
 import type { TablePlatform } from "./core/platform.ts";
 import type { StoredTable } from "./core/store.ts";
+import type { AttributePlace, TableModel } from "./model/model.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
 import { SettingsDialog } from "./settings.ts";
@@ -733,32 +734,41 @@ export class Controller implements TableHost {
 
   // ---- what tables keep: the core's own, and the names every part reads --------------
 
-  attribute(table: Table, key: string, at?: { readonly column: number }): string | undefined {
-    return this.coreMeta.attribute(table, key, at);
+  // (The owner's functions take either form of a table, their overloads one at a time: `as TableModel` hands either on)
+  attribute(table: Table, key: string, at?: { readonly column: number }): string | undefined;
+  attribute(table: TableModel, key: string, at?: AttributePlace): string | undefined;
+  attribute(table: Table | TableModel, key: string, at?: AttributePlace): string | undefined {
+    return this.coreMeta.attribute(table as TableModel, key, at);
   }
 
-  withAttribute(table: Table, key: string, value: string | undefined, at?: { readonly column: number }): Table {
-    return this.coreMeta.withAttribute(table, key, value, at);
+  withAttribute(table: Table, key: string, value: string | undefined, at?: { readonly column: number }): Table;
+  withAttribute(table: TableModel, key: string, value: string | undefined, at?: AttributePlace): TableModel;
+  withAttribute(table: Table | TableModel, key: string, value: string | undefined, at?: AttributePlace): Table | TableModel {
+    return this.coreMeta.withAttribute(table as TableModel, key, value, at);
   }
 
-  attributes(table: Table): ReadonlyMap<string, string> {
+  attributes(table: Table | TableModel): ReadonlyMap<string, string> {
     return this.coreMeta.attributes(table);
   }
 
-  columnAttributes(table: Table, key: string): Map<number, string> {
+  columnAttributes(table: Table | TableModel, key: string): Map<number, string> {
     return this.coreMeta.columnAttributes(table, key);
   }
 
-  withColumnAttributes(table: Table, key: string, values: ReadonlyMap<number, string>): Table {
-    return this.coreMeta.withColumnAttributes(table, key, values);
+  withColumnAttributes(table: Table, key: string, values: ReadonlyMap<number, string>): Table;
+  withColumnAttributes(table: TableModel, key: string, values: ReadonlyMap<number, string>): TableModel;
+  withColumnAttributes(table: Table | TableModel, key: string, values: ReadonlyMap<number, string>): Table | TableModel {
+    return this.coreMeta.withColumnAttributes(table as TableModel, key, values);
   }
 
   getCellTag(cell: string, key: string): string | undefined {
     return this.coreMeta.getCellTag(cell, key);
   }
 
-  canStore(table: Table, key: string, at?: { readonly column: number }): boolean {
-    return this.coreMeta.canStore(table, key, at);
+  canStore(table: Table, key: string, at?: { readonly column: number }): boolean;
+  canStore(table: TableModel, key: string, at?: AttributePlace): boolean;
+  canStore(table: Table | TableModel, key: string, at?: AttributePlace): boolean {
+    return this.coreMeta.canStore(table as TableModel, key, at);
   }
 
   canStoreCellTag(cell: string, key: string): boolean {

@@ -124,7 +124,7 @@ class FilterTable {
   private storedFilters(info: TableInfo): readonly string[] {
     if (this.stored?.revision === info.revision) return this.stored.filters;
     const filters: string[] = [];
-    for (const [column, value] of this.host.columnsMeta(info.model, "condition")) {
+    for (const [column, value] of this.host.columnAttributes(info.model, "condition")) {
       while (filters.length < column) filters.push("");
       filters[column] = value;
     }
@@ -379,10 +379,10 @@ class FilterTable {
     });
     // A filter the table cannot take (the metadata setting off, none stored for its column) stays typed: a view
     const table = info.model;
-    const storable = [...filters.keys()].every((column) => this.host.canStoreMeta(table, "condition", { column }));
+    const storable = [...filters.keys()].every((column) => this.host.canStore(table, "condition", { column }));
     // (Nothing it can take and nothing to change: no write, whose step would recalculate every formula for nothing)
-    if (this.host.setColumnsMeta(table, "condition", filters) === table) return;
-    const result = await this.host.writeTable(info, (t) => this.host.setColumnsMeta(t, "condition", filters));
+    if (this.host.withColumnAttributes(table, "condition", filters) === table) return;
+    const result = await this.host.writeTable(info, (t) => this.host.withColumnAttributes(t, "condition", filters));
     // Stored: the table's markdown has them now
     if (result !== "failed" && storable && sameFilters(this.typed ?? [], written)) this.typed = undefined;
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { findTables, locateByShape, parseMetaRow, parseTable, serializeTable } from "./markdown.ts";
-import { columnValues, followColumnMeta, metaName, metaSort, withColumnValues, withMeta, withMetaName, withMetaSort } from "./meta.ts";
+import { findTables, locateByShape, parseMetaRow, parseTable, serializeTable, type Table, writtenMeta } from "./markdown.ts";
+import { columnValues, followColumnMeta, metaName, metaSort, withColumnValues, withMeta, withMetaSort, withMetaValue } from "./meta.ts";
 import { sameTableName, validateTableName } from "./namerules.ts";
 import { columnAfterMove, deleteColumn, insertRow, moveColumn, setCell } from "./ops.ts";
 
@@ -10,15 +10,23 @@ describe("metadata row", () => {
   it("is read from a last row holding only <meta …>", () => {
     const table = parseTable(`| A | B |\n|---|---|\n| 1 | 2 |\n| <meta core.table sort='A:desc' note='x'> | |`);
     expect(table.rows.map((r) => r.cells)).toEqual([["A", "B"], ["1", "2"]]);
-    expect(table.meta).toEqual({ sort: "A:desc", note: "x" });
+    expect(writtenMeta(table)).toEqual({ sort: "A:desc", note: "x" });
   });
 
   it("reads values in quotes too, as tables written before apostrophes have them, and keeps that row until its metadata changes", () => {
     const source = `| A | B |\n|---|---|\n| 1 | 2 |\n| <meta core.table core.name="prices" note="say &quot;hi&quot;" who='O&#39;Brien' x="it&apos;s"> |`;
     const table = parseTable(source);
-    expect(table.meta).toEqual({ "core.name": "prices", note: 'say "hi"', who: "O'Brien", x: "it's" });
+    expect(writtenMeta(table)).toEqual({ "core.name": "prices", note: 'say "hi"', who: "O'Brien", x: "it's" });
     expect(md(table)).toBe(source);
     expect(md(withMeta(table, "core.name", "costs"))).toContain(`<meta core.table core.name='costs' note='say "hi"' who='O&#39;Brien' x='it&#39;s'>`);
+  });
+
+  it("keeps a row's order, the table's attributes and its columns' among each other, those set since after them", () => {
+    const table = parseTable(`| A |\n|---|\n| 1 |\n| <meta core.table core.-c-a.sort='asc' core.name='x' filters.-c-a.condition='&gt;1'> |`);
+    expect(writtenMeta(table)).toEqual({ "core.-c-a.sort": "asc", "core.name": "x", "filters.-c-a.condition": ">1" });
+    expect(Object.keys(writtenMeta(table))).toEqual(["core.-c-a.sort", "core.name", "filters.-c-a.condition"]);
+    const changed = withMeta(withMeta(table, "core.name", "y"), "themes.name", "slate");
+    expect(md(changed)).toContain(`<meta core.table core.-c-a.sort='asc' core.name='y' filters.-c-a.condition='&gt;1' themes.name='slate'>`);
   });
 
   it("accepts <meta …/> and a row with fewer cells", () => {
@@ -57,7 +65,7 @@ describe("metadata row", () => {
     const table = withMeta(parseTable("| A |\n|---|\n| 1 |"), "sort", 'a|b "c" >d:asc');
     const text = md(table);
     expect(text).toBe(`| A |\n|---|\n| 1 |\n| <meta core.table sort='a\\|b "c" &gt;d:asc'> |`);
-    expect(parseTable(text).meta).toEqual({ sort: 'a|b "c" >d:asc' });
+    expect(writtenMeta(parseTable(text))).toEqual({ sort: 'a|b "c" >d:asc' });
     expect(md(withMeta(parseTable(text), "sort", undefined))).toBe("| A |\n|---|\n| 1 |");
   });
 
@@ -108,7 +116,7 @@ describe("attributes of columns", () => {
     expect(filtered.meta).toEqual({ "filters.-c-name.condition": "=a|b", "filters.-c-qty:2.condition": ">1" });
     expect(columnValues(filtered, "filters", "condition")).toEqual(new Map([[0, "=a|b"], [2, ">1"]]));
     const named = withMeta(filtered, "core.name", "fruit");
-    expect(withColumnValues(named, "filters", "condition", new Map([[1, "x"]])).meta).toEqual({ "core.name": "fruit", "filters.-c-qty:1.condition": "x" });
+    expect(writtenMeta(withColumnValues(named, "filters", "condition", new Map([[1, "x"]])))).toEqual({ "core.name": "fruit", "filters.-c-qty:1.condition": "x" });
     // Unchanged: the same table
     expect(withColumnValues(filtered, "filters", "condition", new Map([[0, "=a|b"], [2, ">1"]]))).toBe(filtered);
     // Written in the metadata row, the | escaped, and read back
@@ -126,6 +134,25 @@ describe("attributes of columns", () => {
     expect(metaSort(moved)).toEqual({ column: 0, direction: "desc" });
     const deleted = followColumnMeta(both, deleteColumn(both, 2), (c) => (c === 2 ? undefined : c));
     expect(deleted.meta).toEqual({ "filters.-c-name.condition": "=a|b" });
+  });
+
+  it("follow their columns' names where the edit does not say how columns moved: a column gone keeps them as written", () => {
+    // A calculated table made anew without its column Q2: the others' stay on theirs, Q2's wait for it
+    const quarters = withColumnValues(parseTable("| Q1 | Q2 | Q3 |\n|---|---|---|\n| 1 | 2 | 3 |"), "widths", "size", new Map([[0, "80"], [1, "90"], [2, "100"]]));
+    // (Made anew from the table, its metadata row with it, as a recalculation does)
+    const remade = (from: Table, text: string): Table => ({ ...parseTable(text), meta: from.meta });
+    const without = followColumnMeta(quarters, remade(quarters, "| Q1 | Q3 |\n|---|---|\n| 1 | 3 |"));
+    expect(columnValues(without, "widths", "size")).toEqual(new Map([[0, "80"], [1, "100"]]));
+    expect(writtenMeta(without)["widths.-c-q2.size"]).toBe("90");
+    // Back: its own again
+    const back = followColumnMeta(without, remade(without, "| Q1 | Q2 | Q3 |\n|---|---|---|\n| 1 | 2 | 3 |"));
+    expect(columnValues(back, "widths", "size")).toEqual(new Map([[0, "80"], [1, "90"], [2, "100"]]));
+    // A header renamed where it is: its column's still
+    const renamed = followColumnMeta(quarters, setCell(quarters, 0, 1, "Second"));
+    expect(columnValues(renamed, "widths", "size")).toEqual(new Map([[0, "80"], [1, "90"], [2, "100"]]));
+    // Renamed into another column's name: by place, not onto that column
+    const twice = followColumnMeta(quarters, setCell(quarters, 0, 0, "Q3"));
+    expect(writtenMeta(twice)).toEqual({ "widths.-c-q3:1.size": "80", "widths.-c-q2.size": "90", "widths.-c-q3:2.size": "100" });
   });
 
   it("leave tables alone that have none, and those the edit set", () => {
@@ -153,11 +180,11 @@ describe("table names", () => {
 
   it("reads and writes a table's name in its metadata row, compared ignoring case", () => {
     const table = parseTable("| A |\n|---|\n| 1 |");
-    const named = withMetaName(table, "prices");
+    const named = withMetaValue(table, "core", "name", "prices");
     expect(serializeTable(named)).toBe(`| A |\n|---|\n| 1 |\n| <meta core.table core.name='prices'> |`);
     expect(metaName(parseTable(serializeTable(named)))).toBe("prices");
     expect(metaName(withMeta(table, "core.name", "A1"))).toBeUndefined();
-    expect(serializeTable(withMetaName(named, undefined))).toBe(serializeTable(table));
+    expect(serializeTable(withMetaValue(named, "core", "name", undefined))).toBe(serializeTable(table));
     expect(sameTableName("Prices", "prices")).toBe(true);
   });
 });

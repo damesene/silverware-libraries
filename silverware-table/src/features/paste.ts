@@ -24,9 +24,12 @@ import {
 } from "../core/feature.ts";
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/feature.ts";
 import type { MenuEntry } from "../menu.ts";
-import { cellMoveRules, growTo, moveRowsTo } from "../core/structure.ts";
+import { growTo, moveRowsTo } from "../core/structure.ts";
 import { ICONS } from "../icons.ts";
 import { moveCells, parseClipboardCells, pasteCells, planPaste } from "../paste.ts";
+import { headerCell } from "../columns.ts";
+import { type ModelCell, sameCell, type TableModel } from "../model/model.ts";
+import { EMPTY_CELL } from "../model/ops.ts";
 
 const PASTE_BLOCKED = "Clear sorting and filters to paste cells: the rows shown are not where they would go";
 
@@ -42,15 +45,26 @@ function sameText(text: string): string {
   return text.replace(/\r\n?/g, "\n").replace(/\n$/, "");
 }
 
-/** Cells copied or cut (`moves`): their table and its shape, the cells (rows as shown, columns left to right), what they held then, the text copied */
+/**
+ * Cells copied or cut (`moves`): their table and its shape, the cells (rows as
+ * shown, columns left to right), their contents then (`held`, what a paste
+ * writes) and the cells as they were (`was`: their attributes too, a header's
+ * its text as written), the text copied
+ */
 type Cut = {
   readonly moves: boolean;
   readonly key: string;
   readonly shape: string;
   readonly cells: readonly (readonly CellRef[])[];
   readonly held: readonly (readonly string[])[];
+  readonly was: readonly (readonly ModelCell[])[];
   readonly text: string;
 };
+
+/** A cell of the table as a cut keeps it: a body cell, a header as its cell (its text as written, the column's attributes) */
+function cellOf(table: TableModel, ref: CellRef): ModelCell {
+  return (ref.row === 0 ? headerCell(table, ref.column) : table.rows[ref.row - 1]?.cells[ref.column]) ?? EMPTY_CELL;
+}
 
 export class Paste implements Feature {
   // The paste on its way was asked for with Ctrl+Shift+V: as new rows
@@ -364,8 +378,9 @@ export class Paste implements Feature {
 
   private startCut(info: TableInfo, cells: CellRef[][], text: string, moves: boolean): void {
     const table = this.host.tableOf(info);
-    const held = cells.map((row) => row.map((ref) => table.rows[ref.row]?.cells[ref.column] ?? ""));
-    this.cut = { moves, key: info.key, shape: this.shapeOf(table), cells, held, text: sameText(text) };
+    const was = cells.map((row) => row.map((ref) => cellOf(table, ref)));
+    const held = cells.map((row) => row.map((ref) => (ref.row === 0 ? "" : cellOf(table, ref).content)));
+    this.cut = { moves, key: info.key, shape: this.shapeOf(table), cells, held, was, text: sameText(text) };
     this.markCut(info);
   }
 
@@ -386,12 +401,13 @@ export class Paste implements Feature {
     const table = this.host.tableOf(info);
     // Rows or columns added or deleted: the cells are not where they were (one of the same value would be taken for them)
     if (this.shapeOf(table) !== cut.shape) return undefined;
-    const same = cut.cells.every((row, i) => row.every((ref, j) => (table.rows[ref.row]?.cells[ref.column] ?? "") === cut.held[i]![j]));
+    // (Their attributes too: a formula typed giving the same text is not what was cut)
+    const same = cut.cells.every((row, i) => row.every((ref, j) => sameCell(cellOf(table, ref), cut.was[i]![j]!)));
     return same ? cut : undefined;
   }
 
   private shapeOf(table: ReturnType<ModelHost["tableOf"]>): string {
-    return `${table.rows.length}×${table.align.length}`;
+    return `${table.rows.length}×${table.columns.length}`;
   }
 
   /** The cells copied or cut outlined, dashed, as a spreadsheet marks them */
@@ -516,11 +532,11 @@ export class Paste implements Feature {
         const saved = closed ? closed.save(t) : t;
         const edited = saved && growth ? growth.grow(saved) : saved;
         if (!edited) return undefined;
-        if (cut) return moveCells(edited, cut.cells, plan, cellMoveRules(this.host));
+        // (A cell moved over another: its content and its formula with it, the name there staying)
+        if (cut) return moveCells(edited, cut.cells, plan, (moved, over) => this.host.cellWrittenOver(moved, over));
         const pasted = pasteCells(edited, plan, data, {
           keptBy: (cell) => this.host.cellKeptBy(cell),
-          keepTags: (value, from) => this.host.keepTags(value, from),
-          headerRenamed: (name, from) => this.host.headerRenamed(name, from),
+          headerRenamed: (original, name) => this.host.headerRenamed(original, name),
         });
         skipped = pasted.skipped;
         return pasted.table;

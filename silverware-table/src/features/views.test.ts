@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { setCell } from "../ops.ts";
+import { withContentAt } from "../model/ops.ts";
 import { cell, clickOn, controller, cursorMoves, editor, edits, flashes, flush, key, renderPage, setText, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 import { PREVIEW_DELAY_MS } from "./viewdialog.ts";
 
@@ -118,7 +118,7 @@ describe("Views", () => {
     expect(editor.querySelector(".swt-cell-editor")).toBeNull();
     expect(flashes.at(-1)).toContain("is a view");
     const info = controller.shownTables()[1]!;
-    expect(await controller.writeTable(info, (t) => setCell(t, 1, 0, "zed"))).toBe("failed");
+    expect(await controller.writeTable(info, (t) => withContentAt(t, 1, 0, "zed"))).toBe("failed");
     expect(text).toBe(page);
   });
 
@@ -237,6 +237,32 @@ describe("Views", () => {
     await controller.scan();
     expect(viewOf(text)).toBe("| Assignee |\n|---|\n| anna |\n| petr |\n| <meta core.table core.name='people' ");
     expect(controller.tableBadges(controller.shownTables()[1]!).map((b) => b.text)).toEqual(["View"]);
+  });
+
+  it("keeps its columns' widths on their columns as a column of its source goes, Refresh writing it; the one gone's kept for it", async () => {
+    const all = [
+      "| Name | Assignee | Hours |",
+      "|---|---|--:|",
+      "| Write | anna | 3 |",
+      "| Test | petr | 1 |",
+      "| Ship | anna | 2 |",
+      "| <meta core.table core.name='all' view.formula='=tasks![#Data]' widths.-c-name.size='80' widths.-c-assignee.size='90' widths.-c-hours.size='100'> |",
+    ].join("\n");
+    // The source's Assignee column taken out by hand: the view is out of date
+    const source = TASKS.split("\n")
+      .map((line) => line.replace(/^(\|[^|]*)\|[^|]*(\|.*)$/, "$1$2"))
+      .join("\n");
+    await setup(`${source}\n\n${all}\n`, { "silverware.table.metadata": true });
+    table(1).rows[1]!.cells[0]!.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+    document.querySelector<HTMLElement>('.swt-bar button[aria-label="Refresh view"]')!.click();
+    await flush();
+    await controller.scan();
+    const view = text.slice(text.indexOf("| Name | Hours |"));
+    expect(view.split("\n")[0]).toBe("| Name | Hours |");
+    // Name's and Hours' widths on their columns (not Assignee's on Hours); Assignee's kept, for it to come back to
+    expect(view).toContain("widths.-c-name.size='80'");
+    expect(view).toContain("widths.-c-hours.size='100'");
+    expect(view).toContain("widths.-c-assignee.size='90'");
   });
 
   it("shows out of date once its source is changed by hand, and cannot be calculated with the reason where its formula fails", async () => {

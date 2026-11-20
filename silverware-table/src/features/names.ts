@@ -14,10 +14,10 @@
 // table copied with it): formulas elsewhere use the first of them, so each
 // such table's name shows in the danger color in the toolbar, whatever the
 // setting, and it is said once (again once it was not shared meanwhile).
-import { columnIdOf } from "../columns.ts";
+import type { TableModel } from "../model/model.ts";
+import { columnIdOf, modelHeads } from "../columns.ts";
 import type { CellLook, CellRef, Feature, HeaderLook, NamingTarget, ModelHost, StoredTable, TableLooks, ToolbarButton, TableInfo } from "../core/feature.ts";
 import { functionNamed } from "../formulas/index.ts";
-import type { Table } from "../markdown.ts";
 import type { MenuNaming } from "../menu.ts";
 import { validateName, sameTableName, validateTableName } from "../namerules.ts";
 
@@ -81,25 +81,22 @@ export class Names implements Feature {
     );
   }
 
-  /** Deleting a column removes the names of the rows and cells it holds, and the formulas using them break */
+  /**
+   * Deleting a column removes the names of the cells it holds, and the formulas using them break (a row's name is
+   * the row's: it stays, wherever the table keeps it)
+   */
   columnDeleteWarning(info: TableInfo, column: number): string | undefined {
-    const table = info.model;
-    const rows = this.host.rowNames(table).flatMap((named) => (named.column === column ? [named.name] : []));
-    const cells = this.host.cellNames(table).flatMap((named) => (named.column === column ? [named.name] : []));
-    if (!rows.length && !cells.length) return undefined;
-    const lost = [
-      ...(rows.length ? [`the name${rows.length === 1 ? "" : "s"} of ${rows.length === 1 ? "the row" : `${rows.length} rows`} ${listed(rows)}`] : []),
-      ...(cells.length ? [`the name${cells.length === 1 ? "" : "s"} of ${cells.length === 1 ? "the cell" : `${cells.length} cells`} ${listed(cells)}`] : []),
-    ];
-    return `${lost.join(" and ")}: formulas that use ${rows.length + cells.length === 1 ? "it" : "them"} show #REF! or #NAME?`;
+    const cells = this.host.cellNames(info.model).flatMap((named) => (named.column === column ? [named.name] : []));
+    if (!cells.length) return undefined;
+    return `the name${cells.length === 1 ? "" : "s"} of ${cells.length === 1 ? "the cell" : `${cells.length} cells`} ${listed(cells)}: formulas that use ${cells.length === 1 ? "it" : "them"} show #REF! or #NAME?`;
   }
 
   /** Named cells show a mark in their corner, and their name on hover */
-  looks(_info: TableInfo, table: Table): TableLooks | undefined {
+  looks(_info: TableInfo, table: TableModel): TableLooks | undefined {
     const headers: ({ column: number } & HeaderLook)[] = [];
     const cells: (CellRef & CellLook)[] = [];
     // A column's name: the same mark in its header
-    table.rows[0]?.cells.forEach((_, column) => {
+    table.columns.forEach((_, column) => {
       const name = this.host.columnName(table, column);
       if (name) headers.push({ column, marks: ["named"], title: `Column name: ${name}` });
     });
@@ -242,7 +239,7 @@ export class Names implements Feature {
   /** Names a column (empty: unnames it); refused, with why, when not valid or another column answers to it */
   private async rename(shownInfo: TableInfo, column: number, name: string): Promise<string | undefined> {
     const table = shownInfo.model;
-    const headers = table.rows[0]?.cells ?? [];
+    const headers = modelHeads(table);
     const current = this.host.columnName(table, column) ?? "";
     if (name === current) return this.unchanged();
     const problem = name === "" ? undefined : validateName(name, "column");

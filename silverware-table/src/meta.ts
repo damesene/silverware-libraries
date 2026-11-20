@@ -6,9 +6,10 @@
 // names it as columns.ts names columns (its key or fixed name, with its
 // occurrence where several share it), so it survives moves and renames, which
 // every edit follows here whatever the attribute is for.
-import { type ColumnId, columnIdOf, findColumn } from "./columns.ts";
-import type { Row, Table } from "./markdown.ts";
-import { attributeName, COLUMN_MARK, CORE, type Owner } from "./metanames.ts";
+import { type ColumnId, columnIdOf, findColumn, matchColumns, type ColumnHead, headsOf } from "./columns.ts";
+import type { Row, Table, TableMeta } from "./markdown.ts";
+import { attributeName, COLUMN_ATTRIBUTE_RE, COLUMN_MARK, CORE, type Owner, splitAttributeName } from "./metanames.ts";
+import { type Attributes, attributeIn, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt } from "./model/model.ts";
 import { validateTableName } from "./namerules.ts";
 import type { SortDirection } from "../../shared/compare.ts";
 import { NO_PINS, type Pins } from "./view.ts";
@@ -18,8 +19,12 @@ export { attributeName, CORE, type Owner } from "./metanames.ts";
 export type MetaSort = { readonly column: number; readonly direction: SortDirection };
 
 
-/** Sets or (with undefined) removes a metadata attribute by its whole name; unchanged: the same table */
+/** Sets or (with undefined) removes an attribute by its whole name, a table's or a column's; unchanged: the same table */
 export function withMeta(table: Table, name: string, value: string | undefined): Table {
+  if (!parseColumnAttribute(name)) {
+    const { owner, key } = splitAttributeName(name);
+    return withMetaValue(table, owner, key, value);
+  }
   const current = table.meta ?? {};
   if (current[name] === value) return table;
   const meta: Record<string, string> = { ...current };
@@ -29,30 +34,31 @@ export function withMeta(table: Table, name: string, value: string | undefined):
 }
 
 /** An owner's attribute of the table */
-export function metaValue(table: Table, owner: Owner, key: string): string | undefined {
-  return table.meta?.[attributeName(owner, key)];
+export function metaValue(table: Table | TableModel, owner: Owner, key: string): string | undefined {
+  return attributeIn(table.attributes ?? NO_ATTRIBUTES, owner, key);
 }
 
-/** The table with an owner's attribute set (undefined: removed) */
-export function withMetaValue(table: Table, owner: Owner, key: string, value: string | undefined): Table {
-  return withMeta(table, attributeName(owner, key), value);
+/** The table with an owner's attribute set (undefined: removed); unchanged: the same table */
+export function withMetaValue<T extends Table | TableModel>(table: T, owner: Owner, key: string, value: string | undefined): T {
+  const current = table.attributes ?? NO_ATTRIBUTES;
+  const attributes = withAttributeIn(current, owner, key, value);
+  return attributes === current ? table : { ...table, attributes };
+}
+
+/** Whether the table has the attribute of this whole name (of the table's, or of a column's as the metadata row names it) */
+export function hasMetaNamed(table: Table, name: string): boolean {
+  if (parseColumnAttribute(name)) return name in (table.meta ?? {});
+  const { owner, key } = splitAttributeName(name);
+  return metaValue(table, owner, key) !== undefined;
 }
 
 /** An owner's attributes of the table (not of its columns), by key */
 export function metaValuesOf(table: Table, owner: Owner): Map<string, string> {
-  const values = new Map<string, string>();
-  for (const [name, value] of Object.entries(table.meta ?? {})) {
-    if (name.startsWith(`${owner}.`) && !parseColumnAttribute(name)) values.set(name.slice(owner.length + 1), value);
-  }
-  return values;
+  return new Map(table.attributes?.get(owner));
 }
 
 // ---- attributes of columns ------------------------------------------------------
 
-// `<owner>.-c-<column>.<key>` and `<owner>.-c-<column>:<occurrence>.<key>`: a
-// column's key or fixed name has no "." or ":"; it is empty for a header with
-// only hashtags (`#stars`). `what` is its owner and key, `<owner>.<key>`
-const COLUMN_ATTRIBUTE_RE = new RegExp(String.raw`^([^.]+)\.${COLUMN_MARK}([^.:]*)(?::(\d+))?\.(.+)$`);
 
 function parseColumnAttribute(name: string): { readonly what: string; readonly id: ColumnId } | undefined {
   const match = COLUMN_ATTRIBUTE_RE.exec(name);
@@ -60,7 +66,7 @@ function parseColumnAttribute(name: string): { readonly what: string; readonly i
 }
 
 /** The name of the attribute `what` (its owner and key) of a column, as the headers name the column */
-function columnAttributeName(headers: readonly string[], what: string, column: number): string | undefined {
+function columnAttributeName(headers: readonly ColumnHead[], what: string, column: number): string | undefined {
   const id = columnIdOf(headers, column);
   const dot = what.indexOf(".");
   return id && `${what.slice(0, dot)}.${COLUMN_MARK}${id.name}${id.shared ? `:${id.nth}` : ""}.${what.slice(dot + 1)}`;
@@ -69,7 +75,7 @@ function columnAttributeName(headers: readonly string[], what: string, column: n
 /** An owner's attribute of each column that has it, by the column, in the order they are written */
 export function columnValues(table: Table, owner: Owner, key: string): Map<number, string> {
   const what = attributeName(owner, key);
-  const headers = table.rows[0]?.cells ?? [];
+  const headers = headsOf(table.rows[0]?.cells ?? []);
   const values = new Map<number, string>();
   for (const [name, value] of Object.entries(table.meta ?? {})) {
     const attribute = parseColumnAttribute(name);
@@ -82,7 +88,7 @@ export function columnValues(table: Table, owner: Owner, key: string): Map<numbe
 /** The table with an owner's attribute of the columns as `values` (by column), and of no other */
 export function withColumnValues(table: Table, owner: Owner, key: string, values: ReadonlyMap<number, string>): Table {
   const what = attributeName(owner, key);
-  const headers = table.rows[0]?.cells ?? [];
+  const headers = headsOf(table.rows[0]?.cells ?? []);
   const meta: Record<string, string> = {};
   for (const [name, value] of Object.entries(table.meta ?? {})) {
     if (parseColumnAttribute(name)?.what !== what) meta[name] = value;
@@ -96,14 +102,55 @@ export function withColumnValues(table: Table, owner: Owner, key: string, values
   return same ? table : { ...table, meta };
 }
 
+/**
+ * Every attribute of the table's columns in its metadata row, by column (by
+ * owner and key), and those naming no column (a header renamed by hand: kept
+ * as written, for the column's name to come back)
+ */
+export function columnsMetaOf(table: Table): { readonly byColumn: readonly Attributes[]; readonly orphans: TableMeta } {
+  const headers = headsOf(table.rows[0]?.cells ?? []);
+  const byColumn = table.align.map(() => new Map<string, Map<string, string>>());
+  const orphans: Record<string, string> = {};
+  for (const [name, value] of Object.entries(table.meta ?? {})) {
+    const attribute = parseColumnAttribute(name);
+    const column = attribute && findColumn(headers, attribute.id);
+    const own = column === undefined ? undefined : byColumn[column];
+    if (!attribute || !own) {
+      orphans[name] = value;
+      continue;
+    }
+    const { owner, key } = splitAttributeName(attribute.what);
+    let values = own.get(owner);
+    if (!values) own.set(owner, (values = new Map()));
+    // (The first of a name counts, as columnValues reads it)
+    if (!values.has(key)) values.set(key, value);
+  }
+  return { byColumn, orphans };
+}
+
+/** Columns' attributes (by column) as a metadata row names them by these headers, then those kept as written */
+export function columnsMetaNamed(headers: readonly ColumnHead[], byColumn: readonly Attributes[], orphans: TableMeta): TableMeta {
+  const meta: Record<string, string> = {};
+  byColumn.forEach((attributes, column) => {
+    for (const [owner, own] of attributes) {
+      for (const [key, value] of own) {
+        const name = columnAttributeName(headers, attributeName(owner, key), column);
+        if (name) meta[name] = value;
+      }
+    }
+  });
+  for (const [name, value] of Object.entries(orphans)) if (!(name in meta)) meta[name] = value;
+  return meta;
+}
+
 /** The whole name of an owner's attribute of one column, as the headers name it (undefined: no such column) */
 export function columnAttributeOf(table: Table, owner: Owner, key: string, column: number): string | undefined {
-  return columnAttributeName(table.rows[0]?.cells ?? [], attributeName(owner, key), column);
+  return columnAttributeName(headsOf(table.rows[0]?.cells ?? []), attributeName(owner, key), column);
 }
 
 /** The whole names of the attributes of `columns` in the metadata row, whoever's they are */
 export function columnsAttributes(table: Table, columns: ReadonlySet<number>): string[] {
-  const headers = table.rows[0]?.cells ?? [];
+  const headers = headsOf(table.rows[0]?.cells ?? []);
   return Object.keys(table.meta ?? {}).filter((name) => {
     const attribute = parseColumnAttribute(name);
     const column = attribute && findColumn(headers, attribute.id);
@@ -113,16 +160,20 @@ export function columnsAttributes(table: Table, columns: ReadonlySet<number>): s
 
 /**
  * Keeps the columns' attributes on their columns through an edit: each one
- * the table before had, unchanged by the edit, names its column as moved by
- * `map` (undefined: deleted, and the attribute goes) and as the table after
- * names it, so renamed, moved and duplicate-named columns are followed, in
- * the place it was written. Attributes the edit set are its own.
+ * the table before had, unchanged by the edit, names its column as moved and
+ * as the table after names it, so renamed, moved and duplicate-named columns
+ * are followed, in the place it was written. Attributes the edit set are its
+ * own. How the columns moved: `map`, the edit's (undefined: deleted, and the
+ * attribute goes); without one, as `matchColumns` pairs the headers, an
+ * attribute of a column it finds nowhere kept as written (a calculated table
+ * without that column now: it comes back with it), never put on another
  */
-export function followColumnMeta(before: Table, after: Table, map: (column: number) => number | undefined): Table {
+export function followColumnMeta(before: Table, after: Table, map?: (column: number) => number | undefined): Table {
   const old = before.meta ?? {};
   const current = after.meta ?? {};
-  const beforeHeaders = before.rows[0]?.cells ?? [];
-  const afterHeaders = after.rows[0]?.cells ?? [];
+  const beforeHeaders = headsOf(before.rows[0]?.cells ?? []);
+  const afterHeaders = headsOf(after.rows[0]?.cells ?? []);
+  const moves = map ?? matchColumns(beforeHeaders, afterHeaders);
   let changed = false;
   const meta: Record<string, string> = {};
   for (const [name, value] of Object.entries(current)) {
@@ -132,7 +183,12 @@ export function followColumnMeta(before: Table, after: Table, map: (column: numb
       meta[name] = value;
       continue;
     }
-    const moved = map(column);
+    const moved = moves(column);
+    // (Found nowhere, the edit not saying it went: kept as written)
+    if (moved === undefined && !map) {
+      meta[name] = value;
+      continue;
+    }
     const renamed = moved === undefined ? undefined : columnAttributeName(afterHeaders, attribute.what, moved);
     if (renamed !== name) changed = true;
     if (renamed !== undefined) meta[renamed] = value;
@@ -150,9 +206,18 @@ export function metaSort(table: Table): MetaSort | undefined {
   return undefined;
 }
 
-/** Stores (or, with undefined, removes) the sorting */
-export function withMetaSort(table: Table, sort: MetaSort | undefined): Table {
-  return withColumnValues(table, CORE, "sort", new Map(sort ? [[sort.column, sort.direction]] : []));
+/**
+ * Stores (or, with undefined, removes) the sorting: the core's own write, the
+ * metadata setting asked by the caller (a table that has a sorting may change it)
+ */
+export function withMetaSort<T extends Table | TableModel>(table: T, sort: MetaSort | undefined): T {
+  if (!("columns" in table)) return withColumnValues(table, CORE, "sort", new Map(sort ? [[sort.column, sort.direction]] : [])) as T;
+  let model: TableModel = table;
+  for (let column = 0; column < table.columns.length; column++) {
+    const value = sort?.column === column ? sort.direction : undefined;
+    model = withAttributesAt(model, { column }, (attributes) => withAttributeIn(attributes, CORE, "sort", value));
+  }
+  return model as T;
 }
 
 // ---- pins -----------------------------------------------------------------------
@@ -160,13 +225,14 @@ export function withMetaSort(table: Table, sort: MetaSort | undefined): Table {
 const PIN_KEYS = { top: "pin-top", bottom: "pin-bottom", left: "pin-left", right: "pin-right" } as const;
 
 /** The pins stored in the table, limited to what it has room for */
-export function metaPins(table: Table): Pins {
+export function metaPins(table: Table | TableModel): Pins {
   const count = (key: string) => {
     const n = Number(metaValue(table, CORE, key));
     return Number.isInteger(n) && n > 0 ? n : 0;
   };
-  const bodyRows = Math.max(0, table.rows.length - 1);
-  const columns = table.align.length;
+  // (The model's rows are its body's, a markdown table's its header's too)
+  const bodyRows = "columns" in table ? table.rows.length : Math.max(0, table.rows.length - 1);
+  const columns = "columns" in table ? table.columns.length : table.align.length;
   const top = Math.min(count(PIN_KEYS.top), bodyRows);
   const left = Math.min(count(PIN_KEYS.left), columns);
   return {
@@ -178,7 +244,7 @@ export function metaPins(table: Table): Pins {
 }
 
 /** Stores the pins; a count of 0 removes its attribute */
-export function withMetaPins(table: Table, pins: Pins): Table {
+export function withMetaPins<T extends Table | TableModel>(table: T, pins: Pins): T {
   let result = table;
   for (const edge of ["top", "bottom", "left", "right"] as const) {
     result = withMetaValue(result, CORE, PIN_KEYS[edge], pins[edge] > 0 ? String(pins[edge]) : undefined);
@@ -193,19 +259,14 @@ export function hasMetaPins(table: Table): boolean {
 // ---- the table's name ---------------------------------------------------------------
 
 /** The table's name, if it has a valid one */
-export function metaName(table: Table): string | undefined {
-  const name = metaValue(table, CORE, "name")?.trim();
+export function metaName(table: Table | TableModel): string | undefined {
+  const name = writtenName(table)?.trim();
   return name && !validateTableName(name) ? name : undefined;
 }
 
 /** The table's name as written, valid or not */
-export function writtenName(table: Table): string | undefined {
+export function writtenName(table: Table | TableModel): string | undefined {
   return metaValue(table, CORE, "name");
-}
-
-/** Names (or, with undefined, unnames) the table */
-export function withMetaName(table: Table, name: string | undefined): Table {
-  return withMetaValue(table, CORE, "name", name);
 }
 
 // ---- keeping the metadata through edits ------------------------------------------
@@ -222,8 +283,10 @@ export function metadataAfterEdit(
   after: Table,
   edit: { readonly columnMap?: (column: number) => number | undefined; readonly pins?: Pins },
   canPin: (edge: keyof typeof PIN_KEYS) => boolean = () => true,
+  // Whether the columns' attributes are followed by their names (a markdown edit's); else they are on their columns already
+  follows = true,
 ): Table {
-  const followed = followColumnMeta(before, after, edit.columnMap ?? ((c) => c));
+  const followed = follows ? followColumnMeta(before, after, edit.columnMap) : after;
   if (!edit.pins) return followed;
   const kept = metaPins(followed);
   const pins = edit.pins;

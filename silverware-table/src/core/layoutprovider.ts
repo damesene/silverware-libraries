@@ -6,7 +6,8 @@
 // through the core's write (one edit). With the metadata setting off nothing new is stored: the write says so.
 import type { LayoutChanges, LayoutEntries, LayoutProvider } from "../../../shared/layout.ts";
 import { renderedTable, WIDGET_SELECTOR } from "../dom.ts";
-import type { Table } from "../markdown.ts";
+import { type Table, tableMetaOf } from "../markdown.ts";
+import type { TableModel } from "../model/model.ts";
 import type { WriteResult } from "./feature.ts";
 import { ownMeta } from "./metaaccess.ts";
 import { renderedMeta } from "./silverbullet/adapter.ts";
@@ -20,7 +21,7 @@ export type LayoutTables = {
   renderedRows(table: HTMLTableElement): readonly HTMLTableRowElement[];
   // Whether a widget is enhanced (known in the page's markdown), so it can be written
   enhanced(widget: HTMLElement): boolean;
-  write(widget: HTMLElement, change: (table: Table) => Table | undefined): Promise<WriteResult>;
+  write(widget: HTMLElement, change: (table: TableModel) => TableModel | undefined): Promise<WriteResult>;
   // The metadata setting
   metadataOn(): boolean;
 };
@@ -34,7 +35,7 @@ export function tablesLayoutProvider(tables: LayoutTables): LayoutProvider {
     read: (element): LayoutEntries => {
       const table = renderedTable(element);
       const rendered = table && renderedMeta(tables.renderedRows(table));
-      return rendered ? Object.fromEntries(meta.metaOf({ meta: rendered } as Table)) : {};
+      return rendered ? Object.fromEntries(meta.attributes(tableMetaOf(rendered) as Table)) : {};
     },
     // A table holding its header in view (the sticky module) hides the rows that scrolled under it: what is seen of it
     // starts at its header, where the header is held lower than the table's top
@@ -52,8 +53,8 @@ export function tablesLayoutProvider(tables: LayoutTables): LayoutProvider {
       const result = await tables.write(widget, (table) => {
         let changed = table;
         for (const [key, value] of Object.entries(changes)) {
-          if (value !== null && !meta.canStoreMeta(changed, key)) refused = true;
-          else changed = meta.setMeta(changed, key, value ?? undefined);
+          if (value !== null && !meta.canStore(changed, key)) refused = true;
+          else changed = meta.withAttribute(changed, key, value ?? undefined);
         }
         return changed;
       });

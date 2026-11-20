@@ -89,8 +89,9 @@ export function profiled<T extends object>(name: string, target: T, { only, nest
 }
 
 // The controller's phases measured (each apart): enhancing a table and its
-// parts, applying the view, writing; and its toolbar's (made, placed)
-const CORE_PHASES = ["scan", "enhanceNow", "decorate", "applyView", "layOutCells", "pinColumns", "write", "showMarkdown"];
+// parts, applying the view, writing (every write of a table, the model's and
+// the markdown's: writeAt); and its toolbar's (made, placed)
+const CORE_PHASES = ["scan", "enhanceNow", "decorate", "applyView", "layOutCells", "pinColumns", "writeAt", "showMarkdown"];
 const TOOLBAR_PHASES = ["show", "place"];
 
 /** A feature's name in the log: its class's (Formulas, ColumnTypes, Grips: the handles module…) */

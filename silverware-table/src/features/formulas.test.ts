@@ -35,6 +35,24 @@ describe("Formulas", () => {
     expect(cell(3, 1).title).toBe("=SUM(B1:B2)");
   });
 
+  it("keeps a formula typed again as it was, and its cell's name; a value typed over it ends it, the name staying", async () => {
+    const named = "| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Total | 3 <meta formulas.f='=SUM(B1:B1)' core.cn='total'> |\n";
+    await setup(named, { "silverware.table.editor.enterKey": "save" });
+    clickOn(cell(2, 1));
+    await type("=SUM(B1:B1)");
+    expect(text).toBe(named);
+    clickOn(cell(2, 1));
+    await type("7");
+    expect(text).toBe("| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Total | 7 <meta core.cn='total'> |\n");
+  });
+
+  it("ends a formula with a value typed over it that equals its result, as a spreadsheet does", async () => {
+    await setup("| A |\n|---|\n| 3 <meta formulas.f='=1+2'> |\n", { "silverware.table.editor.enterKey": "save" });
+    clickOn(cell(1, 0));
+    await type("3");
+    expect(text).toBe("| A |\n|---|\n| 3 |\n");
+  });
+
   it("inserts a numbered column (=ROW() in every row) from a column's menu; rows added or moved are numbered again", async () => {
     const openColumnMenu = (column: number) => {
       cell(1, column).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
@@ -832,7 +850,7 @@ describe("Formulas", () => {
       expect(text).toContain(`| Figs <meta core.n='fig'> | 3 |`);
     });
 
-    it("asks before deleting a column that holds names of rows or cells", async () => {
+    it("asks before deleting a column that holds names of cells; the names of rows stay with their rows", async () => {
       const NAMED = `| Name | Price | Note |\n|---|---|---|\n| Pear <meta core.n='pear'> | 12 | a |\n| Fig <meta core.n='fig'> | 3 <meta core.cn='fig_price'> | b |\n`;
       await setup(NAMED);
       const confirm = vi.spyOn(window, "confirm");
@@ -847,11 +865,6 @@ describe("Formulas", () => {
         await flush();
       };
       confirm.mockReturnValue(false);
-      await deleteColumn(0);
-      expect(confirm).toHaveBeenLastCalledWith(
-        "Deleting this column also removes the names of 2 rows pear and fig: formulas that use them show #REF! or #NAME?. Delete the column? Ctrl+Z brings it back.",
-      );
-      expect(text).toBe(NAMED);
       await deleteColumn(1);
       expect(confirm).toHaveBeenLastCalledWith(
         "Deleting this column also removes the name of the cell fig_price: formulas that use it show #REF! or #NAME?. Delete the column? Ctrl+Z brings it back.",
@@ -863,9 +876,10 @@ describe("Formulas", () => {
       expect(confirm).not.toHaveBeenCalled();
       expect(text).toBe(`| Name | Price |\n|---|---|\n| Pear <meta core.n='pear'> | 12 |\n| Fig <meta core.n='fig'> | 3 <meta core.cn='fig_price'> |\n`);
       await controller.scan();
-      confirm.mockReturnValue(true);
+      // The column holding the rows' names: nothing asked, the names written in their rows' cells left
       await deleteColumn(0);
-      expect(text).toBe(`| Price |\n|---|\n| 12 |\n| 3 <meta core.cn='fig_price'> |\n`);
+      expect(confirm).not.toHaveBeenCalled();
+      expect(text).toBe(`| Price |\n|---|\n| 12 <meta core.n='pear'> |\n| 3 <meta core.n='fig' core.cn='fig_price'> |\n`);
     });
 
     const TWO_TABLES = `| A | B |\n|---|---|\n| 1 <meta core.cn='one'> | 2 |\n\n| C |\n|---|\n| 3 <meta core.cn='two'> |\n`;

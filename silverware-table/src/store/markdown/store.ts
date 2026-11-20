@@ -5,8 +5,10 @@
 // of the same text free). For now a façade over that code (the plan's step
 // 2); the codec and the register move in here with step 3.
 import { findTables, parseTable } from "../../markdown.ts";
+import { decode } from "./codec.ts";
 import type { TablePlatform } from "../../core/platform.ts";
-import type { StoredTable, TableRevision, TableStore } from "../../core/store.ts";
+import type { PageFormula, PageFormulaStore, StoredTable, TableRevision, TableStore } from "../../core/store.ts";
+import { pageFormulasIn } from "./pageformulas.ts";
 import type { TableKey, TableRegister } from "../../core/tables.ts";
 
 /** A table's revision in a page: its markdown, which is all its model is made of (the same text, the same model) */
@@ -25,7 +27,7 @@ async function textOf(platform: Pick<TablePlatform, "editor" | "space">, documen
   }
 }
 
-export class MarkdownStore implements TableStore {
+export class MarkdownStore implements TableStore, PageFormulaStore {
   constructor(
     private readonly platform: () => Pick<TablePlatform, "editor" | "space">,
     private readonly register: TableRegister,
@@ -39,10 +41,15 @@ export class MarkdownStore implements TableStore {
   documentOf(key: TableKey): string | undefined {
     return this.register.pageOf(key);
   }
+
+  async pageFormulas(document: string): Promise<readonly PageFormula[] | null> {
+    const text = await textOf(this.platform(), document);
+    return text === undefined ? null : pageFormulasIn(document, text);
+  }
 }
 
 /** A page's tables in its text, in order, keyed by the register */
 export function tablesIn(register: TableRegister, document: string, text: string): readonly StoredTable[] {
   const keys = register.keysOf(document, text);
-  return findTables(text).map((range) => ({ key: keys[range.ordinal]!, revision: revisionOf(range.text), model: parseTable(range.text) }));
+  return findTables(text).map((range) => ({ key: keys[range.ordinal]!, revision: revisionOf(range.text), model: decode(parseTable(range.text)) }));
 }

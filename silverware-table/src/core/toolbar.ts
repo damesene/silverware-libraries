@@ -9,7 +9,6 @@
 import { cellText, renderedTable } from "../dom.ts";
 import { el, pressed } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
-import { parseTable } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
 import { hasPins, NO_PINS, withoutSort } from "../view.ts";
 import { TOOLBAR_NAME_ORDER, type TableHost, type ToolbarButton, type ToolbarNameSlot, type WidgetInfo } from "./feature.ts";
@@ -238,15 +237,15 @@ export class Toolbar {
     return [
       // Pinned rows and columns are at the edges already: unpinned, they stay where they are.
       // Not for a table of a fixed shape (a pivot's): its pins are its feature's, as its rows and columns are
-      ...(hasPins(info.pins) && !host.fixedShape(parseTable(info.source))
+      ...(hasPins(info.pins) && !host.fixedShape(info.model)
         ? [
             {
               label: "Unpin all",
               title: "Unpin all rows and columns: they stay where they are, and scroll and sort with the others",
               icon: ICONS.unpin,
               run: () => {
-                const [w] = this.context.current(widget, info);
-                void host.write(w, (t) => t, { pins: NO_PINS });
+                const [, i] = this.context.current(widget, info);
+                void host.writeTable(i, (t) => t, { pins: NO_PINS });
               },
             },
           ]
@@ -257,8 +256,8 @@ export class Toolbar {
         title: "Align the table's markdown: its columns padded to one width, as the Long cells setting says",
         icon: ICONS.format,
         run: () => {
-          const [w] = this.context.current(widget, info);
-          void host.write(w, (t) => ({ ...t, padded: true }));
+          const [, i] = this.context.current(widget, info);
+          void host.writeMarkdown(i, (t) => ({ ...t, padded: true }));
         },
       },
       {

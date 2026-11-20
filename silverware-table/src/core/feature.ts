@@ -3,19 +3,21 @@
 // state and listeners and works through the host.
 import type { TableKey } from "./tables.ts";
 export type { TableKey } from "./tables.ts";
-export type { StoredTable, TableRevision } from "./store.ts";
+export type { PageFormula, PageFormulaKey, StoredTable, TableRevision } from "./store.ts";
 import type { TableParts } from "./parts.ts";
 export type { PartTable, TablePart, TableParts } from "./parts.ts";
 export { tablePartsOf } from "./parts.ts";
 import type { FeatureName, SETTINGS, SettingValue } from "../bridge.ts";
 import type { TablePlatform } from "./platform.ts";
+import type { AttributePlace, KeyedModel, ModelCell, TableModel } from "../model/model.ts";
+import type { PageFormula } from "./store.ts";
 import type { StoredTable, TableRevision } from "./store.ts";
 import type { Dialog, DialogOptions } from "./dialog.ts";
 import type { Rect } from "./geometry.ts";
 
 export type { Dialog, DialogOptions } from "./dialog.ts";
 export type { Rect } from "./geometry.ts";
-import type { IndexMap } from "../ops.ts";
+import type { IndexMap } from "../model/ops.ts";
 import type { Table } from "../markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "../menu.ts";
 import type { MenuBuilder, MenuGroup, MenuSection } from "../../../shared/menuslots.ts";
@@ -30,7 +32,7 @@ export type TableInfo = {
   // the store's: modules read `model` and compare `revision`)
   readonly source: string;
   /** The table as rendered */
-  readonly model: Table;
+  readonly model: TableModel;
   /** Its model's revision: equal, the same model (a module's state kept for it compares it) */
   readonly revision: TableRevision;
   readonly hint: number;
@@ -170,15 +172,16 @@ export type FocusTarget = CellRef & { readonly select?: boolean; readonly select
 
 export type WriteResult = "written" | "unchanged" | "failed";
 
-/** A cell's edit a feature keeps instead of having it written at once (the lazy module) */
-export type HeldEdit = { readonly row: number; readonly column: number; readonly original: string; readonly value: string };
+/** A body cell's edit a feature keeps instead of having it written at once (the lazy module): the cell as it was, and as edited */
+export type HeldEdit = { readonly row: number; readonly column: number; readonly original: ModelCell; readonly value: ModelCell };
 
 /**
- * Edits a feature holds for a table: every write of it starts from its
- * markdown with them (`apply`), so they are written with whatever the write
- * changes; `written` once that write is in the page
+ * Edits a feature holds for a table: every write of it starts from the table
+ * with them (`apply`), so they are written with whatever the write changes,
+ * the rules of an edit applied to them as to it (model/rules.ts); `written`
+ * once that write is in the page
  */
-export type PendingEdits = { readonly apply: (table: Table) => Table; readonly written: () => void };
+export type PendingEdits = { readonly apply: (table: TableModel) => TableModel; readonly written: () => void };
 
 /**
  * The cell editor: an input in place of the cell's content. In model terms
@@ -204,8 +207,8 @@ export type CellEditor = {
   focus(): void;
   /** Saved as Enter saves (and on as Enter goes on) */
   commit(): void;
-  // The cell's markdown when the editor opened
-  readonly original: string;
+  // The cell when the editor opened (a header: its text as written, the column's attributes: columns.ts headerCell)
+  readonly original: ModelCell;
   // What the field showed when it opened: the cell's text, or what a feature showed (a formula)
   readonly initial: string;
   // Edited in the cell's popup
@@ -430,9 +433,12 @@ export type ToolbarButton = {
   readonly choices?: { readonly title: string; readonly entries: () => readonly MenuEntry[] };
 };
 
-/** Another table a write changes in the same edit: where it is, and how */
-/** A place in the page's text (the cursor's), as an offset */
-export type TextPosition = { readonly position: number };
+/**
+ * Where a new table goes (insertTable): after a table (an empty line between),
+ * or where the cursor is as it is written (after its line, or after the table
+ * it is in); none: the page's end
+ */
+export type InsertPlace = { readonly after: TableTarget } | { readonly at: "cursor" };
 
 
 export type WriteOptions = {
@@ -465,9 +471,11 @@ export type RowHold = { readonly after?: number; readonly before?: number };
 /**
  * A step every write goes through after the edit itself, such as formulas
  * following moved cells: the table before the edit, the table after it, and
- * how rows and columns moved; returns the table to write.
+ * how rows and columns moved; returns the table to write. `byModel`: the
+ * change was the model's (TableHost.writeTable), its columns' attributes on
+ * its columns already.
  */
-export type WriteStep = (before: Table, after: Table, options: WriteOptions) => Table;
+export type WriteStep = (before: Table, after: Table, options: WriteOptions, byModel: boolean) => Table;
 
 /** A column as shown: its width, and the width its header needs to show its name and icons whole (0: no header line, one being edited), in pixels */
 export type ColumnMeasure = { readonly width: number; readonly header: number };
@@ -486,16 +494,21 @@ export type ColumnWidths = { readonly widths: ReadonlyMap<number, number>; reado
 
 /**
  * The page a write edits: its tables in order (as the features before have changed them so far), its tables as read
- * for the write, the edited table's key; its text as read, for formulas written outside its tables (until the store
- * keeps such places: docs/silverware-table-store-plan.md, step 4)
+ * for the write, the edited table's key; the formulas written in its text as read (PageFormula: none where the
+ * store keeps none)
  */
-export type WritePage = { readonly text: string; readonly tables: readonly KeyedTable[]; readonly read: readonly KeyedTable[]; readonly key: TableKey };
+export type WritePage = {
+  readonly tables: readonly KeyedTable[];
+  readonly read: readonly KeyedTable[];
+  readonly key: TableKey;
+  readonly formulas: readonly PageFormula[];
+};
 
 /** A table's change, by its key: the table as it is now to the table as written */
-export type TableChange = { readonly key: TableKey; readonly change: (model: Table) => Table };
+export type TableChange = { readonly key: TableKey; readonly change: (model: TableModel) => TableModel };
 
 /** A table of the page by its key, with its model: one a write reads, or another it changes in the same edit (otherTablesWritten) */
-export type KeyedTable = { readonly key: TableKey; readonly model: Table };
+export type KeyedTable = KeyedModel<TableKey>;
 
 /**
  * The other pages formulas can read (the pageLinks module reads them): the tables of each as read (null: no such
@@ -509,9 +522,6 @@ export type OtherPages = {
 
 /** An edit as features' write steps see it: how rows and columns moved, and the page */
 export type WriteEdit = WriteOptions & { readonly page: WritePage };
-
-/** A place of the page's text written anew with a table, in the same edit: its range in the text read and what goes there */
-export type TextWritten = { readonly from: number; readonly to: number; readonly text: string };
 
 /**
  * The places in the toolbar's row of names, in their order, by what they name:
@@ -615,12 +625,9 @@ export interface ModelHost {
   /** Opens a reference where the platform opens one (a page, a hashtag's page: a link in a table drawn by a module) */
   navigate(ref: string): void;
 
-  // What a module asks of the platform besides tables (the store's: `tables`, `pageTables`, `replaceTables`): until
-  // the store plan's step 4 (an insert's place, docs/silverware-table-store-plan.md), nothing else reaches a module
+  // What a module asks of the platform besides tables (the store's: `tables`, `pageTables`, `replaceTables`)
   /** The open page's name now */
   pageNameNow(): Promise<string>;
-  /** Where the cursor is in the open page's text; undefined: the platform does not say */
-  cursorNow(): Promise<number | undefined>;
   /** The editor's own undo of its last edit; undefined: the platform has none */
   readonly undoEdit: (() => Promise<void>) | undefined;
   /** A document's tables in order (a page's name), as it is now: the open page's in the editor, another's in the space; null: not there, or not read */
@@ -642,6 +649,15 @@ export interface ModelHost {
    * text as last read): what a user's script is handed (custom menu entries)
    */
   tableData(info: TableInfo): TableData;
+  /**
+   * A markdown table read into the model (its columns, rows and cells: a cell's
+   * content unescaped, its attributes apart): the sources module's, which makes
+   * its source's table as markdown until a source is a store of its own
+   * (docs/silverware-table-store-plan.md, step 5), and the adapter's
+   */
+  asModel(table: Table): TableModel;
+  /** A table's header and `rows` (its rows, the first 1, in that order) as plain markdown, as any renderer shows them: no hidden data, no metadata row (Copy as Markdown) */
+  plainMarkdown(table: TableModel, rows: readonly number[]): string;
   /** Whether other pages are read (none where the platform reads no page but the open one): formulas and pivots referring to one */
   readonly readsOtherPages: boolean;
   /** Every page's name (none where the platform lists none): what a page is picked from */
@@ -657,19 +673,21 @@ export interface ModelHost {
    */
   openDialog(options: DialogOptions): Dialog;
   /**
-   * The same for a table of the page by where it is (a TableInfo is one),
-   * whether it is rendered or not: what modules write with
+   * A table of the page changed by where it is (a TableInfo is one), whether
+   * it is rendered or not: what modules write with. The change is made on the
+   * model (`rowMap` and `columnMap` say how its rows and columns moved); what an
+   * edit does with the attributes declared bound to their cell's content and
+   * unique is applied after it (model/rules.ts), before the write steps
    */
-  writeTable(target: TableTarget, change: (table: Table) => Table | undefined, options?: WriteOptions): Promise<WriteResult>;
+  writeTable(target: TableTarget, change: (table: TableModel) => TableModel | undefined, options?: WriteOptions): Promise<WriteResult>;
   /**
-   * A new table written into the page, in one edit: after the table `after`
-   * (an empty line between), or where a position is (after its line, or the
-   * table it is in: the cursor's), else at the page's end; `also`: a table of the
-   * page changed in the same edit (put on a sheet with it); `key`: the new
-   * table's, made before it is written (newTableKey), for what the caller
-   * keeps for it meanwhile. No other table's key changes, wherever it goes.
+   * A new table written into the page, in one edit, where `place` says (none:
+   * at the page's end); `also`: a table of the page changed in the same edit
+   * (put on a sheet with it); `key`: the new table's, made before it is
+   * written (newTableKey), for what the caller keeps for it meanwhile. No
+   * other table's key changes, wherever it goes.
    */
-  insertTable(table: Table, after?: TableTarget | TextPosition, also?: TableChange, key?: TableKey): Promise<WriteResult>;
+  insertTable(table: TableModel, place?: InsertPlace, also?: TableChange, key?: TableKey): Promise<WriteResult>;
   /**
    * Deletes a table from the page in one edit, as Delete table in its ⋯ menu
    * does; `unasked`: no question, unless something goes with it (formulas
@@ -790,8 +808,8 @@ export interface ModelHost {
   menuNaming(info: TableInfo, target: NamingTarget): MenuNaming | undefined;
   /** Opens the table's ⋯ menu (of its toolbar), with `naming` its title's name field open (a name to type) */
   openTableMenu(info: TableInfo, naming?: boolean): void;
-  /** A header given a new name (escaped markdown) other than by its editor: with what features keep in it (Feature.headerRenamed) */
-  headerRenamed(name: string, original: string): string;
+  /** A header given a new name other than by its editor: the header cell to save, with what features keep in it (Feature.headerRenamed) */
+  headerRenamed(original: ModelCell, name: string): ModelCell;
   /** Opens the cell menu at a point, as a right click on the cell would; false when no feature offers anything */
   openCellMenu(info: TableInfo, at: CellRef, point: { x: number; y: number }): boolean;
   /** A menu floating over the page (core/menu.ts) made of the entries, one of the core's floating elements, in the page: to place and focus (focusMenu) */
@@ -808,13 +826,13 @@ export interface ModelHost {
    * Closes the cell editor for an edit that ends editing: `save` adds what the
    * editor held to that edit (undefined: the cell changed in the meantime)
    */
-  takeEditor(): { readonly key: TableKey; readonly row: number; readonly column: number; readonly save: (table: Table) => Table | undefined } | undefined;
+  takeEditor(): { readonly key: TableKey; readonly row: number; readonly column: number; readonly save: (table: TableModel) => TableModel | undefined } | undefined;
   /** Closes the cell editor saving, as leaving it does (an edit a feature holds stays held), the focus left where it is */
   saveEditing(): Promise<void>;
   /** Asks the user before a destructive change (SilverBullet's dialog, else the browser's) */
   ask(question: string): Promise<boolean>;
-  /** The table as edited: its markdown with the edits features hold (pendingEdits), what a cell's editor starts from */
-  tableOf(info: TableInfo): Table;
+  /** The table as edited: as rendered with the edits features hold (pendingEdits), what a cell's editor starts from */
+  tableOf(info: TableInfo): TableModel;
   /** The name of the page shown */
   readonly currentPage: string;
   /** The other pages a feature read for formulas (pageLinks); undefined: none reads them */
@@ -857,71 +875,71 @@ export interface ModelHost {
   // What a module keeps in tables, its own only: the core makes each
   // attribute's name from the module's and its key (meta.ts), of a column
   // when `column` is given (it follows its column through edits). A module's
-  // own host has them for that module; the core's for the core.
-  /** The module's attribute of the table (of one column: `column`) */
-  getMeta(table: Table, key: string, at?: { readonly column: number }): string | undefined;
+  // own host has them for that module; the core's for the core. Each takes the
+  // model: the table's, a column's (`column`), a row's (`row`) and a cell's
+  // (both)
+  /** The module's attribute of the table (of one column: `column`; on the model of a row, `row`, of a cell, both) */
+  attribute(table: TableModel, key: string, at?: AttributePlace): string | undefined;
   /** The table with the module's attribute set (undefined: removed) */
-  setMeta(table: Table, key: string, value: string | undefined, at?: { readonly column: number }): Table;
+  withAttribute(table: TableModel, key: string, value: string | undefined, at?: AttributePlace): TableModel;
   /** The module's attributes of the table (not of its columns), by key */
-  metaOf(table: Table): ReadonlyMap<string, string>;
+  attributes(table: TableModel): ReadonlyMap<string, string>;
   /** The module's attribute of the key for each column that has it, by column */
-  columnsMeta(table: Table, key: string): Map<number, string>;
+  columnAttributes(table: TableModel, key: string): Map<number, string>;
   /** The table with the module's attribute of the key on these columns (by column), and on no other */
-  setColumnsMeta(table: Table, key: string, values: ReadonlyMap<number, string>): Table;
+  withColumnAttributes(table: TableModel, key: string, values: ReadonlyMap<number, string>): TableModel;
   /**
    * Whether the module may store this attribute in the table: the metadata
-   * setting is on, or the table has it already (it may change or go; with
-   * the setting off nothing new is stored: setMeta and setColumnsMeta leave
-   * it out)
+   * setting is on, or the table has it already (it may change or go; with the
+   * setting off nothing new is stored: withAttribute and withColumnAttributes
+   * leave it out)
    */
-  canStoreMeta(table: Table, key: string, at?: { readonly column: number }): boolean;
-  /**
-   * Whether the module may write its attribute of the key into this cell's
-   * hidden tags: the setting on, or the cell has it (with the setting off, a
-   * write takes off the tags new to the table: the core's write step)
-   */
-  canStoreCellTag(cell: string, key: string): boolean;
-  /** The module's attribute of the key in a cell's hidden tags */
-  getCellTag(cell: string, key: string): string | undefined;
-  /** The cell with the module's attribute of the key set (undefined: removed), its text and other tags kept */
-  withCellTag(cell: string, key: string, value: string | undefined): string;
+  canStore(table: TableModel, key: string, at?: AttributePlace): boolean;
+  // A cell of the model given alone (a formula's cell as the formulas read and make one): its attribute, the cell with
+  // it set, whether it may be stored there. Set unchecked: whether the cell may take one it had not is the write
+  // step's, which sees the whole table (a calculated column's formula copied into a new row passes)
+  attribute(cell: ModelCell, key: string): string | undefined;
+  withAttribute(cell: ModelCell, key: string, value: string | undefined): ModelCell;
+  canStore(cell: ModelCell, key: string): boolean;
 
   // What every part reads and the core keeps: the names of tables, columns, rows and cells
   /** A table's name, if it has a valid one */
-  tableName(table: Table): string | undefined;
+  tableName(table: TableModel): string | undefined;
   /** What the features say the table is (Feature.tableBadges), in their order */
   tableBadges(info: TableInfo): readonly TableBadge[];
   /** A table's name as written, valid or not */
-  writtenTableName(table: Table): string | undefined;
+  writtenTableName(table: TableModel): string | undefined;
   /** The table named so (undefined: unnamed) */
-  withTableName(table: Table, name: string | undefined): Table;
-  /** A column's fixed name, its header's (apart from the header's text) */
-  columnName(table: Table, column: number): string | undefined;
-  withColumnName(table: Table, column: number, name: string | undefined): Table;
-  /** A body row's name (of the markdown: header 0) */
-  rowName(table: Table, row: number): string | undefined;
-  withRowName(table: Table, row: number, name: string | undefined): Table;
+  withTableName(table: TableModel, name: string | undefined): TableModel;
+  /** A column's fixed name (apart from its header's text) */
+  columnName(table: TableModel, column: number): string | undefined;
+  withColumnName(table: TableModel, column: number, name: string | undefined): TableModel;
+  /** A body row's name (rows from 1: the header 0) */
+  rowName(table: TableModel, row: number): string | undefined;
+  withRowName(table: TableModel, row: number, name: string | undefined): TableModel;
   /** A body cell's name */
-  cellName(table: Table, row: number, column: number): string | undefined;
-  withCellName(table: Table, row: number, column: number, name: string | undefined): Table;
+  cellName(table: TableModel, row: number, column: number): string | undefined;
+  withCellName(table: TableModel, row: number, column: number, name: string | undefined): TableModel;
   /** Whether a name may be given there: the metadata setting on, or one is there already (renamed or removed) */
-  canName(table: Table, target: NamingTarget): boolean;
+  canName(table: TableModel, target: NamingTarget): boolean;
   /** Whether rows (columns) may be pinned at that edge: the metadata setting on, or the table has pins there already */
-  canPin(table: Table, edge: "top" | "bottom" | "left" | "right"): boolean;
-  /** The rows and columns pinned at each edge of a table, as its metadata row has them */
-  pinsOf(table: Table): Pins;
+  canPin(table: TableModel, edge: "top" | "bottom" | "left" | "right"): boolean;
+  /** The rows and columns pinned at each edge of a table, as its attributes have them */
+  pinsOf(table: TableModel): Pins;
   /** The table with these pins (an edge that cannot be pinned, canPin, as it was): a module's table made whole (a pivot's totals) */
-  withPins(table: Table, pins: Pins): Table;
+  withPins(table: TableModel, pins: Pins): TableModel;
   /** A table's named rows, in their order */
-  rowNames(table: Table): readonly RowName[];
+  rowNames(table: TableModel): readonly RowName[];
   /** A table's named body cells, in their order */
-  cellNames(table: Table): readonly CellNameAt[];
+  cellNames(table: TableModel): readonly CellNameAt[];
+  /** A column's hashtags (its header's, its type among them), as text: the core's attribute; undefined: none */
+  columnHashtags(table: TableModel, column: number): string | undefined;
+  /** The table with a column's hashtags (undefined or empty: none); a header's text, not metadata: no setting */
+  withColumnHashtags(table: TableModel, column: number, hashtags: string | undefined): TableModel;
   /** Tables changed outside the page (another page read anew): features check them again */
   tablesChanged(): void;
   /** What deleting a column also removes, by the features (names of rows and cells in it) */
   columnDeleteWarnings(info: TableInfo, column: number): string[];
-  /** Attributes of hidden tags a copy of a row leaves out (names: one per page or table) */
-  uniqueTags(): ReadonlySet<string>;
   /** What a feature's toolbar buttons show changed: the toolbar in view is shown again */
   toolbarChanged(): void;
   /** Whether a table is shown sorted or with rows hidden (filtered), so rows are not where the markdown has them */
@@ -933,24 +951,25 @@ export interface ModelHost {
   forgetStoredView(key: TableKey): void;
   /** The same for the table with `key`, as it is shown now */
   viewChangedFor(key: TableKey): void;
-  /**
-   * A cell's new markdown with the hidden tags the cell had, but those the
-   * features that manage them take (Feature.takesTags): editing, pasting or
-   * clearing a cell keeps the data modules keep in it
-   */
-  keepTags(value: string, from: string): string;
   /** Why a cell's value is a feature's (Feature.keepsCell): pasting leaves it */
-  cellKeptBy(cell: string): string | undefined;
+  cellKeptBy(cell: ModelCell): string | undefined;
+  /**
+   * A cell written over another (a value typed, cleared, copied or filled: a
+   * cell of no attributes; a cell moved): its content and what is bound to it
+   * (a formula) with it, so a value ends a formula even where it equals its
+   * result; the other's other attributes (its name) staying (model/rules.ts)
+   */
+  cellWrittenOver(cell: ModelCell, over: ModelCell): ModelCell;
   /** Why one of these cells of the table is not changed by hand (Feature.readOnly), the first said; undefined: none is */
-  readOnly(table: Table, cells: readonly CellRef[]): string | undefined;
+  readOnly(table: TableModel, cells: readonly CellRef[]): string | undefined;
   /** Why the table's rows and columns are not added, deleted or moved by hand (Feature.fixedShape); undefined: they may be */
-  fixedShape(table: Table): string | undefined;
+  fixedShape(table: TableModel): string | undefined;
   /** Why no cell of the table's body is changed by hand (a pivot's: none to edit, hold or switch editing for); undefined: some may be */
-  readOnlyBody(table: Table): string | undefined;
+  readOnlyBody(table: TableModel): string | undefined;
   /** The user tried to edit a cell not changed by hand: the features' ways to change it instead (Feature.editRefused) */
   editRefused(info: TableInfo, cell: CellRef): void;
   /** A feature's copy of a cell for another cell (Feature.fillCell), or undefined: copied as its value */
-  fillCell(info: TableInfo, cell: string, from: CellRef, to: CellRef): string | undefined;
+  fillCell(info: TableInfo, cell: ModelCell, from: CellRef, to: CellRef): ModelCell | undefined;
   /** Keyboard and input events from a field of a feature must not reach SilverBullet's editor */
   isolate(element: HTMLElement): void;
   /** The entries features give a row's or a column's menu, in their slots (see Feature.lineMenu) */
@@ -967,6 +986,16 @@ export interface ModelHost {
 
 /** What the core offers the adapter's modules (src/core/silverbullet/modules/): the model host and the rendering */
 export interface TableHost extends ModelHost {
+  /**
+   * A table written as markdown (the change on its markdown): what works on how
+   * markdown keeps a table, which no model expresses (Remove metadata: its
+   * metadata row and every hidden tag; Format table: a table padded), the
+   * core's alone until the markdown store does it (step 4b, through the page
+   * writer); every other write is writeTable's
+   */
+  writeMarkdown(target: TableTarget, change: (table: Table) => Table | undefined, options?: WriteOptions): Promise<WriteResult>;
+  /** As replaceTables, the changes on the tables' markdown (Remove metadata of a page) */
+  replaceMarkdown(document: string, changes: readonly { readonly key: TableKey; readonly change: (table: Table) => Table }[]): Promise<WriteResult>;
   /** The platform (core/platform.ts): the adapter is the host's side, which the modules' host functions stand for */
   readonly platform: TablePlatform;
   /** The page's text as last read */
@@ -994,8 +1023,6 @@ export interface TableHost extends ModelHost {
   rowOf(info: WidgetInfo, tr: HTMLTableRowElement): number;
   /** The header row and the shown body rows, in display order */
   shownRows(info: WidgetInfo): HTMLTableRowElement[];
-  /** Re-reads the table, applies `change` and writes it back as one edit */
-  write(widget: HTMLElement, change: (table: Table) => Table | undefined, options?: WriteOptions): Promise<WriteResult>;
   /** A table's visible box: the part of it not scrolled out of view */
   innerBox(widget: HTMLElement): Rect;
   /**
@@ -1133,13 +1160,13 @@ export interface Feature {
    * applies it), asked when the table is rendered and when a feature says its
    * looks changed (TableHost.looksChanged); `table` is its markdown as shown
    */
-  looks?(info: TableInfo, table: Table): TableLooks | undefined;
+  looks?(info: TableInfo, table: TableModel): TableLooks | undefined;
   /**
    * How a table looks as a whole, from its metadata row (none: undefined);
    * asked as soon as the table is rendered (before it is laid out: the
    * metadata as rendered) and once its markdown is read
    */
-  tableLook?(table: Table): TableLook | undefined;
+  tableLook?(table: TableModel): TableLook | undefined;
   /**
    * Entries for the menu of a row or a column (its grip's), each group in
    * the slot of what its entries do (`menu.slot.look([…])`: LineMenuSlots);
@@ -1183,26 +1210,28 @@ export interface Feature {
   /** Another page was loaded into the editor (`name`): what was held for the page left can no longer be written into the editor */
   pageLoaded?(name: string): Promise<void> | void;
   /** After the edit, before the write steps: what they need read (other pages the edited table refers to) */
-  prepareEdit?(edited: Table, page: WritePage): Promise<void>;
+  prepareEdit?(edited: TableModel, page: WritePage): Promise<void>;
   /** A write step: the table edited, as the feature changes it in the same write (formulas recalculated, references following) */
-  writeStep?(before: Table, after: Table, edit: WriteEdit): Table;
+  writeStep?(before: TableModel, after: TableModel, edit: WriteEdit): TableModel;
   /**
    * Why the write must not be made (said so, nothing written): a sheet's table
    * that would grow into another; undefined: it may
    */
-  refusesWrite?(before: Table, after: Table, edit: WriteEdit): string | undefined;
+  refusesWrite?(before: TableModel, after: TableModel, edit: WriteEdit): string | undefined;
   /**
    * Other tables of the page the write changes too, in the same edit (formulas
    * referring to the edited table); `edit.page.tables` has those features
    * before it changed. `after` undefined: the table is deleted (Delete table)
    */
-  otherTablesWritten?(before: Table, after: Table | undefined, edit: WriteEdit): readonly KeyedTable[];
+  otherTablesWritten?(before: TableModel, after: TableModel | undefined, edit: WriteEdit): readonly KeyedTable[];
   /**
-   * Other places of the page's text, outside its tables, the write changes
-   * too, in the same edit (formulas written in the text, referring to the
-   * edited table); one overlapping a table written is left out
+   * The formulas written in the page's text (`edit.page.formulas`) the write
+   * changes too, in the same edit, each by its key with its text as written
+   * anew (those referring to the edited table). One changed since it was
+   * read, or whose text its place cannot hold, is left as it was, said; one
+   * in a table written in the same edit, as the table is written
    */
-  otherTextWritten?(before: Table, after: Table, edit: WriteEdit): readonly TextWritten[];
+  pageFormulasWritten?(before: TableModel, after: TableModel, edit: WriteEdit): readonly PageFormula[];
   /** Other pages read for formulas (the pageLinks module) */
   otherPages?(): OtherPages;
   /** SilverBullet indexed a page (it changed) */
@@ -1255,8 +1284,8 @@ export interface Feature {
   tablesChanged?(): void;
   /** The page or a table scrolled, or tables moved: floating elements follow */
   layoutChanged?(): void;
-  /** What the cell editor shows for a cell's markdown (hidden tags and all); undefined: its text */
-  editorText?(info: TableInfo, cell: CellRef, original: string): string | undefined;
+  /** What the cell editor shows for a cell (a header: its text as written, columns.ts headerCell); undefined: its content */
+  editorText?(info: TableInfo, cell: CellRef, original: ModelCell): string | undefined;
   editorOpened?(editor: CellEditor): void;
   /** What the cell editor holds changed (typed, pasted, set) */
   editorInput?(editor: CellEditor): void;
@@ -1274,35 +1303,42 @@ export interface Feature {
   copied?(kind: "copy" | "cut", data: ClipboardData | undefined): void;
   /** A key in the cell editor, before Silverware Table handles it; true: handled (its default is prevented) */
   editorKeyDown?(e: KeyboardEvent, editor: CellEditor): boolean;
-  /** The markdown to save for what was typed; undefined: the text */
-  editorValue?(editor: CellEditor, typed: string): string | undefined;
+  /**
+   * The cell to save for what was typed (a header: its text as written, as headerCell gives it); undefined: the cell
+   * with its content the text typed, its attributes kept (those bound to the content go, the rule of an edit)
+   */
+  editorValue?(editor: CellEditor, typed: string): ModelCell | undefined;
   /** A click selects first (select mode: the selection module's), a second click acts; false: a click acts at once */
   clickSelects?(): boolean;
   /** The name of what a menu is about (a cell, a row, a column, the table), shown in its title with a pencil to change it */
   menuNaming?(info: TableInfo, target: NamingTarget): MenuNaming | undefined;
-  /** A header given a new name other than by its editor (a paste): what it becomes (the column type's hashtag kept); undefined: as given */
-  headerRenamed?(name: string, original: string): string | undefined;
   /**
-   * Keys of the module's attributes in hidden tags in cells (tags.ts) it
-   * manages: when a cell's text is edited, pasted over or cleared, its tags
-   * with them are not kept but what the module wrote (formulas: f). Others'
-   * tags are kept.
+   * A header given a new name other than by its editor (a paste): the header cell to save (`original` as headerCell
+   * gives it, its text as written; as editorValue gives a header's: the column type's hashtag kept); undefined: its
+   * text the name given
    */
-  takesTags?(): readonly string[];
+  headerRenamed?(original: ModelCell, name: string): ModelCell | undefined;
+  /**
+   * Keys of the module's cells' attributes bound to their cell's content
+   * (formulas: f): a cell whose content an edit changed (typed, pasted,
+   * cleared over) loses them unless the edit set them (model/rules.ts, the
+   * core's write step); every other attribute of a cell, whoever's, is kept
+   */
+  boundToContent?(): readonly string[];
   /**
    * Why a cell's value is the feature's, so pasting leaves the cell as it is
    * (formulas: "formula cell", the formula computes it); undefined: it is not
    */
-  keepsCell?(cell: string): string | undefined;
+  keepsCell?(cell: ModelCell): string | undefined;
   /**
    * Why a cell of the table (its markdown's row, the header 0) is not changed
    * by hand, said to the user (a pivot's: calculated from its source); the
    * core writes no edit that changes it, the features offering edits ask
    * first (ModelHost.readOnly); undefined: it may be changed
    */
-  readOnly?(table: Table, cell: CellRef): string | undefined;
+  readOnly?(table: TableModel, cell: CellRef): string | undefined;
   /** Why the table's rows and columns are not added, deleted or moved by hand (a pivot's: its calculation's); undefined: they may be */
-  fixedShape?(table: Table): string | undefined;
+  fixedShape?(table: TableModel): string | undefined;
   /**
    * The user tried to edit a cell that is not changed by hand (readOnly), told
    * why: the feature's own way to change it instead, if it has one (a pivot's
@@ -1315,7 +1351,7 @@ export interface Feature {
    * references moved by as many rows and columns; undefined: not the
    * feature's cell (it is copied as its value)
    */
-  fillCell?(info: TableInfo, cell: string, from: CellRef, to: CellRef): string | undefined;
+  fillCell?(info: TableInfo, cell: ModelCell, from: CellRef, to: CellRef): ModelCell | undefined;
   /** The cells selected changed (the selection module): what goes with them follows */
   selectionChanged?(): void;
   /**

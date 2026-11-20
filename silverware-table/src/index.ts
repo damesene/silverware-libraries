@@ -10,13 +10,15 @@ import { customTypesAnew, defineCustomTypes } from "./columntypes/registry.ts";
 import { checkedConditions, checkedFormats, customDefinitionsAnew, defineCustomConditions, defineCustomFormats } from "./conditions/index.ts";
 import { customFunctions } from "./formulas/custom.ts";
 import { cellResult, choiceText, type FormulasOffer, functionNamed, givesList, scalarText, withEquals } from "./formulas/index.ts";
-import { defineFormulaPlaces as defineFormulaPlacesIn, type FormulaPlaces } from "./formulas/places.ts";
+import type { KeyedModel } from "./model/model.ts";
+import { defineFormulaPlaces as defineFormulaPlacesIn, type FormulaPlaces } from "./store/markdown/pageformulas.ts";
 import { isError, isRange, type Scalar, single, TimeValue, type Value } from "./formulas/values.ts";
 import { customFunctionsAnew, defineCustomFunctions } from "./formulas/registry.ts";
 import { addWriteListener, type WriteListener, writeListenersAnew } from "./core/writelisteners.ts";
 import { cellSourceOffset, findTables, pageTablesOf } from "./markdown.ts";
+import { decodeCell } from "./store/markdown/codec.ts";
 import { metaName } from "./meta.ts";
-import { columnNameIn } from "./names.ts";
+import { nameOf } from "./names.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { customMenuEntries, customMenuEntriesAnew, defineCustomMenuEntries } from "./menus/custom.ts";
 import { LuaSources } from "./host/sources.ts";
@@ -85,13 +87,18 @@ const FORMULAS_OFF: EvaluatedError = { code: "#N/A", detail: "formulas are off" 
  * the formulas module is off. `text`: the page's text (else the editor's),
  * `page` its name (else the page shown).
  */
+/** A text's tables as the formulas take them: each told apart by its key */
+function modelsOfText(controller: Controller, text: string, page?: string): readonly KeyedModel[] {
+  return controller.tablesOfText(text, page);
+}
+
 async function calculated(formula: string, text?: string, page?: string): Promise<{ readonly value: Value; readonly pages: readonly string[] } | undefined> {
   const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
   const formulas = controller?.offered<FormulasOffer>("formulas");
   if (!controller || !formulas) return undefined;
   const written = String(formula);
   const named = page === undefined ? undefined : String(page);
-  const tables = controller.tablesOfText(text ?? (await controller.platform.editor.text()), named);
+  const tables = modelsOfText(controller, text ?? (await controller.platform.editor.text()), named);
   const { value, pages } = await formulas.evaluate(written, tables, named);
   const list = isRange(value) && (value.length !== 1 || givesList(withEquals(written).formula.trim()));
   return { value: list ? value : single(value), pages };
@@ -157,13 +164,13 @@ export type FormulaErrorRecord = {
 export function formulaPagesIn(rows: unknown): string[] {
   const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
   const formulas = controller?.offered<FormulasOffer>("formulas");
-  if (!formulas) return [];
+  if (!controller || !formulas) return [];
   const pages = new Set<string>();
   for (const row of listOf(rows)) {
     if (!row || typeof row !== "object") continue;
     const { page } = row as { page?: unknown };
     if (typeof page !== "string" || pages.has(page)) continue;
-    if (Object.values(row).some((cell) => typeof cell === "string" && formulas.cells.formulaOf(cell) !== undefined)) pages.add(page);
+    if (Object.values(row).some((cell) => typeof cell === "string" && formulas.cells.formulaOf(decodeCell(cell)) !== undefined)) pages.add(page);
   }
   return [...pages];
 }
@@ -185,7 +192,7 @@ export async function formulaErrorsIn(pages: unknown): Promise<{ readonly errors
   for (const item of listOf(pages)) {
     const { page, text } = (item ?? {}) as { page?: unknown; text?: unknown };
     if (typeof page !== "string" || typeof text !== "string") continue;
-    const found = await formulas.errors(controller.tablesOfText(text, page), page);
+    const found = await formulas.errors(modelsOfText(controller, text, page), page);
     for (const other of found.pages) read.add(other);
     // Where its cell's text starts in the page's: its table's place in the text, the cell's in the table's markdown
     const ranges = findTables(text);
@@ -237,7 +244,7 @@ export function completions(formula: string, text: string, caret?: number): { re
   // A formula without its "=" read as one with it
   const lead = written.trimStart().startsWith("=") ? "" : "=";
   const at = lead.length + Math.max(0, Math.min(written.length, caret ?? written.length));
-  const found = formulas.complete(lead + written, at, controller.tablesOfText(String(text)));
+  const found = formulas.complete(lead + written, at, modelsOfText(controller, String(text)));
   if (!found || found.choices.length === 0) return undefined;
   const choices = found.choices.map((choice): FormulaCompletion => {
     const fn = choice.kind === "function" ? functionNamed(choice.name) : undefined;
@@ -282,7 +289,7 @@ export type TableOfText = TableData;
  * cells: what another plugin reads tables by, without reading their metadata
  */
 export function tables(text: string): TableOfText[] {
-  return pageTablesOf(String(text)).map(({ range, table }) => tableData(table, range, metaName(table), (column) => columnNameIn(table, column)));
+  return pageTablesOf(String(text)).map(({ range, table }) => tableData(table, range, metaName(table), (column) => nameOf(table.rows[0]?.cells[column] ?? "")));
 }
 
 /**

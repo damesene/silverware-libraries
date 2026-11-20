@@ -15,6 +15,14 @@ function attributes(tag: string): Map<string, string> {
   return found;
 }
 
+/** Every attribute of a cell's hidden tags by name (lowercase), its value unescaped: the last tag with one counts, in the order first found */
+export function tagAttributes(cell: string): Map<string, string> {
+  const found = new Map<string, string>();
+  if (!cell.includes("<")) return found;
+  for (const tag of cellTags(cell)) for (const [name, value] of attributes(tag)) found.set(name, value);
+  return found;
+}
+
 /** The value of the attribute `name` in a cell's hidden tags (the last tag with it counts); undefined without it */
 export function tagValue(cell: string, name: string): string | undefined {
   // No tag at all (most cells): asked for every cell of a table on every view
@@ -27,6 +35,20 @@ export function tagValue(cell: string, name: string): string | undefined {
 
 // A tag's attributes one by one, a value read whole (a name inside one is no attribute): its space, name and value as written
 const TAG_ATTRIBUTE_RE = /(\s+)([^\s=/>]+)(\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?/g;
+
+/**
+ * A hidden tag in today's form: each attribute written in double quotes (as
+ * before 2026-10-22) written as metaAttribute writes it, the rest as written.
+ * What a cell written anew carries over of the tags it had.
+ */
+export function currentTag(tag: string): string {
+  const body = tag.slice("<meta".length, tag.length - 1);
+  const written = body.replace(TAG_ATTRIBUTE_RE, (whole: string, space: string, name: string, value: string | undefined) => {
+    const quoted = value && /^\s*=\s*"([^"]*)"$/.exec(value);
+    return quoted ? `${space}${metaAttribute(name, unescapeMetaValue(quoted[1]!))}` : whole;
+  });
+  return written === body ? tag : `<meta${written}>`;
+}
 
 /**
  * The cell with the attribute `name` set to `value` (undefined: removed), in

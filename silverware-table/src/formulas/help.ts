@@ -2,8 +2,7 @@
 // function's syntax (the argument typed marked) and description, where a
 // pointed reference goes; and the functions found by what they are or do
 // (the Functions dialog).
-import { columnIdOf, columnName } from "../columns.ts";
-import { escapeCell, unescapeCell } from "../markdown.ts";
+import { columnIdOf, columnName, type ColumnHead } from "../columns.ts";
 import { CELL_RE } from "../namerules.ts";
 import type { AnyFunction, FunctionCategory } from "./function.ts";
 import { functionNamed, functionNames } from "./registry.ts";
@@ -87,11 +86,11 @@ export type FormulaChoice = {
 /** A column of the table a formula is of: its header's name, what a reference writes for it */
 export type ColumnChoice = { readonly name: string; readonly id: string };
 
-/** A table's columns as completion offers them (`headers`: its header's cells as written): each its name and its id, as a click on its header writes it */
-export function columnChoicesOf(headers: readonly string[]): ColumnChoice[] {
+/** A table's columns as completion offers them (`headers`: its columns' heads): each its name and its id, as a click on its header writes it */
+export function columnChoicesOf(headers: readonly ColumnHead[]): ColumnChoice[] {
   return headers.flatMap((header, column) => {
     const ref = columnRefText(columnIdOf(headers, column), false);
-    const name = columnName(unescapeCell(header));
+    const name = columnName(header.text);
     const id = ref?.slice(1, -1);
     const nth = id && /:(\d+)$/.exec(id)?.[1];
     return id && name ? [{ name: nth ? `${name} (${nth})` : name, id }] : [];
@@ -100,7 +99,7 @@ export function columnChoicesOf(headers: readonly string[]): ColumnChoice[] {
 
 /** The sources of the space as choices: each by its name, with its columns (by their names as the source gives them) for its [ ] */
 export function sourceChoices(sources: readonly { readonly name: string; readonly columns: readonly string[] }[]): FormulaChoice[] {
-  return sources.map(({ name, columns }): FormulaChoice => ({ kind: "source", name, columns: columnChoicesOf(columns.map(escapeCell)) }));
+  return sources.map(({ name, columns }): FormulaChoice => ({ kind: "source", name, columns: columnChoicesOf(columns.map((name) => ({ text: name, fixed: undefined }))) }));
 }
 
 /** The choices a name typed right before the caret may be, and where the name is (from..to) */

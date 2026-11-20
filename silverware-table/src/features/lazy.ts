@@ -12,9 +12,8 @@
 // browser asks whether to leave.
 import { type CellEditor, type Feature, type HeldEdit, type ModelHost, type PartTable, type PendingEdits, type TableInfo, type TableKey, type TableLooks, tablePartsOf, type ToolbarButton } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
-import { type Table, unescapeCell } from "../markdown.ts";
-import { setCell } from "../ops.ts";
-import { withoutTags } from "../tags.ts";
+import { sameCell, type TableModel } from "../model/model.ts";
+import { withCellAt } from "../model/ops.ts";
 
 // After a navigation started, what is held waits this long at most for the page loaded
 const LEAVING_MS = 5000;
@@ -23,7 +22,7 @@ const LEAVING_MS = 5000;
 type Held = {
   readonly page: string;
   readonly key: TableKey;
-  // By "row:column"; `original` is the cell's markdown before the first edit held
+  // By "row:column"; `original` is the cell before the first edit held
   readonly edits: Map<string, HeldEdit>;
 };
 
@@ -34,16 +33,16 @@ const cellId = (edit: { readonly row: number; readonly column: number }) => `${e
  * the others are counted (changed elsewhere), but for a cell that holds the
  * edit already (written by a write not finished yet)
  */
-function applyEdits(table: Table, edits: readonly HeldEdit[]): { table: Table; skipped: number } {
+function applyEdits(table: TableModel, edits: readonly HeldEdit[]): { table: TableModel; skipped: number } {
   let skipped = 0;
   const result = edits.reduce((t, edit) => {
-    const cell = t.rows[edit.row]?.cells[edit.column] ?? "";
-    if (cell === edit.value) return t;
-    if (cell !== edit.original) {
+    const cell = t.rows[edit.row - 1]?.cells[edit.column];
+    if (cell && sameCell(cell, edit.value)) return t;
+    if (!cell || !sameCell(cell, edit.original)) {
       skipped++;
       return t;
     }
-    return setCell(t, edit.row, edit.column, edit.value);
+    return withCellAt(t, edit.row, edit.column, edit.value);
   }, table);
   return { table: result, skipped };
 }
@@ -104,9 +103,9 @@ class LazyTable {
     if (!this.on) return false;
     const held = this.held ?? { page: this.host.currentPage, key: info.key, edits: new Map() };
     const id = cellId(edit);
-    // What a write checks is the markdown's cell: the original of the first edit held
+    // What a write checks is the cell as written: the original of the first edit held
     const original = held.edits.get(id)?.original ?? edit.original;
-    if (edit.value === original) held.edits.delete(id);
+    if (sameCell(edit.value, original)) held.edits.delete(id);
     else held.edits.set(id, { ...edit, original });
     this.held = held.edits.size ? held : undefined;
     this.host.looksChanged(info, [{ row: edit.row, column: edit.column }]);
@@ -150,7 +149,7 @@ class LazyTable {
   looks(): TableLooks | undefined {
     const edits = this.held?.edits;
     if (!edits?.size) return undefined;
-    return { cells: [...edits.values()].map((edit) => ({ row: edit.row, column: edit.column, display: unescapeCell(withoutTags(edit.value)), marks: ["lazy-pending"] })) };
+    return { cells: [...edits.values()].map((edit) => ({ row: edit.row, column: edit.column, display: edit.value.content, marks: ["lazy-pending"] })) };
   }
 
   /** Its page left: switched off (a table of the page left is a different table now) */
@@ -196,7 +195,8 @@ class LazyTable {
     const lost = () => this.host.notify(`Silverware Table: ${count} ${count === 1 ? "cell" : "cells"} edited on ${held.page} could not be saved`, "error");
     try {
       let skipped = 0;
-      const change = (table: Table) => {
+      // (The page's table read into the model, the cells held put in, written back as read where they are not)
+      const change = (table: TableModel) => {
         const applied = applyEdits(table, [...held.edits.values()]);
         skipped = applied.skipped;
         return applied.table;

@@ -8,7 +8,12 @@ import { describe, expect, it } from "vitest";
 const features = import.meta.glob(["./features/*.ts", "!./features/*.test.ts"], { query: "?raw", import: "default", eager: true });
 const core = import.meta.glob(["./controller.ts", "./core/**/*.ts", "!./core/**/*.test.ts"], { query: "?raw", import: "default", eager: true });
 // The domains the modules hand data to: their own pure code
-const domains = import.meta.glob(["./formulas/**/*.ts", "./calculated/**/*.ts", "./sheet/**/*.ts", "./excel/**/*.ts", "./export/**/*.ts", "!./**/*.test.ts"], { query: "?raw", import: "default", eager: true });
+const domains = import.meta.glob(
+  ["./formulas/**/*.ts", "./calculated/**/*.ts", "./pivot/**/*.ts", "./sheet/**/*.ts", "./excel/**/*.ts", "./export/**/*.ts", "./columntypes/**/*.ts", "./conditions/**/*.ts", "./autofill/**/*.ts", "!./**/*.test.ts"],
+  { query: "?raw", import: "default", eager: true },
+);
+// The model: what a table is, kept by no store in particular
+const model = import.meta.glob(["./model/**/*.ts", "!./model/**/*.test.ts"], { query: "?raw", import: "default", eager: true });
 // The pivot module's domain, and what it shares with views (calculated tables)
 const pivot = import.meta.glob(["./pivot/**/*.ts", "./calculated/**/*.ts", "!./**/*.test.ts"], { query: "?raw", import: "default", eager: true });
 
@@ -50,10 +55,24 @@ describe("isolation", () => {
     expect(matches(modules, /\b(Map|Set|WeakMap)<TableKey\b/)).toEqual([]);
   });
 
+  it("the modules work on the model: nothing of the markdown's form (its tables, cells, tags and operations)", () => {
+    // (The sources module makes its source's table as markdown, read in by the host, until a source is a store of its own:
+    // docs/silverware-table-store-plan.md, step 5)
+    const modules = Object.fromEntries(Object.entries(features).filter(([path]) => path !== "./features/sources.ts"));
+    expect(matches(modules, /from "[./]*(markdown|tags|ops)\.ts"/)).toEqual([]);
+  });
+
+  it("the domains and the model work on the model too: nothing of the markdown's form, no cell escaped or unescaped", () => {
+    expect(Object.keys(domains)).toEqual(expect.arrayContaining(["./formulas/help.ts", "./columntypes/registry.ts", "./conditions/rule.ts", "./autofill/series.ts", "./pivot/pivot.ts"]));
+    expect(Object.keys(model)).toContain("./model/rules.ts");
+    // (The markdown's files are the folder above: the model has an ops.ts of its own)
+    expect(matches({ ...domains, ...model }, /from "(\.\.\/)+(markdown|tags|ops)\.ts"|\b(escapeCell|unescapeCell)\b/)).toEqual([]);
+  });
+
   it("what tables keep is read and written through the host: no module nor domain names an attribute or reads the metadata itself", () => {
-    // (Remove metadata is the core's: it names whose each attribute is)
+    // (Remove metadata is the core's, core/metadata.ts: it names whose each attribute is)
     const modules = Object.fromEntries(
-      Object.entries({ ...features, ...core }).filter(([path]) => (path.startsWith("./features/") && path !== "./features/metadata.ts") || path.startsWith("./core/silverbullet/modules/")),
+      Object.entries({ ...features, ...core }).filter(([path]) => path.startsWith("./features/") || path.startsWith("./core/silverbullet/modules/")),
     );
     // A guard against calling them by mistake: a module could keep its data elsewhere, which nothing here prevents
     expect(matches(modules, /from "[./]*(meta|metanames|names|tagvalues)\.ts"/)).toEqual([]);

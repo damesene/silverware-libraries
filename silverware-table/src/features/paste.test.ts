@@ -238,9 +238,28 @@ describe("Pasting from a spreadsheet", () => {
       controller.selectCells(info(), { row: 2, column: 0 }, { row: 2, column: 0 });
       cutKey();
       expect(edges()).toBe(1);
-      await controller.write(editor.querySelector<HTMLElement>(".sb-table-widget")!, (t) => ({ ...t, rows: t.rows.filter((_, i) => i !== 1) }));
+      await controller.writeMarkdown(controller.infoOf(editor.querySelector<HTMLElement>(".sb-table-widget")!)!, (t) => ({ ...t, rows: t.rows.filter((_, i) => i !== 1) }));
       await controller.scan();
       expect(edges()).toBe(0);
+    });
+
+    it("ends the cut once a cell cut holds a formula it did not, its text the same: pasted, a copy", async () => {
+      await setup("| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | |\n", { "silverware.table.metadata": true });
+      controller.selectCells(info(), { row: 1, column: 0 }, { row: 1, column: 1 });
+      cutKey();
+      await controller.writeMarkdown(controller.infoOf(editor.querySelector<HTMLElement>(".sb-table-widget")!)!, (t) => ({
+        ...t,
+        rows: t.rows.map((r, i) => (i === 1 ? { cells: [r.cells[0]!, "2 <meta formulas.f='=1+1'>"] } : r)),
+      }));
+      await controller.scan();
+      // The cut ended: what it held changed
+      expect(edges()).toBe(0);
+      clickOn(cell(2, 0));
+      pasteText("1\t2\n");
+      await flush();
+      // A copy: the formula stays where it is, the text pasted
+      expect(text).toContain("| 1 | 2 <meta formulas.f='=1+1'> |");
+      expect(text).toContain("| 1 | 2 |");
     });
 
     it("pastes a copy once the cells cut changed, the clipboard holds something else, or Esc ended the cut", async () => {

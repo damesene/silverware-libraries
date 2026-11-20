@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { STORE_SORT_DELAY_MS } from "../controller.ts";
 import { parseTable } from "../markdown.ts";
+import { decode } from "../store/markdown/codec.ts";
 import { bridge, PAGE, bodyTexts, buttonLabel, cell, cellMenuItem, clickOn, controller, editor, flashes, flush, key, menuButtons, nameInMenu, setup, tableMenuItem, text, toolbarName, useTablePage } from "../testing/page.ts";
 
 describe("Table metadata", () => {
@@ -115,7 +116,8 @@ describe("Table metadata", () => {
   it("with the setting off, takes the hidden values new to a table off a write, and says so; those it has stay", async () => {
     await setup(`| Name | Qty |\n|---|---|\n| Pear <meta x.note='a'> | 3 |\n| apple | 10 |\n`);
     const [info] = controller.shownTables();
-    await controller.writeTable(info!, (t) => ({
+    // (The tags written as markdown: the core's step that takes off what the setting does not let in)
+    await controller.writeMarkdown(info!, (t) => ({
       ...t,
       rows: t.rows.map((row, r) => (r === 1 ? { cells: ["Pears <meta x.note='b'>", "3 <meta x.note='c'>"] } : r === 2 ? { cells: ["apple <meta x.other='1'>", "10"] } : row)),
     }));
@@ -123,8 +125,9 @@ describe("Table metadata", () => {
     expect(text).toContain("| apple | 10 |");
     expect(flashes.some((f) => f.includes("2 new hidden values") && f.includes("not stored"))).toBe(true);
     // (Pins: only where the table has them)
-    expect(controller.canPin(parseTable(`| A |\n|---|\n| 1 |\n| <meta core.table core.pin-top='1'> |`), "top")).toBe(true);
-    expect(controller.canPin(parseTable(`| A |\n|---|\n| 1 |\n| <meta core.table core.pin-top='1'> |`), "bottom")).toBe(false);
+    const pinned = decode(parseTable(`| A |\n|---|\n| 1 |\n| <meta core.table core.pin-top='1'> |`));
+    expect(controller.canPin(pinned, "top")).toBe(true);
+    expect(controller.canPin(pinned, "bottom")).toBe(false);
   });
 
   it("stores the sorting with the setting on, only where the clicks end", async () => {

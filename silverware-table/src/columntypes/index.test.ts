@@ -62,6 +62,14 @@ describe("column types in headers", () => {
     expect(withColumnType("Price #euro #todo", "number-2")).toBe("Price #todo #number-2");
     expect(withColumnType("Price #currency #todo", undefined)).toBe("Price #todo");
   });
+
+  it("reads and sets a type among a column's hashtags alone, as the model keeps them", () => {
+    expect(columnTypeOf("#todo #currency-usd")).toMatchObject({ type: type("currency"), params: { code: "usd" } });
+    expect(columnTypeOf(undefined)).toBeUndefined();
+    expect(withColumnType("#todo #euro", "stars")).toBe("#todo #stars");
+    expect(withColumnType("#euro", undefined)).toBe("");
+    expect(withColumnType("", "stars")).toBe("#stars");
+  });
 });
 
 describe("the types", () => {

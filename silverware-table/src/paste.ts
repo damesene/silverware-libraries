@@ -1,8 +1,9 @@
 // Pasting cells copied from a spreadsheet (Excel, Google Sheets, LibreOffice).
 // Their text on the clipboard has a tab between cells and a line break between
 // rows; a cell holding a tab, a line break or a quote is quoted as in CSV.
-import { escapeCell, type Table } from "./markdown.ts";
-import { insertColumn, insertRow, setCell } from "./ops.ts";
+import { headerCell, withHeaderText } from "./columns.ts";
+import type { ModelCell, TableModel } from "./model/model.ts";
+import { EMPTY_CELL, insertColumn, insertRow, withCellAt, withContentAt } from "./model/ops.ts";
 import { insertRowAt } from "./pins.ts";
 import type { Pins } from "./view.ts";
 
@@ -94,19 +95,20 @@ function along(start: number, count: number, length: number, pinnedAtEnd: number
  * Undefined, with why, when there is no room.
  */
 export function planPaste(
-  table: Table,
+  table: TableModel,
   pins: Pins,
   at: { row: number; column: number },
   data: readonly (readonly string[])[],
   insert: boolean,
 ): PastePlan | { error: string } {
   const width = Math.max(...data.map((r) => r.length));
-  const columns = along(at.column, width, table.align.length, pins.right);
+  const columns = along(at.column, width, table.columns.length, pins.right);
   if (!columns) return { error: "there are no columns after the columns pinned to the right to paste into" };
   if (insert) {
     const first = Math.max(1, at.row);
     let p = pins;
-    let rows = table.rows.length;
+    // (Rows counted as the markdown's: the header one of them)
+    let rows = table.rows.length + 1;
     let index = first;
     const targets: number[] = [];
     for (let k = 0; k < data.length; k++) {
@@ -126,7 +128,7 @@ export function planPaste(
   }
   // From the header: its first pasted row names the columns, the others go below it
   const header = at.row === 0 ? [0] : [];
-  const body = along(Math.max(1, at.row), data.length - header.length, table.rows.length, pins.bottom);
+  const body = along(Math.max(1, at.row), data.length - header.length, table.rows.length + 1, pins.bottom);
   if (!body) return { error: "there are no rows below the rows pinned to the bottom to paste into" };
   return {
     rows: [...header, ...body.targets],
@@ -138,27 +140,27 @@ export function planPaste(
 }
 
 export type Pasted = {
-  readonly table: Table;
+  readonly table: TableModel;
   // Values not pasted because a feature computes their cells, by why ("formula cell")
   readonly skipped: ReadonlyMap<string, number>;
 };
 
-/** How pasting treats the cells already there (the features' rules, TableHost) */
+/** How pasting treats the cells already there (the features' rules) */
 export type PasteRules = {
   // Why a cell's value is a feature's, so it is left as it is; undefined: pasted over
-  readonly keptBy: (cell: string) => string | undefined;
-  // The pasted value with the hidden tags the cell had (names, formulas …), as when it is edited
-  readonly keepTags: (value: string, from: string) => string;
-  // A header's new name with what features keep in it (a column type's hashtag)
-  readonly headerRenamed?: (name: string, from: string) => string;
+  readonly keptBy: (cell: ModelCell) => string | undefined;
+  // A header given a new name (as written, its hashtags with it): its cell to save, with what features keep in it (a column type's hashtag)
+  readonly headerRenamed?: (original: ModelCell, name: string) => ModelCell;
 };
 
 /**
- * The table with `data` pasted as planned. A cell a feature computes (a
- * formula's) is left; a header keeps its name where the pasted one is empty.
- * New rows get what features give new rows (calculated columns) in the write.
+ * The table with `data` pasted as planned: a cell's content the value, its
+ * attributes kept (those bound to the content go, as the write's rule takes
+ * them: a value pasted over a formula). A cell a feature computes (a formula's)
+ * is left; a header keeps its name where the pasted one is empty. New rows get
+ * what features give new rows (calculated columns) in the write.
  */
-export function pasteCells(table: Table, plan: PastePlan, data: readonly (readonly string[])[], rules: PasteRules): Pasted {
+export function pasteCells(table: TableModel, plan: PastePlan, data: readonly (readonly string[])[], rules: PasteRules): Pasted {
   let result = table;
   for (let k = 0; k < plan.newColumns.count; k++) result = insertColumn(result, plan.newColumns.at + k);
   for (let k = 0; k < plan.newRows.count; k++) result = insertRow(result, plan.newRows.at + k);
@@ -167,45 +169,46 @@ export function pasteCells(table: Table, plan: PastePlan, data: readonly (readon
     const row = plan.rows[i]!;
     values.forEach((value, j) => {
       const column = plan.columns[j]!;
-      const current = result.rows[row]?.cells[column] ?? "";
-      const cell = escapeCell(value);
-      const kept = rules.keptBy(current);
-      if (kept) {
-        if (cell !== "") skipped.set(kept, (skipped.get(kept) ?? 0) + 1);
+      if (row === 0) {
+        // A header: written as its text (its hashtags with it), a name kept where none is pasted
+        const current = headerCell(result, column) ?? EMPTY_CELL;
+        if (value !== "") result = withHeaderText(result, column, rules.headerRenamed ? rules.headerRenamed(current, value).content : value);
         return;
       }
-      if (row === 0 && cell === "") return;
-      const named = row === 0 && rules.headerRenamed ? rules.headerRenamed(cell, current) : cell;
-      result = setCell(result, row, column, rules.keepTags(named, current));
+      const kept = rules.keptBy(result.rows[row - 1]?.cells[column] ?? EMPTY_CELL);
+      if (kept) {
+        if (value !== "") skipped.set(kept, (skipped.get(kept) ?? 0) + 1);
+        return;
+      }
+      result = withContentAt(result, row, column, value);
     });
   });
   return { table: result, skipped };
 }
 
-/** What a move does with a cell's hidden tags: what stays where a cell is emptied, what a cell written over becomes */
-export type MoveRules = {
-  readonly emptied: (cell: string) => string;
-  readonly placed: (moved: string, over: string) => string;
-};
-
 /**
  * The table with cells moved (cut, then pasted): the cells cut (rows of the
  * markdown and columns, as they were cut: rows as shown, columns left to
- * right) emptied, then written where the plan puts them, over what is there
- * (as a spreadsheet moves cells); `rules` say what of their hidden tags goes
- * with them. Body cells only: the plan starts under the header.
+ * right) emptied as `placed` writes an empty cell over them (their formula
+ * gone, even one whose result is empty; their names staying), then written
+ * where the plan puts them, over what is there (as a spreadsheet moves cells), as
+ * `placed` writes a cell over another (its content and its formula with it,
+ * the name there staying). Body cells only: the plan starts under the header.
  */
-export function moveCells(table: Table, sources: readonly (readonly { row: number; column: number }[])[], plan: PastePlan, rules: MoveRules): Table {
-  const moved = sources.map((row) => row.map((ref) => table.rows[ref.row]?.cells[ref.column] ?? ""));
+export function moveCells(table: TableModel, sources: readonly (readonly { row: number; column: number }[])[], plan: PastePlan, placed: (moved: ModelCell, over: ModelCell) => ModelCell): TableModel {
+  const moved = sources.map((row) => row.map((ref) => table.rows[ref.row - 1]?.cells[ref.column] ?? EMPTY_CELL));
   let result = table;
-  for (const row of sources) for (const ref of row) if (ref.row > 0) result = setCell(result, ref.row, ref.column, rules.emptied(result.rows[ref.row]?.cells[ref.column] ?? ""));
+  sources.forEach((row, i) => row.forEach((ref, j) => {
+    if (ref.row > 0) result = withCellAt(result, ref.row, ref.column, placed(EMPTY_CELL, moved[i]![j]!));
+  }));
   for (let k = 0; k < plan.newColumns.count; k++) result = insertColumn(result, plan.newColumns.at + k);
   for (let k = 0; k < plan.newRows.count; k++) result = insertRow(result, plan.newRows.at + k);
   moved.forEach((cells, i) => {
     cells.forEach((cell, j) => {
       const row = plan.rows[i]!;
       const column = plan.columns[j]!;
-      result = setCell(result, row, column, rules.placed(cell, result.rows[row]?.cells[column] ?? ""));
+      const over = result.rows[row - 1]?.cells[column];
+      if (over) result = withCellAt(result, row, column, placed(cell, over));
     });
   });
   return result;

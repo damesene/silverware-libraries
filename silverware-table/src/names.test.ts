@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { columnIdOf, columnKey, findColumn } from "./columns.ts";
+import { decode, encode } from "./store/markdown/codec.ts";
+import { columnIdOf, columnKey, findColumn, headsOf } from "./columns.ts";
 import {
   referencedColumn,
 } from "./formulas/index.ts";
 import { formulaCell, formulaOf, recalculate } from "./testing/formulas.ts";
-import { parseMetaRow, parseTable } from "./markdown.ts";
+import { parseMetaRow, parseTable, serializeTable } from "./markdown.ts";
 import { validateName } from "./namerules.ts";
-import { nameOf, withCellName, withName, withoutName } from "./names.ts";
+import { modelCellName, modelCellNames, modelColumnName, modelRowName, modelRowNames, nameOf, withCellName, withModelName, withName, withoutName } from "./names.ts";
 
 describe("names in cells", () => {
   it("reads, writes and removes a cell's name, keeping its text", () => {
@@ -37,10 +38,10 @@ describe("names in cells", () => {
 });
 
 describe("a column's fixed name", () => {
-  const headers = [`Unit price <meta core.n='price'>`, "Qty", "Price"];
+  const headers = headsOf([`Unit price <meta core.n='price'>`, "Qty", "Price"]);
 
   it("names the column whatever its header says, and is left out of its key as SilverBullet does", () => {
-    expect(columnKey(headers[0]!)).toBe("unit_price");
+    expect(columnKey(headers[0]!.text)).toBe("unit_price");
     expect(findColumn(headers, { name: "price", nth: 1 })).toBe(0);
     expect(findColumn(headers, { name: "unit_price", nth: 1 })).toBe(0);
     expect(columnIdOf(headers, 0)).toEqual({ name: "price", nth: 1, shared: false });
@@ -50,10 +51,10 @@ describe("a column's fixed name", () => {
   it("comes before a column whose header has that key, which is then the second of the name", () => {
     expect(columnIdOf(headers, 2)).toEqual({ name: "price", nth: 2, shared: true });
     expect(findColumn(headers, { name: "price", nth: 2 })).toBe(2);
-    const same = [`Price <meta core.n='price'>`, "Price"];
+    const same = headsOf([`Price <meta core.n='price'>`, "Price"]);
     expect(columnIdOf(same, 1)).toEqual({ name: "price", nth: 2, shared: true });
     expect(findColumn(same, { name: "price", nth: 2 })).toBe(1);
-    const after = ["Price", `Cost <meta core.n='price'>`];
+    const after = headsOf(["Price", `Cost <meta core.n='price'>`]);
     expect(columnIdOf(after, 0)).toEqual({ name: "price", nth: 2, shared: true });
     expect(findColumn(after, { name: "price", nth: 2 })).toBe(0);
   });
@@ -68,5 +69,33 @@ describe("a column's fixed name", () => {
   it("is what [name] reads, after the header is renamed too", () => {
     const table = parseTable(`| Cost <meta core.n='price'> | Total |\n|---|---|\n| 3 | ${formulaCell("", "=SUM([price])")} |`);
     expect(formulaOf(recalculate(table).rows[1]!.cells[1]!)!.value).toBe("3");
+  });
+});
+
+describe("names on the model", () => {
+  it("are those the markdown has: rows' and cells', as their rows (from 1) and columns", () => {
+    const table = parseTable("| Item | Price |\n|---|---|\n| Pear <meta core.n='pear'> | 3 <meta core.cn='p3'> |\n| Fig | 2 |\n| x | 1 <meta core.n='last' core.cn='one'> |");
+    const model = decode(table);
+    expect(modelRowNames(model)).toEqual([
+      { name: "pear", row: 1 },
+      { name: "last", row: 3 },
+    ]);
+    expect(modelCellNames(model)).toEqual([
+      { name: "p3", row: 1, column: 1 },
+      { name: "one", row: 3, column: 1 },
+    ]);
+  });
+
+  it("are read where they are, and set as the writers of names write them", () => {
+    const table = parseTable("| Item <meta core.n='item'> | Price |\n|---|---|\n| Pear <meta core.n='pear'> | 3 <meta core.cn='p3'> |\n| Fig | 2 |");
+    const model = decode(table);
+    expect([modelColumnName(model, 0), modelRowName(model, 1), modelCellName(model, 1, 1), modelRowName(model, 2)]).toEqual(["item", "pear", "p3", undefined]);
+    const md = (changed: typeof model) => serializeTable(encode(changed, table));
+    const written = (from: string, to: string) => serializeTable(table).replace(from, to);
+    expect(md(withModelName(model, { column: 1 }, "price"))).toBe(written("| Price |", "| Price <meta core.n='price'> |"));
+    expect(md(withModelName(model, { row: 2 }, "fig"))).toBe(written("| Fig |", "| Fig <meta core.n='fig'> |"));
+    expect(md(withModelName(model, { row: 1 }, undefined))).toBe(written("| Pear <meta core.n='pear'> |", "| Pear |"));
+    expect(md(withModelName(model, { row: 2, column: 1 }, "two"))).toBe(written("| 2 |", "| 2 <meta core.cn='two'> |"));
+    expect(md(withModelName(model, { row: 1, column: 1 }, ""))).toBe(written("| 3 <meta core.cn='p3'> |", "| 3 |"));
   });
 });

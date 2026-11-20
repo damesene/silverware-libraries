@@ -4,7 +4,7 @@
 // `SourceProvider`. The sources module (features/sources.ts) offers them to
 // the formulas, which read them as `@name` (`@tasks[due]`). Nothing here knows
 // where they come from.
-import type { Table } from "./markdown.ts";
+import type { TableModel } from "./model/model.ts";
 
 /** What a source gives: its columns' names, and its rows, each a text per column ("" where empty) */
 export type SourceData = { readonly columns: readonly string[]; readonly rows: readonly (readonly string[])[] };
@@ -25,7 +25,7 @@ export type SourceProvider = {
 
 /**
  * What the sources module offers the formulas (ModelHost.offered("sources")):
- * the sources as tables of the markdown model, the same object while their
+ * the sources as tables of the model, the same object while their
  * data are the same; `version` counts their changes
  */
 export type SourcesOffer = {
@@ -34,7 +34,7 @@ export type SourcesOffer = {
   /** A source's columns' names as it gives them; undefined where it is not read (or there is none) */
   readonly columns: (name: string) => readonly string[] | undefined;
   /** A source as a table: its columns the header; null where none is defined so, undefined where it is not read yet */
-  readonly table: (name: string) => Table | null | undefined;
+  readonly table: (name: string) => TableModel | null | undefined;
   readonly version: () => number;
 };
 

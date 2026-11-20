@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { formatAt, parseAt, placeBelow, sameSheet, validateSheetName, sheetsOf, sheetTables, sheetWidths } from "./page.ts";
+import { pageTablesOf } from "../markdown.ts";
+import { decode } from "../store/markdown/codec.ts";
+import { formatAt, parseAt, placeBelow, sameSheet, validateSheetName, sheetsOf, sheetTablesOf, sheetWidths } from "./page.ts";
 import { SHEET_META } from "../testing/meta.ts";
 
 const PAGE = [
@@ -37,7 +39,7 @@ describe("Sheets of a page", () => {
   });
 
   it("finds the tables on sheets, a sheet by its name ignoring case, a table without a valid place on none", () => {
-    const tables = sheetTables(SHEET_META, PAGE);
+    const tables = sheetTablesOf(SHEET_META, pageTablesOf(PAGE).map((t) => ({ table: decode(t.table) })));
     expect(tables.map((t) => [t.name, t.sheet, formatAt(t.at), t.rows, t.columns])).toEqual([
       ["costs", "Budget", "B2", 3, 2],
       ["income", "budget", "E2", 2, 2],
@@ -52,7 +54,7 @@ describe("Sheets of a page", () => {
   });
 
   it("keeps a sheet's columns' widths in its first table", () => {
-    const budget = sheetsOf(sheetTables(SHEET_META, PAGE))[0]!.tables;
+    const budget = sheetsOf(sheetTablesOf(SHEET_META, pageTablesOf(PAGE).map((t) => ({ table: decode(t.table) }))))[0]!.tables;
     expect([...sheetWidths(SHEET_META, budget[0]?.table)]).toEqual([
       [1, 140],
       [26, 60],
@@ -60,7 +62,7 @@ describe("Sheets of a page", () => {
   });
 
   it("puts a table added in column A, one empty row under the lowest table, A1 on a new sheet", () => {
-    const budget = sheetsOf(sheetTables(SHEET_META, PAGE))[0]!.tables;
+    const budget = sheetsOf(sheetTablesOf(SHEET_META, pageTablesOf(PAGE).map((t) => ({ table: decode(t.table) }))))[0]!.tables;
     // costs: B2 to B4 (rows 1 to 3 from 0), income: E2 to E3
     expect(placeBelow(budget)).toEqual({ row: 5, column: 0 });
     expect(placeBelow([])).toEqual({ row: 0, column: 0 });

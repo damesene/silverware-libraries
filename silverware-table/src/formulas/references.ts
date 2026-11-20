@@ -1,8 +1,8 @@
 // What formulas refer to and how references are written: cells (A1),
 // ranges, [columns], [@columns] of the row, named cells and rows, other
 // tables and pages; what a table's formulas refer to.
-import { type ColumnId, columnIdOf, columnKey, findColumn } from "../columns.ts";
-import type { Table } from "../markdown.ts";
+import { type ColumnId, columnIdOf, columnKey, findColumn, type ColumnHead } from "../columns.ts";
+import type { TableModel } from "../model/model.ts";
 import { cellsByName, type FormulaCells, forFormulas } from "./cell.ts";
 import { isBuiltInFunction, isCustomFunction } from "./registry.ts";
 import { type Token, tokenize } from "./tokens.ts";
@@ -98,7 +98,7 @@ export function columnIdText(id: ColumnId): string | undefined {
  * Silverware Table writes them ([Unit price] becomes [unit_price]); references to
  * columns the table does not have stay as written
  */
-export function withColumnKeys(formula: string, headers: readonly string[]): string {
+export function withColumnKeys(formula: string, headers: readonly ColumnHead[]): string {
   let result = formula;
   for (const ref of references(formula).reverse()) {
     // Another table's columns are not among these headers
@@ -119,7 +119,7 @@ export function withColumnKeys(formula: string, headers: readonly string[]): str
 }
 
 /** The column a [Name] or [Name:2] reference names; a column named exactly "Name:2" comes first */
-export function referencedColumnId(headers: readonly string[], written: string): ColumnId {
+export function referencedColumnId(headers: readonly ColumnHead[], written: string): ColumnId {
   const exact = { name: written, nth: 1 };
   if (findColumn(headers, exact) !== undefined) return exact;
   const match = /^(.*\S)\s*:\s*([1-9]\d*)$/.exec(written);
@@ -127,7 +127,7 @@ export function referencedColumnId(headers: readonly string[], written: string):
 }
 
 /** The index of the column a [Name] reference names, or undefined */
-export function referencedColumn(headers: readonly string[], written: string): number | undefined {
+export function referencedColumn(headers: readonly ColumnHead[], written: string): number | undefined {
   return findColumn(headers, referencedColumnId(headers, written));
 }
 
@@ -229,12 +229,12 @@ export function namedReferences(formula: string): NamedReference[] {
 }
 
 /** The names (lowercase) of a table's named body cells */
-export function cellNamesOf(cells: FormulaCells, table: Table): Set<string> {
+export function cellNamesOf(cells: FormulaCells, table: TableModel): Set<string> {
   return new Set(cellsByName(cells, table).keys());
 }
 
 /** The other pages whose tables a table's formulas refer to ([[Page]]prices!B2) */
-export function referredPages(cells: FormulaCells, table: Table): Set<string> {
+export function referredPages(cells: FormulaCells, table: TableModel): Set<string> {
   const pages = new Set<string>();
   forFormulas(cells, table, (formula) => {
     for (const page of formulaPages(formula)) pages.add(page);
@@ -265,7 +265,7 @@ export function formulaOutside(formula: string): { readonly pages: string[]; rea
 }
 
 /** The sources of the space (lowercase) a table's formulas read */
-export function referredSources(cells: FormulaCells, table: Table): Set<string> {
+export function referredSources(cells: FormulaCells, table: TableModel): Set<string> {
   const names = new Set<string>();
   forFormulas(cells, table, (formula) => {
     for (const name of formulaSources(formula)) names.add(name.toLowerCase());
@@ -278,7 +278,7 @@ export function referredSources(cells: FormulaCells, table: Table): Set<string> 
  * built in (it may be defined later): their results change when the custom
  * functions are defined anew
  */
-export function callsCustomFunctions(cells: FormulaCells, table: Table): boolean {
+export function callsCustomFunctions(cells: FormulaCells, table: TableModel): boolean {
   let calls = false;
   forFormulas(cells, table, (formula) => {
     const { tokens } = tokenize(formula);
@@ -310,7 +310,7 @@ export function callsPureFunctionsOnly(formula: string): boolean {
 }
 
 /** The names (lowercase) of the tables on the page that a table's formulas refer to, so they change when those do */
-export function referredTableNames(cells: FormulaCells, table: Table): Set<string> {
+export function referredTableNames(cells: FormulaCells, table: TableModel): Set<string> {
   const names = new Set<string>();
   forFormulas(cells, table, (formula) => {
     for (const name of formulaTableNames(formula)) names.add(name);

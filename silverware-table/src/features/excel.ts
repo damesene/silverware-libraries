@@ -318,7 +318,7 @@ export class Excel implements Feature {
     // An Excel table: its name, its columns named as its header shows them (unique), its last row its totals row
     // where that is the table's only total row (a total of its own column: what [qty] leaves out)
     const columns = excelColumnNames(exported.header);
-    const bodyRows = Math.max(0, model.rows.length - 1);
+    const bodyRows = model.rows.length;
     const totals = cells ? totalRows(cells, model) : new Set<number>();
     const totalsRow = bodyRows >= 2 && totals.size === 1 && totals.has(bodyRows - 1);
     const tableName = excelTableName(this.host.tableName(model));
@@ -329,7 +329,8 @@ export class Excel implements Feature {
       rows[row - 1] = values.map((text, column) => {
         const value = excelValue(text);
         // (Without the formulas module, no formulas: the cells' values)
-        const stored = cells?.formulaOf(model.rows[row]?.cells[column] ?? "");
+        const cell = model.rows[row - 1]?.cells[column];
+        const stored = cell && cells?.formulaOf(cell);
         if (!stored) return { value };
         formulas++;
         const formula = excelFormula(stored.formula, own!, row - 1, column, templates);

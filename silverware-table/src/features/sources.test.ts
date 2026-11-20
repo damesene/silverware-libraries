@@ -3,13 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 import type { ModelHost } from "../core/feature.ts";
 import { cell, clickOn, controller, editor, flush, key, setup, text, useTablePage } from "../testing/page.ts";
 import { memorySources, type SourceProvider, type SourcesOffer } from "../sources.ts";
+import { decode } from "../store/markdown/codec.ts";
 import { Sources, sourceTable } from "./sources.ts";
 
 /** The module on a host that keeps what it offers and counts the tables' checks */
 function started<P extends SourceProvider>(provider: P = memorySources({ tasks: { columns: ["name", "due"], rows: [["a | b", "2025-11-06"]] } }) as unknown as P) {
   let offer: SourcesOffer | undefined;
   const tablesChanged = vi.fn();
-  const host = { offer: (api: SourcesOffer) => void (offer = api), tablesChanged } as unknown as ModelHost;
+  const host = { offer: (api: SourcesOffer) => void (offer = api), tablesChanged, asModel: decode } as unknown as ModelHost;
   const module = new Sources(host, provider);
   module.start();
   return { offer: offer!, tablesChanged, module, provider };
@@ -26,7 +27,7 @@ describe("the sources module", () => {
   it("offers a source as a table, the same object while its data are the same", () => {
     const { offer } = started();
     const table = offer.table("Tasks");
-    expect(table?.rows[1]?.cells).toEqual(["a \\| b", "2025-11-06"]);
+    expect(table?.rows[0]?.cells.map((cell) => cell.content)).toEqual(["a | b", "2025-11-06"]);
     expect(offer.table("tasks")).toBe(table);
     expect(offer.names()).toEqual(["tasks"]);
   });

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { completions, defineFormulaPlaces, evaluated, evaluatedText, formulaErrorsIn, formulaErrorsTextIn, formulaPagesIn, luaCallPlaces, onWrite, resetDefinitions, tables } from "./index.ts";
-import { buttonLabel, cell, clickOn, controller, editor, edits, flush, key, menuButtons, nameInMenu, setup, text, toolbarName, useTablePage } from "./testing/page.ts";
+import { buttonLabel, cell, clickOn, controller, editor, edits, flashes, flush, key, menuButtons, nameInMenu, setup, text, toolbarName, useTablePage } from "./testing/page.ts";
 
 describe("silverware.table.evaluate: a formula calculated on the page shown", () => {
   useTablePage();
@@ -307,6 +307,17 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
       toolbarName("table");
       expect(await nameInMenu("costs")).toBeUndefined();
       expect(text.endsWith(LINES("costs", "cost", "2"))).toBe(true);
+    });
+
+    it("leaves one as written where its place cannot hold its new text, the table written and that said", async () => {
+      await setup(TABLE + LINES("prices", "price", "1"), { "silverware.table.metadata": true });
+      // (A finder whose places hold no text: as a string literal a quote of its own)
+      defineFormulaPlaces((page: string) => luaCallPlaces("te")(page).map((place) => ({ ...place, holds: () => false })));
+      toolbarName("table");
+      expect(await nameInMenu("costs")).toBeUndefined();
+      expect(text).toContain("core.name='costs'");
+      expect(text.endsWith(LINES("prices", "price", "1"))).toBe(true);
+      expect(flashes.pop()).toContain("2 formulas written in the page (silverware.table.evaluate) did not follow the table");
     });
 
     it("leaves them as written without a finder, and where the finder gives places that are none", async () => {

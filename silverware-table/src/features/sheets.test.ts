@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { insertRow } from "../ops.ts";
+import { insertRow } from "../model/ops.ts";
 import { bridge, controller, edits, flashes, flush, nameInMenu, setup, tableMenuItem, text, toolbarName, useTablePage } from "../testing/page.ts";
 
 const PAGE = [
@@ -163,7 +163,7 @@ describe("Sheets: a table that grows makes room on its sheet", () => {
 
   const costs = () => controller.shownTables()[0]!;
   const grow = (rows: number, claims: boolean) =>
-    controller.writeTable(costs(), (t) => Array.from({ length: rows }).reduce<typeof t>((out) => insertRow(out, out.rows.length), t), claims ? { claims } : {});
+    controller.writeTable(costs(), (t) => Array.from({ length: rows }).reduce<typeof t>((out) => insertRow(out, out.rows.length + 1), t), claims ? { claims } : {});
 
   it("rows inserted: everything starting below moves down as far, side by side tables in line, the table beside stays, one edit", async () => {
     await setup(SHEET, { "silverware.table.metadata": true });

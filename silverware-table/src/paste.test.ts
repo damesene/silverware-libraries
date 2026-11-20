@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { parseTable, serializeTable } from "./markdown.ts";
-import { parseClipboardCells, pasteCells, planPaste } from "./paste.ts";
-import { formulaOf } from "./testing/formulas.ts";
-import { keepTags } from "./tags.ts";
+import { cellWrittenOver } from "./model/rules.ts";
+import { moveCells, parseClipboardCells, pasteCells, planPaste } from "./paste.ts";
+import { decode, encode } from "./store/markdown/codec.ts";
+import { CELLS } from "./testing/formulas.ts";
 import { NO_PINS } from "./view.ts";
 
 describe("parseClipboardCells", () => {
@@ -33,14 +34,11 @@ const TABLE = parseTable(
 );
 
 function paste(data: string[][], at: { row: number; column: number }, insert = false, pins = NO_PINS) {
-  const plan = planPaste(TABLE, pins, at, data, insert);
+  const plan = planPaste(decode(TABLE), pins, at, data, insert);
   if ("error" in plan) return plan;
   // As with the formulas module on: formula cells are its
-  const pasted = pasteCells(TABLE, plan, data, {
-    keptBy: (cell) => (formulaOf(cell) ? "formula cell" : undefined),
-    keepTags: (value, from) => keepTags(value, from, new Set(["f"])),
-  });
-  return { markdown: serializeTable(pasted.table), skipped: pasted.skipped.get("formula cell") ?? 0, plan };
+  const pasted = pasteCells(decode(TABLE), plan, data, { keptBy: (cell) => (CELLS.formulaOf(cell) ? "formula cell" : undefined) });
+  return { markdown: serializeTable(encode(pasted.table, TABLE)), skipped: pasted.skipped.get("formula cell") ?? 0, plan };
 }
 
 describe("pasting cells", () => {
@@ -127,5 +125,17 @@ describe("pasting cells", () => {
     expect(paste([["x"], ["y"]], { row: 3, column: 0 }, false, { ...NO_PINS, bottom: 1 })).toEqual({
       error: "there are no rows below the rows pinned to the bottom to paste into",
     });
+  });
+});
+
+describe("moving cells", () => {
+  const RULES = { boundToContent: [{ owner: "formulas", key: "f" }], unique: [{ owner: "core", key: "cn" }] };
+
+  it("takes a formula from the cell it leaves, even one whose result is empty, the name there staying", () => {
+    const TABLE = parseTable("| A | B |\n|---|---|\n| 1 | <meta formulas.f='=\"\"' core.cn='x'> |\n| 2 | |");
+    const plan = planPaste(decode(TABLE), NO_PINS, { row: 2, column: 1 }, [[""]], false);
+    if ("error" in plan) throw new Error(plan.error);
+    const moved = moveCells(decode(TABLE), [[{ row: 1, column: 1 }]], plan, (cell, over) => cellWrittenOver(cell, over, RULES));
+    expect(serializeTable(encode(moved, TABLE))).toBe("| A | B |\n|---|---|\n| 1 | <meta core.cn='x'> |\n| 2 | <meta formulas.f='=\"\"'> |");
   });
 });

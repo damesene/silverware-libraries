@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { parseTable, serializeTable, type Table } from "../markdown.ts";
+import { parseTable, serializeTable } from "../markdown.ts";
+import { decode, encode } from "../store/markdown/codec.ts";
 import { tablesLayoutProvider } from "./layoutprovider.ts";
 
 /** A table widget as SilverBullet renders one, its metadata row's <meta> with these attributes (none: no metadata row) */
@@ -12,16 +13,17 @@ function widget(attributes?: Record<string, string>): HTMLElement {
   return element;
 }
 
-/** The provider over one table's markdown, written as the core writes it */
+/** The provider over one table's markdown, written as the core writes a model */
 function provider(markdown: string, options: { metadataOn?: boolean; enhanced?: boolean } = {}) {
   const page = { text: markdown };
   const made = tablesLayoutProvider({
     renderedRows: (table) => Array.from(table.rows),
     enhanced: () => options.enhanced ?? true,
     write: async (_, change) => {
-      const changed = change(parseTable(page.text));
+      const read = parseTable(page.text);
+      const changed = change(decode(read));
       if (!changed) return "unchanged";
-      page.text = serializeTable(changed as Table);
+      page.text = serializeTable(encode(changed, read));
       return "written";
     },
     metadataOn: () => options.metadataOn ?? true,

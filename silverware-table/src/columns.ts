@@ -7,14 +7,107 @@
 // which one (the second qty is qty:2). A column with a fixed name in its
 // header (`<meta core.n='price'>`, names.ts) is named by it instead, so renaming
 // the header changes nothing.
-import { unescapeCell } from "./markdown.ts";
-import { nameOf } from "./names.ts";
+import { type Align, unescapeCell } from "./markdown.ts";
+import { type Attributes, attributeIn, type ModelCell, type ModelColumn, NO_ATTRIBUTES, type TableModel, withAttributeIn } from "./model/model.ts";
+import { CORE } from "./metanames.ts";
+import { LINE_NAME_KEY, nameOf } from "./names.ts";
 import { metaTagPattern } from "./tags.ts";
 
 export type ColumnId = { readonly name: string; readonly nth: number };
 
+/**
+ * A column as its name tells it: its header's text (as markdown writes it or
+ * as the model has it: its tags, hashtags and emphasis are no part of its key
+ * either way) and its fixed name, if it has one
+ */
+export type ColumnHead = { readonly text: string; readonly fixed: string | undefined };
+
+/** Markdown header cells as their columns' heads: a fixed name read from the cell's tag (names.ts) */
+export function headsOf(headers: readonly string[]): ColumnHead[] {
+  return headers.map((text) => ({ text, fixed: nameOf(text) }));
+}
+
+/** A column's hashtags (its header's), as text: its type among them (the core's attribute; the column types' module reads it) */
+export const HASHTAGS_KEY = "hashtags";
+
+/** A column's header as it is written: its text with its hashtags */
+export function headerText(column: ModelColumn): string {
+  const hashtags = attributeIn(column.attributes, CORE, HASHTAGS_KEY);
+  return hashtags && column.header ? `${column.header} ${hashtags}` : (hashtags ?? column.header);
+}
+
+/** A column's header as a cell: its text as written (its hashtags with it), the column's attributes (what a header's editor edits) */
+export function headerCell(model: TableModel, column: number): ModelCell | undefined {
+  const at = model.columns[column];
+  return at && { content: headerText(at), attributes: at.attributes };
+}
+
+/** The table with a column's header written so: its name the text without hashtags, its hashtags the text's */
+export function withHeaderText(model: TableModel, column: number, text: string): TableModel {
+  const at = model.columns[column];
+  if (!at || headerText(at) === text) return model;
+  const made = columnOfHeader(text, at.align, at.attributes);
+  return { ...model, columns: model.columns.map((c, i) => (i === column ? made : c)) };
+}
+
+/** A column of a header as written (its hashtags its attribute), with these attributes besides */
+export function columnOfHeader(text: string, align: Align, attributes: Attributes = NO_ATTRIBUTES): ModelColumn {
+  const hashtags = headerHashtags(text);
+  return { header: withoutHashtags(text), align, attributes: withAttributeIn(attributes, CORE, HASHTAGS_KEY, hashtags.length ? hashtags.join(" ") : undefined) };
+}
+
+/**
+ * Whether a column's header is empty: no text, no hashtags, no name of its own
+ * (an empty header cell, which SilverBullet renders none of, the header then
+ * shifted against the data)
+ */
+function emptyHeader(column: ModelColumn): boolean {
+  return headerText(column) === "" && attributeIn(column.attributes, CORE, LINE_NAME_KEY) === undefined;
+}
+
+/** Names every column with an empty header "Column N" (N its place, or the next free number) */
+export function nameEmptyHeaders(model: TableModel): TableModel {
+  if (!model.columns.some(emptyHeader)) return model;
+  const names = new Set(model.columns.map((c) => c.header));
+  const columns = model.columns.map((column, i): ModelColumn => {
+    if (!emptyHeader(column)) return column;
+    let n = i + 1;
+    while (names.has(`Column ${n}`)) n++;
+    const header = `Column ${n}`;
+    names.add(header);
+    return { ...column, header };
+  });
+  return { ...model, columns };
+}
+
+/** A column with the header of `header` (its text, its hashtags) and its alignment, its other attributes its own (the column itself where they are the same) */
+export function withHeaderOf(column: ModelColumn, header: ModelColumn): ModelColumn {
+  const attributes = withAttributeIn(column.attributes, CORE, HASHTAGS_KEY, attributeIn(header.attributes, CORE, HASHTAGS_KEY));
+  return column.header === header.header && column.align === header.align && attributes === column.attributes ? column : { header: header.header, align: header.align, attributes };
+}
+
+/** A model's columns as their heads: each header, and the column's own name */
+export function modelHeads(model: TableModel): ColumnHead[] {
+  return model.columns.map((column) => ({ text: column.header, fixed: attributeIn(column.attributes, CORE, LINE_NAME_KEY) }));
+}
+
 // A hashtag in a header (`Price #euro`): SilverBullet leaves it out of the column's key
 const HASHTAG_RE = /(^|\s)#[^\s#]+/g;
+
+/** A header's hashtags (`Price #currency-usd #x`: `#currency-usd`, `#x`), in their order */
+export function headerHashtags(header: string): string[] {
+  return Array.from(header.matchAll(HASHTAG_RE), (match) => match[0].trim());
+}
+
+/** A header without its hashtags, its spaces between words one */
+export function withoutHashtags(header: string): string {
+  return withoutHashtagsWhere(header, () => true);
+}
+
+/** A header (or a column's hashtags) without the hashtags `drop` takes (given as written, with its #), its spaces between words one */
+export function withoutHashtagsWhere(header: string, drop: (tag: string) => boolean): string {
+  return header.replace(HASHTAG_RE, (whole, space: string) => (drop(whole.trim()) ? space : whole)).replace(/\s+/g, " ").trim();
+}
 
 /**
  * A header cell as a column name: markdown escapes, hashtags and the
@@ -41,7 +134,7 @@ export function columnKey(name: string): string {
 }
 
 /** The column `id` names, or undefined if the table has none of that name (and occurrence) */
-export function findColumn(headers: readonly string[], id: ColumnId): number | undefined {
+export function findColumn(headers: readonly ColumnHead[], id: ColumnId): number | undefined {
   // A fixed name first: it is the column's whatever the headers say
   const fixed = fixedColumn(headers, id.name);
   if (fixed >= 0 && id.nth === 1) return fixed;
@@ -51,16 +144,16 @@ export function findColumn(headers: readonly string[], id: ColumnId): number | u
   const find = (wanted: string) => {
     // The column with the fixed name is the first of that name, the headers of that key follow it
     let seen = fixed >= 0 ? 1 : 0;
-    const index = headers.findIndex((header, c) => c !== fixed && columnKey(header) === wanted && ++seen === id.nth);
+    const index = headers.findIndex((header, c) => c !== fixed && columnKey(header.text) === wanted && ++seen === id.nth);
     return index < 0 ? undefined : index;
   };
   return (asKey === undefined ? undefined : find(asKey)) ?? find(columnKey(id.name));
 }
 
 /** The column whose fixed name is `name`, or -1 */
-function fixedColumn(headers: readonly string[], name: string): number {
+function fixedColumn(headers: readonly ColumnHead[], name: string): number {
   const wanted = name.toLowerCase();
-  return headers.findIndex((header) => nameOf(header)?.toLowerCase() === wanted);
+  return headers.findIndex((header) => header.fixed?.toLowerCase() === wanted);
 }
 
 /**
@@ -68,21 +161,48 @@ function fixedColumn(headers: readonly string[], name: string): number {
  * key (then the occurrence must be written to tell them apart)
  */
 export function columnIdOf(
-  headers: readonly string[],
+  headers: readonly ColumnHead[],
   column: number,
 ): (ColumnId & { readonly shared: boolean }) | undefined {
   const header = headers[column];
   if (header === undefined) return undefined;
-  const fixed = nameOf(header);
-  if (fixed) return { name: fixed, nth: 1, shared: false };
-  const wanted = columnKey(header);
+  if (header.fixed) return { name: header.fixed, nth: 1, shared: false };
+  const wanted = columnKey(header.text);
   // Another column with this key as its fixed name comes first (findColumn)
   const fixedOther = fixedColumn(headers, wanted);
-  const counted = (h: string, c: number) => c !== fixedOther && columnKey(h) === wanted;
+  const counted = (h: ColumnHead, c: number) => c !== fixedOther && columnKey(h.text) === wanted;
   const before = fixedOther >= 0 ? 1 : 0;
   const same = before + headers.filter(counted).length;
   const nth = before + headers.slice(0, column + 1).filter(counted).length;
   return { name: wanted, nth, shared: same > 1 };
+}
+
+/**
+ * Where each column of a header row went in another, for an edit that does
+ * not say (no column map: a table built anew, a calculated one): the column of
+ * the same name where that name is one column's on both sides (its fixed name,
+ * else its key), then, for the columns left, the one at the same place none
+ * took (a header renamed; headers sharing a name, whose occurrences an edit
+ * renumbers, go by place too); undefined: neither (a column gone, or another
+ * in its place)
+ */
+export function matchColumns(before: readonly ColumnHead[], after: readonly ColumnHead[]): (column: number) => number | undefined {
+  const moved = new Map<number, number>();
+  const taken = new Set<number>();
+  before.forEach((_, column) => {
+    const id = columnIdOf(before, column);
+    if (!id || id.shared) return;
+    const to = findColumn(after, id);
+    if (to === undefined || taken.has(to) || columnIdOf(after, to)?.shared) return;
+    moved.set(column, to);
+    taken.add(to);
+  });
+  before.forEach((_, column) => {
+    if (moved.has(column) || column >= after.length || taken.has(column)) return;
+    moved.set(column, column);
+    taken.add(column);
+  });
+  return (column) => moved.get(column);
 }
 
 /**
@@ -91,8 +211,8 @@ export function columnIdOf(
  * Null: the column was deleted; undefined: `before` had no such column.
  */
 export function followColumn(
-  before: readonly string[],
-  after: readonly string[],
+  before: readonly ColumnHead[],
+  after: readonly ColumnHead[],
   id: ColumnId,
   map: (column: number) => number | undefined = (c) => c,
 ): ColumnId | null | undefined {

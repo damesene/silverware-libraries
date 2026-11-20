@@ -79,7 +79,7 @@ What the design below follows, and what decides a case it does not name:
    *Layers*): domains import the model; modules import the model, domains
    (through their index) and the core's interfaces (`core/feature.ts`:
    `ModelHost`, the hooks); **the core imports no module** (the controller's
-   own `features/metadata.ts` the one exception, as now), the modules being
+   own Remove metadata, `core/metadata.ts` since step 3), the modules being
    put together by `modules.ts`; stores implement the core's `TableStore`
    and import the model and the platform; host bindings import all of it and
    put it together. Nothing imports a binding. `isolation.test.ts` checks it
@@ -259,10 +259,10 @@ What the core asks; modules never see it (they get tables through the host):
   left: the store reads and writes it through the platform's `space` then). What a
   write needs today of `also`, `otherTablesWritten`, `otherTextWritten`,
   `insertTable`, `deleteTable`, and lazy saving's `writePage`.
-- `places(document)`: content kept outside tables that formulas are in, each
-  by a key of its own, read and written as a cell's content. Which places a
-  document has is told to the store by the binding (the formulas of
-  `silverware.table.evaluate(…)` calls: `defineFormulaPlaces`, as now).
+- The formulas written in a document outside its tables: not this
+  interface's, a store of their own beside it, `PageFormulaStore` (decided
+  2026-11-20, *Decided (2026-11-20)* 7), in place of the `places(document)`
+  first planned here.
 - `reveal(key, cell)`: the cell shown to the user (*Find formula errors*,
   `errorsText`'s links).
 - `InsertPlace`: where a new table goes, opaque (after a table, at the
@@ -351,7 +351,7 @@ Everything that is SilverBullet's and not markdown's, in one place:
 - the history markers (the cursor put outside a table around each write, for
   SilverBullet's undo): the binding's `Editor` places them, as it knows
   the edit's range;
-- the places in Lua calls (host/lua.ts, formulas/places.ts' finding);
+- the places in Lua calls (host/lua.ts; found by store/markdown/pageformulas.ts);
 - the Lua API: `silverware.table.tables(text)`, `onWrite(fn(text))`,
   `evaluate(formula, text, page)`, `evaluateText`, `errors(page)`,
   `errorsText`, the aliases and the `define…` functions, implemented over the
@@ -450,6 +450,297 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      metadata and names it reads (about 6,100 lines tied to the table) go onto
      the model so that a database's items can be such a source without a
      second interface.
+   - **The attribute API, first part (2026-11-20)**: a table's and its
+     columns' attributes by one set of names, `attribute`, `withAttribute`,
+     `canStore` (each with `at`: a column), `attributes(table)` (the owner's
+     of the table, by key), `columnAttributes(table, key)` and
+     `withColumnAttributes` (one key over the columns), in place of
+     `getMeta`, `setMeta`, `canStoreMeta`, `metaOf`, `columnsMeta`,
+     `setColumnsMeta`. The plan's `attributes(table, key)` was split so a
+     name says one thing: the owner's attributes of a table, and one key's
+     over its columns. A cell's (`getCellTag`, `withCellTag`,
+     `canStoreCellTag`) join with the cells' part, `at` a cell.
+   - **Table attributes (2026-11-20)**: `model/model.ts` (`Attributes` by
+     owner and key, and `Owner`; the model's other types come with
+     `TableModel`, when something uses them); a table's own
+     attributes are `Table.attributes` (optional while `Table` becomes the
+     model), its columns' still the metadata row's names in `meta` (the
+     next part). The markdown codec splits the metadata row as it reads it
+     (`tableMetaOf`) and writes it back (`writtenMeta`): a row unchanged as
+     it was read, a row changed in the order it was read, attributes set
+     since after them (a new row: the table's own, then its columns'). An
+     attribute's name is split and made in one place (`metanames.ts`,
+     `splitAttributeName`, `attributeName`, no owner's a key alone).
+   - **Columns' attributes: how they follow (2026-11-20, with the user:
+     nothing lost, none put on another column)**. Found before moving
+     them onto the columns: a write with no column map followed them by
+     place, so a calculated table (a view, a pivot) written anew without a
+     column in its middle put that column's attributes on the next one and
+     lost the last one's. Now, with no column map, the columns are paired
+     by name where a name is one column's on both sides, the rest by place
+     (a header renamed; headers sharing a name, whose occurrences an edit
+     renumbers), and an attribute of a column found nowhere stays as
+     written, its column's to take back (`matchColumns` in columns.ts,
+     `followColumnMeta`); only a column the edit says it deleted takes its
+     attributes with it. Their storage stays the metadata row's names for
+     now: moved onto the columns inside `Table` they would be kept twice (the
+     names to write, the places to work with) and the codec's files would
+     import each other in a ring (markdown.ts, meta.ts, columns.ts); they go
+     onto the model's columns with `TableModel`, where the codec gives
+     places on reading and names on writing by this same pairing.
+   - **The model and its codec, how the rest goes (2026-11-20)**: the
+     model's types are in `model/model.ts` (`TableModel`, columns, rows,
+     cells, attributes), the markdown codec in `store/markdown/codec.ts`
+     (`decode`: a `Table` into the model; `encode`: a model back, against
+     the table it came from). `Table` is not turned into the model in place,
+     part by part: a module or domain moves onto the model on its own (its
+     commit), reading a table through `decode` and writing through
+     `encode` where it meets the core; once every one has, the hooks take
+     and give `TableModel` and those conversions go. The codec writes what
+     did not change as it was read, byte for byte, and an attribute changed
+     into the tags it was read from, by the writers of before
+     (`withTagValue`, the names' one tag, a type's hashtag at the header's
+     end): its tests read every table of the playground's sample and of
+     the forms it knows back unchanged, and compare each change written
+     through the model with the same change by those writers. Which change
+     made a set of attributes is the model's (`attributeChangeOf`), so the
+     codec writes a change where it was read.
+   - **The attribute API on the model (2026-11-20)**: `attribute`,
+     `withAttribute`, `canStore` take the model too, `at` a column, a row
+     (`row`, the first 1) or a cell (both); `attributes`,
+     `columnAttributes`, `withColumnAttributes` alike (`AttributePlace`,
+     `attributesAt`, `withAttributesAt` in model/model.ts). On a `Table`
+     they work as before (no path of the running code changed); a cell's
+     attribute set on the model is written by the codec as `withTagValue`
+     wrote it, so `getCellTag`, `withCellTag`, `canStoreCellTag` go once
+     their one user, the formulas module, is on the model.
+   - **A column's identity from what it is (2026-11-20)**: columns.ts
+     finds and names columns by their heads (`ColumnHead`: the header's
+     text and the column's fixed name), no longer by the header's markdown;
+     markdown header cells give their heads by `headsOf` (the fixed name
+     from its tag), the model's columns will give theirs (the header, the
+     fixed name its attribute). What the formulas' domain moves onto the
+     model stands on it.
+   - **The formulas' domain onto the model, how (2026-11-20)**: one change,
+     as its types run through every user (formulas/, calculated/, pivot/,
+     excel/formulas.ts; the modules formulas, views, pivot, pageLinks,
+     excel, conditions, sources; the Lua API in index.ts). `FormulaCells`
+     takes and gives `ModelCell`s (a formula its cell's attribute
+     `formulas.f`, its result the cell's content, unescaped); a table is a
+     `TableModel` wherever the domain has one (`TableSource` gives models,
+     decided 4), its columns found by their heads; rows keep their numbers
+     (the header 0, the body from 1: `rowMap`, references), the model's
+     row r being `rows[r - 1]`. The formulas module converts where it
+     meets the core (`asModel` of the tables a hook gives, `encode` of
+     what it gives back) until the hooks take the model.
+     **Done (2026-11-20)**: the domain (formulas/, calculated/, pivot/,
+     excel/formulas.ts) takes `TableModel` and `ModelCell` only; the
+     offers between modules (`FormulasOffer`, `CalculatedOffer`,
+     `HeldFormulasOffer`, `PageLinksOffer`, `SourcesOffer`) give and take
+     models. The host converts for what still meets the core in markdown:
+     `asModel(table)` and `fromModel(model, base)`, and a cell a hook gives
+     alone (`keepsCell`, `editorValue`, `fillCell`) by `asModel(cell)` and
+     `fromModel(cell)` (the codec's `decodeCell`, `encodeCell`). A cell's
+     attribute set on the model is unchecked (the metadata setting is the
+     write step's, which sees the table: a calculated column's formula
+     copied into a new row passes); `getCellTag`, `withCellTag`,
+     `canStoreCellTag` are gone. A column of a model is made from a header
+     as written by `columnOfHeader` (its hashtags its `core.hashtags`) and
+     given another's header by `withHeaderOf` (columns.ts, with
+     `HASHTAGS_KEY`, `headerText`, `modelHeads`); pins are read and set on
+     the model too. Two things the writers before did that the codec now
+     does: a cell written anew carries its tags in today's form (one
+     written in double quotes before 2026-10-22 in apostrophes:
+     `currentTag`), and the metadata of a column of the table read that no
+     column of the model comes from (by the attributes' lineage) is kept as
+     written, for the write's step to say whether it went (a view's column
+     whose source column went, kept for it to come back).
+   - **A column's type from its attribute (2026-11-20)**: the column types
+     read a column's type from its hashtags on the model
+     (`host.columnHashtags(table, column)`: the core's attribute, no
+     metadata), so a hidden tag's text is never taken for a hashtag; the
+     offer `valueOf(table, column, text)` (the conditions'). One reader of
+     hashtags (`headerHashtags`, `withoutHashtagsWhere` in columns.ts), the
+     registry's own regular expression gone; `columnTypeOf` and
+     `withColumnType` take a column's hashtags or a header's text alike.
+     Writing a type stays on the header's text, as the header editor's
+     hooks do, until `writeTable` and the hooks take the model (its setter,
+     `withColumnHashtags`, comes then, with its first user).
+   - **What is left, in the order the code needs it (2026-11-20)**: the
+     cell rules (`boundToContent`, `unique`) need writes on the model (an
+     edit "set" an attribute is the model's record of changes, which a write
+     through the markdown loses), and the domains left (the sheet's, the
+     conditions', autofill's) each move with their module. So: 4a the
+     model's operations; 4b the host in model terms; 4c `writeTable` and
+     `insertTable` on the model; 4d `TableInfo.model` and the hooks on the
+     model (`KeyedTable` one with `PageTableModel`), the modules and domains
+     left with them; 4e the `Table` overloads gone (the isolation test: no
+     module imports markdown.ts); then the cell rules, autofill's domain
+     with them.
+   - **4a, the model's operations (2026-11-20)**: `model/ops.ts` (a cell's
+     content set keeping its attributes, a header, an alignment; rows
+     inserted, deleted, duplicated, moved, reordered; columns inserted,
+     deleted, moved; empty headers named), rows counted as the markdown's;
+     each written back by the codec as the markdown's operation writes it
+     (`model/ops.test.ts`). `ops.ts` stays for the markdown until no module
+     uses it; the index helpers (`IndexMap`, `lineAfterBlockMove`,
+     `columnAfterMove`) are the model's. A column deleted on the model keeps
+     its attributes through `encode` (the codec cannot tell it from a view's
+     column gone, kept to come back): whether it went is the write's to say
+     by its column map, as now (`followColumnMeta` in the core's write step),
+     which 4c keeps.
+   - **4b, the host in model terms (2026-11-20)**: the names' functions
+     (`writtenTableName`, `withTableName`, `columnName`, `rowName`,
+     `cellName`, their setters, `canName`) take the model too: on it a name
+     is the core's attribute where it is about (a table's `core.name`, a
+     column's and a row's `core.n`, a cell's `core.cn`: `modelColumnName`,
+     `modelRowName`, `modelCellName`, `withModelName` in names.ts), set as
+     the writers of names set them (only a table's name through the metadata
+     setting, as before). `Align` is the model's (markdown.ts re-exports it),
+     so the model imports nothing of the markdown.
+   - **4c begun, with the cell rules (2026-11-20)**: every write of cells
+     (typed, pasted, moved, filled) runs into the rules, so they come with
+     `writeModel` instead of after it. `model/rules.ts`
+     (`withAttributeRules`, run by the core in `writeModel` after the
+     change, before the modules' write steps, with the write's maps): a
+     cell whose content changed loses its attributes declared bound to its
+     content unless the edit set them, told by its attributes being the
+     very ones it had (a value typed, pasted, cleared over keeps them;
+     a cell moved there brings its own); a row or a cell the edit made
+     takes no unique attribute another has (a duplicated row leaves its
+     names). An attribute set explicitly on a cell is recorded even at the
+     same value (`withAttributeSet`, the host's cell overload), so the same
+     formula typed again keeps it. `Feature.takesTags` is
+     `Feature.boundToContent`, the one declaration `keepTags` (the
+     markdown writes) and the rule read; the core's names are unique.
+     `host.writeModel(target, change, options)` beside `writeTable`, which
+     it replaces once the last caller moved; first moved: the structural
+     edits of `core/structure.ts` (rows and columns inserted, duplicated,
+     deleted, moved, pinned). **Changed for users**: a row's name is the
+     row's, so deleting the column whose cell held it keeps it (written in
+     the row's first cell left); deleting a column asks only about the
+     cells' names it takes (library page updated).
+     Then the modules whose writes set attributes and names (themes,
+     filters, widths, conditions, names, views, pivot, sheets, lazy, the
+     formulas' Recalculate), and the column types with the Choices dialog
+     wholly: a column's type written into its hashtags
+     (`host.withColumnHashtags`, a header's text, so no setting), a list's
+     values renamed in its cells by their content.
+   - **The cell editor on the model (2026-11-20)**: its cell is a model
+     cell (`CellEditor.original`; a header's is its text as written, its
+     hashtags with it, and the column's attributes: `headerCell`, written
+     back by `withHeaderText`, which splits the name from the hashtags, so
+     a hashtag typed into a header still makes one and the column types'
+     header hooks work on that text as before); `editorText(…, original:
+     ModelCell)`, `editorValue(…): ModelCell` (the formulas' formula set on
+     the cell as it was, so its name stays); a value typed is written over
+     the cell (`cellWrittenOver`, below: a formula ends even where the value
+     equals its result, which the rule alone, judging by content, would
+     miss), so a value held to write later is right wherever it goes;
+     written by `writeModel`, refused where the cell
+     changed meanwhile (`sameCell`: content and attributes). The lazy
+     module's held edits are model cells (`HeldEdit`, `PendingEdits.apply`
+     on the model); the core puts them into a table read with the rules
+     (`withHeld`: `tableOf` and the write). `takeEditor`'s save and
+     `insertRowWith`'s preparation are on the model. Left on the markdown
+     for paste's commit, next: the cell typed past a table (`growTo`,
+     written through the codec) and paste's change (the editor's value
+     saved on the model of its table).
+   - **Cells written on the model (2026-11-20)**: paste (`pasteCells`, a
+     value the cell's content, a header its text as written; `planPaste`
+     on the model), cut and moved cells (`moveCells`), copied cells
+     (`moveCellsTo`), Clear, AutoFill (its domain, `FillCells` of `claim`
+     and `placed`), a table grown to a cell past it (`growTo`, a header
+     there the new column's name), the alignment. A cell moved, copied or
+     filled over another, a value typed or cleared, is `cellWrittenOver`
+     (model/rules.ts, the host's; first written for moves, made the one way
+     a value is written once review found a value equal to a formula's
+     result kept the formula):
+     its content and what is bound to it, set explicitly, the cell there
+     keeping its other attributes (its name), as tags were kept before.
+     `keepsCell`, `cellKeptBy` and `fillCell` take model cells. The host's
+     `keepTags` and `uniqueTags` are gone, and with them tags.ts'
+     `keepTags` and `withoutTagsWith`: no write of cells goes through the
+     markdown's tags any more.
+     Then the formulas' numbered column and the sheet's attribute writes.
+     What still writes through the markdown, and why: Remove metadata and
+     the toolbar's padding are operations on the store's form (the
+     metadata row and every hidden tag, orphans included; `padded`), which
+     no model expresses: they become the markdown store's in step 4;
+     `insertTable` and `TableChange` (`also`, `replaceTables`) move with the
+     hooks in 4d, where `writeTable` takes `writeModel`'s place.
+   - **4d, the hooks and the host on the model (2026-11-20)**: `TableInfo.model`,
+     the page's tables (`StoredTable`, `KeyedTable`: one with the formulas'
+     `PageTableModel`), `tableOf`, `TableChange`, `insertTable` and every hook
+     (`looks`, `tableLook`, `readOnly`, `fixedShape`, `prepareEdit`,
+     `writeStep`, `refusesWrite`, `otherTablesWritten`, `otherTextWritten`)
+     take and give `TableModel`; `writeTable` changes the model, the rules
+     applied (`writeModel` gone into it). The core keeps its markdown inside
+     the write (its own steps: columns' attributes following, the setting's
+     check, formatting) and converts once where the hooks see the tables; a
+     new table is written as one, indented as the table it goes after. Remove
+     metadata works on the markdown's form (the metadata row and every hidden
+     tag, those of no column too), which no model expresses: it is the core's
+     (`core/metadata.ts`, from `features/`), writing through
+     `TableHost.writeMarkdown` and `replaceMarkdown`, the core's and the
+     adapter's alone, until the markdown store does it (step 4). The sheet's
+     domain is on the model (`SheetPlace.table`, rows counted with the
+     header); reading a page's text for the board is the adapter's
+     (`sheetTablesIn`). Copy as Markdown is the codec's of the model
+     (`plainMarkdown`). Two errors of the conversion the compiler could not
+     see (a model's rows indexed as the markdown's, a cell compared with
+     text) were found by the tests and fixed, and every such index checked
+     by hand. `isolation.test.ts`: no module imports the markdown's form
+     (markdown.ts, tags.ts, ops.ts), the sources module alone until a source
+     is a store of its own (step 5).
+   - **4e, the host in model terms only (2026-11-20)**: `ModelHost` takes
+     and gives the model alone, its `Table` overloads gone, and with them
+     `fromModel` and `asModel(cell)`; `asModel(table)` stays for the
+     sources module (step 5) and the adapter, which reads the page's text
+     for the sheet's board. The core's own steps on the markdown (the write
+     pipeline, the stored view, the layout's entries) read and write
+     attributes through `OwnMeta`, its own type now, both forms. The
+     domains and the model import nothing of the markdown and escape no
+     cell (`isolation.test.ts`, every domain listed: the column types,
+     conditions, autofill and pivot were not); the formulas' completion
+     read a column's header as markdown, unescaping the model's text again.
+     **Step 3 is done** for the modules, the domains and the model; the
+     core and the adapter still read markdown.ts (the write pipeline, Remove
+     metadata, the sheet's board), which moves into the markdown store in
+     steps 4 and 6.
+   - **Review of step 3 (2026-11-20)**: four reviewers, one area each (the
+     model and the codec; the core's writes; the formulas, views and pivots;
+     the other modules), every finding checked in the code and fixed with a
+     test that fails without it. What the conversion had broken: a cell cut
+     and moved kept a formula whose result was empty (emptied as
+     `cellWrittenOver` writes an empty cell, as Delete does); a cut stayed
+     valid after its cell got a formula of the same text (cells compared
+     whole, `sameCell`); a result with spaces around it or a line break was
+     never up to date (`resultContent`: one line, trimmed, as a cell holds
+     it); views and pivots were written on every edit (`calculatedTable`
+     gives the table itself where nothing changed); Copy as Markdown lost
+     the padding and a header's hashtags' place (written by the codec against
+     the table read, its tags then taken off); a column's attribute set
+     rewrote its header (a column decoded keeps what it was read as, its own
+     set of attributes even where it has none); a row's cells past its
+     header were lost when it changed (`beyond`); a new table after an
+     indented one lost the indent of its rows (written anew, each row);
+     columns' attributes moved twice where headers repeat (a write of the
+     model's is not followed by name again: `byModel`; a column its map
+     deleted takes its attributes in `encode`). Then the leftovers: names,
+     attributes and pins in the controller on the model only, one reader of
+     a table's name (`metaName`), the markdown's name writers gone; empty
+     headers named on the model (`nameEmptyHeaders` in columns.ts: a header
+     of hashtags or of its column's name alone is not empty); a page's table
+     by its key one type (`KeyedModel<Key>` in model/model.ts: `KeyedTable`
+     and `StoredTable` the core's, `PageTableModel` gone); a column's type set
+     by the column types module (`withType`, handed to the Choices dialog);
+     `headerRenamed` on the header's cell, as `editorText` and `editorValue`.
+     Left for later steps: the controller's markdown `write` beside
+     `writeMarkdown`, the markdown's operations (ops.ts) the core still uses
+     (step 4), the sources module's markdown table (step 5). A row shorter
+     than its header is written whole when it changes (the markdown's
+     operations grew it to the cell edited): shown the same.
    - **Choice lists by a formula** (`columntypes.choice.<list>='=@projects'`):
      the column types' domain gets a list's values from the formulas module
      through an offer (`host.offer` / `host.offered`), as modules share data
@@ -457,6 +748,24 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
 4. **Outside tables.** Places through the store, `reveal`, `InsertPlace`;
    `TextPosition`, `TextWritten`, `WritePage` gone from the interfaces, the
    offsets left only in the markdown store.
+   **Done (2026-11-20)**: a new table's place is an `InsertPlace` (after a
+   table, or the cursor, read by the core as the table is written: no offset,
+   `cursorNow` gone from the modules' host); the formulas written in a page's
+   text are `PageFormulaStore`'s (*Decided (2026-11-20)* 7: keys that hold
+   from a read to a write, a text the place cannot hold refused and said;
+   `pageFormulasWritten` in place of `otherTextWritten`, `TextWritten` and
+   `WritePage.text` gone; the finder's registry the markdown store's,
+   `store/markdown/pageformulas.ts`); the core's own writes on the model
+   (a sorting stored or sorted into the rows, pins, Silverware Layout's
+   entries: `writeTable`), the markdown written only where no model expresses
+   it (Format table's padding, Remove metadata: `writeMarkdown`,
+   `replaceMarkdown`), the widget's `write` gone. `revealCell` takes a cell
+   by its table, no offset; the links of `errorsText` (`[[page@pos]]`) are
+   the Lua API's (step 6). `WritePage` keeps its name, its text gone: "page"
+   or "document" is weighed for the whole host at once (step 8). Left in the
+   core on the markdown: the write pipeline itself (the metadata setting's
+   step, `withoutNewTagValues` the one user of ops.ts left), which goes into
+   the markdown store with the page writer (4b).
 4b. **Through the page writer.** The markdown store writes through the page
     writer (`shared/pages/`, built for Silverware Database): its codec
     registered as the writer's part `tables`, a transaction a batch of the
@@ -501,6 +810,24 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    adapter's, as the rendered table is. The core keeps no provider.
 7. **Docs.** CLAUDE.md (Layout, Architecture), docs/silverware-table-isolation.md
    extended by the store's boundary.
+8. **The whole API and its names, reviewed.** With every layer in its place,
+   the API is gone through whole, the internal and the public alike (*Decided
+   (2026-11-20)*, *Consistency and maintainability before compatibility*):
+   names made consistent (one name for one thing, the same
+   words for the same ideas across the model, the store, the hosts, the
+   hooks, the domains, the Space Lua API, settings, stored attributes, CSS),
+   and each part weighed for whether a change is worth it (two functions doing
+   one thing, a shape that differs from its siblings, a name that says too
+   little or the wrong thing). The internal part is mechanical (the compiler
+   finds every use: a commit per area). The public part (the Space Lua API,
+   the API other plugins use, settings, the attributes stored in tables, CSS
+   classes and variables, `shared/` for the other plugins) is proposed change
+   by change to the user, each a breaking change (`!`, a major version, the
+   changelog saying what to change), stored attributes read in their old names
+   too where tables hold them. Names known to be wrong are fixed in the step
+   that touches them, not left for this one. Known already: "page" and
+   "document" for one thing (the store's `tables(document)`, the host's
+   `currentPage`, `pageTables`, `WritePage`, `pageNameNow`).
 
 Rough size, not measured, **as estimated on 2026-11-06**: step 1 a day or
 two; step 2 the largest by files (about 25), a week or more; step 3 the
@@ -625,6 +952,40 @@ is done, by what it took.
      decision of 2026-11-06 (a column's type an attribute of the column,
      written by the codec as the header's hashtag): the type is in that
      attribute, kept by its owner.
+- **Step 4's design, ahead of it:**
+  7. **Formulas written in a page outside its tables are a store of their
+     own, `PageFormulaStore`** (a formula given to `silverware.table.evaluate`
+     or an alias in a page's Space Lua, as one string literal; anywhere in the
+     page's text, a table cell's text too, as before: not a formula cell, and
+     one in a table written in the same edit is written as that table is,
+     the page formula left). Weighed
+     against a hook giving the core a rewrite of a formula's text (smaller, but
+     a mechanism of one case, write only) and against leaving the module the
+     page's text until step 6 (an exception to the isolation): chosen as one
+     mechanism for reading and writing, as tables are, since an MCP server
+     giving an agent feedback on what is wrong (formula errors, and fixing
+     them) is to come, later. A capability beside `TableStore`, not a method
+     of it: the markdown store has it, the memory store, sources and a
+     database have none, and the host gives modules page formulas only where
+     the store does. Each page formula has an address that holds from a read
+     to a write (its document, its order among the page's formulas, its text
+     as read; a write refused where it changed since, as a table's), and is
+     written by a writer of its own, not a cell's: a text the string literal
+     cannot hold (a quote, a line break) is refused with why. The finder of
+     their places (`host/lua.ts`, `defineFormulaPlaces`, its registry now in
+     `formulas/places.ts`) is the binding's; `FormulaPlace` (offsets) the
+     markdown store's alone. The formulas module follows a table's edit in
+     them through that store in the same write, replacing
+     `otherTextWritten`, `TextWritten` and `WritePage.text`. The errors of
+     page formulas (for the MCP server) come with it, later; the interface
+     needs no change for them. Named `PageFormulaStore`, not `PlaceStore`:
+     "place" means a position everywhere else (`InsertPlace`, `FormulaPlace`,
+     `SheetPlace`), and the name says what it holds, beside `pageTables()`.
+- **Consistency and maintainability before compatibility**: the public API
+  (Space Lua, settings, stored attributes, CSS) may change where that makes it
+  consistent and easier to keep; such a change is announced in the changelog
+  with what to change (no known users yet). Reviewed whole at the end
+  (step 8).
 
 ## Decided (2026-11-07, with the user)
 

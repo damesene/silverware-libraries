@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { parseTable } from "../markdown.ts";
+import { withMeta } from "../meta.ts";
 import { BUILT_IN_FUNCTIONS } from "../formulas/builtin/index.ts";
 import { clearCustomFunctions, defineCustomFunctions } from "../formulas/registry.ts";
 import { excelHtml, excelText } from "./clipboard.ts";
@@ -80,7 +81,7 @@ describe("Excel's formulas", () => {
     expect(write("=COUNTA(@tasks[name])")).toEqual({ reason: "it reads the source tasks of the space" });
     expect(write("=COUNTA(@tasks)")).toEqual({ reason: "it reads the source tasks of the space" });
     // The table's own name before its own cell: that cell
-    expect(excelFormula("=shop!vat*2", { ...SHOP, meta: { "core.name": "shop" } }, 0, 3)).toEqual({ text: "C3*2", array: false });
+    expect(excelFormula("=shop!vat*2", withMeta(SHOP, "core.name", "shop"), 0, 3)).toEqual({ text: "C3*2", array: false });
     expect(write('=TEXT(A1, "dd.mm.yyyy")')).toEqual({ reason: "Excel reads TEXT's format codes in its own language" });
     expect(write("=DATEADD(A1, 1, [@unit])")).toEqual({ reason: "its unit is not written in the formula (it comes from a cell)" });
     expect(write("=VAT(C1)")).toEqual({ reason: "VAT has no Excel form" });
@@ -144,7 +145,7 @@ describe("as an Excel table", () => {
     expect(excelFormula("=[@jan]*2", table, 0, 3, {}, structured)).toEqual({ text: "T[[#This Row],[Jan]]*2", array: false });
     expect(excelFormula("=SUM([@[feb]:[jan]])", table, 0, 3, {}, structured)).toEqual({ text: "SUM(T[[#This Row],[Jan]:[Feb]])", array: false });
     // The table's own name before it: its own column
-    expect(excelFormula("=SUM(T![@[jan]:[feb]])", { ...table, meta: { "core.name": "T" } }, 0, 3, {}, structured)).toEqual({ text: "SUM(T[[#This Row],[Jan]:[Feb]])", array: false });
+    expect(excelFormula("=SUM(T![@[jan]:[feb]])", withMeta(table, "core.name", "T"), 0, 3, {}, structured)).toEqual({ text: "SUM(T[[#This Row],[Jan]:[Feb]])", array: false });
     expect(excelFormula("=other![@jan]", table, 0, 3, {}, structured)).toEqual({ reason: "it refers to the table other" });
     // In the totals row, which has no This Row of the table's: cells
     expect(excelFormula("=[@jan]*2", table, 2, 3, {}, structured)).toEqual({ text: "B4*2", array: false });

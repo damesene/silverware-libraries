@@ -27,7 +27,7 @@
 // SilverBullet's navigation. Formulas of the board's tables read in the
 // sheet's addresses (addressFrame): a reference is to a record, so sorting a
 // table changes the address shown, not the value.
-import { CELL_MENU_ORDER, type AdapterFeature, type AddressFrame, type AlsoChanged, type CellArea, type CellEditor, type CellMenuGroup, type CellRef, type RenderedEditor, type TableHost, type TableInfo, type TableTarget, type ToolbarButton, type WidgetInfo, type WriteResult } from "../../feature.ts";
+import { CELL_MENU_ORDER, type AdapterFeature, type AddressFrame, type TableChange, type CellArea, type CellEditor, type CellMenuGroup, type CellRef, type RenderedEditor, type TableHost, type TableInfo, type TableTarget, type ToolbarButton, type WidgetInfo, type WriteResult } from "../../feature.ts";
 import { oncePerFrame } from "../../frame.ts";
 import { claimWindow, releaseWindow } from "../../overwindow.ts";
 import { DRAWN_CLASS, STAND_IN_CLASS, UI_CLASS } from "../../../dom.ts";
@@ -1717,7 +1717,7 @@ export class Sheet implements AdapterFeature {
    * edit (`also`: a formula refers to another table by its name); `taken`:
    * the name given to it, which the joining table cannot have
    */
-  private sheetFor(board: Board, text: string): { sheet: string; taken: string[]; also: AlsoChanged | undefined } {
+  private sheetFor(board: Board, text: string): { sheet: string; taken: string[]; also: TableChange | undefined } {
     if (board.sheet) return { sheet: board.sheet, taken: [], also: undefined };
     const keys = this.host.tableKeys(this.host.currentPage, text);
     const alone = findTables(text)[keys.indexOf(board.alone)];
@@ -1735,7 +1735,7 @@ export class Sheet implements AdapterFeature {
   }
 
   /** A table alone's board written to be a sheet (sheetFor's `also`): the sheet's from now on, said so */
-  private becameSheet(board: Board, sheet: string, also: AlsoChanged | undefined, joined: string): void {
+  private becameSheet(board: Board, sheet: string, also: TableChange | undefined, joined: string): void {
     if (!also || this.board !== board) return;
     // Its tables, the one joining too, as the page has them
     board.sheet = sheet;

@@ -407,7 +407,7 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    compared places or text. The write hooks by key: `WritePage` holds the
    page's tables as `KeyedTable`s (key and model; `read` as read, `key` the
    written one's), `otherTablesWritten` gives `KeyedTable`s, `AlsoChanged`
-   is a `TableChange` by key, the core alone turning keys into places. The
+   is gone for `TableChange` by key, the core alone turning keys into places. The
    formulas' domain tells tables apart by an `id` (the module gives the key;
    `replace`, `tablesWritten`), the sheet's domain takes tables with whatever
    tells them apart (`sheetTablesOf<T>`, layout ids), the formulas offer

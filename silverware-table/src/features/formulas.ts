@@ -353,7 +353,7 @@ export class Formulas implements Feature {
   /** A view's formula calculated on the page shown (the view module's dialog and its staleness): see FormulasOffer.view */
   private viewOf(formula: string, table: Table | undefined, replace: { readonly key: string; readonly table: Table } | undefined): Grid | FormulaError | undefined {
     const tables = replace
-      ? pageTables(this.cells, () => this.named(this.host.pageTables()), this.host.currentPage, { id: replace.key, table: replace.table, name: this.nameOf(replace.table) }, this.elsewhere())
+      ? pageTables(this.cells, () => this.named(this.host.pageTables()), this.host.currentPage, { key: replace.key, table: replace.table, name: this.nameOf(replace.table) }, this.elsewhere())
       : this.tableSource();
     // A view to be inserted: a table of its own it has none (A1, [x] alone read nothing)
     const own = table ?? { indent: "", align: [], rows: [{ cells: [] }], padded: false };
@@ -407,7 +407,7 @@ export class Formulas implements Feature {
 
   /** The page's tables with their names, as the domain takes them (told apart by their keys) */
   private named(tables: readonly PageTableModel[]): NamedPageTable[] {
-    return tables.map((t) => ({ id: t.key, table: t.model, name: this.nameOf(t.model) }));
+    return tables.map((t) => ({ key: t.key, table: t.model, name: this.nameOf(t.model) }));
   }
 
   /** What formulas read outside the page: the other pages read, their tables with their names; the space's sources, where offered */
@@ -448,7 +448,7 @@ export class Formulas implements Feature {
    */
   writeStep(before: Table, after: Table, edit: WriteEdit): Table {
     const { page } = edit;
-    const tables = pageTables(this.cells, () => this.named(page.tables), this.host.currentPage, { id: page.key, table: after, name: this.nameOf(after) }, this.elsewhere());
+    const tables = pageTables(this.cells, () => this.named(page.tables), this.host.currentPage, { key: page.key, table: after, name: this.nameOf(after) }, this.elsewhere());
     const names = { before: this.nameOf(before), after: this.nameOf(after) };
     let edited = formulasAfterEdit(before, after, { ...edit, tables, cells: this.cells, names });
     // Formulas it holds besides its cells' (a choice list's) follow its own edit, as its cells' do
@@ -506,7 +506,7 @@ export class Formulas implements Feature {
     const followedAt = new Map(affectedTables.map((t) => [t.key, t.followed]));
     // Deleted (no `after`): the page without it, so what refers to it is #REF!
     const tables = page.tables.filter((t) => after || t.key !== page.key).map((t) => (followedAt.has(t.key) ? { key: t.key, model: followedAt.get(t.key)! } : t));
-    const now = pageTables(this.cells, () => this.named(tables), this.host.currentPage, after ? { id: page.key, table: after, name: this.nameOf(after) } : undefined, this.elsewhere());
+    const now = pageTables(this.cells, () => this.named(tables), this.host.currentPage, after ? { key: page.key, table: after, name: this.nameOf(after) } : undefined, this.elsewhere());
     const written: KeyedTable[] = [];
     for (const { key, table, followed } of affectedTables) {
       const recalculated = this.calculatedWritten(recalculate(followed, { cells: this.cells, tables: now, name: this.nameOf(followed) }), now);

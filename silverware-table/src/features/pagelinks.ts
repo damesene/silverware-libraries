@@ -54,7 +54,7 @@ export class PageLinks implements Feature {
   async prepareWrite(info: TableTarget): Promise<void> {
     const cells = this.cells();
     if (!cells) return;
-    const tables = this.host.pageTables().map((t) => ({ id: t.key, table: t.model, name: this.host.tableName(t.model) }));
+    const tables = this.host.pageTables().map((t) => ({ key: t.key, table: t.model, name: this.host.tableName(t.model) }));
     await this.load(tablesWritten(cells, tables, info.key), true);
   }
 
@@ -92,7 +92,7 @@ export class PageLinks implements Feature {
   private async load(tables: Iterable<Table>, fresh: boolean | ReadonlySet<string>, pages: readonly string[] = [], visited?: Set<string>): Promise<boolean> {
     // Read for formulas only (a pivot is calculated by them too)
     const cells = this.cells();
-    if (!this.host.pages || !cells) return false;
+    if (!this.host.readsOtherPages || !cells) return false;
     const queue = new Set<string>(pages);
     for (const table of tables) for (const page of referredPages(cells, table)) queue.add(page);
     const done = new Set<string>();

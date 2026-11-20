@@ -36,7 +36,7 @@ export const VIEW_CELLS: domain.FormulaCells = {
 };
 
 // A text's tables as the domain takes them: each told apart by where it starts (the module gives its key), named
-const named = (tables: readonly PageTable[]) => tables.map((t) => ({ id: String(t.range.from), table: t.table, name: metaName(t.table) }));
+const named = (tables: readonly PageTable[]) => tables.map((t) => ({ key: String(t.range.from), table: t.table, name: metaName(t.table) }));
 
 /** Other pages' tables as the tests have them, by page (null: no such page; undefined: not read) */
 type OtherPages = { readonly tables: (page: string) => readonly PageTable[] | null | undefined };
@@ -76,7 +76,7 @@ export const pageTables = (
   others?: OtherPages,
   spaceSource?: (name: string) => Table | null | undefined,
 ) =>
-  page.pageTables(CELLS, () => named(tables()), here, replace && { id: String(replace.from), table: replace.table, name: metaName(replace.table) }, {
+  page.pageTables(CELLS, () => named(tables()), here, replace && { key: String(replace.from), table: replace.table, name: metaName(replace.table) }, {
     ...(others && {
       pages: {
         tables: (name: string) => {

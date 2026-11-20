@@ -434,8 +434,6 @@ export type ToolbarButton = {
 /** A place in the page's text (the cursor's), as an offset */
 export type TextPosition = { readonly position: number };
 
-/** Another table of the page a write changes in the same edit, by its key: its table as it is now to the table as written */
-export type AlsoChanged = TableChange;
 
 export type WriteOptions = {
   // The cell to edit once the table is rendered again
@@ -454,7 +452,7 @@ export type WriteOptions = {
   readonly claims?: boolean;
   // Other tables changed in the same edit (a table alone put on the sheet another table joins; a sheet's tables
   // renamed with it)
-  readonly also?: readonly AlsoChanged[];
+  readonly also?: readonly TableChange[];
 };
 
 /**
@@ -644,8 +642,10 @@ export interface ModelHost {
    * text as last read): what a user's script is handed (custom menu entries)
    */
   tableData(info: TableInfo): TableData;
-  /** Other pages read, written and listed; undefined: none are read */
-  readonly pages: PageAccess | undefined;
+  /** Whether other pages are read (none where the platform reads no page but the open one): formulas and pivots referring to one */
+  readonly readsOtherPages: boolean;
+  /** Every page's name (none where the platform lists none): what a page is picked from */
+  pageNames(): Promise<readonly string[]>;
   /** A setting by its path, `fallback` where it has none: a module's own of an open form (Excel's functions), not in SETTINGS */
   configured(path: string, fallback: unknown): Promise<unknown>;
   /** Whether a node is in one of Silverware Table's floating controls (toolbar, grips, menus): one the core made */
@@ -669,7 +669,7 @@ export interface ModelHost {
    * table's, made before it is written (newTableKey), for what the caller
    * keeps for it meanwhile. No other table's key changes, wherever it goes.
    */
-  insertTable(table: Table, after?: TableTarget | TextPosition, also?: AlsoChanged, key?: TableKey): Promise<WriteResult>;
+  insertTable(table: Table, after?: TableTarget | TextPosition, also?: TableChange, key?: TableKey): Promise<WriteResult>;
   /**
    * Deletes a table from the page in one edit, as Delete table in its ⋯ menu
    * does; `unasked`: no question, unless something goes with it (formulas
@@ -964,15 +964,6 @@ export interface ModelHost {
   /** A view change that may change the sorting, which the metadata setting also stores */
   setSort(info: TableInfo, view: ViewState): void;
 }
-
-/** Other pages as text (ModelHost.pages), until the store reads other documents */
-export type PageAccess = {
-  read(name: string): Promise<string>;
-  /** A page's text written whole (failing where the platform writes no page) */
-  write(name: string, text: string): Promise<void>;
-  /** Every page's name (none where the platform lists none) */
-  list(): Promise<readonly string[]>;
-};
 
 /** What the core offers the adapter's modules (src/core/silverbullet/modules/): the model host and the rendering */
 export interface TableHost extends ModelHost {

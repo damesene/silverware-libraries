@@ -105,7 +105,7 @@ export class Pivot implements Feature {
 
   /** Why another page cannot be read for a pivot, if so */
   private unreadable(): string | undefined {
-    if (!this.host.offered<PageLinksOffer>("pageLinks") || !this.host.pages) return "its source is on another page, which the pageLinks module reads: it is off";
+    if (!this.host.offered<PageLinksOffer>("pageLinks") || !this.host.readsOtherPages) return "its source is on another page, which the pageLinks module reads: it is off";
     return undefined;
   }
 
@@ -394,7 +394,7 @@ export class Pivot implements Feature {
   private async pageSources(page: string): Promise<readonly { name: string; columns: string[] }[] | string> {
     if (page === this.host.currentPage) return this.sources();
     const offer = this.host.offered<PageLinksOffer>("pageLinks");
-    if (!offer || !this.host.pages || !this.cells()) return "Other pages are read by the pageLinks module, which is off";
+    if (!offer || !this.host.readsOtherPages || !this.cells()) return "Other pages are read by the pageLinks module, which is off";
     await offer.readPages([page], false);
     const tables = this.host.otherPages()?.tables(page);
     if (tables === null) return `There is no page ${page}`;
@@ -412,7 +412,6 @@ export class Pivot implements Feature {
 
   /** The dialog: a pivot's fields picked, its preview calculated from the source as the page has it */
   private dialog(sources: ReturnType<Pivot["sources"]>, fields: Fields, submitLabel: string, submit: (definition: PivotDefinition) => void, blocked?: string): void {
-    const { pages } = this.host;
     // Without the formulas module nothing is calculated: the dialog says so first, and inserts or saves nothing
     const off = this.cells() ? undefined : FORMULAS_OFF;
     openPivotDialog(this.host, {
@@ -425,7 +424,7 @@ export class Pivot implements Feature {
       ...(off || blocked ? { blocked: off ?? blocked } : {}),
       preview: (definition) => this.calculate(definition, this.sourceFor(definition, sources)),
       readPage: (page) => this.pageSources(page),
-      ...(pages ? { pages: async () => (await pages.list()).filter((page) => page !== this.host.currentPage) } : {}),
+      ...(this.host.readsOtherPages ? { pages: async () => (await this.host.pageNames()).filter((page) => page !== this.host.currentPage) } : {}),
     });
   }
 

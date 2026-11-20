@@ -9,8 +9,8 @@ import type { NamedCell, TableSource } from "./evaluate.ts";
 import type { FormulaChoice } from "./help.ts";
 import { referredTableNames } from "./references.ts";
 
-/** A table of a page with its name (undefined: none), as the formulas module gives it: `id` tells it apart (its key) */
-export type NamedPageTable = { readonly id: string; readonly table: Table; readonly name: string | undefined };
+/** A table of a page with its name (undefined: none), as the formulas module gives it: `key` tells it apart */
+export type NamedPageTable = { readonly key: string; readonly table: Table; readonly name: string | undefined };
 
 /** The other pages read, their tables with their names (null: no such page; undefined: not read) */
 export type NamedOtherPages = { readonly tables: (page: string) => readonly NamedPageTable[] | null | undefined };
@@ -35,7 +35,7 @@ export function pageTables(
   cells: FormulaCells,
   tables: () => readonly NamedPageTable[],
   here: string,
-  replace?: { readonly id: string; readonly table: Table; readonly name: string | undefined },
+  replace?: { readonly key: string; readonly table: Table; readonly name: string | undefined },
   elsewhere?: Elsewhere,
 ): TableSource {
   const others = elsewhere?.pages;
@@ -49,7 +49,7 @@ export function pageTables(
       if (!list) return undefined;
       names = { tables: new Map(), cells: new Map() };
       for (const given of list) {
-        const { table, name: tableName } = isHere && replace && given.id === replace.id ? replace : given;
+        const { table, name: tableName } = isHere && replace && given.key === replace.key ? replace : given;
         const own = tableName?.toLowerCase();
         if (own && !names.tables.has(own)) names.tables.set(own, table);
         for (const [name, cell] of cellsByName(cells, table)) {
@@ -132,12 +132,12 @@ export function isAffected(referred: Affected, affected: Affected): boolean {
 }
 
 /**
- * The tables a write of the table `id` recalculates: that table, and the
+ * The tables a write of the table `key` recalculates: that table, and the
  * tables that refer to it by name, or in turn to those. All of the page's when
  * the table is not found.
  */
-export function tablesWritten(cells: FormulaCells, all: readonly NamedPageTable[], id: string): Table[] {
-  const found = all.find((t) => t.id === id);
+export function tablesWritten(cells: FormulaCells, all: readonly NamedPageTable[], key: string): Table[] {
+  const found = all.find((t) => t.key === key);
   if (!found) return all.map((t) => t.table);
   const own = found.table;
   const result = [own];

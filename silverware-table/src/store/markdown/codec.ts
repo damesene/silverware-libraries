@@ -94,8 +94,10 @@ export function decode(table: Table): TableModel {
     const hashtags = headerHashtags(text);
     let attributes = merged(attributesOf(tags), byColumn[c] ?? NO_ATTRIBUTES);
     if (hashtags.length) attributes = merged(attributes, new Map([[CORE, new Map([[HASHTAGS_KEY, hashtags.join(" ")]])]]));
-    // (The column's attributes as read, its header's tags among them: what a change of one is written into)
-    if (attributes !== NO_ATTRIBUTES) tagsRead.set(attributes, { cell: raw, inTags: new Set(tags.keys()) });
+    // (The column's attributes as read, its header's tags among them: what a change of one is written into, its header
+    // as read with them; a set of its own where it has none, so a column changed is still told by what it was read as)
+    if (attributes === NO_ATTRIBUTES) attributes = new Map();
+    tagsRead.set(attributes, { cell: raw, inTags: new Set(tags.keys()) });
     const column: ModelColumn = { header: unescapeCell(withoutHashtags(text)), align, attributes };
     headers.set(column, raw);
     return column;
@@ -232,7 +234,7 @@ function metaOfColumnsGone(model: TableModel, base: Table): Record<string, strin
       break;
     }
   }
-  const gone = new Set(read.columns.flatMap((column, c) => (column.attributes === NO_ATTRIBUTES || reached.has(column.attributes) ? [] : [c])));
+  const gone = new Set(read.columns.flatMap((column, c) => (column.attributes.size === 0 || reached.has(column.attributes) ? [] : [c])));
   return Object.fromEntries(columnsAttributes(base, gone).map((name) => [name, base.meta![name]!]));
 }
 
@@ -245,7 +247,12 @@ export function encode(model: TableModel, base: Table): Table {
     const read = headers.get(column);
     if (read !== undefined) return read;
     const hashtags = attributeIn(column.attributes, CORE, HASHTAGS_KEY);
-    return cellMarkdown(headerText(column), column.attributes, inHeader, (cell) => withHashtags(cell, hashtags ? hashtags.split(" ") : []));
+    const edited = (cell: string) => withHashtags(cell, hashtags ? hashtags.split(" ") : []);
+    // Its text as read where its header's text is the same (its hashtags where they are written, its spaces): only an
+    // attribute of it changed, or its hashtags (put at its end)
+    const asRead = changesSinceRead(column.attributes).read?.cell;
+    const sameText = asRead !== undefined && unescapeCell(withoutHashtags(withoutTags(asRead))) === column.header;
+    return cellMarkdown(sameText ? unescapeCell(withoutTags(edited(asRead))) : headerText(column), column.attributes, inHeader, edited);
   });
   // The rest of a column's attributes: the metadata row's (its own name and its hashtags are its header's)
   const byColumn = model.columns.map((column): Attributes => {

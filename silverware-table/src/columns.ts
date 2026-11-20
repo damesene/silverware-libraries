@@ -33,7 +33,7 @@ export const HASHTAGS_KEY = "hashtags";
 /** A column's header as it is written: its text with its hashtags */
 export function headerText(column: ModelColumn): string {
   const hashtags = attributeIn(column.attributes, CORE, HASHTAGS_KEY);
-  return hashtags ? `${column.header} ${hashtags}` : column.header;
+  return hashtags && column.header ? `${column.header} ${hashtags}` : (hashtags ?? column.header);
 }
 
 /** A column's header as a cell: its text as written (its hashtags with it), the column's attributes (what a header's editor edits) */

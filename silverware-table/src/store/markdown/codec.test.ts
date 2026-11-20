@@ -10,7 +10,7 @@ import { withCellNameIn, withColumnNameIn, withRowNameIn } from "../../names.ts"
 import { reorderRows, setCell } from "../../ops.ts";
 import { cellTags } from "../../tags.ts";
 import { withTagValue } from "../../tagvalues.ts";
-import { HASHTAGS_KEY } from "../../columns.ts";
+import { HASHTAGS_KEY, headerText } from "../../columns.ts";
 import { decode, decodeCell, encode, encodeCell } from "./codec.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -137,6 +137,14 @@ describe("the markdown codec", () => {
       const named = { ...read, attributes: withAttributeIn(read.attributes, "core", "name", "u") };
       expect(md(encode(named, plain))).toBe(md(withMetaValue(plain, "core", "name", "u")));
       expect(metaValue(encode(named, plain), "core", "name")).toBe("u");
+    });
+
+    it("a column's attribute in the metadata row, its header as written: hashtags first, spaces, none at all", () => {
+      const plain = parseTable("| #euro Price | Unit  price | #stars | Qty |\n|---|---|---|---|\n| 1 | 2 | 3 | 4 |");
+      const read = decode(plain);
+      const sized = { ...read, columns: read.columns.map((c) => ({ ...c, attributes: withAttributeIn(c.attributes, "widths", "size", "10") })) };
+      expect(md(encode(sized, plain)).split("\n")[0]).toBe("| #euro Price | Unit  price | #stars | Qty |");
+      expect(read.columns.map(headerText)).toEqual(["Price #euro", "Unit price", "#stars", "Qty"]);
     });
 
     it("rows moved, each as it was written; a header renamed, its column's attributes with it", () => {

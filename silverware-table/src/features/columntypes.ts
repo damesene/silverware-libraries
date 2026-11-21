@@ -9,7 +9,7 @@ import { type CellEditor, type CellLook, type CellRef, type Feature, HEADER_ICON
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget, StoredTable } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
 import type { MenuDetail, MenuEntry } from "../menu.ts";
-import type { ModelCell, TableModel } from "../model/model.ts";
+import type { ModelCell, TableModel } from "../../../shared/table/model.ts";
 import {
   type Choice,
   type ColumnType,
@@ -30,8 +30,9 @@ import {
   type TypeTable,
   withColumnType,
 } from "../columntypes/index.ts";
-import { FormulaError, formulaSources, formulaTableNames, type FormulasOffer, type HeldFormulas, type HeldFormulasOffer } from "../formulas/index.ts";
-import { sameTableName } from "../namerules.ts";
+import { FormulaError, formulaSources, formulaTableNames, type HeldFormulas } from "../../../shared/formulas/index.ts";
+import { type FormulasOffer, type HeldFormulasOffer } from "../formulas/offers.ts";
+import { sameTableName } from "../../../shared/table/namerules.ts";
 import { ChoicesDialog } from "./choicesdialog.ts";
 
 /** A type's icon, or a tag for a type without one */
@@ -150,7 +151,7 @@ export class ColumnTypes implements Feature {
    * (its leading "="), calculated by the formulas module on the page shown; undefined values where it gives none, with why
    */
   private listOf(table: TableModel, name: string, stored = this.host.attributes(table)): ListRead {
-    const page = this.host.pageTables();
+    const page = this.host.documentTables();
     if (this.lists?.page !== page) this.lists = { page, byTable: new WeakMap() };
     let read = this.lists.byTable.get(table);
     if (!read) this.lists.byTable.set(table, (read = new Map()));

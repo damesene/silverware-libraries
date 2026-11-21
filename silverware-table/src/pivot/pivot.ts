@@ -6,9 +6,10 @@
 // The rows are read as they show (a formula cell by its result), so a group's
 // own formulas are not calculated again in it.
 import type { Calculated, CalculatedColumn } from "../calculated/index.ts";
-import { columnKey, columnName, headerText } from "../columns.ts";
-import { type Calculation, isErrorText, rowValues, type Scalar, scalarText, tableValue } from "../formulas/index.ts";
-import type { TableModel } from "../model/model.ts";
+import { columnKey, columnName } from "../../../shared/table/columns.ts";
+import { headerText } from "../columns.ts";
+import { type Calculation, isErrorText, rowValues, type Scalar, scalarText, tableValue } from "../../../shared/formulas/index.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import { compareValues } from "../../../shared/compare.ts";
 import { groupFormula, type PivotDefinition, valueParts } from "./definition.ts";
 

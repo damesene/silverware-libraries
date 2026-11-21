@@ -12,8 +12,8 @@
 // browser asks whether to leave.
 import { type CellEditor, type Feature, type HeldEdit, type ModelHost, type PartTable, type PendingEdits, type TableInfo, type TableKey, type TableLooks, tablePartsOf, type ToolbarButton } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
-import { sameCell, type TableModel } from "../model/model.ts";
-import { withCellAt } from "../model/ops.ts";
+import { sameCell, type TableModel } from "../../../shared/table/model.ts";
+import { withCellAt } from "../../../shared/table/ops.ts";
 
 // After a navigation started, what is held waits this long at most for the page loaded
 const LEAVING_MS = 5000;
@@ -101,7 +101,7 @@ class LazyTable {
 
   holdCellEdit(info: TableInfo, edit: HeldEdit): boolean {
     if (!this.on) return false;
-    const held = this.held ?? { page: this.host.currentPage, key: info.key, edits: new Map() };
+    const held = this.held ?? { page: this.host.currentDocument, key: info.key, edits: new Map() };
     const id = cellId(edit);
     // What a write checks is the cell as written: the original of the first edit held
     const original = held.edits.get(id)?.original ?? edit.original;
@@ -178,7 +178,7 @@ class LazyTable {
     const held = this.held;
     if (!held?.edits.size) return false;
     if (this.module.leaving()) return false;
-    if ((await this.host.pageNameNow()) !== held.page) {
+    if ((await this.host.documentNameNow()) !== held.page) {
       await this.flushToPage(held);
       return false;
     }

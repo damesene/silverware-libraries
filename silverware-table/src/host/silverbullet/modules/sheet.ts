@@ -28,17 +28,18 @@
 // sheet's addresses (addressFrame): a reference is to a record, so sorting a
 // table changes the address shown, not the value.
 import { nameEmptyHeaders } from "../../../columns.ts";
-import type { TableModel } from "../../../model/model.ts";
+import type { TableModel } from "../../../../../shared/table/model.ts";
 import { CELL_MENU_ORDER, type AdapterFeature, type AddressFrame, type TableChange, type CellArea, type CellEditor, type CellMenuGroup, type CellRef, type RenderedEditor, type TableHost, type TableInfo, type TableTarget, type ToolbarButton, type WidgetInfo, type WriteResult } from "../../../core/feature.ts";
 import { oncePerFrame } from "../../../core/frame.ts";
 import { claimWindow, releaseWindow } from "../../../core/overwindow.ts";
 import { DRAWN_CLASS, STAND_IN_CLASS, UI_CLASS } from "../../../dom.ts";
 import { el } from "../../../../../shared/elements.ts";
 import { markOverWindow } from "../../../../../shared/overwindow.ts";
-import { columnLetters, isFormulaInput } from "../../../formulas/index.ts";
+import { columnLetters, isFormulaInput } from "../../../../../shared/formulas/index.ts";
 import { ICONS } from "../../../icons.ts";
 import { escapeCell, findTables, pageTablesOf, parseTable, type TableRange } from "../../../markdown.ts";
-import { sameTableName } from "../../../namerules.ts";
+import { decode } from "../../../store/markdown/codec.ts";
+import { sameTableName } from "../../../../../shared/table/namerules.ts";
 import { AT_KEY, formatAt, freeNameOf, freeSheetName, SHEET_KEY, WIDTH_PREFIX, sameSheet, type SheetCell, canPlace, sheetDataTable, type SheetPlace, validateSheetName, sheetOfTable, sheetsOf, sheetTablesOf, sheetWidths } from "../../../sheet/page.ts";
 import { parseClipboardCells } from "../../../paste.ts";
 import { validatePlace, roomFor } from "../../../sheet/layout.ts";
@@ -166,12 +167,12 @@ export class Sheet implements AdapterFeature {
 
   /** The tables of a page's text that are on a sheet, in the page's order, with where each is in the text */
   private sheetTablesIn(text: string): SheetTable[] {
-    return sheetTablesOf(this.host, pageTablesOf(text).map((t) => ({ range: t.range, table: this.host.asModel(t.table) })));
+    return sheetTablesOf(this.host, pageTablesOf(text).map((t) => ({ range: t.range, table: decode(t.table) })));
   }
 
   /** A table of the page's text (a range's, or one made) read into the model */
   private modelOf(markdown: string): TableModel {
-    return this.host.asModel(parseTable(markdown));
+    return decode(parseTable(markdown));
   }
 
   /** A name no table of a page's text has (nor one of `taken`): table1, table2, … */
@@ -729,12 +730,12 @@ export class Sheet implements AdapterFeature {
 
   /** The open page's text as last read (its tables shown, written) */
   private textRead(): string {
-    return this.store.lastText(this.host.currentPage) ?? "";
+    return this.store.lastText(this.host.currentDocument) ?? "";
   }
 
   /** The keys of the open page's tables in a text of it, in order */
   private keysOf(text: string): readonly TableKey[] {
-    return this.store.keysOf(this.host.currentPage, text);
+    return this.store.keysOf(this.host.currentDocument, text);
   }
 
   /** Every write: what it wrote is read again (a table far in the page has no rendering of SilverBullet's to follow) */

@@ -29,7 +29,7 @@
 // the table moving as it gets narrower, cannot feed back into them. The widths
 // are the module's (columnWidths); the core shows them, and the handles (a
 // handle layer per table, as every table's headers have them).
-import type { TableModel } from "../model/model.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import type { ColumnsMeasure, ColumnWidths, Feature, HandleLayer, LineMenuBuilder, LineMenuGroup, LineMenuTarget, ModelHost, PartTable, TableInfo, TableKey, TableRevision, ToolbarButton, WriteEdit } from "../core/feature.ts";
 import { tablePartsOf } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";

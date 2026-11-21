@@ -12,11 +12,12 @@
 // keep their values.
 import type { Feature, ModelHost, PageCommand, TableBadge, TableInfo, ToolbarButton } from "../core/feature.ts";
 import { type Calculated, calculatedTable, readRenames, renamedColumns, renamedIn, renamedViewIds, sameCells, storedRenames, viewCalculated } from "../calculated/index.ts";
-import { type CalculatedBy, type CalculatedOffer, followFormula, FormulaError, type FormulasOffer, type Grid, referredTableNames, tokenize, viewGrid, withEquals } from "../formulas/index.ts";
+import { type CalculatedBy, followFormula, FormulaError, type Grid, referredTableNames, tokenize, viewGrid, withEquals } from "../../../shared/formulas/index.ts";
+import { type CalculatedOffer, type FormulasOffer } from "../formulas/offers.ts";
 import { ICONS } from "../icons.ts";
-import { EMPTY_TABLE } from "../model/ops.ts";
-import type { TableModel } from "../model/model.ts";
-import { freeTableName, sameTableName, validateTableName } from "../namerules.ts";
+import { EMPTY_TABLE } from "../../../shared/table/ops.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
+import { freeTableName, sameTableName, validateTableName } from "../../../shared/table/namerules.ts";
 import { openViewDialog } from "./viewdialog.ts";
 
 // What the dialog says first while the formulas module, which calculates views, is off
@@ -183,7 +184,7 @@ export class Views implements Feature {
   private validateName(name: string, own?: TableModel): string | undefined {
     const problem = validateTableName(name);
     if (problem) return problem;
-    const taken = this.host.pageTables().some(({ model }) => {
+    const taken = this.host.documentTables().some(({ model }) => {
       const other = this.host.tableName(model);
       return !!other && sameTableName(other, name) && !(own && sameTableName(this.host.tableName(own) ?? "", name));
     });
@@ -192,7 +193,7 @@ export class Views implements Feature {
 
   /** A name for a new table not taken on the page: view1, view2… (table1… for a source) */
   private freeName(prefix: string): string {
-    return freeTableName(prefix, this.host.pageTables().map((t) => this.host.tableName(t.model)));
+    return freeTableName(prefix, this.host.documentTables().map((t) => this.host.tableName(t.model)));
   }
 
   /** Why no view can be inserted or saved (its metadata not stored, the formulas off), if so */
@@ -243,7 +244,7 @@ export class Views implements Feature {
   /** Insert view at the cursor: the page's first named table's body to start from, else an empty formula */
   private insertAtCursor(): void {
     const first = this.host
-      .pageTables()
+      .documentTables()
       .map(({ model }) => this.host.tableName(model)?.trim())
       .find((name): name is string => !!name);
     const preview = (formula: string) => this.result(formula);

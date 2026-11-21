@@ -1,6 +1,6 @@
 // What a name may be (of a table, a column, a row, a cell), and when two
-// table names are the same: rules, not data a table keeps, so any part of
-// Silverware Table may use them.
+// table names are the same: rules, not data a table keeps, so anything naming
+// tables may use them.
 
 // A cell's A1 name in formulas: column letters, then the row from 1
 export const CELL_RE = /^([A-Za-z]{1,3})([1-9]\d*)$/;

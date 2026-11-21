@@ -11,17 +11,17 @@ import { Controller } from "../../controller.ts";
 import { customTypes } from "../../columntypes/custom.ts";
 import { customTypesAnew, defineCustomTypes } from "../../columntypes/registry.ts";
 import { checkedConditions, checkedFormats, customDefinitionsAnew, defineCustomConditions, defineCustomFormats } from "../../conditions/index.ts";
-import { customFunctions } from "../../formulas/custom.ts";
-import { cellResult, choiceText, type FormulasOffer, functionNamed, givesList, scalarText, withEquals } from "../../formulas/index.ts";
-import type { KeyedModel } from "../../model/model.ts";
+import { customFunctions } from "../../../../shared/formulas/custom.ts";
+import { cellResult, choiceText, functionNamed, givesList, scalarText, withEquals } from "../../../../shared/formulas/index.ts";
+import { type FormulasOffer } from "../../formulas/offers.ts";
+import type { KeyedModel } from "../../../../shared/table/model.ts";
 import { defineFormulaPlaces as defineFormulaPlacesIn, type FormulaPlaces } from "../../store/markdown/pageformulas.ts";
-import { isError, isRange, type Scalar, single, TimeValue, type Value } from "../../formulas/values.ts";
-import { customFunctionsAnew, defineCustomFunctions } from "../../formulas/registry.ts";
+import { isError, isRange, type Scalar, single, TimeValue, type Value } from "../../../../shared/formulas/values.ts";
+import { customFunctionsAnew, defineCustomFunctions } from "../../../../shared/formulas/registry.ts";
 import { addWriteListener, type WriteListener, writeListenersAnew } from "../../store/markdown/writelisteners.ts";
 import { cellSourceOffset, findTables, pageTablesOf } from "../../markdown.ts";
-import { decodeCell } from "../../store/markdown/codec.ts";
+import { decode, decodeCell } from "../../store/markdown/codec.ts";
 import { metaName } from "../../meta.ts";
-import { nameOf } from "../../names.ts";
 import { type TableData, tableData } from "../../tabledata.ts";
 import { customMenuEntries, customMenuEntriesAnew, defineCustomMenuEntries } from "../../menus/custom.ts";
 import { LuaSources } from "./sources.ts";
@@ -98,7 +98,7 @@ const FORMULAS_OFF: EvaluatedError = { code: "#N/A", detail: "formulas are off" 
  * text it is given to the page's keys, and Lua's may be another page's for a
  * moment, the editor's text still the old page's as another opens)
  */
-function modelsOfText(controller: Controller, text: string, page = controller.currentPage): readonly KeyedModel[] {
+function modelsOfText(controller: Controller, text: string, page = controller.currentDocument): readonly KeyedModel[] {
   return tablesIn(new TableRegister(), page, text);
 }
 
@@ -299,7 +299,10 @@ export type TableOfText = TableData;
  * cells: what another plugin reads tables by, without reading their metadata
  */
 export function tables(text: string): TableOfText[] {
-  return pageTablesOf(String(text)).map(({ range, table }) => tableData(table, range, metaName(table), (column) => nameOf(table.rows[0]?.cells[column] ?? "")));
+  return pageTablesOf(String(text)).map(({ range, table }) => {
+    const model = decode(table);
+    return tableData(model, range, metaName(model));
+  });
 }
 
 /**

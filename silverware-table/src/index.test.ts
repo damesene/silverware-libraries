@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { completions, defineFormulaPlaces, evaluated, evaluatedText, formulaErrorsIn, formulaErrorsTextIn, formulaPagesIn, luaCallPlaces, onWrite, resetDefinitions, tables } from "./index.ts";
 import { buttonLabel, cell, clickOn, controller, editor, edits, flashes, flush, key, menuButtons, nameInMenu, setup, text, toolbarName, useTablePage } from "./testing/page.ts";
-import { deleteRow } from "./model/ops.ts";
+import { deleteRow } from "../../shared/table/ops.ts";
 
 describe("silverware.table.evaluate: a formula calculated on the page shown", () => {
   useTablePage();
@@ -202,6 +202,18 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
       });
       expect(plain).toMatchObject({ columns: [{ name: "A", key: "a" }], rows: [["x"]] });
       expect(plain).not.toHaveProperty("name");
+    });
+
+    it("gives the cells by the columns (none past the header), a column's name as the table names it (its spaces one)", () => {
+      const [table] = tables("| Unit  price #euro | Qty |\n|---|---|\n| 1 | 2 | 3 |\n| 4 |\n");
+      expect(table!.columns).toEqual([
+        { name: "Unit price", key: "unit_price" },
+        { name: "Qty", key: "qty" },
+      ]);
+      expect(table!.rows).toEqual([
+        ["1", "2"],
+        ["4", ""],
+      ]);
     });
 
     it("gives a formula's error as it shows, its # unescaped", () => {

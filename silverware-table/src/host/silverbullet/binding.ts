@@ -6,11 +6,9 @@
 import type { FeatureName } from "../../bridge.ts";
 import type { AdapterFeature, Feature, TableHost } from "../../core/feature.ts";
 import type { FeatureEntry, TableBinding } from "../../core/binding.ts";
-import { markTable, renderedMeta, SilverBulletAdapter } from "./adapter.ts";
+import { markTable, renderedModel, SilverBulletAdapter } from "./adapter.ts";
 import { tablesLayoutProvider } from "./layoutprovider.ts";
-import { type Table, tableMetaOf, type TableMeta } from "../../markdown.ts";
-import { decode } from "../../store/markdown/codec.ts";
-import { MarkdownStore } from "../../store/markdown/store.ts";
+import { MarkdownStore, serializerOf } from "../../store/markdown/store.ts";
 import { AutoFill } from "../../features/autofill.ts";
 import { Autoscroll } from "./modules/autoscroll.ts";
 import { ColumnTypes } from "../../features/columntypes.ts";
@@ -49,7 +47,7 @@ import { Widths } from "../../features/widths.ts";
  * The features in the order they get events; `metadata` is the controller's own (Remove metadata, also a page
  * command), `sources` what the host gives the sources module
  */
-export function featureEntries(metadata: Feature, sources: SourceTables, store: MarkdownStore): readonly FeatureEntry[] {
+function featureEntries(metadata: Feature, sources: SourceTables, store: MarkdownStore): readonly FeatureEntry[] {
   const optional = (name: FeatureName, create: (host: TableHost) => AdapterFeature): FeatureEntry => ({ name, create });
   const always = (create: (host: TableHost) => AdapterFeature): FeatureEntry => ({ name: undefined, create });
   return [
@@ -105,14 +103,9 @@ export function featureEntries(metadata: Feature, sources: SourceTables, store: 
 /** Silverware Table bound to SilverBullet: what the Space Lua API's `init` (api.ts) hands the controller */
 export const silverBulletBinding: TableBinding<MarkdownStore> = {
   // The tables kept as markdown in pages, read through the platform as it is now (a new one comes with Space Lua loaded again)
-  store: (context) => new MarkdownStore(context.platform, context.register, context.serializer, context.beforeWrite),
+  store: (context) => new MarkdownStore(context.platform, context.register, () => serializerOf(context.setting), context.beforeWrite),
   adapter: (doc, rows, context, store) => new SilverBulletAdapter(doc, rows, context, store),
   features: featureEntries,
-  markRendered: (widget, rows, look) => markTable(widget, look(decode(metadataOnly(renderedMeta(rows))))),
+  markRendered: (widget, rows, look) => markTable(widget, look(renderedModel(rows))),
   layoutProvider: tablesLayoutProvider,
 };
-
-/** A table of its metadata only (read from a rendering, before the table is): what features read of it as a whole */
-function metadataOnly(meta: TableMeta | undefined): Table {
-  return { indent: "", align: [], rows: [], padded: false, ...(meta ? tableMetaOf(meta) : {}) };
-}

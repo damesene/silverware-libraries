@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { insertRowWith } from "../core/structure.ts";
-import { NO_ATTRIBUTES } from "../model/model.ts";
-import { insertRow, withContentAt } from "../model/ops.ts";
+import { NO_ATTRIBUTES } from "../../../shared/table/model.ts";
+import { insertRow, withContentAt } from "../../../shared/table/ops.ts";
 import { memorySources } from "../sources.ts";
 import { bridge, cell, cellMenuItem, clickOn, controller, cursorMoves, editor, flashes, flush, key, renderPage, setText, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 

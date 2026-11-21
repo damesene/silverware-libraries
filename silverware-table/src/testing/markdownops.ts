@@ -1,12 +1,13 @@
 // Structural edits of a markdown table (its rows the header's and the body's,
 // its cells markdown), for tests alone: tables made for a test, and what the
-// model's operations (model/ops.ts, which every write uses) are compared with,
+// model's operations (shared/table/ops.ts, which every write uses) are compared with,
 // as the markdown wrote them before the model (docs/silverware-table-store-plan.md,
 // step 6). Each returns a new table.
 import type { Align, Row, Table } from "../markdown.ts";
-import { findColumn, headsOf, matchColumns } from "../columns.ts";
+import { findColumn, matchColumns } from "../../../shared/table/columns.ts";
+import { headsOf } from "../columns.ts";
 import { columnAttributeName, parseColumnAttribute } from "../meta.ts";
-export { columnAfterMove, type IndexMap, lineAfterBlockMove } from "../model/ops.ts";
+export { columnAfterMove, type IndexMap, lineAfterBlockMove } from "../../../shared/table/ops.ts";
 
 function withRows(table: Table, rows: readonly Row[]): Table {
   return { ...table, rows };

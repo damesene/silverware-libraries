@@ -3,10 +3,11 @@
 // ones of no column, padding, an indent, columns of one name), random edits made both ways, the markdown written
 // compared. A difference is a bug or a change made on purpose (listed where the edits are made, left out).
 import { describe, expect, it } from "vitest";
-import { type ColumnId, columnKey, findColumn, headsOf } from "../../columns.ts";
+import { type ColumnId, columnKey, findColumn } from "../../../../shared/table/columns.ts";
+import { headsOf } from "../../columns.ts";
 import { escapeCell, parseTable, serializeTable, type Table } from "../../markdown.ts";
-import * as model from "../../model/ops.ts";
-import type { Align, TableModel } from "../../model/model.ts";
+import * as model from "../../../../shared/table/ops.ts";
+import type { Align, TableModel } from "../../../../shared/table/model.ts";
 import { columnsMetaOf, parseColumnAttribute } from "../../meta.ts";
 import { cellTags, withoutTags } from "../../tags.ts";
 import * as old from "../../testing/markdownops.ts";

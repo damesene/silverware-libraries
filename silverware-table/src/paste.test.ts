@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseTable, serializeTable } from "./markdown.ts";
-import { cellWrittenOver } from "./model/rules.ts";
+import { cellWrittenOver } from "../../shared/table/rules.ts";
 import { moveCells, parseClipboardCells, pasteCells, planPaste } from "./paste.ts";
 import { decode, encode } from "./store/markdown/codec.ts";
 import { CELLS } from "./testing/formulas.ts";

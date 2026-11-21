@@ -129,7 +129,7 @@ export class Metadata implements Feature {
   /** Removes the metadata of all tables on the current page, once confirmed */
   async removeFromPage(): Promise<void> {
     const { host } = this;
-    const page = await host.pageNameNow();
+    const page = await host.documentNameNow();
     // The page's tables as read now, those that store some
     const tables = ((await host.tables(page)) ?? []).map((t) => ({ key: t.key, stored: host.storedMetadata(t.model, "all") })).filter((t) => t.stored.any);
     if (tables.length === 0) {

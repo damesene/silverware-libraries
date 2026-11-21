@@ -23,7 +23,8 @@ import type { ExcelTemplates } from "../excel/functions.ts";
 import { excelValue } from "../excel/values.ts";
 import { columnWidth, excelColumnNames, excelTableName, xlsxFile, type XlsxCell } from "../excel/xlsx.ts";
 import { currentTable, type ExportedTable, exportedTable } from "../export/table.ts";
-import { type FormulasOffer, totalRows } from "../formulas/index.ts";
+import { type FormulasOffer } from "../formulas/offers.ts";
+import { totalRows } from "../../../shared/formulas/index.ts";
 import { ICONS } from "../icons.ts";
 
 const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -341,7 +342,7 @@ export class Excel implements Feature {
         return { value, formula };
       });
     }
-    const page = await this.host.pageNameNow();
+    const page = await this.host.documentNameNow();
     const name = this.host.tableName(model) ?? page.split("/").pop() ?? "Table";
     const widths = columns.map((h, c) => columnWidth([h, ...exported.rows.map((r) => r.values[c] ?? "")]));
     // A calculated column: the same formula in every row but the totals row, in Excel's form too

@@ -1,7 +1,7 @@
 // A cell as definitions get it (its value read once), and the statistics of
 // the cells a definition applies to (Scope), each computed only when asked.
 import type { Cell, Scope } from "./api.ts";
-import { parseDate } from "../formulas/dates.ts";
+import { parseDate } from "../../../shared/formulas/dates.ts";
 import { asNumber, normalizeForFilter } from "../../../shared/filter.ts";
 
 /** A cell from what it shows and what sorting compares (a column type's value, else the text) */

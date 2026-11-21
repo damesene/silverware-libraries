@@ -8,8 +8,8 @@ import type { ModelHost, WriteEdit } from "../core/feature.ts";
 import { ownMeta } from "../core/metaaccess.ts";
 import { TableRegister } from "../core/tables.ts";
 import { metaName } from "../meta.ts";
-import type { TableModel } from "../model/model.ts";
-import { insertRow } from "../model/ops.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
+import { insertRow } from "../../../shared/table/ops.ts";
 import { AT_KEY, SHEET_KEY } from "../sheet/page.ts";
 import { table } from "../store/contract.ts";
 import { MemoryStore } from "../store/memory.ts";
@@ -31,7 +31,7 @@ describe("the sheet module over the memory store", () => {
     // Three rows more: from A1 down to A5 now, over the table at A4
     const grown = [1, 2, 3].reduce((t, at) => insertRow(t, at), costs!.model);
     const tables = [costs!, cities!].map(({ key, model }) => ({ key, model }));
-    const edit = { page: { tables, read: tables, key: costs!.key, formulas: [] } } as unknown as WriteEdit;
+    const edit: WriteEdit = { tables, read: tables, key: costs!.key, formulas: [] };
     const module = new Sheets(host);
     expect(module.refusesWrite(costs!.model, grown, edit)).toBeUndefined();
     const others = module.otherTablesWritten(costs!.model, grown, edit);

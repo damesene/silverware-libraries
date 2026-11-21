@@ -1,6 +1,6 @@
 // Values formulas compute with, and the conversions formula functions use.
-import { formatLuaNumber } from "../format.ts";
-import { asNumber } from "../../../shared/filter.ts";
+import { formatLuaNumber } from "./format.ts";
+import { asNumber } from "../filter.ts";
 
 // #SPILL!: a cell's result of several values (a cell holds one); #CALC!: a result of no values (FILTER keeping nothing)
 export type ErrorCode = "#VALUE!" | "#DIV/0!" | "#REF!" | "#NAME?" | "#NUM!" | "#N/A" | "#CYCLE!" | "#ERROR!" | "#SPILL!" | "#CALC!";
@@ -160,8 +160,8 @@ export function single(value: Value): Scalar {
 }
 
 /**
- * One value as a number: an empty cell is 0, TRUE 1, and text a number as
- * Silverware Table reads it in cells (`12,99 €`, `1 000`, `15 %`)
+ * One value as a number: an empty cell is 0, TRUE 1, and text a number as a
+ * table's cell reads one (`12,99 €`, `1 000`, `15 %`: shared/filter.ts)
  */
 export function toNumber(value: Value): number | FormulaError {
   const v = single(value);

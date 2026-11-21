@@ -5,9 +5,10 @@
 // by what a calculated column is), its totals pinned, and whether the table
 // shown is as calculated now. Pure: the module that calculates the table reads
 // and writes its attributes through its host, and hands in the pins'.
-import { columnOfHeader, headerText, matchColumns, modelHeads, withHeaderOf } from "../columns.ts";
-import { resultContent } from "../formulas/index.ts";
-import { type ModelColumn, type ModelRow, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
+import { columnOfHeader, headerText, withHeaderOf } from "../columns.ts";
+import { matchColumns, modelHeads } from "../../../shared/table/columns.ts";
+import { resultContent } from "../../../shared/formulas/index.ts";
+import { type ModelColumn, type ModelRow, NO_ATTRIBUTES, type TableModel } from "../../../shared/table/model.ts";
 import type { Pins } from "../view.ts";
 
 /** A column of the result: what it stands for (kept through a refresh, its header named by the user), its header as made, its alignment */

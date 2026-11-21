@@ -10,7 +10,8 @@
 // now, a column's name now) is the contract, how the write keeps it is not,
 // so it can change without breaking a listener.
 import { listOf } from "../../bridge.ts";
-import { columnKey, columnName } from "../../columns.ts";
+import { columnKey, columnName } from "../../../../shared/table/columns.ts";
+import { markdownHeaderText } from "../../columns.ts";
 import { findTables, type Table } from "../../markdown.ts";
 import { metaName } from "../../meta.ts";
 import { nameOf } from "../../names.ts";
@@ -48,7 +49,7 @@ export type TableWritten = {
 /** A column's name as names are compared: its fixed name, else its header's */
 function nameOfColumn(table: Table, column: number): string {
   const header = table.rows[0]?.cells[column] ?? "";
-  return nameOf(header) ?? columnName(header);
+  return nameOf(header) ?? columnName(markdownHeaderText(header));
 }
 
 const same = (a: string | undefined, b: string | undefined) => (a ?? "").toLowerCase() === (b ?? "").toLowerCase();
@@ -61,7 +62,7 @@ export function writeContext(written: readonly TableWritten[], text: () => strin
     const went = (column: number) => (columnMap ? columnMap(column) : column < (after.rows[0]?.cells.length ?? 0) ? column : undefined);
     const columns = Array.from({ length: width }, (_, i) => {
       const now = went(i);
-      return { before: nameOfColumn(before, i), key: columnKey(before.rows[0]?.cells[i] ?? ""), after: now === undefined ? undefined : nameOfColumn(after, now) };
+      return { before: nameOfColumn(before, i), key: columnKey(markdownHeaderText(before.rows[0]?.cells[i] ?? "")), after: now === undefined ? undefined : nameOfColumn(after, now) };
     });
     const nameBefore = metaName(before);
     const nameAfter = metaName(after);

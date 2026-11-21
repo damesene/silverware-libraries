@@ -1,4 +1,4 @@
-import { DAY_SECONDS, formatClock, parseClock } from "../../formulas/values.ts";
+import { DAY_SECONDS, formatClock, parseClock } from "../../../../shared/formulas/values.ts";
 import { lineIcon } from "../../icons.ts";
 import { dateTimeFormat } from "../../../../shared/intl.ts";
 import { numberOf } from "../format.ts";

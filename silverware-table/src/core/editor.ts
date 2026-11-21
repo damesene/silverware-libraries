@@ -5,8 +5,8 @@
 // on in the popup. Features shape what it shows and saves (a formula) through
 // the editor hooks of core/feature.ts.
 import { headerCell, withHeaderText } from "../columns.ts";
-import { type ModelCell, NO_ATTRIBUTES, sameCell, type TableModel } from "../model/model.ts";
-import { columnAfterMove, EMPTY_CELL, moveColumn, moveRow, withCellAt } from "../model/ops.ts";
+import { type ModelCell, NO_ATTRIBUTES, sameCell, type TableModel } from "../../../shared/table/model.ts";
+import { columnAfterMove, EMPTY_CELL, moveColumn, moveRow, withCellAt } from "../../../shared/table/ops.ts";
 import { appendRowAt, clampColumnMove, clampRowMove } from "../pins.ts";
 import { OUT_OF_LINE_CLASS, UI_CLASS } from "../dom.ts";
 import { type AdapterFeature, type CellField, type CellRef, type FocusTarget, PAGE_ROWS, type RenderedEditor, type TableHost, type WidgetInfo, type WriteResult } from "./feature.ts";

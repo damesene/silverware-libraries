@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { STICKY_GAP } from "./core/layout.ts";
 import { bridge, PAGE, bodyTexts, cell, clickOn, controller, cursorMoves, editor, edits, flashes, flush, inInsertBand, key, pointInsert, press, renderPage, setText, setup, tableMenuItem, text, toolbarName, useTablePage, tableKey } from "./testing/page.ts";
 import { insertRowWith, pinRowAt } from "./core/structure.ts";
-import { moveColumn } from "./model/ops.ts";
+import { moveColumn } from "../../shared/table/ops.ts";
 
 describe("Controller", () => {
   useTablePage();

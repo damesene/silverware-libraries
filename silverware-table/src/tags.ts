@@ -2,7 +2,7 @@
 // not show (verified) and other renderers drop. Modules keep their data in
 // them (formulas: `f`; names: `n`, `cn`), read into a cell's attributes by the
 // markdown codec, which writes them back (store/markdown/codec.ts); what an
-// edit keeps of them is the model's rules (model/rules.ts).
+// edit keeps of them is the model's rules (shared/table/rules.ts).
 
 /**
  * What a hidden tag holds between "<meta" and its ">": anything but ">". A tag

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Editor, Space } from "../platform.ts";
-import { type PageBuilder, pageChanges } from "./changes.ts";
+import { type PageBuilder, type PageSections, pageChanges } from "./changes.ts";
 import { diffLines, minimalEdit } from "./diff.ts";
 import { PageHistory } from "./history.ts";
-import { type Part, PARTS } from "./parts.ts";
+import { builtInParts, type Part } from "./parts.ts";
 import { readGrids } from "../markdown/grid.ts";
 import { pageWriter } from "./writer.ts";
 
@@ -86,6 +86,34 @@ describe("the page writer", () => {
     opened.openPage("B");
     expect((await opened.writer.apply(read)).skipped.map((one) => one.cause)).toEqual(["changed"]);
     expect(opened.map.get("B")).toBe("x #a");
+  });
+
+  it("plans the open page anew as it plans a page: asks leaveAlone of it as it is now, writes nothing where it is already as its changes make it", async () => {
+    const { map, edits, writer } = memory({ A: "one #a two" }, "A");
+    const changes = pageChanges().page("A", (p) => p.tags.rename("a", "c")).build();
+    // Already as its changes make it: reported with no change, nothing written
+    const plan = await writer.plan(changes, { replanOpenPage: true });
+    map.set("A", "zero one #c two");
+    const report = await writer.apply(plan);
+    expect(report.written.map((one) => one.changes)).toEqual([0]);
+    expect(edits).toEqual([]);
+    expect(map.get("A")).toBe("zero one #c two");
+    // A page the plan leaves alone once it reads so: asked again of the text now
+    map.set("A", "one #a two");
+    const asked: string[] = [];
+    const guarded = await writer.plan(changes, {
+      replanOpenPage: true,
+      leaveAlone: (page) => {
+        const tags = page.tagUses().map((use) => use.name);
+        asked.push(tags.join(","));
+        return tags.includes("locked") ? "locked" : undefined;
+      },
+    });
+    map.set("A", "#locked one #a two");
+    const left = await writer.apply(guarded);
+    expect(left.skipped.map((one) => [one.cause, one.reason])).toEqual([["refused", "locked"]]);
+    expect(asked).toEqual(["a", "locked,a"]);
+    expect(map.get("A")).toBe("#locked one #a two");
   });
 
   it("writes the page open through the editor, in one edit", async () => {
@@ -564,8 +592,8 @@ describe("the page writer", () => {
 });
 
 describe("the builder", () => {
-  it("has every section the parts make, each a part of its own", () => {
-    const sections = PARTS.flatMap((one) => (one.section ? [one.section.name] : []));
+  it("has every section the built-in parts make, each a part of its own", () => {
+    const sections = builtInParts().flatMap((one) => (one.section ? [one.section.name as keyof PageSections] : []));
     expect(sections).toEqual(["text", "properties", "tags", "codeBlocks", "grids", "embeds", "links"]);
     pageChanges().page("A", (p) => {
       for (const name of sections) expect(Object.values(p[name]).every((method) => typeof method === "function"), name).toBe(true);
@@ -619,27 +647,35 @@ describe("edits and diffs", () => {
 });
 
 describe("a plugin's own part", () => {
-  it("is registered: its section in the builder, its kind written by it, once; a kind or a section another has refused", async () => {
+  it("is registered: its section given by p.part, its kind written by it, once; a kind or a section another has refused; one not registered refused", async () => {
     // (Modules of their own: the registry of the other tests keeps the built-in parts alone)
     vi.resetModules();
     const parts = await import("./parts.ts");
     const changes = await import("./changes.ts");
     const { pageWriter: writerOf } = await import("./writer.ts");
-    // (Its kind and section in no type: a plugin adds them to PageChangeKinds and PageSections)
-    const shout = {
+    // (Its change and section typed by the part itself: no other plugin's types see them)
+    const shout = parts.definePluginPart<{ readonly kind: "shout" }, { all(): PageBuilder }>({
+      name: "shouting",
       kinds: ["shout"],
-      section: { name: "shouting", make: (add: (change: unknown) => unknown) => ({ all: () => add({ kind: "shout" }) }) },
-      write: (text: string) => ({ text: text.toUpperCase(), changes: 1 }),
-    } as unknown as Part;
+      section: (add) => ({ all: () => add({ kind: "shout" }) }),
+      write: (text) => ({ text: text.toUpperCase(), changes: 1 }),
+    });
+    const whisper = parts.definePluginPart<{ readonly kind: "whisper" }, { all(): PageBuilder }>({
+      name: "whispering",
+      kinds: ["whisper"],
+      section: (add) => ({ all: () => add({ kind: "whisper" }) }),
+      write: (text) => ({ text: text.toLowerCase(), changes: 1 }),
+    });
+    expect(() => changes.pageChanges().page("A", (p) => p.part(whisper).all())).toThrow(/not registered/);
     parts.registerPart(shout);
     parts.registerPart(shout);
-    expect(parts.PARTS.filter((one) => one === shout)).toHaveLength(1);
+    expect(parts.partsNow().filter((one) => one === shout)).toHaveLength(1);
     const { map, writer } = memory({ A: "quiet" }, undefined, writerOf);
-    const built = changes.pageChanges().page("A", (p) => (p as unknown as { shouting: { all(): unknown } }).shouting.all()).build();
+    const built = changes.pageChanges().page("A", (p) => p.part(shout).all()).build();
     expect(built[0]!.changes.map((change) => change.kind)).toEqual(["shout"]);
     await writer.write(built);
     expect(map.get("A")).toBe("QUIET");
     expect(() => parts.registerPart({ ...shout, section: undefined } as Part)).toThrow(/kind shout/);
-    expect(() => parts.registerPart({ ...shout, kinds: ["whisper"], section: { ...shout.section!, name: "properties" } } as unknown as Part)).toThrow(/section properties/);
+    expect(() => parts.registerPart({ ...whisper, section: { ...whisper.section, name: "properties" } })).toThrow(/section properties/);
   });
 });

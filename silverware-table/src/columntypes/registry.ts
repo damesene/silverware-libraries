@@ -2,7 +2,7 @@
 // the user defines (custom.ts), which replace a built-in one of their name;
 // and how a column's header names its type: a hashtag, `#name`, `#name-param`
 // (its parameters read here, so a type gets them as values), or an alias.
-import { headerHashtags, withoutHashtagsWhere } from "../columns.ts";
+import { headerHashtags, withoutHashtagsWhere } from "../../../shared/table/columns.ts";
 import { BUILT_IN_TYPES } from "./builtin/index.ts";
 import type { ColumnType, Params, ParamSpec, ParamSpecs } from "./type.ts";
 

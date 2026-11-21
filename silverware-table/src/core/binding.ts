@@ -6,28 +6,27 @@
 // is host/silverbullet/binding.ts, handed to the controller by its Space Lua
 // API's `init` (host/silverbullet/api.ts) and the tests' page: the core imports nothing of a host.
 import type { LayoutProvider } from "../../../shared/layout.ts";
-import type { FeatureName } from "../bridge.ts";
-import type { TableModel } from "../model/model.ts";
+import type { FeatureName, SETTINGS, SettingValue } from "../bridge.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import type { SourceTables } from "../sources.ts";
 import type { AdapterContext, TableAdapter } from "./adapter.ts";
-import type { AdapterFeature, Feature, TableHost, TableLook, WriteResult } from "./feature.ts";
+import type { AdapterFeature, Feature, TableHost, TableLook, TableTarget, WriteResult } from "./feature.ts";
 import type { TableRows } from "./rows.ts";
 import type { TablePlatform } from "./platform.ts";
 import type { MetadataPart, PageFormulaStore, StoredMetadata, StoredTable, TableStore, TableWriteEdit } from "./store.ts";
 import type { TableKey, TableRegister } from "./tables.ts";
-import type { Table } from "../markdown.ts";
 
 /**
  * What the core gives a host to make its store with: the platform as it is,
- * the register (the one maker of keys), how a table is written (the
- * formatting setting's), and what to do before a write of the open page (the
+ * the register (the one maker of keys), the settings (how a table is written
+ * is the store's: the formatting settings), and what to do before a write of the open page (the
  * features', the history marker), given its text, the span of its tables,
  * the edit's range; what it gives is run after, told where places went
  */
 export type StoreContext = {
   platform(): TablePlatform;
   readonly register: TableRegister;
-  serializer(): Promise<(table: Table) => string>;
+  setting<K extends keyof typeof SETTINGS>(name: K): Promise<SettingValue<K>>;
   beforeWrite(
     text: string,
     span: { readonly from: number; readonly to: number },
@@ -50,6 +49,8 @@ export type BoundStore = TableStore &
     metadataOf(table: TableModel, part: MetadataPart | "all"): StoredMetadata;
     withoutMetadata(table: TableModel, part: MetadataPart | "all"): TableModel;
     writesSame(document: string, read: StoredTable, model: TableModel, options?: Pick<TableWriteEdit, "tidy" | "columnMap">): Promise<boolean>;
+    /** Rows of a table as plain markdown (Copy as Markdown): in `read`'s form where it is the table read, no hidden tags */
+    plainMarkdown(table: TableModel, rows: readonly number[], read?: TableModel): string;
   };
 
 /**
@@ -62,9 +63,9 @@ export type FeatureEntry = { readonly name: FeatureName | undefined; readonly cr
 export type LayoutTables = {
   // A rendered table's rows as SilverBullet rendered them (some may be out of the document: largeTables)
   renderedRows(table: HTMLTableElement): readonly HTMLTableRowElement[];
-  // Whether a widget is enhanced (known in the page's markdown), so it can be written
-  enhanced(widget: HTMLElement): boolean;
-  write(widget: HTMLElement, change: (table: TableModel) => TableModel | undefined): Promise<WriteResult>;
+  // The table a widget shows, where it is enhanced (known in its store), so it can be written; undefined: not yet
+  tableOf(widget: HTMLElement): TableTarget | undefined;
+  write(table: TableTarget, change: (table: TableModel) => TableModel | undefined): Promise<WriteResult>;
   // The metadata setting
   metadataOn(): boolean;
 };

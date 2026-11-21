@@ -7,7 +7,7 @@
 // table of records or of values, is made plain data here (`sourceData`), and
 // the rest reads it through `SourceProvider` (src/sources.ts).
 import { listOf } from "../../bridge.ts";
-import { validateTableName } from "../../namerules.ts";
+import { validateTableName } from "../../../../shared/table/namerules.ts";
 import type { SourceData, SourceProvider } from "../../sources.ts";
 
 /** How long after the last page indexed the sources are read again; after Space Lua loaded, how long its definitions of before stay */

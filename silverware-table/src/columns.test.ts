@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { columnIdOf, columnKey, findColumn, followColumn, headsOf, matchColumns, nameEmptyHeaders, sameColumnId } from "./columns.ts";
+import { columnIdOf, columnKey, findColumn, followColumn, matchColumns, sameColumnId } from "../../shared/table/columns.ts";
+import { headsOf, markdownHeaderText, nameEmptyHeaders } from "./columns.ts";
 import { parseTable, serializeTable } from "./markdown.ts";
 import { decode, encode } from "./store/markdown/codec.ts";
 
@@ -23,9 +24,15 @@ describe("columnKey", () => {
     expect(columnKey("C#")).toBe("c_");
   });
 
-  it("drops markdown emphasis and escapes first", () => {
+  it("drops markdown emphasis first", () => {
     expect(columnKey("**Qty**")).toBe("qty");
-    expect(columnKey("A \\| B")).toBe("a_b");
+  });
+
+  it("names a markdown header cell by its text as the model's: unescaped, its tags out (headsOf)", () => {
+    const [head] = headsOf(["**Unit \\| price** #euro <meta core.n='cost'>"]);
+    expect(head).toEqual({ text: "**Unit | price** #euro", fixed: "cost" });
+    expect(columnKey(head!.text)).toBe("unit_price");
+    expect(columnKey(markdownHeaderText("Qty <meta note='h'>"))).toBe("qty");
   });
 });
 

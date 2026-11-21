@@ -1,12 +1,12 @@
 // A table as data for what is outside Silverware Table: another plugin
 // (`silverware.table.tables`) or a definition of the user's (the context of
-// custom menu entries). Its name and its columns' names are given, as who
-// calls it reads them (the entry from the metadata, a module through its
-// host), so this reads no metadata.
-import { columnKey, columnName } from "./columns.ts";
-import { errorCodeIn } from "./formulas/index.ts";
-import { type Table, unescapeCell } from "./markdown.ts";
-import { withoutTags } from "./tags.ts";
+// custom menu entries). Read off the model: its cells' content (no hidden tag,
+// no escape), its columns' headers and own names; its name is given, as who
+// calls it reads it (the entry from the metadata, a module through its host).
+import { columnKey, columnName } from "../../shared/table/columns.ts";
+import { errorCodeIn } from "../../shared/formulas/index.ts";
+import type { TableModel } from "../../shared/table/model.ts";
+import { modelColumnName } from "../../shared/table/names.ts";
 
 /** A table as data: its name, its place in the text, its columns, its body's cells */
 export type TableData = {
@@ -19,20 +19,19 @@ export type TableData = {
   readonly rows: readonly (readonly string[])[];
 };
 
-/** `table` (at `from`…`to` of its text) as data; `name` its name, `fixedName` a column's name apart from its header (none: the header's) */
-export function tableData(table: Table, place: { readonly from: number; readonly to: number }, name: string | undefined, fixedName: (column: number) => string | undefined): TableData {
-  const header = table.rows[0]?.cells ?? [];
+/** `table` (at `from`…`to` of its text) as data; `name` its name */
+export function tableData(table: TableModel, place: { readonly from: number; readonly to: number }, name: string | undefined): TableData {
   return {
     ...(name ? { name } : {}),
     from: place.from,
     to: place.to,
-    columns: header.map((cell, i) => {
-      const shown = columnName(cell);
-      return { name: fixedName(i) ?? shown, key: columnKey(shown) };
+    columns: table.columns.map((column, i) => {
+      const shown = columnName(column.header);
+      return { name: modelColumnName(table, i) ?? shown, key: columnKey(shown) };
     }),
-    // (An error as it shows, `#REF!`: its `#` escaped in the markdown so it is no hashtag, cellResult)
-    rows: table.rows.slice(1).map((row) => row.cells.map((cell) => {
-      const text = unescapeCell(withoutTags(cell)).trim();
+    // (An error as it shows, `#REF!`: a formula's result, whichever form it was written in, cellResult)
+    rows: table.rows.map((row) => row.cells.map((cell) => {
+      const text = cell.content.trim();
       return errorCodeIn(text) ?? text;
     })),
   };

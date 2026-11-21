@@ -4,8 +4,8 @@ import { escapeCell, parseTable, serializeTable, type Table } from "../markdown.
 import * as markdown from "../testing/markdownops.ts";
 import { decode, encode } from "../store/markdown/codec.ts";
 import { cellTags } from "../tags.ts";
-import { attributeIn, type TableModel } from "./model.ts";
-import * as ops from "./ops.ts";
+import { attributeIn, type TableModel } from "../../../shared/table/model.ts";
+import * as ops from "../../../shared/table/ops.ts";
 
 // A table with what every row and cell may hold: hidden tags, a row's name, an escape, a metadata row
 const TABLE = parseTable(

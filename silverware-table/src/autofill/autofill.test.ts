@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { parseTable, serializeTable } from "../markdown.ts";
-import { NO_ATTRIBUTES } from "../model/model.ts";
-import { cellWrittenOver } from "../model/rules.ts";
+import { NO_ATTRIBUTES } from "../../../shared/table/model.ts";
+import { cellWrittenOver } from "../../../shared/table/rules.ts";
 import { decode, encode, encodeCell } from "../store/markdown/codec.ts";
 import { allSeries, clearCustomSeries, customSeries, customSeriesAnew, defineCustomSeries, type FillCells, type FillLine, filled, fillLine, seriesFor } from "./index.ts";
 

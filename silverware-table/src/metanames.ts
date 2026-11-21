@@ -11,10 +11,9 @@
 // The metadata row carries `core.table`, by which it is told from a last row
 // whose one cell holds only a tag.
 
-import type { Owner } from "./model/model.ts";
+import { CORE, type Owner } from "../../shared/table/model.ts";
 
-export type { Owner };
-export const CORE: Owner = "core";
+export { CORE, type Owner };
 
 /** The mark of a table's metadata row (an attribute without a value) */
 export const TABLE_MARKER = `${CORE}.table`;

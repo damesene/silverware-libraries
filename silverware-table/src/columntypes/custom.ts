@@ -5,7 +5,7 @@
 // (HELPERS). Definitions are checked here; what a type's method gives is
 // checked as it is called, and a method that throws marks the cell (the
 // column types module), so a mistake never breaks a table.
-import { parseDate } from "../formulas/dates.ts";
+import { parseDate } from "../../../shared/formulas/dates.ts";
 import { lineIcon } from "../icons.ts";
 import { dateTimeFormat, numberFormat } from "../../../shared/intl.ts";
 import { formatNumber, notANumber, numberOf } from "./format.ts";

@@ -15,15 +15,17 @@
 // Without the formulas module nothing is calculated.
 import type { Feature, ModelHost, PageCommand, StoredTable, TableBadge, TableInfo, ToolbarButton } from "../core/feature.ts";
 import { type Calculated, calculatedTable, movedRenames, readRenames, renamedIn, type Renames, sameCells, storedRenames } from "../calculated/index.ts";
-import { type CalculatedBy, type CalculatedOffer, followOwnFormula, type Following, callsPureFunctionsOnly, FormulaError, type FormulaCells, type FormulasOffer, type PageLinksOffer, PLAIN_CELLS } from "../formulas/index.ts";
-import { columnName, headerText, modelHeads } from "../columns.ts";
+import { type CalculatedBy, followOwnFormula, type Following, callsPureFunctionsOnly, FormulaError, type FormulaCells, PLAIN_CELLS } from "../../../shared/formulas/index.ts";
+import { type CalculatedOffer, type FormulasOffer, type PageLinksOffer } from "../formulas/offers.ts";
+import { columnName, modelHeads } from "../../../shared/table/columns.ts";
+import { headerText } from "../columns.ts";
 import { ICONS } from "../icons.ts";
-import { EMPTY_TABLE } from "../model/ops.ts";
-import type { TableModel } from "../model/model.ts";
+import { EMPTY_TABLE } from "../../../shared/table/ops.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import { definitionAttributes, groupFormula, KEYS, type Key, looseDefinition, type PivotDefinition, readDefinition, sourceRef, sourceText, valueItem, valueParts } from "../pivot/definition.ts";
 import { type Fields, fieldsOf } from "../pivot/fields.ts";
 import { pivotOf } from "../pivot/pivot.ts";
-import { freeTableName } from "../namerules.ts";
+import { freeTableName } from "../../../shared/table/namerules.ts";
 import { asNumber } from "../../../shared/filter.ts";
 import type { SourcesOffer } from "../sources.ts";
 import { openPivotDialog } from "./pivotdialog.ts";
@@ -68,7 +70,7 @@ export class Pivot implements Feature {
   /** The page of a source on another page (one naming the page shown is of this page) */
   private pageOf(definition: PivotDefinition): string | undefined {
     const { page } = sourceRef(definition.source);
-    return page !== undefined && page !== this.host.currentPage ? page : undefined;
+    return page !== undefined && page !== this.host.currentDocument ? page : undefined;
   }
 
   /** The name of a source of this page, lowercased; none for one on another page, or a source of the space */
@@ -382,7 +384,7 @@ export class Pivot implements Feature {
 
   /** The open page's tables as last read, as models */
   private pageModels(): readonly TableModel[] {
-    return this.modelsOf(this.host.pageTables());
+    return this.modelsOf(this.host.documentTables());
   }
 
   /** Tables the host gave (a page's) as models */
@@ -400,7 +402,7 @@ export class Pivot implements Feature {
 
   /** Another page's tables a pivot can summarize, by their names and their columns' (read through pageLinks), or why there are none */
   private async pageSources(page: string): Promise<readonly { name: string; columns: string[] }[] | string> {
-    if (page === this.host.currentPage) return this.sources();
+    if (page === this.host.currentDocument) return this.sources();
     const offer = this.host.offered<PageLinksOffer>("pageLinks");
     if (!offer || !this.host.readsOtherPages || !this.cells()) return "Other pages are read by the pageLinks module, which is off";
     await offer.readPages([page], false);
@@ -432,7 +434,7 @@ export class Pivot implements Feature {
       ...(off || blocked ? { blocked: off ?? blocked } : {}),
       preview: (definition) => this.calculate(definition, this.sourceFor(definition, sources)),
       readPage: (page) => this.pageSources(page),
-      ...(this.host.readsOtherPages ? { pages: async () => (await this.host.pageNames()).filter((page) => page !== this.host.currentPage) } : {}),
+      ...(this.host.readsOtherPages ? { pages: async () => (await this.host.pageNames()).filter((page) => page !== this.host.currentDocument) } : {}),
     });
   }
 
@@ -574,7 +576,7 @@ function movedId(id: string, moved: ReadonlyMap<string, string>): string {
   return m ? m[1]! + (moved.get(m[2]!) ?? m[2]!) : id;
 }
 
-/** Whether a pivot's result is of its source alone, so it may be kept by it (formulas/references.ts) */
+/** Whether a pivot's result is of its source alone, so it may be kept by it (shared/formulas/references.ts) */
 function keptOf(definition: PivotDefinition): boolean {
   const formulas = [...definition.rows, ...definition.columns].map(groupFormula).concat(definition.values.map((item) => valueParts(item).formula), definition.where ? [definition.where] : []);
   return formulas.every((formula) => callsPureFunctionsOnly(`=${formula}`));

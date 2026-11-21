@@ -3,7 +3,7 @@
 // the pageLinks module read; and which tables a write recalculates (those
 // referring by name to the table written, in turn). The tables' names come with
 // them, from the formulas module (its host): the domain reads no metadata.
-import type { TableModel } from "../model/model.ts";
+import type { TableModel } from "../table/model.ts";
 import { cellsByName, type FormulaCells } from "./cell.ts";
 import type { NamedCell, TableSource } from "./evaluate.ts";
 import type { FormulaChoice } from "./help.ts";

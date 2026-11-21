@@ -5,21 +5,9 @@
 // [@qty] (the cell in the formula's row), the table's named cells and rows.
 // Anything that cannot be written so (another table or page, a function
 // Excel has no form of) makes the formula its cell's value, with the reason.
-import { modelHeads } from "../columns.ts";
-import type { TableModel } from "../model/model.ts";
-import {
-  columnLetters,
-  type FormulaNode,
-  FormulaError,
-  functionNamed,
-  isCustomFunction,
-  parseFormula,
-  referencedColumn,
-  totalRows,
-  cellsByName,
-  type FormulaCells,
-  rowsByName,
-} from "../formulas/index.ts";
+import { modelHeads } from "../../../shared/table/columns.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
+import { columnLetters, type FormulaNode, FormulaError, functionNamed, isCustomFunction, parseFormula, referencedColumn, totalRows, cellsByName, type FormulaCells, rowsByName } from "../../../shared/formulas/index.ts";
 import { type ExcelTemplates, excelCall, hasTemplate } from "./functions.ts";
 
 // The error values Excel has (ours #CYCLE! and #ERROR! are not among them)

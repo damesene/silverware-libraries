@@ -4,8 +4,9 @@
 // changes), each model parsed by markdown.ts (its cache by text makes a read
 // of the same text free); written through the page writer (shared/pages/),
 // by the parts of tableparts.ts (step 4b).
-import { findTables, minimalEdit, parseTable, type Table, type TableRange } from "../../markdown.ts";
-import { decode, decodedFrom, encode, encodeOver } from "./codec.ts";
+import { findTables, minimalEdit, parseTable, serializeTable, type Table, type TableRange } from "../../markdown.ts";
+import { formatRule, type SETTINGS, type SettingValue } from "../../bridge.ts";
+import { decode, decodedFrom, encode, encodeOver, plainMarkdown } from "./codec.ts";
 import { metadataOf, withoutMetadata } from "./metadata.ts";
 import type { TablePlatform } from "../../core/platform.ts";
 import {
@@ -25,12 +26,12 @@ import {
   validateTransaction,
 } from "../../core/store.ts";
 import { pageFormulasIn } from "./pageformulas.ts";
-import { cursorPlace, found, newTableMarkdown, newTablePlace, type NewTablePlace, tableAt, tableEdits, type TableInsert, type TableWrite } from "./tableparts.ts";
+import { cursorPlace, found, newTableMarkdown, newTablePlace, type NewTablePlace, PAGE_FORMULAS, TABLES, tableAt, tableEdits, type TableAddition, type TableReplacement } from "./tableparts.ts";
 import { pageFormulaPlace } from "./pageformulas.ts";
 import { mapPosition, type TableWritten, type TextEdit, withWriteListeners } from "./writelisteners.ts";
 import { written as textWritten } from "../../../../shared/pages/parts.ts";
 import type { EditResult } from "../../../../shared/pages/tags/edit.ts";
-import type { TableModel } from "../../model/model.ts";
+import type { TableModel } from "../../../../shared/table/model.ts";
 import { type PageBuilder, pageChanges } from "../../../../shared/pages/changes.ts";
 import { type ApplyReport, type PagePlan, type PageWriter, pageWriter } from "../../../../shared/pages/writer.ts";
 import type { Space } from "../../../../shared/platform.ts";
@@ -94,7 +95,7 @@ type PlanOwn = {
 type OpenWrite = { readonly text: string; readonly span: { readonly from: number; readonly to: number }; readonly made: string; readonly moved: (position: number, after: boolean) => number };
 
 /** A transaction as the writer's changes: its tables written and new, its page formulas, what other plugins are told */
-type WriteOf = { readonly tables: readonly TableWrite[]; readonly inserts: readonly TableInsert[]; readonly formulas: readonly PageFormula[]; readonly told: readonly TableWritten[] };
+type WriteOf = { readonly tables: readonly TableReplacement[]; readonly inserts: readonly TableAddition[]; readonly formulas: readonly PageFormula[]; readonly told: readonly TableWritten[] };
 
 /**
  * Other plugins' edits of a write (silverware.table.onWrite) as the page
@@ -112,8 +113,18 @@ function listenersEdit(made: string, listened: { readonly text: string }, told: 
 /** Whether two ranges of a text overlap */
 const overlaps = (a: { readonly from: number; readonly to: number }, b: { readonly from: number; readonly to: number }) => a.from < b.to && a.to > b.from;
 
-/** A skip of the writer's as the store's (its causes are the same) */
-const skipOf = (skipped: { readonly cause: TableSkip["cause"]; readonly reason: string }): TableSkip => ({ cause: skipped.cause, reason: skipped.reason });
+/** A page's skip as the transaction's: why, without its page */
+const skipOf = ({ cause, reason }: TableSkip): TableSkip => ({ cause, reason });
+
+/**
+ * How tables are written, as the settings say: with autoFormat every edited table aligned (padded), a padded one as
+ * Long cells says
+ */
+export async function serializerOf(setting: <K extends keyof typeof SETTINGS>(name: K) => Promise<SettingValue<K>>): Promise<(table: Table) => string> {
+  const format = await setting("autoFormat");
+  const rule = await formatRule(setting);
+  return (table) => serializeTable(format ? { ...table, padded: true } : table, rule);
+}
 
 export class MarkdownStore implements TableStore, PageFormulaStore {
   // The writer over the platform as it is (a writer keeps what it planned and wrote, for apply and undo)
@@ -151,6 +162,11 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
   /** Where a table is in its page's text as last read (a custom menu's table's `from`, `to`); undefined: not read */
   placeOf(document: string, key: TableKey): { readonly from: number; readonly to: number } | undefined {
     return this.places.get(document)?.get(key);
+  }
+
+  /** Rows of a table as plain markdown (Copy as Markdown): in `read`'s form where it is the table read, no hidden tags */
+  plainMarkdown(table: TableModel, rows: readonly number[], read?: TableModel): string {
+    return plainMarkdown(table, rows, read);
   }
 
   constructor(
@@ -217,8 +233,8 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
     const ranges = findTables(text);
     const keys = this.register.keysOf(document, text);
     const serialize = await this.serializer();
-    const writes: TableWrite[] = [];
-    const inserts: (TableInsert & { readonly key?: TableKey })[] = [];
+    const writes: TableReplacement[] = [];
+    const inserts: (TableAddition & { readonly key?: TableKey })[] = [];
     // What other plugins are told of the tables written, the tables' spans (what a history marker goes outside of), the keys written
     const told: TableWritten[] = [];
     const spans: { readonly from: number; readonly to: number }[] = [];
@@ -335,9 +351,9 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
   }
 
   /** A transaction's changes of the writer's: its page formulas first (found by their order, which a table written first could change), its tables */
-  private tablesChanges(p: PageBuilder, document: string, formulas: readonly PageFormula[], tables: { readonly tables: readonly TableWrite[]; readonly inserts: readonly TableInsert[] }): void {
-    for (const formula of formulas) p.tables.setPageFormula(document, formula);
-    if (tables.tables.length || tables.inserts.length) p.tables.write(tables.tables, tables.inserts);
+  private tablesChanges(p: PageBuilder, document: string, formulas: readonly PageFormula[], tables: { readonly tables: readonly TableReplacement[]; readonly inserts: readonly TableAddition[] }): void {
+    for (const formula of formulas) p.part(PAGE_FORMULAS).set(document, formula);
+    if (tables.tables.length || tables.inserts.length) p.part(TABLES).write(tables.tables, tables.inserts);
   }
 
   async apply(plan: TablePlan): Promise<TableReport> {

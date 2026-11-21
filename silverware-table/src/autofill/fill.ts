@@ -1,7 +1,7 @@
 // What AutoFill writes: the cells dragged over, from the cells selected, line
 // by line (a column filled down or up, a row filled right or left).
-import type { ModelCell, TableModel } from "../model/model.ts";
-import { EMPTY_CELL, withCellAt } from "../model/ops.ts";
+import type { ModelCell, TableModel } from "../../../shared/table/model.ts";
+import { EMPTY_CELL, withCellAt } from "../../../shared/table/ops.ts";
 import { seriesFor } from "./registry.ts";
 
 /** A cell of the markdown's table: its row (the header 0) and column */

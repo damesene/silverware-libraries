@@ -61,7 +61,7 @@ export class CustomMenus implements Feature {
       axis: target.axis,
       at: target.at,
       lines: [...target.lines],
-      page: this.host.currentPage,
+      page: this.host.currentDocument,
       table: { ...data, columns: data.columns.map((c) => ({ ...c })), rows: data.rows.map((row) => [...row]) },
     });
     return definitions.flatMap((definition) => {

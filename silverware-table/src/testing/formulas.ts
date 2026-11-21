@@ -6,16 +6,17 @@
 // as the module has it (the codec), and what the domain gives back written
 // back as the module writes it.
 import { formulaCellsOf } from "../features/formulas.ts";
-import * as domain from "../formulas/index.ts";
-import * as page from "../formulas/page.ts";
+import * as domain from "../../../shared/formulas/index.ts";
+import * as page from "../../../shared/formulas/page.ts";
 import { type ExcelTable, excelFormula as excelFormulaOf } from "../excel/formulas.ts";
 import type { ExcelTemplates } from "../excel/functions.ts";
 import type { PageTable, Table } from "../markdown.ts";
 import { metaName, metaPins, withMetaPins } from "../meta.ts";
 import { ownMeta } from "../core/metaaccess.ts";
-import { attributeIn, type TableModel, withAttributeIn } from "../model/model.ts";
+import { attributeIn, type TableModel, withAttributeIn } from "../../../shared/table/model.ts";
 import { calculatedTable, viewCalculated } from "../calculated/index.ts";
-import { modelCellNames, modelRowNames, withCellName } from "../names.ts";
+import { modelCellNames, modelRowNames } from "../../../shared/table/names.ts";
+import { withCellName } from "../names.ts";
 import { decode, decodeCell, encode, encodeCell } from "../store/markdown/codec.ts";
 
 type IndexMap = domain.IndexMap;

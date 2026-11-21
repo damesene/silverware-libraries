@@ -7,7 +7,7 @@
 // transaction refused; one keeping one table per document (a source: `@tasks`)
 // is given one each. Tables are given as models: what every store keeps alike.
 import { describe, expect, it } from "vitest";
-import { type ModelRow, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
+import { type ModelRow, NO_ATTRIBUTES, type TableModel } from "../../../shared/table/model.ts";
 import type { PageFormulaKey, TableStore } from "../core/store.ts";
 import type { TableKey } from "../core/tables.ts";
 

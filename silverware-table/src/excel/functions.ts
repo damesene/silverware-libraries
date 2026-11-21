@@ -4,7 +4,7 @@
 // writes it; any other (a custom function without a template) is no formula
 // in Excel, its cell is written as its value. A test requires every built-in
 // function in one of the two.
-import { type Scalar, toUnit } from "../formulas/index.ts";
+import { type Scalar, toUnit } from "../../../shared/formulas/index.ts";
 
 // An argument as Excel writes it, its value when it is written in the formula (a unit "d"), whether it is an operation (A1+1)
 export type ExcelArgument = { readonly text: string; readonly literal?: Scalar; readonly operation?: boolean };

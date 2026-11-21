@@ -6,11 +6,12 @@
 // names it as columns.ts names columns (its key or fixed name, with its
 // occurrence where several share it), so it survives moves and renames, which
 // every edit follows here whatever the attribute is for.
-import { type ColumnId, columnIdOf, findColumn, type ColumnHead, headsOf } from "./columns.ts";
+import { type ColumnId, columnIdOf, findColumn, type ColumnHead } from "../../shared/table/columns.ts";
+import { headsOf } from "./columns.ts";
 import type { Row, Table, TableMeta } from "./markdown.ts";
 import { attributeName, COLUMN_ATTRIBUTE_RE, COLUMN_MARK, CORE, type Owner, splitAttributeName } from "./metanames.ts";
-import { type Attributes, attributeIn, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt, withAttributeSet } from "./model/model.ts";
-import { validateTableName } from "./namerules.ts";
+import { type Attributes, attributeIn, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt, withAttributeSet } from "../../shared/table/model.ts";
+import { validateTableName } from "../../shared/table/namerules.ts";
 import type { SortDirection } from "../../shared/compare.ts";
 import { NO_PINS, type Pins } from "./view.ts";
 

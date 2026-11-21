@@ -7,8 +7,9 @@
 // written in a document's text, not as its tables' formula cells, are a store
 // of their own beside it (PageFormulaStore), which a store keeping none does
 // not have.
-import type { KeyedModel, TableModel } from "../model/model.ts";
-import type { IndexMap } from "../model/ops.ts";
+import type { Skip } from "../../../shared/store.ts";
+import type { KeyedModel, TableModel } from "../../../shared/table/model.ts";
+import type { IndexMap } from "../../../shared/table/ops.ts";
 import type { TableKey } from "./tables.ts";
 
 /**
@@ -114,8 +115,8 @@ export function validateTransaction(transaction: TableTransaction): string | und
   return undefined;
 }
 
-/** Why a transaction was left: a table changed since it was read, the document not there, or the store refusing it (read only, a change it cannot make) */
-export type TableSkip = { readonly cause: "changed" | "missing" | "refused"; readonly reason: string };
+/** Why a transaction was left (shared/store.ts): a table changed since it was read, the document not there, or the store refusing it (read only, a change it cannot make) */
+export type TableSkip = Skip;
 
 /**
  * What a transaction would do, nothing written: how many tables and page formulas it changes,

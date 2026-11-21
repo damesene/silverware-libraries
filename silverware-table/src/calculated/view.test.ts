@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FormulaError, Grid } from "../formulas/index.ts";
+import { FormulaError, Grid } from "../../../shared/formulas/index.ts";
 import { renamedViewIds, viewCalculated } from "./view.ts";
 
 describe("a view's result as a calculated table", () => {

@@ -3,11 +3,11 @@
 // `p.tags`) and how that is written in the text. The builder (changes.ts)
 // makes its sections and the writer (writer.ts) writes the changes by this
 // registry alone. The built-in parts are here; a plugin registers a part of
-// its own (`registerPart(definePart({…}))`: Silverware Table's tables, whose
-// codec stays the table's), its kinds added to `PageChangeKinds` and its
-// section to `PageSections` by TypeScript's interface merging. Each plugin
-// bundles shared/ of its own, so a part registered is that plugin's writer's
-// alone.
+// its own (`registerPart(definePluginPart({…}))`: Silverware Table's tables,
+// whose codec stays the table's), its changes and its section typed by the
+// part itself (a page's builder gives the section with `p.part(it)`), so no
+// other plugin's code sees them. Each plugin bundles shared/ of its own, so a
+// part registered is that plugin's writer's alone.
 import { validateAttributeName, writeAttributes } from "../markdown/attributes.ts";
 import { embedAsLink, type EmbedChanges, linkAsEmbed, linkAsText, linkWithText, readEmbeds, readLinks, writeEmbed } from "../markdown/embed.ts";
 import { readGrids } from "../markdown/grid.ts";
@@ -42,12 +42,7 @@ export type TagsRemoval = {
   readonly keepWord?: boolean;
 };
 
-/**
- * The kinds of change of a page's content, each its fields: a part (below,
- * or a plugin's registered with registerPart) writes each kind. A plugin adds
- * its own by TypeScript's interface merging, as it adds a section to
- * PageSections (`declare module "…/shared/pages/parts.ts"`)
- */
+/** The kinds of change of a page's content the built-in parts write (below), each its fields */
 export interface PageChangeKinds {
   readonly setProperty: { readonly path: readonly string[]; readonly value: PropertyValue };
   readonly removeProperty: { readonly path: readonly string[] };
@@ -86,10 +81,16 @@ export interface PageChangeKinds {
   readonly setLinkText: { readonly text: string; readonly occurrence: number; readonly of?: number; readonly shown: string };
 }
 
-/** One change of a page's content, of a kind a part writes (PageChangeKinds) */
-export type PageChange = { readonly [K in keyof PageChangeKinds]: { readonly kind: K } & PageChangeKinds[K] }[keyof PageChangeKinds];
+/** One change of a page's content, of a kind a built-in part writes (PageChangeKinds) */
+export type BuiltInChange = { readonly [K in keyof PageChangeKinds]: { readonly kind: K } & PageChangeKinds[K] }[keyof PageChangeKinds];
 
-/** The builder's sections, one per part of a page's content (their parts below make them); every method gives the page's builder back */
+/** A change a plugin's part writes: its kind, and the fields its part reads (definePluginPart) */
+export type PluginChange = { readonly kind: string };
+
+/** One change of a page's content: a built-in part's, or a plugin's part's */
+export type PageChange = BuiltInChange | PluginChange;
+
+/** The builder's sections, one per built-in part of a page's content (below makes them); every method gives the page's builder back */
 export interface PageSections {
   readonly text: {
     /**
@@ -203,23 +204,40 @@ export type WriterOptions = {
   readonly newTagsForm?: FrontmatterForm;
 };
 
-type Kind = PageChange["kind"];
-type ChangeOf<K extends Kind> = Extract<PageChange, { kind: K }>;
+type Kind = BuiltInChange["kind"];
+type ChangeOf<K extends Kind> = Extract<BuiltInChange, { kind: K }>;
 
 /** A part: the kinds of change it writes, how, and the builder's section that makes them (none: a page's own method) */
 export type Part = {
-  readonly kinds: readonly Kind[];
-  readonly section?: { readonly name: keyof PageSections; readonly make: (add: (change: PageChange) => PageBuilder) => unknown };
+  readonly kinds: readonly string[];
+  readonly section?: { readonly name: string; readonly make: (add: (change: PageChange) => PageBuilder) => unknown };
   readonly write: (text: string, change: PageChange, options: WriterOptions) => EditResult | Promise<EditResult>;
 };
 
-/** A part made with its types checked: its section gives only its kinds, its write gets only them */
-export function definePart<K extends Kind, N extends keyof PageSections>(definition: {
+/** A built-in part made with its types checked: its section gives only its kinds, its write gets only them */
+function definePart<K extends Kind, N extends keyof PageSections>(definition: {
   readonly kinds: readonly K[];
   readonly section?: { readonly name: N; readonly make: (add: (change: ChangeOf<K>) => PageBuilder) => PageSections[N] };
   readonly write: (text: string, change: ChangeOf<K>, options: WriterOptions) => EditResult | Promise<EditResult>;
 }): Part {
   return definition as unknown as Part;
+}
+
+/** A plugin's part, the section it gives a page's builder its type (`S`, given by `p.part(it)`) */
+export type PluginPart<S> = Part & { readonly section: { readonly name: string; readonly make: (add: (change: PageChange) => PageBuilder) => S } };
+
+/**
+ * A plugin's part (registered with registerPart) made with its types checked: the changes it writes (`C`, each of
+ * its kinds), the section a page's builder gives of it (named `name`: no two parts the same), how it writes them
+ */
+export function definePluginPart<C extends PluginChange, S>(definition: {
+  readonly name: string;
+  readonly kinds: readonly C["kind"][];
+  readonly section: (add: (change: C) => PageBuilder) => S;
+  readonly write: (text: string, change: C, options: WriterOptions) => EditResult | Promise<EditResult>;
+}): PluginPart<S> {
+  const { name, kinds, section, write } = definition;
+  return { kinds, section: { name, make: section as (add: (change: PageChange) => PageBuilder) => S }, write: write as Part["write"] };
 }
 
 const list = (tags: string | readonly string[]) => (typeof tags === "string" ? [tags] : [...tags]);
@@ -630,8 +648,20 @@ const BUILT_IN: readonly Part[] = [
 const parts: Part[] = [...BUILT_IN];
 const partOf = new Map(parts.flatMap((one) => one.kinds.map((kind) => [kind, one] as const)));
 
-/** The parts: the built-in ones, then those registered, in that order */
-export const PARTS: readonly Part[] = parts;
+/** The parts as they are now: the built-in ones, then those registered, in that order */
+export function partsNow(): readonly Part[] {
+  return [...parts];
+}
+
+/** Whether a part is the writer's (built in, or registered) */
+export function isPart(one: Part): boolean {
+  return parts.includes(one);
+}
+
+/** The built-in parts: their sections are a page's builder's own (PageSections) */
+export function builtInParts(): readonly Part[] {
+  return BUILT_IN;
+}
 
 /**
  * A plugin's part added to the writer's (the same part again: nothing). A

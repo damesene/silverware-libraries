@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { withContentAt } from "../model/ops.ts";
-import { withAttributeIn } from "../model/model.ts";
+import { withContentAt } from "../../../shared/table/ops.ts";
+import { withAttributeIn } from "../../../shared/table/model.ts";
 import { cell, clickOn, controller, cursorMoves, editor, edits, flashes, flush, key, renderPage, setText, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 import { PREVIEW_DELAY_MS } from "./viewdialog.ts";
 

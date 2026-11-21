@@ -3,9 +3,9 @@ import { headsOf } from "../columns.ts";
 import { sourceTable } from "../store/sources.ts";
 import { parseTable, type Table } from "../markdown.ts";
 import { CELLS, formulaCell, formulaErrors, formulaOf, model, pageTables, recalculate, shiftReferences } from "../testing/formulas.ts";
-import { evaluateFormula, formulaChoices, FormulaError, formulaSources, formulaTableNames, listResult, references, sourceChoices, tokenize, withColumnKeys } from "./index.ts";
-import { parse } from "./parser.ts";
-import { isError } from "./values.ts";
+import { evaluateFormula, formulaChoices, FormulaError, formulaSources, formulaTableNames, listResult, references, sourceChoices, tokenize, withColumnKeys } from "../../../shared/formulas/index.ts";
+import { parse } from "../../../shared/formulas/parser.ts";
+import { isError } from "../../../shared/formulas/values.ts";
 
 const TASKS = sourceTable({
   columns: ["name", "due", "done"],

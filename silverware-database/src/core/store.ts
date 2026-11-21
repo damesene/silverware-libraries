@@ -6,6 +6,7 @@
 // (store/pages/, step 4), another in memory (store/memory.ts: the tests, the
 // playground); every store passes the same contract (store/contract.ts).
 // Modules and views never see a store: they ask the core.
+import type { Skip, SkipCause } from "../../../shared/store.ts";
 import type { Database, DatabaseSummary, Item, ItemKey, Revised, Value } from "../model/database.ts";
 import type { Changes } from "./changes.ts";
 
@@ -46,16 +47,16 @@ export type Planned = {
 };
 
 /**
- * Why a part is left alone, as a code to act on (the words are the store's):
- * `changed` since it was read (or, an undo, since it was written), `refused`
- * by the store (a name taken, a key it cannot keep), `missing` (no such item
- * or database), `version` (kept in another version than the store writes:
- * older, migrate it first; newer, read only)
+ * Why a part is left alone, as a code to act on (the words are the store's;
+ * shared/store.ts): `changed` since it was read (or, an undo, since it was
+ * written), `refused` by the store (a name taken, a key it cannot keep),
+ * `missing` (no such item or database), `version` (kept in another version
+ * than the store writes: older, migrate it first; newer, read only)
  */
-export type SkipCause = "changed" | "refused" | "missing" | "version";
+export type { SkipCause };
 
 /** A part left alone, why in words and as a code */
-export type Skipped = { readonly target: Target; readonly cause: SkipCause; readonly reason: string };
+export type Skipped = Skip & { readonly target: Target };
 
 export type TransactionPlan = {
   readonly database: string;

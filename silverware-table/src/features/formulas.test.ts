@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { bridge, buttonLabel, cell, cellMenuItem, clickOn, controller, cursorMoves, edits, editor, flashes, flush, key, menuButtons, nameInMenu, pointInsert, press, renderPage, setup as setupPage, tableMenuItem, text, toolbarName, useTablePage, tableKey } from "../testing/page.ts";
 import { FORMULAS_NEED_METADATA } from "./formulas.ts";
 import { insertRowWith } from "../core/structure.ts";
-import { clearCustomFunctions, defineCustomFunctions, functionNamed } from "../formulas/registry.ts";
-import { toNumber, type Value } from "../formulas/values.ts";
+import { clearCustomFunctions, defineCustomFunctions, functionNamed } from "../../../shared/formulas/registry.ts";
+import { toNumber, type Value } from "../../../shared/formulas/values.ts";
 import { defineFunctions, resetDefinitions } from "../index.ts";
 
 describe("Formulas", () => {

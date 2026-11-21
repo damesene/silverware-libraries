@@ -1,5 +1,5 @@
 // The markdown codec: a markdown table (markdown.ts' `Table`) read into the
-// model (model/model.ts) and the model written back
+// model (shared/table/model.ts) and the model written back
 // (docs/silverware-table-store-plan.md, step 3). The one place that knows
 // where the model's parts are in markdown:
 // - a column's header is its header cell's text without its hidden tags and
@@ -17,7 +17,8 @@
 // names.ts writes it), so a changed table reads as before. What the metadata
 // row has of no column found (a header renamed by hand) is kept as written,
 // but of an attribute the model set on a column (orphansKept).
-import { HASHTAGS_KEY, headerHashtags, headerText, headsOf, typedHeader, withoutHashtags } from "../../columns.ts";
+import { HASHTAGS_KEY, headerText, headsOf, typedHeader } from "../../columns.ts";
+import { headerHashtags, withoutHashtags } from "../../../../shared/table/columns.ts";
 import { escapeCell, type Row, serializeTable, type Table, type TableMeta, unescapeCell } from "../../markdown.ts";
 import { columnsAttributes, columnsMetaNamed, columnsMetaOf, parseColumnAttribute } from "../../meta.ts";
 import { attributeName, CORE, escapedForRegExp, splitAttributeName } from "../../metanames.ts";
@@ -32,8 +33,9 @@ import {
   type ModelRow,
   NO_ATTRIBUTES,
   type TableModel,
-} from "../../model/model.ts";
-import { CELL_NAME_KEY, LINE_NAME, LINE_NAME_KEY, rowNameIn, withCellName, withName } from "../../names.ts";
+} from "../../../../shared/table/model.ts";
+import { CELL_NAME_KEY, LINE_NAME_KEY } from "../../../../shared/table/names.ts";
+import { LINE_NAME, rowNameIn, withCellName, withName } from "../../names.ts";
 import { cellTags, withoutTags } from "../../tags.ts";
 import { currentTag, tagAttributes, withTagValue } from "../../tagvalues.ts";
 

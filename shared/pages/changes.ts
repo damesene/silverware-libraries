@@ -10,11 +10,11 @@
 //     .create("Projects/Plan", (p) => p.properties.set(["_database", "rank"], "a2").body("Notes"))
 //     .page("Projects/Old", (p) => p.remove())
 //     .build();
-import { type PageChange, type PageSections, PARTS } from "./parts.ts";
+import { builtInParts, isPart, type PageChange, type PageSections, type PluginPart } from "./parts.ts";
 import type { EditResult } from "./tags/edit.ts";
 
 // The changes' types are their parts', given here to whoever builds them
-export type { PageChange, PageSections, PropertyPath, PropertyValue, TagsFrom, TagsRemoval } from "./parts.ts";
+export type { PageChange, PageSections, PluginChange, PluginPart, PropertyPath, PropertyValue, TagsFrom, TagsRemoval } from "./parts.ts";
 
 /**
  * A page's changes: its content's in the order made, and its new name (made
@@ -37,6 +37,8 @@ export interface PageBuilder extends PageSections {
   body(text: string, was?: string): PageBuilder;
   /** The page taken out of the space (Undo makes it again where its name is still free) */
   remove(): PageBuilder;
+  /** A plugin's part's section (definePluginPart), the part registered with the writer */
+  part<S>(part: PluginPart<S>): S;
 }
 
 /** A batch of changes made page by page; `build()` gives them as frozen data, the builder no longer used */
@@ -61,10 +63,16 @@ export class ChangesBuilder {
       target.changes.push(change);
       return builder;
     };
-    // The sections as the parts make them, the page's own methods beside them
-    const sections = Object.fromEntries(PARTS.flatMap((one) => (one.section ? [[one.section.name, one.section.make(add)]] : [])));
+    // The built-in parts' sections as they make them, the page's own methods beside them; a plugin's part's made as asked
+    const sections = Object.fromEntries(builtInParts().flatMap((one) => (one.section ? [[one.section.name, one.section.make(add)]] : [])));
+    const made = new Map<PluginPart<unknown>, unknown>();
     const builder: PageBuilder = {
       ...(sections as unknown as PageSections),
+      part: <S>(one: PluginPart<S>): S => {
+        if (!isPart(one)) throw new Error(`the part ${one.section.name} is not registered with the page writer`);
+        if (!made.has(one)) made.set(one, one.section.make(add));
+        return made.get(one) as S;
+      },
       rename: (to) => {
         target.renameTo = to;
         return builder;

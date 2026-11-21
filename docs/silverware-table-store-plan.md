@@ -1,8 +1,11 @@
 # Silverware Table: tables apart from where they are kept
 
-Status (2026-11-21): steps 1 to 6 done in branch `refactor/table-store`
-(each step's *Done* note; what one left to later steps is under it), steps 7
-and 8 planned;
+Status (2026-11-21): done in branch `refactor/table-store`: steps 1 to 6
+(each step's *Done* note), then, in this order (decided 2026-11-21 with the
+user, finished without them: public API changes allowed where they make better
+code or have a real benefit), step 6's leftovers, the model and the formulas
+moved into `shared/` (docs/silverware-formulas-shared.md), step 8 (its
+*Progress*) and step 7, the docs, last;
 the plan is in `main`. What it waited for is
 in `main`: the views plan
 (docs/silverware-table-views-plan.md), whose sources (`@tasks`) are the first
@@ -338,7 +341,8 @@ registered with the writer as its part `tables` (step 4b): a transaction of
 this plan becomes a batch of the writer's changes, so a table's edit and a
 page's properties or tags are written in one edit of one document. The
 registry the built-in parts go through takes a plugin's own since
-2026-11-21 (`registerPart`, `PageChangeKinds`: step 4b's first part).
+2026-11-21 (`registerPart`: step 4b's first part; a plugin's part typed by
+itself, `definePluginPart` and `p.part(it)`, since step 8).
 
 ### The SilverBullet binding (`host/silverbullet/`)
 
@@ -817,7 +821,8 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
     writes of one step), the common part is drawn out in step 8, from both
     done.
     **Done (2026-11-21)**: (1) the writer's registry opened
-    (`registerPart`, `definePart`, `PageChangeKinds`) and `replanOpenPage`,
+    (`registerPart`; its types by `definePart` and `PageChangeKinds` then,
+    a plugin's part typed by itself since step 8) and `replanOpenPage`,
     the other plugins built and tested with it. (2) The markdown store's
     parts (`store/markdown/tableparts.ts`): `writeTables` (the tables of a
     write in one change, each found by its text and its order among those
@@ -972,11 +977,18 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    markdown store taking off its hidden tags and metadata row
    (`store/markdown/metadata.ts`); a header cell's own tags go, its column's
    attributes in the metadata row stay (a column's part takes them too).
-   `writeMarkdown` and `replaceMarkdown` are gone. **Left**: the core still
-   imports the codec for a custom menu's table data (`tableData`, from the
-   table's markdown), `asModel` and Copy as Markdown (`plainMarkdown`).
-7. **Docs.** CLAUDE.md (Layout, Architecture), docs/silverware-table-isolation.md
-   extended by the store's boundary.
+   `writeMarkdown` and `replaceMarkdown` are gone. **Left, done 2026-11-21**:
+   the core imports no codec (`isolation.test.ts`): a table's data for custom
+   menus and `silverware.table.tables` is read off the model (`tableData`),
+   Copy as Markdown is the store's (`BoundStore.plainMarkdown`), and the sheet
+   decodes the tables it reads itself (`asModel` gone from the host).
+   **Formulas apart from the table** (added 2026-11-21, done before step 8 so
+   the names are reviewed once, where they end up): the model and the formulas
+   move into `shared/` (docs/silverware-formulas-shared.md), so formulas work
+   outside tables (Silverware Database next, in its own plan).
+7. **Docs** (done last, after step 8: of the final state). CLAUDE.md (Layout,
+   Architecture), docs/silverware-table-isolation.md extended by the store's
+   boundary, `shared/`'s model and formulas.
 8. **The whole API and its names, reviewed.** With every layer in its place,
    the API is gone through whole, the internal and the public alike (*Decided
    (2026-11-20)*, *Consistency and maintainability before compatibility*):
@@ -1022,6 +1034,41 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    where the text came out the same, and skips `leaveAlone` (no plugin
    replanning uses it); a source's key keeps the name it was first defined
    with (`documentOf` answers `@Tasks` after it is redefined `tasks`).
+   **Progress (2026-11-21)**: done: exports used by their file alone kept in
+   it; `TableAt` names its text `text`; a plugin's part of the page writer
+   typed by itself (`definePluginPart`, `p.part(it)`; no `PageSections` nor
+   `PageChangeKinds` merging), page formulas a part of their own
+   (`PAGE_FORMULAS`), `PARTS` gone (`builtInParts()` for the builder,
+   `isPart`, `partsNow()` a copy); the controller's
+   metadata step `asMetadataAllows`; `LayoutTables.write` by a `TableTarget`
+   (`tableOf(widget)`); `SourceStore.plan` takes a `TableTransaction`; the
+   core's API says *document* where a store keeps tables and the editor shows
+   one (`currentDocument`, `documentNameNow`, `documentTables()`), *page* where
+   a page of the space is meant (formulas' `[[Page]]`, pageLinks, the
+   binding), a write's document on its edit (`WriteEdit` is `WriteOptions &
+   WriteDocument`: `edit.tables`, `edit.key`…); the markdown parts named apart
+   from the edits (`TableReplacement`, `TableAddition`); why a change is left
+   alone said once (`shared/store.ts`: `SkipCause`, `Skip`, the writer's,
+   the table's and the database's); the open page planned anew as a page is
+   planned (`leaveAlone` asked of it as it is now, nothing written where it is
+   already as its changes make it: reported with no change; the table store
+   never meets it: a table changed meanwhile is not found by its text as read,
+   and its write is left as changed); a source's
+   document named as it is defined now. The history marker on a write planned
+   anew was right already (the store plans the open page's write anew on its
+   text now, `openWrite`, before `beforeWrite`). Not drawn out: the plan's and
+   the report's shapes, which differ for a reason (a table's transaction is one
+   step of one document, written whole or not; a database's is written part by
+   part), and the contract tests' harness (each store's contract its own).
+   **The public part reviewed (2026-11-21)**: the Space Lua API
+   (`define…` taking their definitions, `defineSource` one source, the
+   `evaluate`/`evaluateText` and `errors`/`errorsText` pairs), the settings,
+   the attributes tables keep (`core.n`, `core.cn`, `formulas.f`…) and the
+   CSS are consistent: no change with a real benefit found, none made.
+   **Public changes, for the release's changelog** (each a user sees):
+   `silverware.table.tables` (and a custom menu's table data) gives a row's
+   cells by the columns, none past the header, and a column's name with its
+   spaces between words one (its key as before).
 
 Rough size, not measured, **as estimated on 2026-11-06**: step 1 a day or
 two; step 2 the largest by files (about 25), a week or more; step 3 the

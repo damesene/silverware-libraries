@@ -13,7 +13,7 @@
 // (conditionsdialog.ts), from the table's ⋯ menu, its toolbar's icon (a table
 // with rules), a column's menu (quick rules, the column's rules cleared) and
 // the cell menu; every change shows in the table before it is saved.
-import { columnKey, columnName } from "../columns.ts";
+import { columnKey, columnName } from "../../../shared/table/columns.ts";
 import { CELL_MENU_ORDER, type CellLook, type CellMenuGroup, type CellRef, type Feature, type ModelHost, type TableInfo, type TableKey, type TableLooks, type ToolbarButton, type WriteResult } from "../core/feature.ts";
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/feature.ts";
 import type { ColumnTypesOffer } from "../columntypes/index.ts";
@@ -35,9 +35,10 @@ import {
   type StoredRule,
   styleLook,
 } from "../conditions/index.ts";
-import { FormulaError, type FormulasOffer, isErrorText, type Scalar, scalarText } from "../formulas/index.ts";
+import { FormulaError, isErrorText, type Scalar, scalarText } from "../../../shared/formulas/index.ts";
+import { type FormulasOffer } from "../formulas/offers.ts";
 import { ICONS } from "../icons.ts";
-import type { TableModel } from "../model/model.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import type { MenuEntry } from "../menu.ts";
 import type { FormulaHelpers } from "../formulafield.ts";
 import { openConditionsDialog, type RuleSample, type ScopeColumn } from "./conditionsdialog.ts";

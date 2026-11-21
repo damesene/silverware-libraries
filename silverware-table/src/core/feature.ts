@@ -9,7 +9,7 @@ export type { PartTable, TablePart, TableParts } from "./parts.ts";
 export { tablePartsOf } from "./parts.ts";
 import type { FeatureName, SETTINGS, SettingValue } from "../bridge.ts";
 import type { TablePlatform } from "./platform.ts";
-import type { AttributePlace, KeyedModel, ModelCell, TableModel } from "../model/model.ts";
+import type { AttributePlace, KeyedModel, ModelCell, TableModel } from "../../../shared/table/model.ts";
 import type { PageFormula } from "./store.ts";
 import type { MetadataPart, StoredMetadata, StoredTable, TableRevision } from "./store.ts";
 import type { Dialog, DialogOptions } from "./dialog.ts";
@@ -17,11 +17,10 @@ import type { Rect } from "./geometry.ts";
 
 export type { Dialog, DialogOptions } from "./dialog.ts";
 export type { Rect } from "./geometry.ts";
-import type { IndexMap } from "../model/ops.ts";
-import type { Table } from "../markdown.ts";
+import type { IndexMap } from "../../../shared/table/ops.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "../menu.ts";
 import type { MenuBuilder, MenuGroup, MenuSection } from "../../../shared/menuslots.ts";
-import type { CellNameAt, RowName } from "../names.ts";
+import type { CellNameAt, RowName } from "../../../shared/table/names.ts";
 import type { Pins, ViewState } from "../view.ts";
 import type { TableData } from "../tabledata.ts";
 
@@ -173,7 +172,7 @@ export type HeldEdit = { readonly row: number; readonly column: number; readonly
 /**
  * Edits a feature holds for a table: every write of it starts from the table
  * with them (`apply`), so they are written with whatever the write changes,
- * the rules of an edit applied to them as to it (model/rules.ts); `written`
+ * the rules of an edit applied to them as to it (shared/table/rules.ts); `written`
  * once that write is in the page
  */
 export type PendingEdits = { readonly apply: (table: TableModel) => TableModel; readonly written: () => void };
@@ -481,11 +480,11 @@ export type ColumnsMeasure = { readonly columns: readonly ColumnMeasure[]; reado
 export type ColumnWidths = { readonly widths: ReadonlyMap<number, number>; readonly box?: number };
 
 /**
- * The page a write edits: its tables in order (as the features before have changed them so far), its tables as read
+ * The document a write edits: its tables in order (as the features before have changed them so far), its tables as read
  * for the write, the edited table's key; the formulas written in its text as read (PageFormula: none where the
  * store keeps none)
  */
-export type WritePage = {
+export type WriteDocument = {
   readonly tables: readonly KeyedTable[];
   readonly read: readonly KeyedTable[];
   readonly key: TableKey;
@@ -509,7 +508,7 @@ export type OtherPages = {
 };
 
 /** An edit as features' write steps see it: how rows and columns moved, and the page */
-export type WriteEdit = WriteOptions & { readonly page: WritePage };
+export type WriteEdit = WriteOptions & WriteDocument;
 
 /**
  * The places in the toolbar's row of names, in their order, by what they name:
@@ -613,9 +612,9 @@ export interface ModelHost {
   /** Opens a reference where the platform opens one (a page, a hashtag's page: a link in a table drawn by a module) */
   navigate(ref: string): void;
 
-  // What a module asks of the platform besides tables (the store's: `tables`, `pageTables`, `replaceTables`)
+  // What a module asks of the platform besides tables (the store's: `tables`, `documentTables`, `replaceTables`)
   /** The open page's name now */
-  pageNameNow(): Promise<string>;
+  documentNameNow(): Promise<string>;
   /** The editor's own undo of its last edit; undefined: the platform has none */
   readonly undoEdit: (() => Promise<void>) | undefined;
   /** A document's tables in order (a page's name), as it is now: the open page's in the editor, another's in the space; null: not there, or not read */
@@ -632,7 +631,7 @@ export interface ModelHost {
    * are (their keys and revisions; a module's state kept for the page compares it), a table of the page found in it
    * by its key
    */
-  pageTables(): readonly StoredTable[];
+  documentTables(): readonly StoredTable[];
   /**
    * A table shown as data, as `silverware.table.tables` gives it (its name, columns, cells, its place in the page's
    * text as last read): what a user's script is handed (custom menu entries)
@@ -659,7 +658,7 @@ export interface ModelHost {
    * it is rendered or not: what modules write with. The change is made on the
    * model (`rowMap` and `columnMap` say how its rows and columns moved); what an
    * edit does with the attributes declared bound to their cell's content and
-   * unique is applied after it (model/rules.ts), before the write steps
+   * unique is applied after it (shared/table/rules.ts), before the write steps
    */
   writeTable(target: TableTarget, change: (table: TableModel) => TableModel | undefined, options?: WriteOptions): Promise<WriteResult>;
   /**
@@ -816,7 +815,7 @@ export interface ModelHost {
   /** The table as edited: as rendered with the edits features hold (pendingEdits), what a cell's editor starts from */
   tableOf(info: TableInfo): TableModel;
   /** The name of the page shown */
-  readonly currentPage: string;
+  readonly currentDocument: string;
   /** The other pages a feature read for formulas (pageLinks); undefined: none reads them */
   otherPages(): OtherPages | undefined;
   /** Selects cells, where a feature selects (Feature.selectCells) */
@@ -939,7 +938,7 @@ export interface ModelHost {
    * A cell written over another (a value typed, cleared, copied or filled: a
    * cell of no attributes; a cell moved): its content and what is bound to it
    * (a formula) with it, so a value ends a formula even where it equals its
-   * result; the other's other attributes (its name) staying (model/rules.ts)
+   * result; the other's other attributes (its name) staying (shared/table/rules.ts)
    */
   cellWrittenOver(cell: ModelCell, over: ModelCell): ModelCell;
   /** Why one of these cells of the table is not changed by hand (Feature.readOnly), the first said; undefined: none is */
@@ -968,13 +967,6 @@ export interface ModelHost {
 
 /** What the core offers the adapter's modules (src/host/silverbullet/modules/): the model host and the rendering */
 export interface TableHost extends ModelHost {
-  /**
-   * A markdown table read into the model (its columns, rows and cells: a cell's
-   * content unescaped, its attributes apart): the adapter's, which reads the
-   * page's text for the sheet's board (until the binding pairs it with the
-   * markdown store: docs/silverware-table-store-plan.md, step 6)
-   */
-  asModel(table: Table): TableModel;
   /** What a table, or a part of it, stores beyond its content (Remove metadata: whose it is, whether any): its store's */
   storedMetadata(table: TableModel, part: MetadataPart | "all"): StoredMetadata;
   /** The table without what its store keeps of a part of it (or all) beyond its content, as its store reads it then (Remove metadata's change) */
@@ -1182,7 +1174,7 @@ export interface Feature {
   /** Another page was loaded into the editor (`name`): what was held for the page left can no longer be written into the editor */
   pageLoaded?(name: string): Promise<void> | void;
   /** After the edit, before the write steps: what they need read (other pages the edited table refers to) */
-  prepareEdit?(edited: TableModel, page: WritePage): Promise<void>;
+  prepareEdit?(edited: TableModel, edit: WriteDocument): Promise<void>;
   /** A write step: the table edited, as the feature changes it in the same write (formulas recalculated, references following) */
   writeStep?(before: TableModel, after: TableModel, edit: WriteEdit): TableModel;
   /**
@@ -1192,12 +1184,12 @@ export interface Feature {
   refusesWrite?(before: TableModel, after: TableModel, edit: WriteEdit): string | undefined;
   /**
    * Other tables of the page the write changes too, in the same edit (formulas
-   * referring to the edited table); `edit.page.tables` has those features
+   * referring to the edited table); `edit.tables` has those features
    * before it changed. `after` undefined: the table is deleted (Delete table)
    */
   otherTablesWritten?(before: TableModel, after: TableModel | undefined, edit: WriteEdit): readonly KeyedTable[];
   /**
-   * The formulas written in the page's text (`edit.page.formulas`) the write
+   * The formulas written in the page's text (`edit.formulas`) the write
    * changes too, in the same edit, each by its key with its text as written
    * anew (those referring to the edited table). One changed since it was
    * read, or whose text its place cannot hold, is left as it was, said; one
@@ -1293,7 +1285,7 @@ export interface Feature {
   /**
    * Keys of the module's cells' attributes bound to their cell's content
    * (formulas: f): a cell whose content an edit changed (typed, pasted,
-   * cleared over) loses them unless the edit set them (model/rules.ts, the
+   * cleared over) loses them unless the edit set them (shared/table/rules.ts, the
    * core's write step); every other attribute of a cell, whoever's, is kept
    */
   boundToContent?(): readonly string[];

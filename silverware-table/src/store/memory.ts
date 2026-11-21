@@ -5,7 +5,7 @@
 // one maker of keys), revisions by a count: a table changed gets a new one.
 import { type StoredTable, type TablePlan, type TableReport, type TableRevision, type TableSkip, type TableStore, type TableTransaction, validateTransaction } from "../core/store.ts";
 import type { TableKey, TableRegister } from "../core/tables.ts";
-import type { TableModel } from "../model/model.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 
 type Document = readonly StoredTable[];
 

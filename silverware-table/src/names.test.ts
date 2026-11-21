@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { decode, encode } from "./store/markdown/codec.ts";
-import { columnIdOf, columnKey, findColumn, headsOf } from "./columns.ts";
-import {
-  referencedColumn,
-} from "./formulas/index.ts";
+import { columnIdOf, columnKey, findColumn } from "../../shared/table/columns.ts";
+import { headsOf } from "./columns.ts";
+import { referencedColumn } from "../../shared/formulas/index.ts";
 import { formulaCell, formulaOf, recalculate } from "./testing/formulas.ts";
 import { parseMetaRow, parseTable, serializeTable } from "./markdown.ts";
-import { validateName } from "./namerules.ts";
-import { modelCellName, modelCellNames, modelColumnName, modelRowName, modelRowNames, nameOf, withCellName, withModelName, withName, withoutName } from "./names.ts";
+import { validateName } from "../../shared/table/namerules.ts";
+import { modelCellName, modelCellNames, modelColumnName, modelRowName, modelRowNames, withModelName } from "../../shared/table/names.ts";
+import { nameOf, withCellName, withName, withoutName } from "./names.ts";
 
 describe("names in cells", () => {
   it("reads, writes and removes a cell's name, keeping its text", () => {

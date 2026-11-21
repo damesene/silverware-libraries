@@ -31,5 +31,5 @@ export { checkStyle, validateColor, styleLook } from "./style.ts";
  * rows and columns left out; rules that do not read, and those whose row is gone, left out
  */
 export type ConditionsOffer = {
-  readonly ranges: (table: import("../model/model.ts").TableModel) => readonly { readonly rule: import("./rule.ts").Rule; readonly rows: readonly [number, number]; readonly columns: readonly [number, number] }[];
+  readonly ranges: (table: import("../../../shared/table/model.ts").TableModel) => readonly { readonly rule: import("./rule.ts").Rule; readonly rows: readonly [number, number]; readonly columns: readonly [number, number] }[];
 };

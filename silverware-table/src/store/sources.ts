@@ -4,10 +4,10 @@
 // cells (a hidden tag in one among them): its table is read as a table of a
 // page is, by the markdown codec, so what a renderer hides is an attribute,
 // and the same model while its data are the same.
-import type { StoredTable, TablePlan, TableReport, TableRevision, TableStore } from "../core/store.ts";
+import type { StoredTable, TablePlan, TableReport, TableRevision, TableStore, TableTransaction } from "../core/store.ts";
 import type { TableKey, TableRegister } from "../core/tables.ts";
 import { type Align, escapeCell, type Table } from "../markdown.ts";
-import type { TableModel } from "../model/model.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import type { SourceData, SourceProvider, SourceTables } from "../sources.ts";
 import { decode } from "./markdown/codec.ts";
 
@@ -22,7 +22,7 @@ export function sourceTable(data: SourceData): Table {
 }
 
 /** A source's document: its name after `@` */
-export const sourceDocument = (name: string): string => `@${name}`;
+const sourceDocument = (name: string): string => `@${name}`;
 
 const READ_ONLY = { cause: "refused", reason: "a source is read only" } as const;
 
@@ -66,11 +66,15 @@ export class SourceStore implements TableStore, SourceTables {
   }
 
   documentOf(key: TableKey): string | undefined {
-    for (const one of this.keys.values()) if (one.key === key) return sourceDocument(one.name);
+    for (const [lower, one] of this.keys) {
+      if (one.key !== key) continue;
+      // (Named as the source is defined now: redefined in another case, the same source; gone, as it was last)
+      return sourceDocument(this.provider.names().find((n) => n.toLowerCase() === lower) ?? one.name);
+    }
     return undefined;
   }
 
-  async plan(transaction: { readonly document: string }): Promise<TablePlan> {
+  async plan(transaction: TableTransaction): Promise<TablePlan> {
     return { document: transaction.document, changes: 0, skipped: READ_ONLY };
   }
 

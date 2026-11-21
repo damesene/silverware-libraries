@@ -4,7 +4,7 @@
 // `SourceProvider`. The sources module (features/sources.ts) offers them to
 // the formulas, which read them as `@name` (`@tasks[due]`). Nothing here knows
 // where they come from.
-import type { TableModel } from "./model/model.ts";
+import type { TableModel } from "../../shared/table/model.ts";
 
 /** What a source gives: its columns' names, and its rows, each a text per column ("" where empty) */
 export type SourceData = { readonly columns: readonly string[]; readonly rows: readonly (readonly string[])[] };
@@ -49,7 +49,7 @@ export type SourceTables = {
   /** A source's columns' names as it gives them; undefined where it is not read (or there is none) */
   columns(name: string): readonly string[] | undefined;
   /** A source as a table: null where none is defined so, undefined where it is not read yet */
-  table(name: string): import("./model/model.ts").TableModel | null | undefined;
+  table(name: string): import("../../shared/table/model.ts").TableModel | null | undefined;
   /** `listener` called whenever a source changed; the function returned stops it */
   changed(listener: () => void): () => void;
 };

@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { parseTable } from "../markdown.ts";
 import { metaName } from "../meta.ts";
 import { formulaCell, formulaOf, model, recalculate } from "../testing/formulas.ts";
-import { BUILT_IN_FUNCTIONS } from "./builtin/index.ts";
-import { errorCodeIn } from "./cell.ts";
-import type { TableSource } from "./evaluate.ts";
-import { takesGrids } from "./function.ts";
-import { cellValue, FormulaError, Grid, type Result, type Scalar } from "./values.ts";
+import { BUILT_IN_FUNCTIONS } from "../../../shared/formulas/builtin/index.ts";
+import { errorCodeIn } from "../../../shared/formulas/cell.ts";
+import type { TableSource } from "../../../shared/formulas/evaluate.ts";
+import { takesGrids } from "../../../shared/formulas/function.ts";
+import { cellValue, FormulaError, Grid, type Result, type Scalar } from "../../../shared/formulas/values.ts";
 
 // A table with `formula` in its last row's last cell (or `at`); what that cell shows once calculated
 function shown(markdown: string, formula: string, tables?: TableSource, at?: { row: number; column: number }): string {

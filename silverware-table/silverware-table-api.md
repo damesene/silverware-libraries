@@ -227,7 +227,8 @@ if js and js.window then
     return formulaErrors(silverwareTableJs.formulaErrorsTextIn, page).errors
   end
   --- The tables of a markdown text (a page's, as you have it): each with its name (where Silverware Table
-  --- named it), its place in the text, its columns (their names and keys) and its body's cells as they show.
+  --- named it), its place in the text, its columns (their names and keys) and its body's cells as they show, one
+  --- per column.
   --- @param text string the text, e.g. editor.getText()
   --- @return table a list of { name, from, to, columns = { { name, key } }, rows = { { cell, … } } }
   --- @see Library/damesene/silverware-table#For other plugins

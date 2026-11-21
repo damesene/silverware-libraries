@@ -280,6 +280,12 @@ function nameChanged(attributes: Attributes): boolean {
   return false;
 }
 
+/** A table's metadata row as the codec names it, by its own headers (what it means, its names' form aside: a column of a name others share named with its number) */
+function asNamedNow(base: Table): Record<string, string> {
+  const { byColumn, orphans } = columnsMetaOf(base);
+  return columnsMetaNamed(headsOf(base.rows[0]?.cells ?? []), byColumn, orphans);
+}
+
 /** The row of `baseRows` a row's attributes were read with, through the changes made to them since */
 function readRowOf(attributes: Attributes, baseRows: ReadonlySet<Row>): Row | undefined {
   for (let at: Attributes | undefined = attributes; at; at = attributeChangeOf(at)?.from) {
@@ -363,7 +369,8 @@ export function encode(model: TableModel, base: Table, deleted: (column: number)
     align: model.columns.map((column) => column.align),
     rows: [headerRow, ...bodyRows],
     attributes: model.attributes === (base.attributes ?? NO_ATTRIBUTES) ? base.attributes : model.attributes,
-    // (No metadata row read and none to write: none)
-    meta: same(meta, base.meta) ? base.meta : Object.keys(meta).length || base.meta ? meta : undefined,
+    // (No metadata row read and none to write: none; the same as read, though named another way, a column of a name
+    // others share without its number: as read)
+    meta: same(meta, base.meta) || (base.meta && same(meta, asNamedNow(base))) ? base.meta : Object.keys(meta).length || base.meta ? meta : undefined,
   };
 }

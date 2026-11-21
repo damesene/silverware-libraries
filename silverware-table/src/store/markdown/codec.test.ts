@@ -182,6 +182,18 @@ describe("the markdown codec", () => {
       expect(read.columns.map(headerText)).toEqual(["Price #euro", "Unit price", "#stars", "Qty"]);
     });
 
+    it("a metadata row naming a column of a name others share without its number: as read while it means the same, named anew once a header changed", () => {
+      const plain = parseTable("| Item | Item | Qty |\n|---|---|---|\n| a | b | c |\n| <meta core.table core.-c-item.sort='asc'> |");
+      const read = decode(plain);
+      const moved = { ...read, rows: [], columns: [read.columns[0]!, read.columns[2]!, read.columns[1]!] };
+      expect(md(encode({ ...read, rows: [] }, plain)).split("\n").at(-1)).toBe("| <meta core.table core.-c-item.sort='asc'> |");
+      expect(md(encode(moved, plain)).split("\n").at(-1)).toBe("| <meta core.table core.-c-item.sort='asc'> |");
+      const renamed = { ...read, columns: read.columns.map((c, i) => (i === 1 ? { ...c, header: "Cost" } : c)) };
+      expect(md(encode(renamed, plain)).split("\n").at(-1)).toBe("| <meta core.table core.-c-item.sort='asc'> |");
+      const first = { ...read, columns: read.columns.map((c, i) => (i === 0 ? { ...c, header: "Cost" } : c)) };
+      expect(md(encode(first, plain)).split("\n").at(-1)).toBe("| <meta core.table core.-c-cost.sort='asc'> |");
+    });
+
     it("rows moved, each as it was written; a header renamed, its column's attributes with it", () => {
       const plain = parseTable(FORMS[0]!);
       const read = decode(plain);

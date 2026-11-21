@@ -71,6 +71,21 @@ describe("the markdown store", () => {
     expect(pages.get("Shop")).toBe("Intro.\n\n| A |\n|---|\n| one \\| two |\n\n| B |\n|---|\n| 2 |\n");
   });
 
+  it("tells what a model stores beyond its content once, a model changed told anew", async () => {
+    const { platform } = pagesOf({ Shop: [table(["A"], ["1"])] }, "Shop");
+    const store = storeOf(platform);
+    const [read] = (await store.tables("Shop"))!;
+    const plain = store.metadataOf(read!.model, "all");
+    expect(plain.any).toBe(false);
+    // (The same model asked again, as each enhancing of its table asks: the same answer, not worked out again)
+    expect(store.metadataOf(read!.model, "all")).toBe(plain);
+    const model = read!.model;
+    const cell = model.rows[0]!.cells[0]!;
+    const stored = { ...model, rows: [{ ...model.rows[0]!, cells: [{ ...cell, attributes: withAttributeIn(cell.attributes, "x", "y", "1") }] }] };
+    expect(store.metadataOf(stored, "all")).toMatchObject({ any: true, owners: expect.arrayContaining([{ owner: "x", cells: 1 }]) });
+    expect(store.metadataOf(read!.model, "all")).toBe(plain);
+  });
+
   describe("a write's text apart from its tables", () => {
     afterEach(() => {
       // (No listener left for the next test: a new one replaces those of before)

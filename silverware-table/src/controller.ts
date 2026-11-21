@@ -54,6 +54,8 @@ import { CELL_NAME_KEY, type CellNameAt, LINE_NAME_KEY, modelCellName, modelCell
 import { ownMeta } from "./core/metaaccess.ts";
 import { reorderRows } from "../../shared/table/ops.ts";
 import {
+  type CellValues,
+  cellValues,
   cycleSort,
   DEFAULT_VIEW,
   type Pins,
@@ -105,11 +107,19 @@ const NAVIGATING_CLASS = "swt-navigating-here";
 
 
 /** What sorting compares of body rows' cells, by row and column: a look's key of its own (data-swt-sort), else the value */
-function sortKeys(rows: readonly HTMLTableRowElement[], values: readonly (readonly string[])[]): (row: number, column: number) => string {
+function sortKeys(rows: readonly HTMLTableRowElement[], values: CellValues): (row: number, column: number) => string {
   return (row, column) => {
     const cell = rows[row]?.cells[column];
-    return cell ? sortKeyOf(cell, values[row]![column]!) : "";
+    return cell ? sortKeyOf(cell, values.value(row, column)) : "";
   };
+}
+
+/** Body rows' cell values, each read from its cell when first asked */
+function rowsValues(rows: readonly HTMLTableRowElement[], valueOf: (cell: HTMLTableCellElement) => string): CellValues {
+  return cellValues(rows.length, (row, column) => {
+    const cell = rows[row]?.cells[column];
+    return cell ? valueOf(cell) : "";
+  });
 }
 
 export class Controller implements TableHost {
@@ -364,7 +374,8 @@ export class Controller implements TableHost {
   private registerLayout(): void {
     layoutOf(this.platform.layout).register(
       this.binding.layoutProvider({
-        renderedRows: (table) => this.rows.renderedRows(table),
+        // (Read, not taken: its observer may see a table rendered anew before the core's, which takes it)
+        renderedRows: (table) => this.rows.readRows(table),
         tableOf: (widget) => {
           const info = this.infos.get(widget);
           return info && { key: info.key, revision: info.revision };
@@ -982,7 +993,7 @@ export class Controller implements TableHost {
     this.sortsWaiting.delete(shownInfo.key);
     const [widget, info] = this.current(shownWidget, shownInfo);
     const rows = this.bodyRows(info);
-    const values = rows.map((tr) => Array.from(tr.cells).map(cellValue));
+    const values = rowsValues(rows, cellValue);
     const { top, bottom } = info.pins;
     const middle = visibleRows(values, withPins(view, info.pins), undefined, sortKeys(rows, values));
     const order = [
@@ -2050,7 +2061,7 @@ export class Controller implements TableHost {
     const view = this.viewOf(info);
     const { top, bottom } = info.pins;
     const rows = this.bodyRows(info);
-    const values = rows.map((tr) => Array.from(tr.cells).map((cell) => this.cellValue(cell)));
+    const values = rowsValues(rows, (cell) => this.cellValue(cell));
     // The rows features hide (filters)
     const hidden = new Set<number>();
     for (const feature of this.features) for (const i of feature.hiddenRows?.(info, values) ?? []) hidden.add(i);

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { cycleSort, DEFAULT_VIEW, remapColumns, visibleRows } from "./view.ts";
+import { cellValues, cellValuesOf, cycleSort, DEFAULT_VIEW, remapColumns, visibleRows } from "./view.ts";
 
-const values = [
+const values = cellValuesOf([
   ["Banana", "10"],
   ["apple", "9"],
   ["", "100"],
   ["Čokoláda", ""],
-];
+]);
 
 describe("sorting", () => {
   it("cycles ascending, descending, source order", () => {
@@ -29,6 +29,15 @@ describe("sorting", () => {
 
   it("keeps the source order without sorting", () => {
     expect(visibleRows(values, DEFAULT_VIEW)).toEqual([0, 1, 2, 3]);
+  });
+
+  it("reads only the cells it sorts by, each once; none without sorting", () => {
+    const read: string[] = [];
+    const lazy = () => cellValues(4, (row, column) => (read.push(`${row}:${column}`), `${row * 7 % 4}`));
+    visibleRows(lazy(), DEFAULT_VIEW);
+    expect(read).toEqual([]);
+    expect(visibleRows(lazy(), cycleSort(DEFAULT_VIEW, 1))).toEqual([0, 3, 2, 1]);
+    expect(read.sort()).toEqual(["0:1", "1:1", "2:1", "3:1"]);
   });
 });
 

@@ -21,7 +21,7 @@ import type { IndexMap } from "../../../shared/table/ops.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "../menu.ts";
 import type { MenuBuilder, MenuGroup, MenuSection } from "../../../shared/menuslots.ts";
 import type { CellNameAt, RowName } from "../../../shared/table/names.ts";
-import type { Pins, ViewState } from "../view.ts";
+import type { CellValues, Pins, ViewState } from "../view.ts";
 import type { TableData } from "../tabledata.ts";
 
 /** A table shown, in model terms (what modules get): where it is in the page, its shape, its pins */
@@ -1205,10 +1205,11 @@ export interface Feature {
   /** What deleting the whole table (Delete table) also affects, asked first: "the formulas of 2 tables that refer to it show #REF!" */
   tableDeleteWarning?(info: TableInfo): string | undefined;
   /**
-   * Body rows the feature hides (filters), as indexes into `values` (one array
-   * of cell values per body row, values[0] being row 1); pinned rows are not hidden
+   * Body rows the feature hides (filters), as indexes into `values` (row 0 being
+   * row 1; read only the cells it needs: each is read from the table when first
+   * asked); pinned rows are not hidden
    */
-  hiddenRows?(info: TableInfo, values: readonly (readonly string[])[]): ReadonlySet<number> | undefined;
+  hiddenRows?(info: TableInfo, values: CellValues): ReadonlySet<number> | undefined;
   /** Whether the feature hides rows of the table now (moving rows and pasting wait for that to end) */
   hidesRows?(info: TableInfo): boolean;
   /** The table's view was applied: rows sorted and hidden, the header marked */

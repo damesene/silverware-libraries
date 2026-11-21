@@ -133,6 +133,9 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
   private readonly reports = new WeakMap<TableReport, ApplyReport>();
   // The tables the store made of a table read (withoutMetadata): written as they are, over the one they were made of
   private readonly made = new WeakSet<Table>();
+  // What each model stores beyond its content, as a whole (a model is never changed: asked of the same one again by
+  // every enhancing of its table, it is not encoded again)
+  private readonly metadata = new WeakMap<TableModel, StoredMetadata>();
   // Each document's tables as last read, by revision: a write encodes a model over the very table it was decoded from
   // (the codec tells a column the model keeps from one gone by what it read), which a parse again need not be
   private readonly read = new Map<string, ReadonlyMap<TableRevision, Table>>();
@@ -423,7 +426,10 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
 
   metadataOf(table: TableModel, part: MetadataPart | "all"): StoredMetadata {
     // (Its markdown as read: what it stores is written there, the metadata of no column too)
-    return metadataOf(encodeOver(table, table), part);
+    if (part !== "all") return metadataOf(encodeOver(table, table), part);
+    let stored = this.metadata.get(table);
+    if (!stored) this.metadata.set(table, (stored = metadataOf(encodeOver(table, table), "all")));
+    return stored;
   }
 
   withoutMetadata(table: TableModel, part: MetadataPart | "all"): TableModel {

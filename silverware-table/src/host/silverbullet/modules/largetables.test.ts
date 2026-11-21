@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { controller, editor, flush, PAGE, setup, text, useTablePage } from "../../../testing/page.ts";
+import { LAYOUT_VERSION, type LayoutProvider } from "../../../../../shared/layout.ts";
+import { bridge, controller, editor, flush, PAGE, setup, text, useTablePage } from "../../../testing/page.ts";
 
 describe("Large tables", () => {
   useTablePage();
@@ -40,6 +41,36 @@ describe("Large tables", () => {
     await controller.scan();
     expect(inDocument().length).toBeLessThan(ROWS);
     expect(editor.querySelector(".swt-cell-editor")?.closest("tr")?.dataset.swtRow).toBe("251");
+  });
+
+  it("takes the rows of a table rendered anew out before it is laid out, though Silverware Layout read the table first", async () => {
+    let provider: LayoutProvider | undefined;
+    const layout = { version: LAYOUT_VERSION, register: (made: LayoutProvider) => ((provider = made), () => undefined) };
+    await setup(LARGE, ON, { layout });
+    expect(provider).toBeDefined();
+    // Silverware Layout's observer, started before Silverware Table's, reads a table rendered anew before it is told
+    const write = bridge.replaceRange;
+    bridge.replaceRange = (from, to, insert) => {
+      write(from, to, insert);
+      provider!.read(widget());
+    };
+    controller.editCell(info(), { row: 2, column: 1 }, "replace");
+    const field = editor.querySelector<HTMLInputElement>(".swt-cell-editor")!;
+    field.value = "x";
+    // The rows of the table rendered anew in the document once Silverware Table's observer has run (this one runs
+    // after it), before the table is enhanced
+    let told = -1;
+    const after = new MutationObserver((records) => {
+      const added = records.flatMap((record) => Array.from(record.addedNodes)).find((node) => node instanceof HTMLElement && node.querySelector("table"));
+      if (told < 0 && added) told = (added as HTMLElement).querySelectorAll("tbody tr:not(.swt-large-spacer)").length;
+    });
+    after.observe(editor, { childList: true, subtree: true });
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    for (let i = 0; i < 4; i++) await flush();
+    after.disconnect();
+    expect(text).toContain("| Row 2 | x");
+    expect(told).toBeGreaterThan(0);
+    expect(told).toBeLessThan(ROWS);
   });
 
   it("leaves smaller tables as they were", async () => {

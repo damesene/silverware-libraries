@@ -13,6 +13,7 @@
 // filters were typed that are not stored (yet, or the setting is off): so an
 // undo of the metadata (Ctrl+Z after Remove metadata, after a store) shows
 // what the markdown has again.
+import type { CellValues } from "../view.ts";
 import {
   CELL_MENU_ORDER,
   HEADER_ICON_ORDER,
@@ -147,18 +148,18 @@ class FilterTable {
     return matchers;
   }
 
-  hiddenRows(info: TableInfo, values: readonly (readonly string[])[]): ReadonlySet<number> | undefined {
+  hiddenRows(info: TableInfo, values: CellValues): ReadonlySet<number> | undefined {
     const matchers = this.matchers(info);
     if (matchers.size === 0) return undefined;
     const hidden = new Set<number>();
-    values.forEach((row, i) => {
+    for (let row = 0; row < values.rows; row++) {
       for (const [column, match] of matchers) {
-        if (!match(row[column] ?? "")) {
-          hidden.add(i);
-          return;
+        if (!match(values.value(row, column))) {
+          hidden.add(row);
+          break;
         }
       }
-    });
+    }
     return hidden;
   }
 

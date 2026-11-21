@@ -61,7 +61,8 @@ export type FeatureEntry = { readonly name: FeatureName | undefined; readonly cr
 
 /** What the provider for Silverware Layout is given of the tables (the core's) */
 export type LayoutTables = {
-  // A rendered table's rows as SilverBullet rendered them (some may be out of the document: largeTables)
+  // A rendered table's rows as SilverBullet rendered them (some may be out of the document: largeTables), read only:
+  // a table the core has not taken yet stays new, so its features are told of it before it is laid out
   renderedRows(table: HTMLTableElement): readonly HTMLTableRowElement[];
   // The table a widget shows, where it is enhanced (known in its store), so it can be written; undefined: not yet
   tableOf(widget: HTMLElement): TableTarget | undefined;

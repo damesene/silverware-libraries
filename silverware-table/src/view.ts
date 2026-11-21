@@ -67,23 +67,44 @@ export function remapColumns(
 }
 
 /**
+ * The body rows' cell values (row 0 being the table's row 1; a cell a row lacks
+ * is empty): what a view reads of the cells it sorts or filters by, and only
+ * those, so a table neither sorted nor filtered reads none.
+ */
+export type CellValues = {
+  readonly rows: number;
+  value(row: number, column: number): string;
+};
+
+/** Cell values each read once, when first asked */
+export function cellValues(rows: number, read: (row: number, column: number) => string): CellValues {
+  const known: string[][] = [];
+  return {
+    rows,
+    value: (row, column) => ((known[row] ??= [])[column] ??= read(row, column)),
+  };
+}
+
+/** Cell values given whole, one array per body row */
+export function cellValuesOf(values: readonly (readonly string[])[]): CellValues {
+  return { rows: values.length, value: (row, column) => values[row]?.[column] ?? "" };
+}
+
+/**
  * The body rows to show between the pinned ones, in display order, as indexes
- * into `values` (one array of cell texts per body row, values[0] being row 1),
- * but those `hidden` (by a feature: filters). Pinned rows are left out: they
- * are not sorted or hidden. Empty cells sort last in both directions; ties
- * keep the source order.
+ * into `values`, but those `hidden` (by a feature: filters). Pinned rows are
+ * left out: they are not sorted or hidden. Empty cells sort last in both
+ * directions; ties keep the source order.
  */
 export function visibleRows(
-  values: readonly (readonly string[])[],
+  values: CellValues,
   view: ViewState,
   hidden: ReadonlySet<number> = new Set(),
   // What sorting compares of a row's cell, where it is not its value
-  sortKey: (row: number, column: number) => string = (row, column) => values[row]![column] ?? "",
+  sortKey: (row: number, column: number) => string = (row, column) => values.value(row, column),
 ): number[] {
   const { top, bottom } = pinsOf(view);
-  const indexes = values
-    .map((_, i) => i)
-    .filter((i) => i >= top && i < values.length - bottom && !hidden.has(i));
+  const indexes = Array.from({ length: values.rows }, (_, i) => i).filter((i) => i >= top && i < values.rows - bottom && !hidden.has(i));
   const sort = view.sort;
   if (!sort) return indexes;
   return indexes.sort((a, b) => compareForSort(sortKey(a, sort.column), sortKey(b, sort.column), sort.direction) || a - b);

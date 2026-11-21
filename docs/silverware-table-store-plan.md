@@ -341,7 +341,8 @@ registered with the writer as its part `tables` (step 4b): a transaction of
 this plan becomes a batch of the writer's changes, so a table's edit and a
 page's properties or tags are written in one edit of one document. The
 registry the built-in parts go through takes a plugin's own since
-2026-11-21 (`registerPart`, `PageChangeKinds`: step 4b's first part).
+2026-11-21 (`registerPart`: step 4b's first part; a plugin's part typed by
+itself, `definePluginPart` and `p.part(it)`, since step 8).
 
 ### The SilverBullet binding (`host/silverbullet/`)
 
@@ -820,7 +821,8 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
     writes of one step), the common part is drawn out in step 8, from both
     done.
     **Done (2026-11-21)**: (1) the writer's registry opened
-    (`registerPart`, `definePart`, `PageChangeKinds`) and `replanOpenPage`,
+    (`registerPart`; its types by `definePart` and `PageChangeKinds` then,
+    a plugin's part typed by itself since step 8) and `replanOpenPage`,
     the other plugins built and tested with it. (2) The markdown store's
     parts (`store/markdown/tableparts.ts`): `writeTables` (the tables of a
     write in one change, each found by its text and its order among those
@@ -1036,7 +1038,8 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    it; `TableAt` names its text `text`; a plugin's part of the page writer
    typed by itself (`definePluginPart`, `p.part(it)`; no `PageSections` nor
    `PageChangeKinds` merging), page formulas a part of their own
-   (`PAGE_FORMULAS`), the writer's parts read as `partsNow()`; the controller's
+   (`PAGE_FORMULAS`), `PARTS` gone (`builtInParts()` for the builder,
+   `isPart`, `partsNow()` a copy); the controller's
    metadata step `asMetadataAllows`; `LayoutTables.write` by a `TableTarget`
    (`tableOf(widget)`); `SourceStore.plan` takes a `TableTransaction`; the
    core's API says *document* where a store keeps tables and the editor shows
@@ -1048,7 +1051,9 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    alone said once (`shared/store.ts`: `SkipCause`, `Skip`, the writer's,
    the table's and the database's); the open page planned anew as a page is
    planned (`leaveAlone` asked of it as it is now, nothing written where it is
-   already as its changes make it: reported with no change); a source's
+   already as its changes make it: reported with no change; the table store
+   never meets it: a table changed meanwhile is not found by its text as read,
+   and its write is left as changed); a source's
    document named as it is defined now. The history marker on a write planned
    anew was right already (the store plans the open page's write anew on its
    text now, `openWrite`, before `beforeWrite`). Not drawn out: the plan's and

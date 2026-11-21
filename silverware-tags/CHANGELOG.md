@@ -1,5 +1,9 @@
 # Silverware Tags: changelog
 
+## 1.1.2 (2026-11-21)
+
+- Shares updated code with Silverware Table 1.4.0; nothing changes in use.
+
 ## 1.1.1 (2026-11-19)
 
 - Panels, menus and dialogs scroll with a thin scrollbar, the same in every Silverware plugin; SilverBullet's own scrollbar is unchanged.

@@ -883,7 +883,9 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    provider): the core imports nothing of `host/` (`isolation.test.ts`, the
    adapter's modules checked there too). The core's write steps are on the
    model (the pins set; the metadata setting's rule, `withoutNewAttributes`,
-   a cell's and a row's attributes; the columns' attributes follow their
+   a cell's, a row's and a header's attributes, checked on the table as
+   written and read again: a tag typed into a cell is an attribute once the
+   page is read; the columns' attributes follow their
    columns in the model itself, so the markdown's following,
    `metadataAfterEdit`, is gone, and `WriteStep` and `byModel` with it); the
    markdown's operations (ops.ts) are the tests' alone
@@ -930,6 +932,31 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    drawn out into `shared/` where the table's and the database's are alike
    (revisions, plans and reports by parts, the causes a part is left for, the
    contract tests' harness), decided 2026-11-21 (step 4b).
+   Found by the review of steps 4 to 6 (2026-11-21), for this step: one
+   outcome of a write said three ways (the markdown store's `PageWritten`,
+   `TableReport`, the core's `WriteResult`; `skipOf` copying the writer's
+   skip into a `TableSkip` of the same shape); the table store's plan and
+   report shaped unlike the database's (`TablePlan`/`TableReport`/`TableSkip`
+   with one `skipped` and `written` a boolean, against
+   `TransactionPlan`/`TransactionReport`/`Skipped[]`); `TableWrite` and
+   `TableInsert` of the markdown store's parts against `TableEdit`'s kinds
+   `write` and `insert`; `TableAt` naming the text `source` where the
+   writer's other parts say `text` and `occurrence`/`of`; `setPageFormula`
+   in the `tables` section; the controller's private `withoutNewAttributes`
+   named as the model's rule it calls; `LayoutTables.write` taking a widget
+   where every other write takes a `TableTarget`; `SourceStore.plan` taking
+   `{ document }`; exports used by their file alone (`featureEntries`,
+   `sourceDocument`, `PageWritten`, `TableAt`, `NewTablePlace`,
+   `newTablePlace`, `LAYOUT_OWNER`); the shared writer's part registry typed
+   for every plugin (`PageSections.tables` type-checks in a bundle that has
+   no such part) and `PARTS` a mutable array exported as readonly.
+   Left by the review, smaller than a fix of their own: a write planned
+   anew on the open page leaves the controller's `pageText` and the history
+   marker as computed on the text read (the page itself right; the next
+   scan reads it again); the writer's `plannedAnew` reports a page written
+   where the text came out the same, and skips `leaveAlone` (no plugin
+   replanning uses it); a source's key keeps the name it was first defined
+   with (`documentOf` answers `@Tasks` after it is redefined `tasks`).
 
 Rough size, not measured, **as estimated on 2026-11-06**: step 1 a day or
 two; step 2 the largest by files (about 25), a week or more; step 3 the

@@ -1,27 +1,21 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import type { ModelHost } from "../core/feature.ts";
+import { TableRegister } from "../core/tables.ts";
 import { cell, clickOn, controller, editor, flush, key, setup, text, useTablePage } from "../testing/page.ts";
 import { memorySources, type SourceProvider, type SourcesOffer } from "../sources.ts";
-import { decode } from "../store/markdown/codec.ts";
-import { Sources, sourceTable } from "./sources.ts";
+import { SourceStore } from "../store/sources.ts";
+import { Sources } from "./sources.ts";
 
-/** The module on a host that keeps what it offers and counts the tables' checks */
+/** The module on a host that keeps what it offers and counts the tables' checks, its sources the core's store of them */
 function started<P extends SourceProvider>(provider: P = memorySources({ tasks: { columns: ["name", "due"], rows: [["a | b", "2025-11-06"]] } }) as unknown as P) {
   let offer: SourcesOffer | undefined;
   const tablesChanged = vi.fn();
-  const host = { offer: (api: SourcesOffer) => void (offer = api), tablesChanged, asModel: decode } as unknown as ModelHost;
-  const module = new Sources(host, provider);
+  const host = { offer: (api: SourcesOffer) => void (offer = api), tablesChanged } as unknown as ModelHost;
+  const module = new Sources(host, new SourceStore(provider, new TableRegister()));
   module.start();
   return { offer: offer!, tablesChanged, module, provider };
 }
-
-describe("sourceTable", () => {
-  it("makes a source's data a table: its columns the header, each value a cell's text", () => {
-    const table = sourceTable({ columns: ["name"], rows: [["a | b"], []] });
-    expect(table.rows.map((r) => r.cells)).toEqual([["name"], ["a \\| b"], [""]]);
-  });
-});
 
 describe("the sources module", () => {
   it("offers a source as a table, the same object while its data are the same", () => {

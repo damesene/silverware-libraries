@@ -169,6 +169,15 @@ export class TableRegister {
     for (const tables of this.pages.values()) for (const e of tables.expected) if (e.key === key) e.text = text;
   }
 
+  /**
+   * A key for a table a store keeps itself (the memory store, a source's),
+   * made as the register makes its own, so no two keys meet; the register
+   * keeps nothing of it
+   */
+  newKey(page: string): TableKey {
+    return this.make(page, this.page(page));
+  }
+
   /** A key reserved for a table not written after all: no table gets it */
   release(key: TableKey): void {
     for (const tables of this.pages.values()) tables.expected = tables.expected.filter((e) => e.key !== key);

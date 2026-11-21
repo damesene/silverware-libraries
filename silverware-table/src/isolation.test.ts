@@ -7,6 +7,8 @@ import { describe, expect, it } from "vitest";
 // (Vite reads the options as written: a literal each time)
 const features = import.meta.glob(["./features/*.ts", "!./features/*.test.ts"], { query: "?raw", import: "default", eager: true });
 const core = import.meta.glob(["./controller.ts", "./core/**/*.ts", "!./core/**/*.test.ts"], { query: "?raw", import: "default", eager: true });
+// The stores (the markdown store writes through the page writer)
+const stores = import.meta.glob(["./store/**/*.ts", "!./store/**/*.test.ts"], { query: "?raw", import: "default", eager: true });
 // The domains the modules hand data to: their own pure code
 const domains = import.meta.glob(
   ["./formulas/**/*.ts", "./calculated/**/*.ts", "./pivot/**/*.ts", "./sheet/**/*.ts", "./excel/**/*.ts", "./export/**/*.ts", "./columntypes/**/*.ts", "./conditions/**/*.ts", "./autofill/**/*.ts", "!./**/*.test.ts"],
@@ -55,11 +57,14 @@ describe("isolation", () => {
     expect(matches(modules, /\b(Map|Set|WeakMap)<TableKey\b/)).toEqual([]);
   });
 
+  it("a page is written by the page writer alone: no editor's replace nor space's write in the core, the stores or the modules (store plan, step 4b)", () => {
+    expect(Object.keys(stores)).toContain("./store/markdown/store.ts");
+    expect(matches({ ...core, ...stores, ...features }, /\b(editor|space)[!?]?\.(replace|write)\(/)).toEqual([]);
+  });
+
   it("the modules work on the model: nothing of the markdown's form (its tables, cells, tags and operations)", () => {
-    // (The sources module makes its source's table as markdown, read in by the host, until a source is a store of its own:
-    // docs/silverware-table-store-plan.md, step 5)
-    const modules = Object.fromEntries(Object.entries(features).filter(([path]) => path !== "./features/sources.ts"));
-    expect(matches(modules, /from "[./]*(markdown|tags|ops)\.ts"/)).toEqual([]);
+    expect(matches(features, /from "[./]*(markdown|tags|ops)\.ts"/)).toEqual([]);
+    expect(matches(features, /\basModel\(/)).toEqual([]);
   });
 
   it("the domains and the model work on the model too: nothing of the markdown's form, no cell escaped or unescaped", () => {

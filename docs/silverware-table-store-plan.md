@@ -336,8 +336,8 @@ store's, the one place that reads that form back (Principle 1), and is
 registered with the writer as its part `tables` (step 4b): a transaction of
 this plan becomes a batch of the writer's changes, so a table's edit and a
 page's properties or tags are written in one edit of one document. The
-writer's parts are built in only until a plugin needs its own; the registry
-they go through is the one the table's part is registered with.
+registry the built-in parts go through takes a plugin's own since
+2026-11-21 (`registerPart`, `PageChangeKinds`: step 4b's first part).
 
 ### The SilverBullet binding (`host/silverbullet/`)
 
@@ -791,6 +791,52 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
       (lazy saving, another page's table) keep the writer's check. The
       contract tests have a write meeting a change of the page between its
       read and its write.
+    **How (decided 2026-11-21, with the user)**: in two parts, the first
+    `shared/`'s alone. (1) The writer: its registry opened (`PageChange` a map
+    of kinds plugins add to, as `PageSections` is now, and parts registered
+    from outside), its option to plan the open page anew where it changed,
+    every plugin writing through it (Database, Tags, Layout, Assets) built
+    and tested with it, nothing of the table yet. (2) The markdown store on
+    it: its parts (a table found by its text and its order among the page's
+    tables, as the writer finds a code block; a page formula), other
+    plugins' edits of a write (`onWrite`) as `editText`, lazy saving's own
+    path gone. Weighed against writing the table through `editText` alone (no
+    change of `shared/`, but the codec no part of the writer, other plugins
+    unable to write a table through it, and a retry of the table's around
+    the writer) and against the table keeping a writer of its own (two
+    writers of pages, no report nor undo for a page not open): chosen as one
+    writer of pages for every plugin, and for the MCP server to come (writes
+    to pages not open, with a report). **The table's transactions take the
+    database's shape** (`plan`, `apply`, `planUndo`, parts left with their
+    cause, `changed`, `missing`, `refused`, a revision checked as written)
+    without a module of their own in `shared/` yet: weighed against a
+    skeleton shared now (the database's released API changed, an abstraction
+    made of two stores whose needs differ: batches with a preview, quick
+    writes of one step), the common part is drawn out in step 8, from both
+    done.
+    **Done (2026-11-21)**: (1) the writer's registry opened
+    (`registerPart`, `definePart`, `PageChangeKinds`) and `replanOpenPage`,
+    the other plugins built and tested with it. (2) The markdown store's
+    parts (`store/markdown/tableparts.ts`): `writeTables` (the tables of a
+    write in one change, each found by its text and its order among those
+    alike before any is written, so two tables alike written in one edit are
+    each the one it was; written, taken out with the empty line after it, a
+    new one put after a table or where the cursor's line was) and
+    `setPageFormula`; `MarkdownStore.write(document, make)` writes through
+    the writer, planned anew where the open page changed, into the space
+    where it is not open (lazy saving's own path gone). Every write of the
+    core (a table's, a new table, a table deleted, empty headers named,
+    tables replaced on a page not open) hands the writer its tables as data;
+    other plugins' edits (`onWrite`) are its `editText`, made once by the core
+    and made again only where the writer plans the write anew. The core still
+    computes the text a write makes beforehand, for what it keeps of it (the
+    register's new keys, a table's place written, the history markers,
+    anchors). A write goes to the page the editor has open as its text is
+    read (its name with it, not the page last scanned). Nothing but the
+    writer writes a page (`isolation.test.ts`). The transactions'
+    `plan` / `apply` / `planUndo` come with the first caller that needs them
+    apart (a preview, an undo of a page not open): the writer's `write` is
+    all the core asks now.
 5. **The other stores.** The memory store and the views plan's sources on the
    store interface, both passing the contract tests; a few module tests over
    the memory store as the proof that modules need no text (the rest keep the
@@ -798,6 +844,26 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    table, not a document's: the sources' store gives each as a document of
    its name (`@tasks`) holding that one table, read only (`writable`:
    nothing), so the interface needs nothing of its own for them.
+   **Done (2026-11-21)**: the store's write side, a transaction of a
+   document's tables (written by key where their revision is still the one
+   read, new ones after a table or at the end, some taken out) as one step,
+   `plan` / `apply` / `planUndo` in the database store's shape, left whole
+   with its cause (`changed`, `missing`, `refused`); the markdown store's
+   through the page writer (lazy saving into a page not open is one now,
+   `replaceTables`). `store/contract.ts` gives its tables as models (what
+   every store keeps alike) and has the write side; the markdown store passes
+   it with the page open and not, `store/memory.ts` (keys by the register's
+   `newKey`, revisions a count) and `store/sources.ts` (each source `@name`,
+   one table, read only: every transaction refused; `oneTable`) too. A
+   source's values are read as a table of a page is (its hidden tags
+   attributes), by the store, so the sources module is given models
+   (`SourceTables`) and reads no markdown: no module does now, and
+   `asModel` is the adapter's alone (`TableHost`). The proof that a module
+   needs no text: the sheet module's write hooks over the memory store
+   (`features/sheets.store.test.ts`), its host only the sheet's attributes
+   and the names. The core still writes the open page through its own
+   pipeline on the markdown (step 6 pairs it with the store); `writable`,
+   `changed(listener)` and `reveal` come with their first callers.
 6. **The SilverBullet binding.** The adapter, its pairing with the markdown
    store, history markers, Lua places and the Lua API into
    `host/silverbullet/`; the dependency rule checked by folder.
@@ -827,7 +893,10 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    too where tables hold them. Names known to be wrong are fixed in the step
    that touches them, not left for this one. Known already: "page" and
    "document" for one thing (the store's `tables(document)`, the host's
-   `currentPage`, `pageTables`, `WritePage`, `pageNameNow`).
+   `currentPage`, `pageTables`, `WritePage`, `pageNameNow`). The stores' common part
+   drawn out into `shared/` where the table's and the database's are alike
+   (revisions, plans and reports by parts, the causes a part is left for, the
+   contract tests' harness), decided 2026-11-21 (step 4b).
 
 Rough size, not measured, **as estimated on 2026-11-06**: step 1 a day or
 two; step 2 the largest by files (about 25), a week or more; step 3 the

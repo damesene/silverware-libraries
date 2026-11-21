@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { TableRegister } from "../../core/tables.ts";
 import { luaCallPlaces } from "../../host/lua.ts";
+import { serializeTable } from "../../markdown.ts";
 import { defineFormulaPlaces, formulaPlacesIn, pageFormulaPlace, pageFormulasIn } from "./pageformulas.ts";
 import { MarkdownStore } from "./store.ts";
 
@@ -46,7 +47,7 @@ describe("page formulas: the formulas written in a page's text, not as formula c
       editor: { documentName: () => "Shop", text: () => PAGE, replace: () => undefined },
       space: { read: () => Promise.reject(new Error("no page")), write: () => undefined, list: () => [] },
     };
-    const store = new MarkdownStore(() => platform, new TableRegister());
+    const store = new MarkdownStore(() => platform, new TableRegister(), async () => serializeTable);
     expect((await store.pageFormulas("Shop"))!.map((f) => f.text)).toEqual(["=SUM(prices![price])", "=prices!B1", "=prices!B1"]);
     expect(await store.pageFormulas("Missing")).toBeNull();
   });

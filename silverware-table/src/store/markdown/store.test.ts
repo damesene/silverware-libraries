@@ -1,19 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { serializeTable, type Table } from "../../markdown.ts";
+import { serializeTable } from "../../markdown.ts";
 import { TableRegister } from "../../core/tables.ts";
 import type { TablePlatform } from "../../core/platform.ts";
-import { storeContract } from "../contract.ts";
+import type { TableModel } from "../../model/model.ts";
+import { storeContract, table } from "../contract.ts";
 import { MarkdownStore } from "./store.ts";
+import { newTableMarkdown } from "./tableparts.ts";
 
-// Pages in memory, one of them open in the editor; each a line of text between its tables
-function pagesOf(documents: Readonly<Record<string, readonly Table[]>>, open: string) {
+/** A page's text of these tables, a line of text before each */
+const textOf = (tables: readonly TableModel[]) => ["Intro.", ...tables.map((one) => newTableMarkdown(one, "", serializeTable))].join("\n\n") + "\n";
+
+// Pages in memory, one of them open in the editor
+function pagesOf(documents: Readonly<Record<string, readonly TableModel[]>>, open: string) {
   const pages = new Map(Object.entries(documents).map(([name, tables]) => [name, textOf(tables)]));
   const platform: Pick<TablePlatform, "editor" | "space"> = {
     editor: {
       documentName: () => open,
       text: () => pages.get(open) ?? "",
-      replace: () => {
-        throw new Error("not written here");
+      replace: (from, to, insert) => {
+        const text = pages.get(open) ?? "";
+        pages.set(open, text.slice(0, from) + insert + text.slice(to));
       },
     },
     space: {
@@ -29,20 +35,32 @@ function pagesOf(documents: Readonly<Record<string, readonly Table[]>>, open: st
   return { pages, platform };
 }
 
-const textOf = (tables: readonly Table[]) => ["Intro.", ...tables.map((table) => serializeTable(table))].join("\n\n") + "\n";
+const storeOf = (platform: Pick<TablePlatform, "editor" | "space">) => new MarkdownStore(() => platform, new TableRegister(), async () => serializeTable);
 
 storeContract("markdown in pages, the open page's through the editor", (documents) => {
   const open = Object.keys(documents)[0] ?? "";
   const { pages, platform } = pagesOf(documents, open);
-  return { store: new MarkdownStore(() => platform, new TableRegister()), replace: (document, tables) => void pages.set(document, textOf(tables)) };
+  return { store: storeOf(platform), replace: (document, tables) => void pages.set(document, textOf(tables)) };
+});
+
+storeContract("markdown in pages, none open: through the space", (documents) => {
+  const { pages, platform } = pagesOf(documents, "");
+  return { store: storeOf(platform), replace: (document, tables) => void pages.set(document, textOf(tables)) };
 });
 
 describe("the markdown store", () => {
   it("reads a page not open through the space, none where the platform reads no other page", async () => {
-    const table: Table = { rows: [{ cells: ["A"] }, { cells: ["1"] }], align: [""], indent: "", padded: false };
-    const { platform } = pagesOf({ Open: [], Other: [table] }, "Open");
-    expect(await new MarkdownStore(() => platform, new TableRegister()).tables("Other")).toHaveLength(1);
+    const { platform } = pagesOf({ Open: [], Other: [table(["A"], ["1"])] }, "Open");
+    expect(await storeOf(platform).tables("Other")).toHaveLength(1);
     const { space: _, ...editorOnly } = platform;
-    expect(await new MarkdownStore(() => editorOnly, new TableRegister()).tables("Other")).toBeNull();
+    expect(await storeOf(editorOnly).tables("Other")).toBeNull();
+  });
+
+  it("writes a transaction's tables as markdown, the rest of the page as it was", async () => {
+    const { pages, platform } = pagesOf({ Shop: [table(["A"], ["1"]), table(["B"], ["2"])] }, "Shop");
+    const store = storeOf(platform);
+    const [first] = (await store.tables("Shop"))!;
+    await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "write", key: first!.key, expects: first!.revision, model: table(["A"], ["one | two"]) }] }));
+    expect(pages.get("Shop")).toBe("Intro.\n\n| A |\n|---|\n| one \\| two |\n\n| B |\n|---|\n| 2 |\n");
   });
 });

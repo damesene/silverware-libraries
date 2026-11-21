@@ -127,6 +127,23 @@ describe("the markdown store", () => {
       expect(seen).toEqual([`| B |\n|---|\n| 2 | ${at + 3}-${at + 3}`, `moved ${before.length + 1}`]);
     });
 
+    it("tells the binding of the write as it is made on the open page changed since it was planned", async () => {
+      const { pages, platform } = pagesOf({ Shop: [table(["A"], ["1"]), table(["B"], ["2"])] }, "Shop");
+      const seen: string[] = [];
+      const store = storeOf(platform, async (text, span) => {
+        seen.push(`${span.from} ${text.length}`);
+        return (moved) => seen.push(String(moved(span.to + 1, false) - (span.to + 1)));
+      });
+      const [, second] = (await store.tables("Shop"))!;
+      const plan = await store.plan({ document: "Shop", edits: [{ kind: "write", key: second!.key, expects: second!.revision, model: table(["B"], ["22"]) }] });
+      const typed = `Typed meanwhile.\n${pages.get("Shop")!}`;
+      pages.set("Shop", typed);
+      expect((await store.apply(plan)).written).toBe(true);
+      // (Where the table is in the page as it is now, in that text)
+      expect(seen).toEqual([`${typed.indexOf("| B |")} ${typed.length}`, "1"]);
+      expect(pages.get("Shop")).toContain("Typed meanwhile.\n");
+    });
+
     it("makes a new table where the cursor is, or under a key the caller reserved", async () => {
       const { pages, platform } = pagesOf({ Shop: [table(["A"], ["1"])] }, "Shop");
       const store = storeOf(platform);

@@ -25,7 +25,7 @@ import {
   validateTransaction,
 } from "../../core/store.ts";
 import { pageFormulasIn } from "./pageformulas.ts";
-import { cursorPlace, newTableMarkdown, newTablePlace, type NewTablePlace, tableAt, tableEdits, type TableInsert, type TableWrite } from "./tableparts.ts";
+import { cursorPlace, found, newTableMarkdown, newTablePlace, type NewTablePlace, tableAt, tableEdits, type TableInsert, type TableWrite } from "./tableparts.ts";
 import { pageFormulaPlace } from "./pageformulas.ts";
 import { mapPosition, type TableWritten, type TextEdit, withWriteListeners } from "./writelisteners.ts";
 import { written as textWritten } from "../../../../shared/pages/parts.ts";
@@ -85,8 +85,16 @@ type PlanOwn = {
   readonly page: PagePlan;
   readonly inserted: readonly { readonly markdown: string; readonly key: TableKey | undefined }[];
   readonly written: readonly TableKey[];
-  readonly open?: { readonly text: string; readonly span: { readonly from: number; readonly to: number }; readonly made: string; readonly moved: (position: number, after: boolean) => number };
+  readonly open?: OpenWrite;
+  // What the write is made of, for its open write made anew on the page changed since (the writer plans it anew)
+  readonly of: WriteOf;
 };
+
+/** The open page's write as BeforeWrite sees it: the text it is made on, the span of its tables, the text it makes, where places go */
+type OpenWrite = { readonly text: string; readonly span: { readonly from: number; readonly to: number }; readonly made: string; readonly moved: (position: number, after: boolean) => number };
+
+/** A transaction as the writer's changes: its tables written and new, its page formulas, what other plugins are told */
+type WriteOf = { readonly tables: readonly TableWrite[]; readonly inserts: readonly TableInsert[]; readonly formulas: readonly PageFormula[]; readonly told: readonly TableWritten[] };
 
 /**
  * Other plugins' edits of a write (silverware.table.onWrite) as the page
@@ -259,11 +267,10 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
     }
     // The text the tables and formulas make (as the writer's parts make it), then what other plugins write with it
     const tablesChange = { tables: writes, inserts };
-    const edits = tableEdits(text, tablesChange);
-    if ("problem" in edits) return left({ cause: "changed", reason: edits.problem });
-    let made = text;
-    for (const change of pageChanges().page(document, (p) => this.tablesChanges(p, document, formulas, tablesChange)).build()[0]!.changes) made = (await textWritten(made, change, {})).text;
-    const listened = await withWriteListeners(made, told);
+    const of: WriteOf = { ...tablesChange, formulas, told };
+    const write = await this.openWrite(document, text, of);
+    if ("problem" in write) return left({ cause: "changed", reason: write.problem });
+    const { made, listened } = write;
     const page = await this.writer().plan(
       pageChanges()
         .page(document, (p) => {
@@ -276,18 +283,52 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
     const skipped = page.skipped[0];
     if (skipped) return left(skipOf(skipped));
     const plan: TablePlan = { document, changes: page.pages.length ? transaction.edits.length + formulas.length : 0, ...(formulasLeft.length ? { formulasLeft } : {}) };
-    // The open page's write as the binding's hook sees it: the text read, the span of its tables, the text made, where places go
-    const open =
-      (await platform.editor.documentName()) === document && spans.length
-        ? {
-            text,
-            span: { from: Math.min(...spans.map((span) => span.from)), to: Math.max(...spans.map((span) => span.to)) },
-            made: listened.text,
-            moved: (position: number, after: boolean) => mapPosition(position, after, [[...formulaEdits, ...edits], ...listened.edits]),
-          }
-        : undefined;
-    this.plans.set(plan, { page, inserted: inserts.map((one) => ({ markdown: one.markdown, key: one.key })), written, ...(open ? { open } : {}) });
+    // The open page's write as the binding's hook sees it
+    const open = (await platform.editor.documentName()) === document && spans.length ? write.open : undefined;
+    this.plans.set(plan, { page, inserted: inserts.map((one) => ({ markdown: one.markdown, key: one.key })), written, of, ...(open ? { open } : {}) });
     return plan;
+  }
+
+  /**
+   * A write in a page's text: the text its tables and page formulas make (as
+   * the writer's parts make it), what other plugins write with it, and the
+   * open page's write as BeforeWrite sees it (the span of its tables, where
+   * places go); or why it cannot be made there
+   */
+  private async openWrite(
+    document: string,
+    text: string,
+    of: WriteOf,
+  ): Promise<{ readonly made: string; readonly listened: { readonly text: string; readonly edits: TextEdit[][] }; readonly open: OpenWrite } | { readonly problem: string }> {
+    const change = { tables: of.tables, inserts: of.inserts };
+    const edits = tableEdits(text, change);
+    if ("problem" in edits) return { problem: edits.problem };
+    // Where the tables are in this text: those written and taken out, the place of each new one (after its table)
+    const spans: { readonly from: number; readonly to: number }[] = [];
+    for (const one of of.tables) {
+      const range = found(text, one);
+      if (range) spans.push(range);
+    }
+    for (const insert of of.inserts) {
+      const where = newTablePlace(text, insert.place);
+      if ("problem" in where) continue;
+      const after = insert.place && "after" in insert.place ? found(text, insert.place.after) : undefined;
+      spans.push({ from: after ? after.from : where.at, to: where.at });
+    }
+    const formulaEdits: TextEdit[] = [];
+    for (const formula of of.formulas) {
+      const place = pageFormulaPlace(document, text, formula);
+      if (!("problem" in place)) formulaEdits.push({ from: place.from, to: place.to, text: formula.text });
+    }
+    let made = text;
+    for (const one of pageChanges().page(document, (p) => this.tablesChanges(p, document, of.formulas, change)).build()[0]!.changes) made = (await textWritten(made, one, {})).text;
+    const listened = await withWriteListeners(made, of.told);
+    const span = spans.length ? { from: Math.min(...spans.map((one) => one.from)), to: Math.max(...spans.map((one) => one.to)) } : { from: 0, to: 0 };
+    return {
+      made,
+      listened,
+      open: { text, span, made: listened.text, moved: (position, after) => mapPosition(position, after, [[...formulaEdits, ...edits], ...listened.edits]) },
+    };
   }
 
   /** A transaction's changes of the writer's: its page formulas first (found by their order, which a table written first could change), its tables */
@@ -316,8 +357,17 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
     };
     let page: ApplyReport;
     let then: ((moved: (position: number, after: boolean) => number) => void) | undefined;
+    // The open page changed since it was planned (the writer plans it anew on it): its write as it is made on it now
+    let open = own.open;
+    if (open) {
+      const now = await this.platform().editor.text();
+      if (now !== open.text) {
+        const anew = await this.openWrite(document, now, own.of);
+        open = "problem" in anew ? undefined : anew.open;
+      }
+    }
     try {
-      then = own.open && (await this.beforeWrite?.(own.open.text, own.open.span, minimalEdit(own.open.text, own.open.made)));
+      then = open && (await this.beforeWrite?.(open.text, open.span, minimalEdit(open.text, open.made)));
       page = await this.writer().apply(own.page);
     } catch (e) {
       release();
@@ -328,7 +378,7 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
       release();
       return { document, written: false, inserted: [], revisions: none, skipped: skipOf(skipped) };
     }
-    if (then && own.open) then(own.open.moved);
+    if (then && open) then(open.moved);
     // Each table written or made, as it is now
     const keys = new Set([...own.written, ...inserted.map((one) => one.key)]);
     const now = keys.size ? ((await this.tables(document)) ?? []) : [];
@@ -346,7 +396,7 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
     const skipped = page.skipped[0];
     if (skipped) return { document, changes: 0, skipped: skipOf(skipped) };
     const plan: TablePlan = { document, changes: page.pages.length };
-    this.plans.set(plan, { page, inserted: [], written: [] });
+    this.plans.set(plan, { page, inserted: [], written: [], of: { tables: [], inserts: [], formulas: [], told: [] } });
     return plan;
   }
 

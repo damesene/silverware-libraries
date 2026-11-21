@@ -69,7 +69,7 @@ export function tableAt(text: string, range: TableRange): TableAt {
 }
 
 /** The table a change names in the text as it is now; undefined: changed since it was read (another of its text made, or it gone) */
-function found(text: string, at: TableAt): TableRange | undefined {
+export function found(text: string, at: TableAt): TableRange | undefined {
   const alike = findTables(text).filter((one) => one.text === at.source);
   return alike.length === at.of ? alike[at.occurrence] : undefined;
 }

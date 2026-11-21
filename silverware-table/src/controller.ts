@@ -2836,10 +2836,9 @@ export class Controller implements TableHost {
         const which = left.length === 1 ? "a formula" : `${left.length} formulas`;
         this.notify(`Silverware Table: ${which} written in the page (silverware.table.evaluate) did not follow the table, left as written (${left.join("; ")})`, "info");
       }
-      if (columnMap) {
-        this.views.set(key, remapColumns(this.viewOf(given), columnMap));
-        for (const feature of this.features) feature.columnsMoved?.(key, columnMap);
-      }
+      // What follows the table once it is rendered anew (the cell to edit, the row held), set before it is written: put
+      // back where the write is left
+      const heldBefore = this.held;
       if (focus) this.cellEditor.editAfterWrite(key, focus);
       this.holdAfterWrite(key, options);
       if (widget && !widget.classList.contains(DRAWN_CLASS)) {
@@ -2851,8 +2850,18 @@ export class Controller implements TableHost {
       const report = await this.store.apply(plan);
       if (report.skipped) {
         this.cellEditor.dropPending();
+        this.held = heldBefore;
         this.notify(`Silverware Table: the table was not saved (${report.skipped.reason})`, "error");
         return "failed";
+      }
+      // Its columns moved: the view and the features follow them, once they are (a table rendered anew already, as
+      // written, applying the view anew; one rendered later applies it as it shows)
+      if (columnMap) {
+        this.views.set(key, remapColumns(this.viewOf(given), columnMap));
+        for (const feature of this.features) feature.columnsMoved?.(key, columnMap);
+        const shown = this.widgetForKey(key);
+        const now = shown && this.infos.get(shown);
+        if (shown && now && now.revision === report.revisions.get(key)) this.viewChanged(shown, now);
       }
       // What this write made of the table: a caller from before it finds the table as it left it (writeTarget)
       const revision = report.revisions.get(key);

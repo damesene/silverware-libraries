@@ -11,7 +11,7 @@ import { reorderRows, setCell } from "../../testing/markdownops.ts";
 import { cellTags } from "../../tags.ts";
 import { withTagValue } from "../../tagvalues.ts";
 import { HASHTAGS_KEY, headerText, withHeaderText } from "../../columns.ts";
-import { decode, decodeCell, encode, encodeCell } from "./codec.ts";
+import { decode, decodeCell, encode, encodeCell, plainMarkdown } from "./codec.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SAMPLE = readFileSync(join(here, "../../../../playground/sample.md"), "utf8");
@@ -135,6 +135,13 @@ describe("the markdown codec", () => {
       const written = md(encode(renamed, tagged));
       expect(written).toContain("| Cost #currency-usd <meta note='x'> |");
       expect(written).toContain("widths.-c-cost.size='90'");
+    });
+
+    it("plain markdown of a table made of the one read (edits held in) in that one's form: padded where it is", () => {
+      const padded = parseTable("| Name  | Qty |\n| ----- | --- |\n| Apple | 1   |");
+      const read = decode(padded);
+      const held = { ...read, rows: [{ ...read.rows[0]!, cells: [read.rows[0]!.cells[0]!, { content: "5", attributes: new Map() }] }] };
+      expect(plainMarkdown(held, [1], read)).toBe("| Name  | Qty |\n| ----- | --- |\n| Apple | 5   |");
     });
 
     it("a header typed written as typed: its hashtags where they were typed, in their order", () => {

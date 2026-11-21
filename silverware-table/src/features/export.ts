@@ -45,7 +45,8 @@ export class Export implements Feature {
   private async copyMarkdown(shownInfo: TableInfo): Promise<void> {
     const info = currentTable(this.host, shownInfo);
     const rows = this.host.shownOrder(info).filter((row) => row > 0);
-    await this.copy(`${this.host.plainMarkdown(this.host.tableOf(info), rows)}\n`, rows.length, "Markdown");
+    // (The table as shown, its edits held in, written in the form of the table as the page has it)
+    await this.copy(`${this.host.plainMarkdown(this.host.tableOf(info), rows, info.model)}\n`, rows.length, "Markdown");
   }
 
   private async copy(text: string, body: number, format: string): Promise<void> {

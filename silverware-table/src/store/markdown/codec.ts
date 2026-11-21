@@ -225,9 +225,10 @@ export function encodeCell(cell: ModelCell): string {
 }
 
 /** A table's header and `rows` (its rows, the first 1, in that order) as plain markdown: no attribute, no metadata row */
-export function plainMarkdown(model: TableModel, rows: readonly number[]): string {
-  // Written as it is in the page (a header's hashtags where they are, padding), its tags then left out
-  const table = encode(model, bases.get(model) ?? NO_TABLE);
+export function plainMarkdown(model: TableModel, rows: readonly number[], read?: TableModel): string {
+  // Written as it is in the page (a header's hashtags where they are, padding: the form of the table it was read from,
+  // or of `read`, the table as the page has it, where it was made of that with edits held), its tags then left out
+  const table = encode(model, bases.get(model) ?? (read && bases.get(read)) ?? NO_TABLE);
   const plain = (row: number) => ({ cells: (table.rows[row]?.cells ?? []).map(withoutTags) });
   return serializeTable({ indent: "", align: table.align, padded: table.padded, rows: [plain(0), ...rows.map(plain)] });
 }

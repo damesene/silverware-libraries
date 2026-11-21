@@ -565,8 +565,8 @@ export class Controller implements TableHost {
     return decode(table);
   }
 
-  plainMarkdown(table: TableModel, rows: readonly number[]): string {
-    return plainMarkdown(table, rows);
+  plainMarkdown(table: TableModel, rows: readonly number[], read?: TableModel): string {
+    return plainMarkdown(table, rows, read);
   }
 
   tableData(info: TableInfo): TableData {

@@ -1,5 +1,5 @@
 // The sources of the space: tables no page has, which the host gives as plain
-// data (SilverBullet's: host/sources.ts, a Space Lua function each; the
+// data (SilverBullet's: host/silverbullet/sources.ts, a Space Lua function each; the
 // playground's and the tests': `memorySources`), all through one interface,
 // `SourceProvider`. The sources module (features/sources.ts) offers them to
 // the formulas, which read them as `@name` (`@tasks[due]`). Nothing here knows

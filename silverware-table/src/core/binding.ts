@@ -3,8 +3,8 @@
 // events (its own among them: the adapter's modules), how a table rendered
 // anew is marked with its look before the browser lays it out, and the
 // provider it registers the tables with in Silverware Layout. SilverBullet's
-// is host/silverbullet/binding.ts, handed to the controller by the entry
-// (index.ts) and the tests' page: the core imports nothing of a host.
+// is host/silverbullet/binding.ts, handed to the controller by its Space Lua
+// API's `init` (host/silverbullet/api.ts) and the tests' page: the core imports nothing of a host.
 import type { LayoutProvider } from "../../../shared/layout.ts";
 import type { FeatureName } from "../bridge.ts";
 import type { TableModel } from "../model/model.ts";

@@ -267,7 +267,7 @@ export function defineFormulaPlaces(finder: unknown): void {
 }
 
 // The finder of formulas given to Space Lua calls (silverware.table.evaluate and its aliases), which the
-// library's init page registers: host/lua.ts, apart from the rest, which knows nothing of Lua
+// library's init page registers: host/silverbullet/lua.ts, apart from the rest, which knows nothing of Lua
 export { luaCallPlaces } from "./lua.ts";
 
 /**

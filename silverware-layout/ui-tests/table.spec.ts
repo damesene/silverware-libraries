@@ -1,5 +1,5 @@
 // Silverware Table's tables laid out by Silverware Layout, in SilverBullet: the table's provider (Silverware Table's
-// core/layoutprovider.ts) keeps the width in the table's metadata (`layout.width`), Silverware Layout shows it.
+// host/silverbullet/layoutprovider.ts) keeps the width in the table's metadata (`layout.width`), Silverware Layout shows it.
 import { boxOf, expect, test, textWidthOf } from "./helpers.ts";
 
 // SilverBullet's default theme: 800 px of text less 20 px of padding each side

@@ -1,6 +1,6 @@
 # Silverware Table: the core and the SilverBullet adapter
 
-The model of layers, hosts and the write pipeline is in `silverware-table/CLAUDE.md`. Here: what the core's code must keep that the code does not say.
+The model of layers, hosts and the write pipeline is in `silverware-table/CLAUDE.md`. Here: what the core's code must keep that the code does not say. The adapter's files named below (`modules/…`, `columns.ts`, `drawn.ts`, `cells.ts`) are in `host/silverbullet/`.
 
 ## Rules for the core
 

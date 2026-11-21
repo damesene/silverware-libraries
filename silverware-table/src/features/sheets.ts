@@ -1,5 +1,5 @@
 // The sheets module, the sheet module's model side (the sheet view itself is
-// the SilverBullet adapter's: core/silverbullet/modules/sheet.ts): the sheet's
+// the SilverBullet adapter's: host/silverbullet/modules/sheet.ts): the sheet's
 // name in the toolbar's row of names, a click on it its field: typed there,
 // the table goes to that sheet (a new one, or one of the page's), left empty,
 // off it. A table on a sheet says so in its metadata row

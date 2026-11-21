@@ -968,7 +968,7 @@ export interface ModelHost {
   setSort(info: TableInfo, view: ViewState): void;
 }
 
-/** What the core offers the adapter's modules (src/core/silverbullet/modules/): the model host and the rendering */
+/** What the core offers the adapter's modules (src/host/silverbullet/modules/): the model host and the rendering */
 export interface TableHost extends ModelHost {
   /**
    * A markdown table read into the model (its columns, rows and cells: a cell's
@@ -1364,7 +1364,7 @@ export interface Feature {
   editorClosed?(editor: CellEditor): void;
 }
 
-/** A module of the adapter (src/core/silverbullet/modules/): a module, and the hooks of the rendering */
+/** A module of the adapter (src/host/silverbullet/modules/): a module, and the hooks of the rendering */
 export interface AdapterFeature extends Feature {
   /**
    * A menu of the feature's own at a point in no table's cell (the sheet's

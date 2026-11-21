@@ -14,7 +14,7 @@
 // of the box the table had then (widths.box): the table is shown as that
 // share of whatever box it has, so it widens and narrows with it (full
 // screen, another window; narrower, the rendering holds columns at their
-// headers' need, core/silverbullet/columns.ts). A column added
+// headers' need, host/silverbullet/columns.ts). A column added
 // or deleted keeps the table so (widthsAfterEdit, in the write). A table of
 // its own width (narrower or wider than its box) is a sum other than the box:
 // the same data (docs/silverware-table-column-resize.md).

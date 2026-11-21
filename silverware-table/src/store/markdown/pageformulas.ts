@@ -2,7 +2,7 @@
 // (docs/silverware-table-store-plan.md, *Decided (2026-11-20)* 7): found where
 // the binding's finder says they are (a formula given to
 // silverware.table.evaluate in the page's Space Lua, a table cell's text among
-// them: host/lua.ts), each kept by the markdown store as a page formula
+// them: host/silverbullet/lua.ts), each kept by the markdown store as a page formula
 // (core/store.ts, PageFormulaStore). A page formula's key holds its page, its
 // order among the page's formulas and its text as read, so a write finds it
 // again in the page's text and refuses one changed since. What a place is in

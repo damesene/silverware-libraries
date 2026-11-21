@@ -2,8 +2,8 @@
 // *The store*): a document's tables in order, each by its key with its model
 // and a revision, whichever store keeps them (markdown in a page:
 // store/markdown/). Modules never see a store: they get tables through the
-// host (TableInfo.model and .revision; host.tables). Step 2 of the plan has
-// the read side; transactions and the rest come with steps 2 to 4. Formulas
+// host (TableInfo.model and .revision; host.tables). Step 2 of the plan gave
+// the read side, step 5 transactions. Formulas
 // written in a document's text, not as its tables' formula cells, are a store
 // of their own beside it (PageFormulaStore), which a store keeping none does
 // not have.

@@ -80,7 +80,7 @@ What the design below follows, and what decides a case it does not name:
    (through their index) and the core's interfaces (`core/feature.ts`:
    `ModelHost`, the hooks); **the core imports no module** (the controller's
    own Remove metadata, `core/metadata.ts` since step 3), the modules being
-   put together by `modules.ts`; stores implement the core's `TableStore`
+   put together by the binding (`host/silverbullet/binding.ts`); stores implement the core's `TableStore`
    and import the model and the platform; host bindings import all of it and
    put it together. Nothing imports a binding. `isolation.test.ts` checks it
    by folder.
@@ -344,14 +344,14 @@ registry the built-in parts go through takes a plugin's own since
 Everything that is SilverBullet's and not markdown's, in one place:
 
 - the platform, made of what the init page hands over;
-- the adapter (`core/silverbullet/` now) and its pairing with the markdown
+- the adapter (`host/silverbullet/` now) and its pairing with the markdown
   store: which key a rendered table is (`data-pos`, shape, source; moved out
   of the controller), the type hashtags hidden in headers (the codec tells
   which part of a header it wrote);
 - the history markers (the cursor put outside a table around each write, for
   SilverBullet's undo): the binding's `Editor` places them, as it knows
   the edit's range;
-- the places in Lua calls (host/lua.ts; found by store/markdown/pageformulas.ts);
+- the places in Lua calls (host/silverbullet/lua.ts; found by store/markdown/pageformulas.ts);
 - the Lua API: `silverware.table.tables(text)`, `onWrite(fn(text))`,
   `evaluate(formula, text, page)`, `evaluateText`, `errors(page)`,
   `errorsText`, the aliases and the `define…` functions, implemented over the
@@ -867,7 +867,7 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
 6. **The SilverBullet binding.** The adapter, its pairing with the markdown
    store, history markers, Lua places and the Lua API into
    `host/silverbullet/`; the dependency rule checked by folder.
-   **Silverware Layout's provider** (core/layoutprovider.ts, after the plan
+   **Silverware Layout's provider** (host/silverbullet/layoutprovider.ts, after the plan
    was first written) is the binding's: it registers tables with
    `silverware.layout.api` and reads their `layout.width` from the table as
    rendered (`renderedMeta`, synchronously, for the widget's size before the
@@ -949,7 +949,7 @@ is done, by what it took.
   large tables; after our own writes none is built (*A model made once, kept
   from our own writes*). The playground's benchmark before and after steps 2
   and 3.
-- **The sheet** (core/silverbullet/modules/sheet.ts, about 1800 lines) reads
+- **The sheet** (host/silverbullet/modules/sheet.ts, about 1800 lines) reads
   the page's text in many places: it moves in step 2 on its own, with its
   UI tests (`ui-tests/sheet/`).
 - **One undo step**: a transaction is one edit of the text in the markdown
@@ -1074,7 +1074,7 @@ is done, by what it took.
      as read; a write refused where it changed since, as a table's), and is
      written by a writer of its own, not a cell's: a text the string literal
      cannot hold (a quote, a line break) is refused with why. The finder of
-     their places (`host/lua.ts`, `defineFormulaPlaces`, its registry now in
+     their places (`host/silverbullet/lua.ts`, `defineFormulaPlaces`, its registry now in
      `formulas/places.ts`) is the binding's; `FormulaPlace` (offsets) the
      markdown store's alone. The formulas module follows a table's edit in
      them through that store in the same write, replacing

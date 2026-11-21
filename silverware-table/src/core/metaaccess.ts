@@ -45,7 +45,7 @@ export function ownMeta(owner: Owner, enabled: () => boolean): OwnMeta {
   const withInModel = (model: TableModel, key: string, value: string | undefined, at?: AttributePlace) =>
     value !== undefined && !storableInModel(model, key, at) ? model : withAttributesAt(model, at, (attributes) => withAttributeIn(attributes, owner, key, value));
   // A cell given alone: may it hold one (the setting on, or it has it). Set on it unchecked: whether a cell may take
-  // one it had not is the write step's, which sees the table before the change (withoutNewTagValues: a calculated
+  // one it had not is the write step's, which sees the table before the change (withoutNewAttributes: a calculated
   // column's formula copied into a new row passes, a new formula does not)
   const storableInCell = (cell: ModelCell, key: string) => enabled() || attributeIn(cell.attributes, owner, key) !== undefined;
   function attribute(table: Table, key: string, at?: { readonly column: number }): string | undefined;

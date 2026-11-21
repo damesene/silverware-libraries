@@ -101,7 +101,7 @@ export function featureEntries(metadata: Feature, sources: SourceTables): readon
   ];
 }
 
-/** Silverware Table bound to SilverBullet: what the entry (index.ts) hands the controller */
+/** Silverware Table bound to SilverBullet: what the Space Lua API's `init` (api.ts) hands the controller */
 export const silverBulletBinding: TableBinding = {
   adapter: (doc, rows, context) => new SilverBulletAdapter(doc, rows, context),
   features: featureEntries,

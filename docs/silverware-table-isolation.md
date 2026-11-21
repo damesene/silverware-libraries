@@ -33,8 +33,8 @@ writing every module again.
   writes, menus, and routes events to the modules in model terms. It does not
   touch the DOM of the tables either: it asks **the adapter**.
 - **The adapter** (`core/adapter.ts` the interface `TableAdapter`,
-  `host/silverbullet/` its implementation for SilverBullet) is part of the core
-  but behind that interface: it knows the rendering. SilverBullet's adapter
+  `host/silverbullet/` its implementation for SilverBullet) is SilverBullet's
+  binding's, handed to the core behind that interface (`core/binding.ts`): it knows the rendering. SilverBullet's adapter
   finds the tables SilverBullet rendered, applies to them what the modules
   asked for (the looks of cells, marks, outlines, handles), turns DOM events
   into events on cells and answers geometry; everything about SilverBullet's
@@ -82,7 +82,7 @@ writing every module again.
 - `CellEditor`: the editor's model (its cell, text, selection, calls);
   `RenderedEditor` adds its widget, cell and field, the adapter's.
 - Order of what modules add without knowing each other: the modules' order in
-  `modules.ts`, and named slots where one list takes several modules'
+  the binding (`host/silverbullet/binding.ts`), and named slots where one list takes several modules'
   entries (`CELL_MENU_ORDER` for the cell menu's groups, `HEADER_ICON_ORDER`
   for icons after a header's name).
 

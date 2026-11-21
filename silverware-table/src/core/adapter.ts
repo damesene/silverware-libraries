@@ -2,7 +2,7 @@
 // keeps the model (tables by key, cells by their row in the markdown and
 // their column), the view, the editor's state and the writes, and asks the
 // adapter to show what the features want; the adapter knows the rendering
-// (SilverBullet's tables today: core/silverbullet/) and answers in model
+// (SilverBullet's tables today: host/silverbullet/) and answers in model
 // terms. Another rendering (the sheet's own tables, the page's tables drawn
 // by Silverware Table itself) is another adapter.
 //

@@ -97,7 +97,8 @@ export interface PageWriter {
 // A planned page's texts, kept by the writer that planned it (a plugin has one writer): the plugin is given
 // the page, never them; undefined: no page (before it is made, after it is removed); `changes`: kept to plan it
 // anew where it is open and changed (PlanOptions.replanOpenPage)
-type Texts = { readonly before: string | undefined; readonly after: string | undefined; readonly changes?: readonly PageChange[] };
+// A page planned anew where it is open (replanOpenPage): its changes, and what the plan asked of its pages (leaveAlone)
+type Texts = { readonly before: string | undefined; readonly after: string | undefined; readonly changes?: readonly PageChange[]; readonly leaveAlone?: PlanOptions["leaveAlone"] };
 
 function planned(texts: WeakMap<PlannedPage, Texts>, page: string, changes: number, own: Texts, renamedTo?: string): PlannedPage {
   const kind = own.before === undefined ? { created: true as const } : own.after === undefined ? { removed: true as const } : {};
@@ -194,7 +195,7 @@ export function pageWriter(platform: Pick<Platform, "editor" | "space">, options
         const renamed = entry.renameTo !== undefined && entry.renameTo !== page;
         if (!renamed && (!result.changes || result.text === before)) return undefined;
         // (Only the page open as it is planned: one read from the space keeps the check, opened since or not)
-        const anew = planOptions.replanOpenPage && !renamed && (await isOpen(page)) ? { changes: entry.changes } : {};
+        const anew = planOptions.replanOpenPage && !renamed && (await isOpen(page)) ? { changes: entry.changes, ...(planOptions.leaveAlone ? { leaveAlone: planOptions.leaveAlone } : {}) } : {};
         return planned(texts, page, result.changes + (renamed ? 1 : 0), { before, after: result.text, ...anew }, renamed ? entry.renameTo : undefined);
       },
       planOptions.progress,
@@ -204,18 +205,22 @@ export function pageWriter(platform: Pick<Platform, "editor" | "space">, options
 
   // The open page, changed since it was planned, its changes planned anew on its text now and written (reported as
   // so written: Undo puts back what this wrote); changed again meanwhile, or the changes not made on it: left, said
-  const plannedAnew = async (page: string, changes: readonly PageChange[], toApply: PagePlan): Promise<PlannedPage | Skipped> => {
+  const plannedAnew = async (page: string, own: Texts & { readonly changes: readonly PageChange[] }, toApply: PagePlan): Promise<PlannedPage | Skipped> => {
     const now = String(await editor.text());
+    // (Asked again of the page as it is now, as the plan asked it of the page it read)
+    const left = own.leaveAlone?.({ name: page, tagUses: () => tagUses(now) });
+    if (left) return { page, cause: "refused", reason: left };
     let result: EditResult;
     try {
-      result = await changedPage(now, changes, options);
+      result = await changedPage(now, own.changes, options);
     } catch (e) {
       return { page, cause: "refused", reason: `its edit failed (${reasonOf(e)}): left alone` };
     }
     // (Its changes not made on the page as it changed since: changed, as a page that was not planned anew)
     if (result.problem) return { page, cause: "changed", reason: result.problem };
+    // (The page already as its changes would make it: none written, none to undo)
+    if (result.text === now) return planned(texts, page, 0, { before: now, after: now });
     const again = planned(texts, page, result.changes, { before: now, after: result.text });
-    if (result.text === now) return again;
     return (await writeText(page, now, result.text)) === "written" ? again : { page, cause: "changed", reason: changedReason(toApply) };
   };
 
@@ -258,7 +263,7 @@ export function pageWriter(platform: Pick<Platform, "editor" | "space">, options
           }
           const written = own.before === own.after ? "written" : await writeText(page, own.before, own.after);
           if (written === "written") return one;
-          if (own.changes && (await isOpen(page))) return await plannedAnew(page, own.changes, toApply);
+          if (own.changes && (await isOpen(page))) return await plannedAnew(page, { ...own, changes: own.changes }, toApply);
           if (one.renamedTo === undefined) return { page: one.page, cause: "changed", reason: changedReason(toApply) };
           // Renamed, its text changed by the rename itself (a link to itself followed): the name is written, its
           // content left, and so it is reported, so that Undo can give the name back

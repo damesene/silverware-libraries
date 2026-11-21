@@ -88,6 +88,34 @@ describe("the page writer", () => {
     expect(opened.map.get("B")).toBe("x #a");
   });
 
+  it("plans the open page anew as it plans a page: asks leaveAlone of it as it is now, writes nothing where it is already as its changes make it", async () => {
+    const { map, edits, writer } = memory({ A: "one #a two" }, "A");
+    const changes = pageChanges().page("A", (p) => p.tags.rename("a", "c")).build();
+    // Already as its changes make it: reported with no change, nothing written
+    const plan = await writer.plan(changes, { replanOpenPage: true });
+    map.set("A", "zero one #c two");
+    const report = await writer.apply(plan);
+    expect(report.written.map((one) => one.changes)).toEqual([0]);
+    expect(edits).toEqual([]);
+    expect(map.get("A")).toBe("zero one #c two");
+    // A page the plan leaves alone once it reads so: asked again of the text now
+    map.set("A", "one #a two");
+    const asked: string[] = [];
+    const guarded = await writer.plan(changes, {
+      replanOpenPage: true,
+      leaveAlone: (page) => {
+        const tags = page.tagUses().map((use) => use.name);
+        asked.push(tags.join(","));
+        return tags.includes("locked") ? "locked" : undefined;
+      },
+    });
+    map.set("A", "#locked one #a two");
+    const left = await writer.apply(guarded);
+    expect(left.skipped.map((one) => [one.cause, one.reason])).toEqual([["refused", "locked"]]);
+    expect(asked).toEqual(["a", "locked,a"]);
+    expect(map.get("A")).toBe("#locked one #a two");
+  });
+
   it("writes the page open through the editor, in one edit", async () => {
     const { edits, writer } = memory({ A: "one #a two" }, "A");
     await writer.write(pageChanges().page("A", (p) => p.tags.rename("a", "c")).build());

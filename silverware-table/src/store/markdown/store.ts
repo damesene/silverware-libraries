@@ -362,6 +362,8 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
     let then: ((moved: (position: number, after: boolean) => number) => void) | undefined;
     // The open page changed since it was planned (the writer plans it anew on it): its write as it is made on it now
     let open = own.open;
+    // (Another page open now: none of this page's to tell of; the writer writes it into the space)
+    if (open && (await this.platform().editor.documentName()) !== document) open = undefined;
     if (open) {
       const now = await this.platform().editor.text();
       if (now !== open.text) {

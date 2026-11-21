@@ -144,6 +144,30 @@ describe("the markdown store", () => {
       expect(pages.get("Shop")).toContain("Typed meanwhile.\n");
     });
 
+    it("tells the binding of no write of a page no longer open: another opened between its plan and its write", async () => {
+      const pages = new Map([["Shop", "Intro.\n\n| A |\n|---|\n| 1 |\n"], ["Other", "Text.\n"]]);
+      let open = "Shop";
+      const platform: Pick<TablePlatform, "editor" | "space"> = {
+        editor: {
+          documentName: () => open,
+          text: () => pages.get(open) ?? "",
+          replace: (from, to, insert) => void pages.set(open, (pages.get(open) ?? "").slice(0, from) + insert + (pages.get(open) ?? "").slice(to)),
+        },
+        space: { read: (name) => pages.get(name)!, write: (name, text) => void pages.set(name, text), list: () => [...pages.keys()] },
+      };
+      const told: string[] = [];
+      const store = storeOf(platform, async (text) => {
+        told.push(text);
+        return undefined;
+      });
+      // (A new table only: nothing of this page to find in another's text)
+      const plan = await store.plan({ document: "Shop", edits: [{ kind: "insert", model: table(["B"], ["2"]) }] });
+      open = "Other";
+      await store.apply(plan);
+      expect(told).toEqual([]);
+      expect(pages.get("Other")).toBe("Text.\n");
+    });
+
     it("makes a new table where the cursor is, or under a key the caller reserved", async () => {
       const { pages, platform } = pagesOf({ Shop: [table(["A"], ["1"])] }, "Shop");
       const store = storeOf(platform);

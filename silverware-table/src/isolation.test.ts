@@ -49,7 +49,7 @@ describe("isolation", () => {
 
   it("a table's key is made by the core's register only: no module builds one, from a table's place or otherwise", () => {
     // (core/parts.ts makes none: it passes on the key a hook was given)
-    const outside = Object.fromEntries(Object.entries({ ...features, ...core }).filter(([path]) => path !== "./core/tables.ts" && path !== "./core/parts.ts"));
+    const outside = Object.fromEntries(Object.entries({ ...features, ...core, ...adapter, ...adapterModules }).filter(([path]) => path !== "./core/tables.ts" && path !== "./core/parts.ts"));
     expect(matches(outside, /as TableKey\b|`\$\{[^`]*\}#\$\{/)).toEqual([]);
   });
 
@@ -61,9 +61,9 @@ describe("isolation", () => {
     expect(matches(modules, /\b(Map|Set|WeakMap)<TableKey\b/)).toEqual([]);
   });
 
-  it("a page is written by the page writer alone: no editor's replace nor space's write in the core, the stores or the modules (store plan, step 4b)", () => {
+  it("a page is written by the page writer alone: no editor's replace nor space's write in the core, the stores, the modules or SilverBullet's binding (store plan, step 4b)", () => {
     expect(Object.keys(stores)).toContain("./store/markdown/store.ts");
-    expect(matches({ ...core, ...stores, ...features }, /\b(editor|space)[!?]?\.(replace|write)\(/)).toEqual([]);
+    expect(matches({ ...core, ...stores, ...features, ...adapter, ...adapterModules }, /\b(editor|space)[!?]?\.(replace|write)\(/)).toEqual([]);
   });
 
   it("the modules work on the model: nothing of the markdown's form (its tables, cells, tags and operations)", () => {
@@ -80,9 +80,7 @@ describe("isolation", () => {
 
   it("what tables keep is read and written through the host: no module nor domain names an attribute or reads the metadata itself", () => {
     // (Remove metadata is the core's, core/metadata.ts: it names whose each attribute is)
-    const modules = Object.fromEntries(
-      Object.entries({ ...features, ...adapterModules }),
-    );
+    const modules = { ...features, ...adapterModules };
     // A guard against calling them by mistake: a module could keep its data elsewhere, which nothing here prevents
     expect(matches(modules, /from "[./]*(meta|metanames|names|tagvalues)\.ts"/)).toEqual([]);
     expect(matches(modules, /\bmetaAttribute\b/)).toEqual([]);
@@ -125,7 +123,8 @@ describe("isolation", () => {
   });
 
   it("the core and the adapter name no module", () => {
-    expect(matches({ ...core, ...adapter }, /from "[./]*features\//)).toEqual([]);
-    expect(matches({ ...core, ...adapter }, /moduleOn\("/)).toEqual([]);
+    const named = { ...core, ...adapter, ...adapterModules };
+    expect(matches(named, /from "[./]*features\//)).toEqual([]);
+    expect(matches(named, /moduleOn\("/)).toEqual([]);
   });
 });

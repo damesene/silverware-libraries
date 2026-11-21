@@ -84,7 +84,6 @@ export interface TableAdapter {
   stop(): void;
 }
 
-/** What the adapter needs to know of the core: which tables it enhanced, and a row taken out of the document put back (largeTables) */
 /**
  * A rendered table paired with a table of the page (TableAdapter.pair): its
  * key, model and revision as read now, its document and the document's
@@ -107,13 +106,14 @@ export type EmptyHeaders = { readonly document: string; readonly key: TableKey; 
  * find it by, or none is it (a table in a block quote; `emptyHeaders`: one
  * whose headers are empty, which naming them would make a table)
  */
-export type Unpaired = { readonly unpaired: "unplaced" | "unfound"; readonly emptyHeaders?: EmptyHeaders };
+export type Unpaired = { readonly unpaired: "unplaced" } | { readonly unpaired: "unfound"; readonly emptyHeaders?: EmptyHeaders };
 
 /** What pairing a rendered table asks of the core: the platform (the page's text read) */
 export type PairingContext = {
   platform(): TablePlatform;
 };
 
+/** What the adapter needs to know of the core: which tables it enhanced, and a row taken out of the document put back (largeTables) */
 export type AdapterContext = PairingContext & {
   infoOf(widget: HTMLElement): WidgetInfo | undefined;
   rowNeeded(info: WidgetInfo, row: HTMLTableRowElement): void;

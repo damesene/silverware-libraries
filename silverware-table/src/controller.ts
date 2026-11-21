@@ -123,7 +123,7 @@ export class Controller implements TableHost {
   // viewport) has the features' layout follow, as what they placed for it (a table's tab) would stay otherwise
   private scanned = new Set<HTMLElement>();
   currentPage = "";
-  // The page's tables as last read (pageTables), made once per page and text
+  // The page's tables as last read (pageTables), kept while its tables are the same (notePageTables)
   private shownPage: { readonly page: string; readonly tables: readonly StoredTable[] } | undefined;
 
   // Tables being enhanced: a scan meanwhile waits for it instead of starting again
@@ -1122,7 +1122,7 @@ export class Controller implements TableHost {
       const paired = await this.adapter.pair(widget, table);
       if (this.stopped || !paired || renderedTable(widget) !== table) return;
       if ("unpaired" in paired) {
-        if (paired.emptyHeaders) this.offerHeaderFix(widget, paired.emptyHeaders);
+        if (paired.unpaired === "unfound" && paired.emptyHeaders) this.offerHeaderFix(widget, paired.emptyHeaders);
         // No place to find it by (it shows as rendered, never asked again); none of the page's (a table in a block quote):
         // it stays a plain SilverBullet table
         this.markUnsupported(widget, paired.unpaired === "unplaced");

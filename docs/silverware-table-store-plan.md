@@ -241,7 +241,7 @@ What changes for the modules, so that nothing of a store's form is in it:
 | `takesTags`, `keepTags`, `uniqueTags` | gone (attributes kept on edit; `unique` and `boundToContent` declared, the core's write step applying them) |
 | `headerRenamed` | gone (a header's name holds nothing else) |
 | `hideHeaderTags` | gone (the binding hides what the codec writes into headers) |
-| `TableInfo.source`, `hint`, `metaRow` | gone (`revision`; the place is the store's; the metadata row the adapter's) |
+| `TableInfo.source`, `hint` | gone (`revision`; the place is the store's; `metaRow` set by the adapter's pairing) |
 | `pageText`, `otherPages()`, `PageTable` | `host.tables(document)`, `host.table(key)`, other documents through the store |
 | `WritePage`, `TextWritten`, `TextPosition` | `WriteEdit.document` (its tables by key), places by key, `InsertPlace` |
 | `bridge` | `notify`, `ask`, `navigate`; nothing else of the platform |
@@ -423,7 +423,8 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    custom menus' context is unchanged (the check below is for when the core
    no longer has offsets, step 4 or 6). Modules read no markdown, no page
    text and no table's place (`isolation.test.ts`); `pageText`,
-   `pageTextNow` and `tableKeys` are the adapter's (`TableHost`).
+   `pageTextNow` and `tableKeys` are the adapter's (`TableHost`; gone in
+   step 6: the sheet reads the page through the markdown store).
    Left to later steps, as planned: a cell's escapes, `sameTable` and Copy
    as Markdown's `serializeTable` (step 3: content unescaped, the codec);
    formulas written outside tables (`WritePage.text`, `TextWritten`) and an
@@ -1015,9 +1016,8 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    for every plugin (`PageSections.tables` type-checks in a bundle that has
    no such part) and `PARTS` a mutable array exported as readonly.
    Left by the review, smaller than a fix of their own: a write planned
-   anew on the open page leaves the controller's `pageText` and the history
-   marker as computed on the text read (the page itself right; the next
-   scan reads it again); the writer's `plannedAnew` reports a page written
+   anew on the open page leaves the history marker as computed on the text
+   read (the page itself right); the writer's `plannedAnew` reports a page written
    where the text came out the same, and skips `leaveAlone` (no plugin
    replanning uses it); a source's key keeps the name it was first defined
    with (`documentOf` answers `@Tasks` after it is redefined `tasks`).

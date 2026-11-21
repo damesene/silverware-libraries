@@ -628,8 +628,9 @@ export interface ModelHost {
    */
   replaceTables(document: string, changes: readonly TableChange[]): Promise<WriteResult>;
   /**
-   * The open page's tables in order, as last read (pageText): the same list while that text is (a module's state kept
-   * for the page compares it), a table of the page found in it by its key
+   * The open page's tables in order, as last read (a rendered table paired, a write): the same list while its tables
+   * are (their keys and revisions; a module's state kept for the page compares it), a table of the page found in it
+   * by its key
    */
   pageTables(): readonly StoredTable[];
   /**

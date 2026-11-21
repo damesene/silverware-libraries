@@ -118,7 +118,7 @@ export function validateTransaction(transaction: TableTransaction): string | und
 export type TableSkip = { readonly cause: "changed" | "missing" | "refused"; readonly reason: string };
 
 /**
- * What a transaction would do, nothing written: how many tables it changes,
+ * What a transaction would do, nothing written: how many tables and page formulas it changes,
  * or why it is left (the whole of it: a transaction is one step). Opaque
  * beyond that: applied by the store that planned it
  */

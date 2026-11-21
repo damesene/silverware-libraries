@@ -194,7 +194,8 @@ export function pageWriter(platform: Pick<Platform, "editor" | "space">, options
         if (result.problem) return { page, cause: "refused", reason: result.problem };
         const renamed = entry.renameTo !== undefined && entry.renameTo !== page;
         if (!renamed && (!result.changes || result.text === before)) return undefined;
-        const anew = planOptions.replanOpenPage && !renamed ? { changes: entry.changes } : {};
+        // (Only the page open as it is planned: one read from the space keeps the check, opened since or not)
+        const anew = planOptions.replanOpenPage && !renamed && (await isOpen(page)) ? { changes: entry.changes } : {};
         return planned(texts, page, result.changes + (renamed ? 1 : 0), { before, after: result.text, ...anew }, renamed ? entry.renameTo : undefined);
       },
       planOptions.progress,
@@ -212,7 +213,8 @@ export function pageWriter(platform: Pick<Platform, "editor" | "space">, options
     } catch (e) {
       return { page, cause: "refused", reason: `its edit failed (${reasonOf(e)}): left alone` };
     }
-    if (result.problem) return { page, cause: "refused", reason: result.problem };
+    // (Its changes not made on the page as it changed since: changed, as a page that was not planned anew)
+    if (result.problem) return { page, cause: "changed", reason: result.problem };
     const again = planned(texts, page, result.changes, { before: now, after: result.text });
     if (result.text === now) return again;
     return (await writeText(page, now, result.text)) === "written" ? again : { page, cause: "changed", reason: changedReason(toApply) };

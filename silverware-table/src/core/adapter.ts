@@ -88,10 +88,7 @@ export interface TableAdapter {
 /**
  * A rendered table paired with a table of the page (TableAdapter.pair): its
  * key, model and revision as read now, its document and the document's
- * tables as read with it, whether the rendering shows a metadata row; and,
- * until the core tells tables by their keys alone
- * (docs/silverware-table-store-plan.md, step 6, A4), the table's markdown and
- * where it starts in its text
+ * tables as read with it, whether the rendering shows a metadata row
  */
 export type PairedTable = {
   readonly key: TableKey;
@@ -100,8 +97,6 @@ export type PairedTable = {
   readonly document: string;
   readonly tables: readonly StoredTable[];
   readonly metaRow: boolean;
-  readonly source: string;
-  readonly hint: number;
 };
 
 /** A table of the page whose empty headers keep it from being paired (by its key and revision): naming them makes it a table shown */

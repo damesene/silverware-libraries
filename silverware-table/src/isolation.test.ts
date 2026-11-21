@@ -66,6 +66,13 @@ describe("isolation", () => {
     expect(matches({ ...core, ...stores, ...features, ...adapter, ...adapterModules }, /\b(editor|space)[!?]?\.(replace|write)\(/)).toEqual([]);
   });
 
+  it("the core tells tables by their keys and revisions: it reads no page's text, finds no table in one, makes no store (store plan, step 6)", () => {
+    // (The register, core/tables.ts, keys a text's tables: the stores ask it)
+    const own = Object.fromEntries(Object.entries(core).filter(([path]) => path !== "./core/tables.ts"));
+    expect(matches(own, /\beditor[!?]?\.text\(|\b(findTables|parseTable|locateBy\w*|tablesIn|keysOf)\(/)).toEqual([]);
+    expect(matches(own, /from "[./]*store\/markdown\/(store|tableparts|pageformulas)\.ts"|new MarkdownStore\b/)).toEqual([]);
+  });
+
   it("the modules work on the model: nothing of the markdown's form (its tables, cells, tags and operations)", () => {
     expect(matches(features, /from "[./]*(markdown|tags|ops)\.ts"/)).toEqual([]);
     expect(matches(features, /\basModel\(/)).toEqual([]);

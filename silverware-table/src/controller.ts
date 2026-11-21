@@ -26,7 +26,6 @@ import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, sameAt
 import { HASHTAGS_KEY, nameEmptyHeaders } from "./columns.ts";
 import { type AttributeRules, cellWrittenOver, withAttributeRules, withoutNewAttributes } from "./model/rules.ts";
 import { type TableData, tableData } from "./tabledata.ts";
-import { tablesIn } from "./store/markdown/store.ts";
 import { SourceStore } from "./store/sources.ts";
 import { decode, encodeOver, plainMarkdown } from "./store/markdown/codec.ts";
 import { SettingsDialog } from "./settings.ts";
@@ -573,7 +572,7 @@ export class Controller implements TableHost {
   tableData(info: TableInfo): TableData {
     // (Its markdown as the page has it, where the page's text read last has it)
     const table = encodeOver(info.model, info.model);
-    const place = this.store.placeOf(this.currentPage, info.key) ?? { from: info.hint, to: info.hint + info.source.length };
+    const place = this.store.placeOf(this.currentPage, info.key) ?? { from: 0, to: 0 };
     return tableData(table, place, this.tableName(info.model), (column) => this.columnName(info.model, column));
   }
 
@@ -592,15 +591,6 @@ export class Controller implements TableHost {
       }
     }
     return { written, page: pageNow };
-  }
-
-  /**
-   * A page's tables in a text given (the Space Lua API's: a page's text its Lua read; none: the page shown), keyed
-   * for this call alone: the session's register matches every text it is given to the page's keys, and Lua's may be
-   * another page's for a moment (the editor's text is still the old page's as another opens), so it never sees one
-   */
-  tablesOfText(text: string, page = this.currentPage): readonly StoredTable[] {
-    return tablesIn(new TableRegister(), page, text);
   }
 
   pageTables(): readonly StoredTable[] {
@@ -1143,10 +1133,8 @@ export class Controller implements TableHost {
       const { model } = paired;
       const info: WidgetInfo = {
         table,
-        source: paired.source,
         model,
         revision: paired.revision,
-        hint: paired.hint,
         key: paired.key,
         columns: model.columns.length,
         metaRow: paired.metaRow,

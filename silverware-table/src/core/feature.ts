@@ -27,15 +27,10 @@ import type { TableData } from "../tabledata.ts";
 
 /** A table shown, in model terms (what modules get): where it is in the page, its shape, its pins */
 export type TableInfo = {
-  // The table's markdown when it was rendered: the editor only reuses a
-  // rendered table while its markdown stays exactly the same (the core's and
-  // the store's: modules read `model` and compare `revision`)
-  readonly source: string;
   /** The table as rendered */
   readonly model: TableModel;
   /** Its model's revision: equal, the same model (a module's state kept for it compares it) */
   readonly revision: TableRevision;
-  readonly hint: number;
   readonly key: TableKey;
   readonly columns: number;
   // The table ends with a metadata row (`<meta …>`), rendered as its last row
@@ -49,8 +44,8 @@ export type TableInfo = {
 /** A table shown as the adapter has it: with its rendered element */
 export type WidgetInfo = TableInfo & { readonly table: HTMLTableElement };
 
-/** A table of the page as a write finds it, rendered or not: its key, its revision as the caller saw it, its markdown as last read and where it was (`hint`) */
-export type TableTarget = Pick<WidgetInfo, "key" | "revision" | "source" | "hint">;
+/** A table of the page as a write finds it, rendered or not: its key, its revision as the caller saw it */
+export type TableTarget = Pick<WidgetInfo, "key" | "revision">;
 
 // A cell by its row in the markdown (header 0) and its column
 export type CellRef = { readonly row: number; readonly column: number };

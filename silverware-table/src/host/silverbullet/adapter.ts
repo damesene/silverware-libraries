@@ -2,7 +2,7 @@
 // core asks of the rendering, done on the DOM SilverBullet renders tables to.
 // Everything assumed about that DOM is in ../../dom.ts and in this folder.
 import { caretTextOffset, cellText, UI_CLASS, WIDGET_SELECTOR } from "../../dom.ts";
-import { cellSourceOffset, locateBySource, parseTable } from "../../markdown.ts";
+import { cellSourceOffset, parseTable } from "../../markdown.ts";
 import { EVERYWHERE, heldBounds, innerBox, intersect, isEmpty, scrollNearEdge, shownPart, shownRect, viewBounds } from "../../core/geometry.ts";
 import { dragLines } from "./linedrag.ts";
 import { Overlays } from "./overlays.ts";
@@ -81,8 +81,9 @@ export class SilverBulletAdapter implements TableAdapter {
 
   async showSource(info: WidgetInfo, at?: { readonly ref: CellRef; readonly cell: HTMLTableCellElement; readonly x: number; readonly y: number }): Promise<boolean> {
     const { editor } = this.context.platform();
-    const range = locateBySource(await editor.text(), info.hint, info.source);
-    if (!range) return false;
+    const found = await this.store.rangeNow(await editor.documentName(), info.key);
+    if (!found) return false;
+    const { range } = found;
     let offset = 0;
     if (at) {
       // Within a plain-text cell, the character at the point; otherwise the cell's start

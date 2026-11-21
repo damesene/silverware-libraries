@@ -26,6 +26,8 @@ import { type TableData, tableData } from "../../tabledata.ts";
 import { customMenuEntries, customMenuEntriesAnew, defineCustomMenuEntries } from "../../menus/custom.ts";
 import { LuaSources } from "./sources.ts";
 import type { SourceProvider } from "../../sources.ts";
+import { tablesIn } from "../../store/markdown/store.ts";
+import { TableRegister } from "../../core/tables.ts";
 
 export const version = "0.1.0";
 
@@ -90,9 +92,14 @@ const FORMULAS_OFF: EvaluatedError = { code: "#N/A", detail: "formulas are off" 
  * the formulas module is off. `text`: the page's text (else the editor's),
  * `page` its name (else the page shown).
  */
-/** A text's tables as the formulas take them: each told apart by its key */
-function modelsOfText(controller: Controller, text: string, page?: string): readonly KeyedModel[] {
-  return controller.tablesOfText(text, page);
+/**
+ * A text's tables as the formulas take them: each told apart by its key, made
+ * for this call alone (a register of its own: the session's matches every
+ * text it is given to the page's keys, and Lua's may be another page's for a
+ * moment, the editor's text still the old page's as another opens)
+ */
+function modelsOfText(controller: Controller, text: string, page = controller.currentPage): readonly KeyedModel[] {
+  return tablesIn(new TableRegister(), page, text);
 }
 
 async function calculated(formula: string, text?: string, page?: string): Promise<{ readonly value: Value; readonly pages: readonly string[] } | undefined> {

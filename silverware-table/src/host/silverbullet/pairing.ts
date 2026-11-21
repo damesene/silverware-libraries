@@ -44,7 +44,5 @@ export async function pairTable(widget: HTMLElement, table: HTMLTableElement, ro
     document,
     tables,
     metaRow: writesMetaRow(markdown),
-    source: range.text,
-    hint: range.from,
   };
 }

@@ -4,7 +4,7 @@
 // changes), each model parsed by markdown.ts (its cache by text makes a read
 // of the same text free); written through the page writer (shared/pages/),
 // by the parts of tableparts.ts (step 4b).
-import { findTables, minimalEdit, parseTable, type Table } from "../../markdown.ts";
+import { findTables, minimalEdit, parseTable, type Table, type TableRange } from "../../markdown.ts";
 import { decode, decodedFrom, encode } from "./codec.ts";
 import type { TablePlatform } from "../../core/platform.ts";
 import {
@@ -111,6 +111,14 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
   // Where each table was in the page's text as last read, and that text
   private readonly places = new Map<string, ReadonlyMap<TableKey, { readonly from: number; readonly to: number }>>();
   private readonly texts = new Map<string, string>();
+
+  /** Where a table is in its page's text as it is now, with that text; undefined: the page or the table not there */
+  async rangeNow(document: string, key: TableKey): Promise<{ readonly text: string; readonly range: TableRange } | undefined> {
+    const text = await textOf(this.platform(), document);
+    if (text === undefined) return undefined;
+    const range = findTables(text)[this.register.keysOf(document, text).indexOf(key)];
+    return range && { text, range };
+  }
 
   /** The keys of a page's tables in a text of it, in order (the register's) */
   keysOf(document: string, text: string): readonly TableKey[] {

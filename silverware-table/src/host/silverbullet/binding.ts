@@ -95,7 +95,7 @@ export function featureEntries(metadata: Feature, sources: SourceTables, store: 
     optional("tableLabels", (host) => new TableLabels(host)),
     always((host) => new Expressions(host)),
     always((host) => new History(host)),
-    always((host) => new BesideTables(host)),
+    always((host) => new BesideTables(host, store)),
     // Custom definitions' entries in a row's or a column's menu, after the modules'
     always((host) => new CustomMenus(host)),
     always((host) => new CellPopup(host)),

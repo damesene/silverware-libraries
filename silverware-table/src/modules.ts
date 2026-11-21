@@ -30,7 +30,7 @@ import { Selection } from "./features/selection.ts";
 import { Sheet } from "./core/silverbullet/modules/sheet.ts";
 import { Sheets } from "./features/sheets.ts";
 import { Sources } from "./features/sources.ts";
-import type { SourceProvider } from "./sources.ts";
+import type { SourceTables } from "./sources.ts";
 import { Sticky } from "./core/silverbullet/modules/sticky.ts";
 import { TableLabels } from "./core/silverbullet/modules/labels.ts";
 import { Themes } from "./features/themes.ts";
@@ -46,7 +46,7 @@ export type FeatureEntry = { readonly name: FeatureName | undefined; readonly cr
  * The features in the order they get events; `metadata` is the controller's own (Remove metadata, also a page
  * command), `sources` what the host gives the sources module
  */
-export function featureEntries(metadata: Feature, sources: SourceProvider): readonly FeatureEntry[] {
+export function featureEntries(metadata: Feature, sources: SourceTables): readonly FeatureEntry[] {
   const optional = (name: FeatureName, create: (host: TableHost) => AdapterFeature): FeatureEntry => ({ name, create });
   const always = (create: (host: TableHost) => AdapterFeature): FeatureEntry => ({ name: undefined, create });
   return [

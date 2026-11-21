@@ -1,46 +1,33 @@
-// The sources module: the sources of the space the host gives (a SourceProvider:
-// SilverBullet's Space Lua functions, the playground's in memory), offered to
-// the formulas as tables of the model, which they read as `@name`
+// The sources module: the sources of the space (SilverBullet's Space Lua
+// functions, the playground's in memory), as the core gives them read as tables
+// of the model (SourceTables: store/sources.ts), offered to the formulas, which
+// they read as `@name`
 // (`@tasks[due]`, `@tasks[#Data]`). A source read anew makes the modules check
 // the tables shown again (`tablesChanged`): what is out of date is said, nothing
 // written. Turned off, no source is offered: formulas, views and pivots reading
 // one keep what they show (a source is `unread`).
 import type { Feature, ModelHost } from "../core/feature.ts";
-import { type Align, escapeCell, type Table } from "../markdown.ts";
-import type { TableModel } from "../model/model.ts";
-import type { SourceData, SourceProvider, SourcesOffer } from "../sources.ts";
-
-/** A source's data as a table: its columns the header, each value escaped as a cell's text */
-export function sourceTable(data: SourceData): Table {
-  return {
-    indent: "",
-    align: data.columns.map((): Align => ""),
-    rows: [{ cells: data.columns.map(escapeCell) }, ...data.rows.map((row) => ({ cells: data.columns.map((_, c) => escapeCell(row[c] ?? "")) }))],
-    padded: false,
-  };
-}
+import type { SourcesOffer, SourceTables } from "../sources.ts";
 
 export class Sources implements Feature {
-  // The table made of each source's data: the same object while the data are (the formulas keep their sheets by table)
-  private readonly tables = new WeakMap<SourceData, TableModel>();
   private version = 0;
   private stopListening: (() => void) | undefined;
 
   constructor(
     private readonly host: ModelHost,
-    private readonly provider: SourceProvider,
+    private readonly sources: SourceTables,
   ) {
     host.offer({
       // (Names are of letters, digits and _: "en" orders them so in every locale)
-      names: () => [...provider.names()].sort((a, b) => a.localeCompare(b, "en")),
-      columns: (name) => provider.read(name)?.columns,
-      table: (name) => this.table(name),
+      names: () => [...sources.names()].sort((a, b) => a.localeCompare(b, "en")),
+      columns: (name) => sources.columns(name),
+      table: (name) => sources.table(name),
       version: () => this.version,
     } satisfies SourcesOffer);
   }
 
   start(): void {
-    this.stopListening = this.provider.changed(() => {
+    this.stopListening = this.sources.changed(() => {
       this.version++;
       this.host.tablesChanged();
     });
@@ -48,16 +35,5 @@ export class Sources implements Feature {
 
   stop(): void {
     this.stopListening?.();
-  }
-
-  private table(name: string): TableModel | null | undefined {
-    const wanted = name.toLowerCase();
-    if (!this.provider.names().some((n) => n.toLowerCase() === wanted)) return null;
-    const data = this.provider.read(name);
-    if (!data) return undefined;
-    let table = this.tables.get(data);
-    // (Read as a table of the page is: a value's hidden tag hidden, as a renderer hides it)
-    if (!table) this.tables.set(data, (table = this.host.asModel(sourceTable(data))));
-    return table;
   }
 }

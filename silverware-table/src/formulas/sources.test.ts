@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { headsOf } from "../columns.ts";
-import { sourceTable } from "../features/sources.ts";
+import { sourceTable } from "../store/sources.ts";
 import { parseTable, type Table } from "../markdown.ts";
 import { CELLS, formulaCell, formulaErrors, formulaOf, model, pageTables, recalculate, shiftReferences } from "../testing/formulas.ts";
 import { evaluateFormula, formulaChoices, FormulaError, formulaSources, formulaTableNames, listResult, references, sourceChoices, tokenize, withColumnKeys } from "./index.ts";

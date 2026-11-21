@@ -29,6 +29,7 @@ import { HASHTAGS_KEY, nameEmptyHeaders } from "./columns.ts";
 import { type AttributeRules, cellWrittenOver, withAttributeRules } from "./model/rules.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
+import { SourceStore } from "./store/sources.ts";
 import { pageFormulaPlace, pageFormulasIn } from "./store/markdown/pageformulas.ts";
 import { cursorPlace, newTableMarkdown, removedSpan, tableAt, type TableWrite } from "./store/markdown/tableparts.ts";
 import type { EditResult } from "../../shared/pages/tags/edit.ts";
@@ -156,6 +157,8 @@ export class Controller implements TableHost {
   private readonly register = new TableRegister();
   // The tables kept as markdown in pages, read through the platform as it is now (a new one comes with Space Lua loaded again)
   private readonly store = new MarkdownStore(() => this.platform, this.register, () => this.serializer());
+  // The space's sources as tables (the sources module offers them to formulas)
+  private readonly sourceStore: SourceStore;
   // The modules' parts for each table (core/parts.ts)
   private readonly parts = new Parts((key) => this.tableFor(key));
   private readonly views = new Map<TableKey, ViewState>();
@@ -260,8 +263,9 @@ export class Controller implements TableHost {
     readonly doc: Document,
     public platform: TablePlatform,
     // The sources of the space the host gives (the sources module offers them to formulas)
-    private readonly sources: SourceProvider = NO_SOURCES,
+    sources: SourceProvider = NO_SOURCES,
   ) {
+    this.sourceStore = new SourceStore(sources, this.register);
     this.adapter = new SilverBulletAdapter(doc, this.rows, {
       infoOf: (widget) => this.infos.get(widget),
       rowNeeded: (info, row) => this.rowNeeded(info, row),
@@ -434,7 +438,7 @@ export class Controller implements TableHost {
    * page is loaded again.
    */
   private async startFeatures(): Promise<void> {
-    const all = featureEntries(this.metadata, this.sources);
+    const all = featureEntries(this.metadata, this.sourceStore);
     const enabled = await Promise.all(all.map(({ name }) => (name ? this.featureEnabled(name) : true)));
     if (this.stopped) return;
     all.forEach(({ name }, i) => {

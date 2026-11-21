@@ -63,10 +63,8 @@ describe("isolation", () => {
   });
 
   it("the modules work on the model: nothing of the markdown's form (its tables, cells, tags and operations)", () => {
-    // (The sources module makes its source's table as markdown, read in by the host, until a source is a store of its own:
-    // docs/silverware-table-store-plan.md, step 5)
-    const modules = Object.fromEntries(Object.entries(features).filter(([path]) => path !== "./features/sources.ts"));
-    expect(matches(modules, /from "[./]*(markdown|tags|ops)\.ts"/)).toEqual([]);
+    expect(matches(features, /from "[./]*(markdown|tags|ops)\.ts"/)).toEqual([]);
+    expect(matches(features, /\basModel\(/)).toEqual([]);
   });
 
   it("the domains and the model work on the model too: nothing of the markdown's form, no cell escaped or unescaped", () => {

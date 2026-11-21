@@ -649,13 +649,6 @@ export interface ModelHost {
    * text as last read): what a user's script is handed (custom menu entries)
    */
   tableData(info: TableInfo): TableData;
-  /**
-   * A markdown table read into the model (its columns, rows and cells: a cell's
-   * content unescaped, its attributes apart): the sources module's, which makes
-   * its source's table as markdown until a source is a store of its own
-   * (docs/silverware-table-store-plan.md, step 5), and the adapter's
-   */
-  asModel(table: Table): TableModel;
   /** A table's header and `rows` (its rows, the first 1, in that order) as plain markdown, as any renderer shows them: no hidden data, no metadata row (Copy as Markdown) */
   plainMarkdown(table: TableModel, rows: readonly number[]): string;
   /** Whether other pages are read (none where the platform reads no page but the open one): formulas and pivots referring to one */
@@ -986,6 +979,13 @@ export interface ModelHost {
 
 /** What the core offers the adapter's modules (src/core/silverbullet/modules/): the model host and the rendering */
 export interface TableHost extends ModelHost {
+  /**
+   * A markdown table read into the model (its columns, rows and cells: a cell's
+   * content unescaped, its attributes apart): the adapter's, which reads the
+   * page's text for the sheet's board (until the binding pairs it with the
+   * markdown store: docs/silverware-table-store-plan.md, step 6)
+   */
+  asModel(table: Table): TableModel;
   /**
    * A table written as markdown (the change on its markdown): what works on how
    * markdown keeps a table, which no model expresses (Remove metadata: its

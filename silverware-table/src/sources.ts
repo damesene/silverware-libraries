@@ -38,6 +38,22 @@ export type SourcesOffer = {
   readonly version: () => number;
 };
 
+/**
+ * The sources as tables of the model, as the core gives them to the sources
+ * module (store/sources.ts reads them): each the same object while its data
+ * are the same
+ */
+export type SourceTables = {
+  /** The sources' names, as defined, read or not yet */
+  names(): readonly string[];
+  /** A source's columns' names as it gives them; undefined where it is not read (or there is none) */
+  columns(name: string): readonly string[] | undefined;
+  /** A source as a table: null where none is defined so, undefined where it is not read yet */
+  table(name: string): import("./model/model.ts").TableModel | null | undefined;
+  /** `listener` called whenever a source changed; the function returned stops it */
+  changed(listener: () => void): () => void;
+};
+
 /** No sources: the provider of a host that gives none */
 export const NO_SOURCES: SourceProvider = { names: () => [], read: () => undefined, changed: () => () => {} };
 

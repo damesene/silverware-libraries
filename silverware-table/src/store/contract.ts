@@ -3,9 +3,9 @@
 // fixture of its own. Tables read in order with keys that stay, revisions,
 // documents; transactions (plan, apply, planUndo: the database store's
 // shape) written as one step or left whole, a table changed since it was read
-// refusing it. A store keeping no tables of a kind (read only: a source) runs
-// the read side alone. Tables are given as models: what every store keeps
-// alike.
+// refusing it. A store whose tables are read only (a source) has every
+// transaction refused; one keeping one table per document (a source: `@tasks`)
+// is given one each. Tables are given as models: what every store keeps alike.
 import { describe, expect, it } from "vitest";
 import { type ModelRow, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
 import type { TableStore } from "../core/store.ts";
@@ -29,41 +29,47 @@ export function table(header: readonly string[], ...rows: (readonly string[])[])
 /** A table of a store as texts: its headers, then its rows' contents (what every store keeps alike) */
 const texts = (model: TableModel): string[][] => [model.columns.map((c) => c.header), ...model.rows.map((r) => r.cells.map((c) => c.content))];
 
-export function storeContract(name: string, make: (documents: Readonly<Record<string, readonly TableModel[]>>) => StoreFixture, options: { readonly readOnly?: boolean } = {}): void {
+export function storeContract(
+  name: string,
+  make: (documents: Readonly<Record<string, readonly TableModel[]>>) => StoreFixture,
+  options: { readonly readOnly?: boolean; readonly oneTable?: boolean } = {},
+): void {
   describe(`${name}: the table store's contract`, () => {
     const prices = table(["Fruit", "Price"], ["Pear", "12"], ["Fig", "3"]);
     const counts = table(["Item", "Count"], ["Box", "4"]);
+    // A document's tables as the store keeps them: the first alone where it keeps one per document
+    const kept = (...tables: TableModel[]) => (options.oneTable ? tables.slice(0, 1) : tables);
 
     it("reads a document's tables in order, each with its model", async () => {
-      const { store } = make({ Shop: [prices, counts] });
+      const { store } = make({ Shop: kept(prices, counts) });
       const tables = (await store.tables("Shop"))!;
-      expect(tables.map((t) => texts(t.model))).toEqual([texts(prices), texts(counts)]);
+      expect(tables.map((t) => texts(t.model))).toEqual(kept(prices, counts).map(texts));
     });
 
     it("gives no tables for a document without any, null for one not there", async () => {
-      const { store } = make({ Empty: [] });
-      expect(await store.tables("Empty")).toEqual([]);
+      const { store } = make(options.oneTable ? {} : { Empty: [] });
+      if (!options.oneTable) expect(await store.tables("Empty")).toEqual([]);
       expect(await store.tables("Nowhere")).toBeNull();
     });
 
     it("keeps a table's key and revision read again unchanged, each table's its own", async () => {
-      const { store } = make({ Shop: [prices, counts] });
+      const { store } = make({ Shop: kept(prices, counts) });
       const first = (await store.tables("Shop"))!;
       const again = (await store.tables("Shop"))!;
       expect(again.map((t) => t.key)).toEqual(first.map((t) => t.key));
       expect(again.map((t) => t.revision)).toEqual(first.map((t) => t.revision));
-      expect(new Set(first.map((t) => t.key)).size).toBe(2);
+      expect(new Set(first.map((t) => t.key)).size).toBe(kept(prices, counts).length);
     });
 
     it("changes the revision of a table changed, and only its; the key stays", async () => {
-      const fixture = make({ Shop: [prices, counts] });
+      const fixture = make({ Shop: kept(prices, counts) });
       const before = await fixture.store.tables("Shop");
-      fixture.replace("Shop", [table(["Fruit", "Price"], ["Pear", "13"], ["Fig", "3"]), counts]);
+      fixture.replace("Shop", kept(table(["Fruit", "Price"], ["Pear", "13"], ["Fig", "3"]), counts));
       const after = (await fixture.store.tables("Shop"))!;
       expect(after.map((t) => t.key)).toEqual(before!.map((t) => t.key));
       expect(after[0]!.revision).not.toBe(before![0]!.revision);
       expect(texts(after[0]!.model)[1]).toEqual(["Pear", "13"]);
-      expect(after[1]!.revision).toBe(before![1]!.revision);
+      if (!options.oneTable) expect(after[1]!.revision).toBe(before![1]!.revision);
     });
 
     it("tells the document a key is of", async () => {

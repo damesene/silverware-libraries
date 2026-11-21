@@ -8,13 +8,16 @@
 // is given one each. Tables are given as models: what every store keeps alike.
 import { describe, expect, it } from "vitest";
 import { type ModelRow, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
-import type { TableStore } from "../core/store.ts";
+import type { PageFormulaKey, TableStore } from "../core/store.ts";
+import type { TableKey } from "../core/tables.ts";
 
 /** A store holding these documents' tables (by name, in order), and a way to put others in a document's place */
 export type StoreFixture = {
   readonly store: TableStore;
   /** The document's tables made these, as an edit outside the store would (typed, synced) */
   replace(document: string, tables: readonly TableModel[]): void;
+  /** A key reserved for a new table of the document (the store's register's: TableRegister.reserve); none: a store making none */
+  reserve?(document: string): TableKey;
 };
 
 /** A table of these headers and rows of text */
@@ -162,6 +165,15 @@ export function storeContract(
       expect(report.revisions.has(count!.key)).toBe(false);
     });
 
+    it("makes a new table under the key reserved for it, where one is given", async () => {
+      const fixture = make({ Shop: [prices] });
+      if (options.readOnly || !fixture.reserve) return;
+      const key = fixture.reserve("Shop");
+      const report = await fixture.store.apply(await fixture.store.plan({ document: "Shop", edits: [{ kind: "insert", model: counts, key }] }));
+      expect(report.inserted).toEqual([key]);
+      expect((await fixture.store.tables("Shop"))!.map((t) => t.key)).toContain(key);
+    });
+
     it("applies a plan once: applied again, it is left and nothing is written twice", async () => {
       const { store } = make({ Shop: [prices] });
       const plan = await store.plan({ document: "Shop", edits: [{ kind: "insert", model: counts }] });
@@ -186,7 +198,7 @@ export function storeContract(
       expect((await store.tables("Shop"))!.map((t) => texts(t.model))).toEqual([texts(typed), texts(counts)]);
     });
 
-    it("refuses a transaction that edits a table twice, or puts a new one after a table it takes out", async () => {
+    it("refuses a transaction that edits a table twice, puts a new one after a table it takes out, or a new one with page formulas", async () => {
       const { store } = make({ Shop: [prices, counts] });
       const [shop] = (await store.tables("Shop"))!;
       const write = { kind: "write", key: shop!.key, expects: shop!.revision, model: table(["Fruit", "Price"], ["Kiwi", "2"]) } as const;
@@ -194,6 +206,7 @@ export function storeContract(
       expect((await store.plan({ document: "Shop", edits: [write, remove] })).skipped?.cause).toBe("refused");
       expect((await store.plan({ document: "Shop", edits: [write, { ...write, model: counts }] })).skipped?.cause).toBe("refused");
       expect((await store.plan({ document: "Shop", edits: [remove, { kind: "insert", model: counts, after: shop!.key }] })).skipped?.cause).toBe("refused");
+      expect((await store.plan({ document: "Shop", edits: [{ kind: "insert", model: counts }], formulas: [{ key: "f" as PageFormulaKey, text: "=1" }] })).skipped?.cause).toBe("refused");
       expect((await store.tables("Shop"))!.map((t) => texts(t.model))).toEqual([texts(prices), texts(counts)]);
     });
   });

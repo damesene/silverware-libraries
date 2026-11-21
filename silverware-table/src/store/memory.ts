@@ -62,7 +62,8 @@ export class MemoryStore implements TableStore {
     const inserted: TableKey[] = [];
     for (const edit of transaction.edits) {
       if (edit.kind === "insert") {
-        const table = this.made(document, edit.model, false);
+        // (Under the key reserved for it, else one made for it)
+        const table = edit.key ? { key: edit.key, revision: this.revision(), model: edit.model } : this.made(document, edit.model, false);
         inserted.push(table.key);
         const at = edit.after === undefined ? after.length : after.findIndex((one) => one.key === edit.after) + 1;
         if (at === 0) return left({ cause: "changed", reason: "the table a new one goes after is not there" });

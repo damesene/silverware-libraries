@@ -39,17 +39,20 @@ function pagesOf(documents: Readonly<Record<string, readonly TableModel[]>>, ope
   return { pages, platform };
 }
 
-const storeOf = (platform: Pick<TablePlatform, "editor" | "space">, beforeWrite?: BeforeWrite) => new MarkdownStore(() => platform, new TableRegister(), async () => serializeTable, beforeWrite);
+const storeOf = (platform: Pick<TablePlatform, "editor" | "space">, beforeWrite?: BeforeWrite, register = new TableRegister()) =>
+  new MarkdownStore(() => platform, register, async () => serializeTable, beforeWrite);
 
 storeContract("markdown in pages, the open page's through the editor", (documents) => {
   const open = Object.keys(documents)[0] ?? "";
   const { pages, platform } = pagesOf(documents, open);
-  return { store: storeOf(platform), replace: (document, tables) => void pages.set(document, textOf(tables)) };
+  const register = new TableRegister();
+  return { store: storeOf(platform, undefined, register), replace: (document, tables) => void pages.set(document, textOf(tables)), reserve: (document) => register.reserve(document) };
 });
 
 storeContract("markdown in pages, none open: through the space", (documents) => {
   const { pages, platform } = pagesOf(documents, "");
-  return { store: storeOf(platform), replace: (document, tables) => void pages.set(document, textOf(tables)) };
+  const register = new TableRegister();
+  return { store: storeOf(platform, undefined, register), replace: (document, tables) => void pages.set(document, textOf(tables)), reserve: (document) => register.reserve(document) };
 });
 
 describe("the markdown store", () => {

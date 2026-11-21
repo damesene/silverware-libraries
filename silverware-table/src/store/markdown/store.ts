@@ -101,6 +101,9 @@ function listenersEdit(made: string, listened: { readonly text: string }, told: 
   };
 }
 
+/** Whether two ranges of a text overlap */
+const overlaps = (a: { readonly from: number; readonly to: number }, b: { readonly from: number; readonly to: number }) => a.from < b.to && a.to > b.from;
+
 /** A skip of the writer's as the store's (its causes are the same) */
 const skipOf = (skipped: { readonly cause: TableSkip["cause"]; readonly reason: string }): TableSkip => ({ cause: skipped.cause, reason: skipped.reason });
 
@@ -207,6 +210,8 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
     const told: TableWritten[] = [];
     const spans: { readonly from: number; readonly to: number }[] = [];
     const written: TableKey[] = [];
+    // Where each table written or taken out is in the text read (a page formula in one is the table's)
+    const placesRead = new Map<TableKey, { readonly from: number; readonly to: number }>();
     for (const edit of transaction.edits) {
       if (edit.kind === "insert") {
         const after = edit.after === undefined ? undefined : ranges[keys.indexOf(edit.after)];
@@ -224,6 +229,7 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
       if (revisionOf(range.text) !== edit.expects) return left({ cause: "changed", reason: "a table of it changed since it was read" });
       spans.push(range);
       written.push(edit.key);
+      placesRead.set(edit.key, range);
       if (edit.kind === "remove") {
         writes.push({ ...tableAt(text, range), markdown: undefined });
         continue;
@@ -245,7 +251,7 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
         formulasLeft.push(place.problem);
         continue;
       }
-      if (spans.some((span) => place.from < span.to && place.to > span.from) || formulaEdits.some((one) => place.from < one.to && place.to > one.from)) continue;
+      if (written.some((key) => overlaps(placesRead.get(key)!, place)) || formulaEdits.some((one) => place.from < one.to && place.to > one.from)) continue;
       formulas.push(formula);
       formulaEdits.push({ from: place.from, to: place.to, text: formula.text });
     }
@@ -302,11 +308,22 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
       this.register.writing(made, markdown.trimEnd());
       return { key: made, own: !key };
     });
-    const then = own.open && (await this.beforeWrite?.(own.open.text, own.open.span, minimalEdit(own.open.text, own.open.made)));
-    const page = await this.writer().apply(own.page);
+    // Not written (left, or failed: an exception), the keys the store made for its new tables go: no table gets one
+    const release = () => {
+      for (const one of inserted) if (one.own) this.register.release(one.key);
+    };
+    let page: ApplyReport;
+    let then: ((moved: (position: number, after: boolean) => number) => void) | undefined;
+    try {
+      then = own.open && (await this.beforeWrite?.(own.open.text, own.open.span, minimalEdit(own.open.text, own.open.made)));
+      page = await this.writer().apply(own.page);
+    } catch (e) {
+      release();
+      throw e;
+    }
     const skipped = page.skipped[0];
     if (skipped) {
-      for (const one of inserted) if (one.own) this.register.release(one.key);
+      release();
       return { document, written: false, inserted: [], revisions: none, skipped: skipOf(skipped) };
     }
     if (then && own.open) then(own.open.moved);

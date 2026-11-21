@@ -97,7 +97,8 @@ export type TableTransaction = { readonly document: string; readonly edits: read
 /**
  * Why a transaction cannot be made as one step, whatever its document holds
  * (a store refuses it): a table edited twice (which edit is the table's?), a
- * new one after a table it takes out; undefined where it can
+ * new one after a table it takes out, a new one with page formulas; undefined
+ * where it can
  */
 export function validateTransaction(transaction: TableTransaction): string | undefined {
   const edited = new Set<TableKey>();
@@ -108,6 +109,8 @@ export function validateTransaction(transaction: TableTransaction): string | und
   }
   const removed = new Set(transaction.edits.flatMap((edit) => (edit.kind === "remove" ? [edit.key] : [])));
   if (transaction.edits.some((edit) => edit.kind === "insert" && edit.after !== undefined && removed.has(edit.after))) return "a new table goes after a table the transaction takes out";
+  // (A new table's place is found in the document as read, which its page formulas, written first, would change)
+  if (transaction.formulas?.length && transaction.edits.some((edit) => edit.kind === "insert")) return "a new table and page formulas in one transaction";
   return undefined;
 }
 

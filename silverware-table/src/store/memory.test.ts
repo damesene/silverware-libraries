@@ -4,8 +4,9 @@ import { storeContract, table } from "./contract.ts";
 import { MemoryStore } from "./memory.ts";
 
 storeContract("tables in memory", (documents) => {
-  const store = new MemoryStore(new TableRegister(), documents);
-  return { store, replace: (document, tables) => store.replace(document, tables) };
+  const register = new TableRegister();
+  const store = new MemoryStore(register, documents);
+  return { store, replace: (document, tables) => store.replace(document, tables), reserve: (document) => register.reserve(document) };
 });
 
 describe("the memory store", () => {

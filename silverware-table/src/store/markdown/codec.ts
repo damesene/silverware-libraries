@@ -273,6 +273,12 @@ function orphansKept(model: TableModel, base: Table): Record<string, string> {
   return set.size ? Object.fromEntries(Object.entries(orphans).filter(([name]) => !set.has(parseColumnAttribute(name)?.what ?? ""))) : orphans;
 }
 
+/** Whether a row's name was set or taken off by a change of its attributes since they were read */
+function nameChanged(attributes: Attributes): boolean {
+  for (let change = attributeChangeOf(attributes); change; change = attributeChangeOf(change.from)) if (change.owner === CORE && change.key === LINE_NAME_KEY) return true;
+  return false;
+}
+
 /** The row of `baseRows` a row's attributes were read with, through the changes made to them since */
 function readRowOf(attributes: Attributes, baseRows: ReadonlySet<Row>): Row | undefined {
   for (let at: Attributes | undefined = attributes; at; at = attributeChangeOf(at)?.from) {
@@ -322,16 +328,18 @@ export function encode(model: TableModel, base: Table, deleted: (column: number)
     const read = rows.get(row);
     if (read && baseRows.has(read)) return read;
     const rowCells = row.cells.map((cell) => cells.get(cell)?.cell ?? cellMarkdown(cell.content, cell.attributes, () => true));
-    // Its name in the cell holding it, else its first
-    const name = attributeIn(row.attributes, CORE, LINE_NAME_KEY);
-    const at = rowNameIn(rowCells);
-    if (at?.name !== name && rowCells.length) {
-      const column = at?.column ?? 0;
-      rowCells[column] = withName(rowCells[column]!, name);
-    }
     // As an edit of the row it was read from (its first cell read's, else its attributes'): written as it was where its
     // cells are (markdown.ts), its cells past the header kept
     const from = row.cells.map((cell) => cells.get(cell)?.row).find((r) => r !== undefined && baseRows.has(r)) ?? readRowOf(row.attributes, baseRows);
+    // Its name in the cell holding it, else its first: where the row has one, had one, or an edit set it (a name tag
+    // typed into a cell's text, the row having none, is the text's: read as the row's name once written)
+    const name = attributeIn(row.attributes, CORE, LINE_NAME_KEY);
+    const at = rowNameIn(rowCells);
+    const named = name !== undefined || (from !== undefined && rowNameIn(from.cells.slice(0, model.columns.length)) !== undefined) || nameChanged(row.attributes);
+    if (at?.name !== name && rowCells.length && named) {
+      const column = at?.column ?? 0;
+      rowCells[column] = withName(rowCells[column]!, name);
+    }
     return from ? { ...from, cells: [...rowCells, ...(beyond.get(from) ?? [])] } : { cells: rowCells };
   });
   const baseHeader = base.rows[0];

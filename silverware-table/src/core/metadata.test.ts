@@ -131,6 +131,24 @@ describe("Table metadata", () => {
     expect(controller.canPin(pinned, "bottom")).toBe(false);
   });
 
+  it("writes a row's name typed into a cell as typed with the setting on, and takes it off saying so with it off", async () => {
+    const typeName = async () => {
+      clickOn(cell(1, 0));
+      editor.querySelector<HTMLInputElement>(".swt-cell-editor")!.value = "Pears <meta core.n='p'>";
+      key(editor.querySelector(".swt-cell-editor")!, "Enter");
+      await flush();
+    };
+    await setup(`| Name | Qty |\n|---|---|\n| Pear | 3 |\n`, { "silverware.table.metadata": true, "silverware.table.editor.enterKey": "save" });
+    await typeName();
+    expect(text).toBe(`| Name | Qty |\n|---|---|\n| Pears <meta core.n='p'> | 3 |\n`);
+    controller.stop();
+    document.body.replaceChildren();
+    await setup(`| Name | Qty |\n|---|---|\n| Pear | 3 |\n`, { "silverware.table.editor.enterKey": "save" });
+    await typeName();
+    expect(text).toBe(`| Name | Qty |\n|---|---|\n| Pears | 3 |\n`);
+    expect(flashes.some((f) => f.includes("1 new hidden value") && f.includes("not stored"))).toBe(true);
+  });
+
   it("with the setting off, takes a tag typed into a cell's or a header's text off a write, as one written new", async () => {
     await setup(`| Name | Qty |\n|---|---|\n| Pear | 3 |\n`);
     const [info] = controller.shownTables();

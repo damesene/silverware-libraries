@@ -5,7 +5,7 @@
 // puts the cursor on the line after the table instead, as if pressed there.
 // Presses on the widget are the controller's, left of it the +'s band; with a
 // modifier (Shift extending the selection, Alt showing the markdown) SilverBullet's.
-import type { AdapterFeature, TableHost } from "../../feature.ts";
+import type { AdapterFeature, TableHost } from "../../../core/feature.ts";
 import { EDITOR_SELECTOR, SCROLLER_SELECTOR, WIDGET_SELECTOR, widgetOfLineBelow } from "../../../dom.ts";
 import { locateBySource } from "../../../markdown.ts";
 

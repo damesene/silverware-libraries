@@ -71,3 +71,14 @@ export interface TableAdapter {
   /** Silverware Table stops: what the adapter added to the page goes */
   stop(): void;
 }
+
+/** What the adapter needs to know of the core: which tables it enhanced, and a row taken out of the document put back (largeTables) */
+export type AdapterContext = {
+  infoOf(widget: HTMLElement): WidgetInfo | undefined;
+  rowNeeded(info: WidgetInfo, row: HTMLTableRowElement): void;
+  holdInDocument(info: WidgetInfo, row: HTMLTableRowElement | undefined): void;
+  floating(className: string): HTMLElement;
+  place(element: HTMLElement, left: number, top: number): void;
+  // A table's columns took other widths after layout (ColumnLayouts): what is placed by them follows
+  columnsResized(info: WidgetInfo): void;
+};

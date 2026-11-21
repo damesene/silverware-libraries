@@ -4,28 +4,17 @@
 // keeps anyone's, without reading their meaning. Read from the table as rendered (its metadata row's <meta>, before
 // the browser lays it out: as a table's look is read), so Silverware Layout lays it out before it is painted; written
 // through the core's write (one edit). With the metadata setting off nothing new is stored: the write says so.
-import type { LayoutChanges, LayoutEntries, LayoutProvider } from "../../../shared/layout.ts";
-import { renderedTable, WIDGET_SELECTOR } from "../dom.ts";
-import { type Table, tableMetaOf } from "../markdown.ts";
-import type { TableModel } from "../model/model.ts";
-import type { WriteResult } from "./feature.ts";
-import { ownMeta } from "./metaaccess.ts";
-import { renderedMeta } from "./silverbullet/adapter.ts";
+import type { LayoutChanges, LayoutEntries, LayoutProvider } from "../../../../shared/layout.ts";
+import { renderedTable, WIDGET_SELECTOR } from "../../dom.ts";
+import { type Table, tableMetaOf } from "../../markdown.ts";
+import type { LayoutTables } from "../../core/binding.ts";
+import { ownMeta } from "../../core/metaaccess.ts";
+import { renderedMeta } from "./adapter.ts";
 
 /** The owner of Silverware Layout's attributes in a table's metadata */
 export const LAYOUT_OWNER = "layout";
 
 /** What the provider asks of the core */
-export type LayoutTables = {
-  // A rendered table's rows as SilverBullet rendered them (some may be out of the document: largeTables)
-  renderedRows(table: HTMLTableElement): readonly HTMLTableRowElement[];
-  // Whether a widget is enhanced (known in the page's markdown), so it can be written
-  enhanced(widget: HTMLElement): boolean;
-  write(widget: HTMLElement, change: (table: TableModel) => TableModel | undefined): Promise<WriteResult>;
-  // The metadata setting
-  metadataOn(): boolean;
-};
-
 export function tablesLayoutProvider(tables: LayoutTables): LayoutProvider {
   const meta = ownMeta(LAYOUT_OWNER, tables.metadataOn);
   return {

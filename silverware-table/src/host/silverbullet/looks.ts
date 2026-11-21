@@ -5,8 +5,8 @@
 // changed) it first takes back what it applied before, so a cell whose look is
 // gone shows its content as rendered again.
 import { cellText, HIDDEN_TAG_CLASS, UI_CLASS } from "../../dom.ts";
-import type { CellDisplay } from "../feature.ts";
-import type { MergedCell, MergedHeader } from "../looks.ts";
+import type { CellDisplay } from "../../core/feature.ts";
+import type { MergedCell, MergedHeader } from "../../core/looks.ts";
 
 /** What was applied to a cell, to take back: its marks, its title as rendered, its content replaced */
 type Applied = {

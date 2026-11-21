@@ -5,11 +5,11 @@
 // them. Pieces and handles are Silverware Table's own elements in the cells
 // (UI_CLASS, OUT_OF_LINE_CLASS), so they scroll, stick and are cut with them.
 import { OUT_OF_LINE_CLASS, UI_CLASS, WIDGET_SELECTOR } from "../../dom.ts";
-import type { HandlePlace, PointerTarget, Side, WidgetInfo } from "../feature.ts";
-import { intersect, isEmpty, shownRect, viewBounds } from "../geometry.ts";
-import { Outline } from "../outline.ts";
-import type { TableRows } from "../rows.ts";
-import type { TableKey } from "../tables.ts";
+import type { HandlePlace, PointerTarget, Side, WidgetInfo } from "../../core/feature.ts";
+import { intersect, isEmpty, shownRect, viewBounds } from "../../core/geometry.ts";
+import { Outline } from "../../core/outline.ts";
+import type { TableRows } from "../../core/rows.ts";
+import type { TableKey } from "../../core/tables.ts";
 
 type PieceOf = { readonly layer: string; readonly key: TableKey; readonly row: number; readonly column: number };
 type HandleOf = { readonly layer: string; readonly key: TableKey; readonly className: string; readonly row: number; readonly column: number };

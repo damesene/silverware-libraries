@@ -7,6 +7,10 @@ import { describe, expect, it } from "vitest";
 // (Vite reads the options as written: a literal each time)
 const features = import.meta.glob(["./features/*.ts", "!./features/*.test.ts"], { query: "?raw", import: "default", eager: true });
 const core = import.meta.glob(["./controller.ts", "./core/**/*.ts", "!./core/**/*.test.ts"], { query: "?raw", import: "default", eager: true });
+// SilverBullet's binding (host/silverbullet/): its adapter's modules, and the rest of it but its composition (binding.ts,
+// which names the modules in their order by design)
+const adapterModules = import.meta.glob(["./host/silverbullet/modules/*.ts", "!./host/silverbullet/modules/*.test.ts"], { query: "?raw", import: "default", eager: true });
+const adapter = import.meta.glob(["./host/silverbullet/*.ts", "!./host/silverbullet/*.test.ts", "!./host/silverbullet/binding.ts"], { query: "?raw", import: "default", eager: true });
 // The stores (the markdown store writes through the page writer)
 const stores = import.meta.glob(["./store/**/*.ts", "!./store/**/*.test.ts"], { query: "?raw", import: "default", eager: true });
 // The domains the modules hand data to: their own pure code
@@ -52,7 +56,7 @@ describe("isolation", () => {
   it("a module keeps no collection of state by table: its part for each table holds it (core/parts.ts)", () => {
     // (The sheet lays several tables out on one board: those are its own, the page's)
     const modules = Object.fromEntries(
-      Object.entries({ ...features, ...core }).filter(([path]) => (path.startsWith("./features/") || path.startsWith("./core/silverbullet/modules/")) && !path.endsWith("/sheet.ts")),
+      Object.entries({ ...features, ...adapterModules }).filter(([path]) => !path.endsWith("/sheet.ts")),
     );
     expect(matches(modules, /\b(Map|Set|WeakMap)<TableKey\b/)).toEqual([]);
   });
@@ -77,7 +81,7 @@ describe("isolation", () => {
   it("what tables keep is read and written through the host: no module nor domain names an attribute or reads the metadata itself", () => {
     // (Remove metadata is the core's, core/metadata.ts: it names whose each attribute is)
     const modules = Object.fromEntries(
-      Object.entries({ ...features, ...core }).filter(([path]) => path.startsWith("./features/") || path.startsWith("./core/silverbullet/modules/")),
+      Object.entries({ ...features, ...adapterModules }),
     );
     // A guard against calling them by mistake: a module could keep its data elsewhere, which nothing here prevents
     expect(matches(modules, /from "[./]*(meta|metanames|names|tagvalues)\.ts"/)).toEqual([]);
@@ -97,8 +101,11 @@ describe("isolation", () => {
     expect(matches(users, /from "[./]*formulas\/(?!index\.ts")/)).toEqual([]);
   });
 
-  it("SilverBullet's side (its platform, the sources of the space) is the entry's only: no other file imports host/, no domain the sources", () => {
-    // (The tests' page stands for the entry: it makes the platform of its bridge as the entry does)
+  it("SilverBullet's side (its platform, its binding, the sources of the space) is the entry's only: no other file imports host/, no domain the sources", () => {
+    // (The tests' page stands for the entry: it makes the platform of its bridge and binds the core as the entry does; the core is
+    // handed its binding, core/binding.ts)
+    expect(Object.keys(adapterModules)).toContain("./host/silverbullet/modules/sheet.ts");
+    expect(Object.keys(adapter)).toContain("./host/silverbullet/adapter.ts");
     const all = import.meta.glob(["./**/*.ts", "!./**/*.test.ts", "!./index.ts", "!./host/**", "!./testing/**"], { query: "?raw", import: "default", eager: true });
     expect(Object.keys(all)).toContain("./features/sources.ts");
     expect(matches(all, /from "[./]*host\//)).toEqual([]);
@@ -118,8 +125,7 @@ describe("isolation", () => {
   });
 
   it("the core and the adapter name no module", () => {
-    // Remove metadata is the controller's own (a page command too), made by it for the list of modules
-    expect(matches(core, /from "[./]*features\/(?!metadata\.ts")/)).toEqual([]);
-    expect(matches(core, /moduleOn\("/)).toEqual([]);
+    expect(matches({ ...core, ...adapter }, /from "[./]*features\//)).toEqual([]);
+    expect(matches({ ...core, ...adapter }, /moduleOn\("/)).toEqual([]);
   });
 });

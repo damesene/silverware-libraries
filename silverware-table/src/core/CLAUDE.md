@@ -4,9 +4,9 @@ The model of layers, hosts and the write pipeline is in `silverware-table/CLAUDE
 
 ## Rules for the core
 
-- The core names no module and touches no table's DOM itself: rendering is the adapter's (`core/adapter.ts`, `core/silverbullet/`), SilverBullet DOM assumptions are `dom.ts`'s. A module-specific need becomes a generic hook or host function in `core/feature.ts`.
+- The core names no module and touches no table's DOM itself: rendering is the adapter's (`core/adapter.ts`, `host/silverbullet/`), SilverBullet DOM assumptions are `dom.ts`'s. A module-specific need becomes a generic hook or host function in `core/feature.ts`.
 - Modules get the host from `modulehost.ts` (members forwarded, methods bound once, fields read live, the module's own `offer`). Metadata access per owner is `metaaccess.ts` (`ownMeta`): an owner reads and writes only its own attributes.
-- `core/silverbullet/modules/` may touch the rendered DOM; the same rules about rows apply (through `TableRows`, not queries).
+- `host/silverbullet/modules/` may touch the rendered DOM; the same rules about rows apply (through `TableRows`, not queries).
 
 ## Tables and their rows
 

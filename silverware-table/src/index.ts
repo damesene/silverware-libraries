@@ -4,6 +4,7 @@ import { applyLayers } from "../../shared/layers.ts";
 import { customSeries, customSeriesAnew, defineCustomSeries } from "./autofill/index.ts";
 import { type Bridge, listOf, missingBridgeFunctions } from "./bridge.ts";
 import { tablePlatform } from "./host/silverbullet/platform.ts";
+import { silverBulletBinding } from "./host/silverbullet/binding.ts";
 import { Controller } from "./controller.ts";
 import { customTypes } from "./columntypes/custom.ts";
 import { customTypesAnew, defineCustomTypes } from "./columntypes/registry.ts";
@@ -21,7 +22,7 @@ import { metaName } from "./meta.ts";
 import { nameOf } from "./names.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { customMenuEntries, customMenuEntriesAnew, defineCustomMenuEntries } from "./menus/custom.ts";
-import { LuaSources } from "./host/sources.ts";
+import { LuaSources } from "./host/silverbullet/sources.ts";
 import type { SourceProvider } from "./sources.ts";
 
 export const version = "0.1.0";
@@ -265,7 +266,7 @@ export function defineFormulaPlaces(finder: unknown): void {
 
 // The finder of formulas given to Space Lua calls (silverware.table.evaluate and its aliases), which the
 // library's init page registers: host/lua.ts, apart from the rest, which knows nothing of Lua
-export { luaCallPlaces } from "./host/lua.ts";
+export { luaCallPlaces } from "./host/silverbullet/lua.ts";
 
 /**
  * `silverware.table.onWrite`: a function told of each write of tables, the
@@ -420,7 +421,7 @@ export function init(bridge: Bridge, sources: SourceProvider = spaceSources): vo
     existing.setPlatform(platform);
     return;
   }
-  const controller = new Controller(document, platform, sources);
+  const controller = new Controller(document, platform, silverBulletBinding, sources);
   global[GLOBAL_KEY] = controller;
   controller.start();
 }

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { mergeLooks } from "./looks.ts";
-import { applyCellLook } from "./silverbullet/looks.ts";
+import { applyCellLook } from "../host/silverbullet/looks.ts";
 
 describe("Looks' vars", () => {
   it("merges the features' vars, a later one's value of a name winning, Silverware Table's own names only", () => {

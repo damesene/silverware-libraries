@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { pageChanges } from "../../../../shared/pages/changes.ts";
 import { pageWriter } from "../../../../shared/pages/writer.ts";
 import type { Editor, Space } from "../../../../shared/platform.ts";
-import { luaCallPlaces } from "../../host/lua.ts";
+import { luaCallPlaces } from "../../host/silverbullet/lua.ts";
 import { findTables } from "../../markdown.ts";
 import { defineFormulaPlaces, pageFormulasIn } from "./pageformulas.ts";
 import { cursorPlace, removedSpan, tableAt } from "./tableparts.ts";

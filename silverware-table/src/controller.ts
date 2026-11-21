@@ -21,7 +21,6 @@ import { mergeLooks } from "./core/looks.ts";
 import { Panels } from "./core/panel.ts";
 import { type DragContext, followDrag } from "./core/drag.ts";
 import { writingClipboard } from "../../shared/clipboard.ts";
-import { markTable, renderedMeta, SilverBulletAdapter } from "./core/silverbullet/adapter.ts";
 import type { TablePlatform } from "./core/platform.ts";
 import type { PageFormula, StoredTable, TableEdit } from "./core/store.ts";
 import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt } from "./model/model.ts";
@@ -36,7 +35,6 @@ import type { EditResult } from "../../shared/pages/tags/edit.ts";
 import { decode, encode, plainMarkdown } from "./store/markdown/codec.ts";
 import { SettingsDialog } from "./settings.ts";
 import { Metadata } from "./core/metadata.ts";
-import { featureEntries } from "./modules.ts";
 import { NO_SOURCES, type SourceProvider } from "./sources.ts";
 import { moduleHost } from "./core/modulehost.ts";
 import {
@@ -68,8 +66,6 @@ import {
   parseTable,
   serializeTable,
   type Table,
-  type TableMeta,
-  tableMetaOf,
   writesMetaRow,
   type TableRange,
 } from "./markdown.ts";
@@ -96,7 +92,7 @@ import { Parts } from "./core/parts.ts";
 import { underWindow } from "./core/overwindow.ts";
 import { layoutOf } from "../../shared/layout.ts";
 import { overWindowOf } from "../../shared/overwindow.ts";
-import { tablesLayoutProvider } from "./core/layoutprovider.ts";
+import type { TableBinding } from "./core/binding.ts";
 
 // The cell editor as features see it, and what it takes to put the cell back
 
@@ -127,10 +123,6 @@ const NOT_SAVED = "Silverware Table: the table changed in the meantime, nothing 
 // The element under the pointer while Ctrl is held in a cell editor (the move cursor, CSS)
 const NAVIGATING_CLASS = "swt-navigating-here";
 
-/** A table of its metadata only (read from a rendering, before the table is): what features read of it as a whole */
-function metadataOnly(meta: TableMeta | undefined): Table {
-  return { indent: "", align: [], rows: [], padded: false, ...(meta ? tableMetaOf(meta) : {}) };
-}
 
 /** What sorting compares of body rows' cells, by row and column: a look's key of its own (data-swt-sort), else the value */
 function sortKeys(rows: readonly HTMLTableRowElement[], values: readonly (readonly string[])[]): (row: number, column: number) => string {
@@ -262,11 +254,13 @@ export class Controller implements TableHost {
   constructor(
     readonly doc: Document,
     public platform: TablePlatform,
+    // What the host binds the core to: its rendering's adapter, the features in their order (core/binding.ts)
+    private readonly binding: TableBinding,
     // The sources of the space the host gives (the sources module offers them to formulas)
     sources: SourceProvider = NO_SOURCES,
   ) {
     this.sourceStore = new SourceStore(sources, this.register);
-    this.adapter = new SilverBulletAdapter(doc, this.rows, {
+    this.adapter = binding.adapter(doc, this.rows, {
       infoOf: (widget) => this.infos.get(widget),
       rowNeeded: (info, row) => this.rowNeeded(info, row),
       holdInDocument: (info, row) => this.holdInDocument(info, row),
@@ -386,7 +380,7 @@ export class Controller implements TableHost {
    */
   private registerLayout(): void {
     layoutOf(this.platform.layout).register(
-      tablesLayoutProvider({
+      this.binding.layoutProvider({
         renderedRows: (table) => this.rows.renderedRows(table),
         enhanced: (widget) => this.infos.has(widget),
         write: (widget, change) => {
@@ -438,7 +432,7 @@ export class Controller implements TableHost {
    * page is loaded again.
    */
   private async startFeatures(): Promise<void> {
-    const all = featureEntries(this.metadata, this.sourceStore);
+    const all = this.binding.features(this.metadata, this.sourceStore);
     const enabled = await Promise.all(all.map(({ name }) => (name ? this.featureEnabled(name) : true)));
     if (this.stopped) return;
     all.forEach(({ name }, i) => {
@@ -1116,7 +1110,7 @@ export class Controller implements TableHost {
           if (!widget || this.rows.knows(table) || this.ownTable(widget)) continue;
           const rows = this.rows.renderedRows(table);
           // How it looks as a whole, from its metadata as rendered, before the browser lays it out
-          markTable(widget, this.tableLook(decode(metadataOnly(renderedMeta(rows)))));
+          this.binding.markRendered(widget, rows, (table) => this.tableLook(table));
           for (const feature of this.features) feature.tableAdded?.(widget, table, rows);
         }
       }

@@ -12,9 +12,9 @@
 // (placeRows), as the box scrolls, and put back when a row is needed
 // (rowNeeded: a cell edited or selected out of view).
 import { SETTINGS } from "../../../bridge.ts";
-import { type AdapterFeature, type TableHost, tablePartsOf, type WidgetInfo } from "../../feature.ts";
+import { type AdapterFeature, type TableHost, tablePartsOf, type WidgetInfo } from "../../../core/feature.ts";
 import { UI_CLASS } from "../../../dom.ts";
-import type { TableKey } from "../../tables.ts";
+import type { TableKey } from "../../../core/tables.ts";
 
 const LARGE_CLASS = "swt-large-table";
 const SPACER_CLASS = "swt-large-spacer";

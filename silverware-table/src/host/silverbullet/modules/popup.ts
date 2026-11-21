@@ -3,7 +3,7 @@
 // edited whose text does not fit its field (a long formula), gets a small
 // expand button at its top right corner. It opens the cell's editor in its
 // popup (core/editor.ts): the whole text, wrapped, to read and edit.
-import type { AdapterFeature, RenderedEditor, TableHost, WidgetInfo } from "../../feature.ts";
+import type { AdapterFeature, RenderedEditor, TableHost, WidgetInfo } from "../../../core/feature.ts";
 import { ICONS } from "../../../icons.ts";
 
 export class CellPopup implements AdapterFeature {

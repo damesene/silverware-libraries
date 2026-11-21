@@ -1,46 +1,48 @@
-// Silverware Table's features, in the order they get events: the modules (turned on
-// or off by `silverware.table.modules.<name>.enabled`) and those always there. The
-// controller creates those turned on from this list and knows none of them.
-import type { FeatureName } from "./bridge.ts";
-import type { AdapterFeature, Feature, TableHost } from "./core/feature.ts";
-import { AutoFill } from "./features/autofill.ts";
-import { Autoscroll } from "./core/silverbullet/modules/autoscroll.ts";
-import { ColumnTypes } from "./features/columntypes.ts";
-import { Conditions } from "./features/conditions.ts";
-import { Excel } from "./features/excel.ts";
-import { Pivot } from "./features/pivot.ts";
-import { Views } from "./features/views.ts";
-import { Export } from "./features/export.ts";
-import { Expressions } from "./core/silverbullet/modules/expressions.ts";
-import { Filters } from "./features/filters.ts";
-import { Formulas } from "./features/formulas.ts";
-import { FullScreen } from "./core/silverbullet/modules/fullscreen.ts";
-import { Grips } from "./features/grips.ts";
-import { History } from "./core/silverbullet/modules/history.ts";
-import { BesideTables } from "./core/silverbullet/modules/beside.ts";
-import { CustomMenus } from "./features/custommenus.ts";
-import { LargeTables } from "./core/silverbullet/modules/largetables.ts";
-import { Lazy } from "./features/lazy.ts";
-import { LongText } from "./core/silverbullet/modules/longtext.ts";
-import { Names } from "./features/names.ts";
-import { PageLinks } from "./features/pagelinks.ts";
-import { Paste } from "./features/paste.ts";
-import { CellPopup } from "./core/silverbullet/modules/popup.ts";
-import { Selection } from "./features/selection.ts";
-import { Sheet } from "./core/silverbullet/modules/sheet.ts";
-import { Sheets } from "./features/sheets.ts";
-import { Sources } from "./features/sources.ts";
-import type { SourceTables } from "./sources.ts";
-import { Sticky } from "./core/silverbullet/modules/sticky.ts";
-import { TableLabels } from "./core/silverbullet/modules/labels.ts";
-import { Themes } from "./features/themes.ts";
-import { Widths } from "./features/widths.ts";
+// Silverware Table bound to SilverBullet (core/binding.ts): the adapter of the
+// tables SilverBullet renders, and the features in the order they get events:
+// the modules (turned on or off by `silverware.table.modules.<name>.enabled`)
+// and those always there. The controller creates those turned on from this
+// list and knows none of them.
+import type { FeatureName } from "../../bridge.ts";
+import type { AdapterFeature, Feature, TableHost } from "../../core/feature.ts";
+import type { FeatureEntry, TableBinding } from "../../core/binding.ts";
+import { markTable, renderedMeta, SilverBulletAdapter } from "./adapter.ts";
+import { tablesLayoutProvider } from "./layoutprovider.ts";
+import { type Table, tableMetaOf, type TableMeta } from "../../markdown.ts";
+import { decode } from "../../store/markdown/codec.ts";
+import { AutoFill } from "../../features/autofill.ts";
+import { Autoscroll } from "./modules/autoscroll.ts";
+import { ColumnTypes } from "../../features/columntypes.ts";
+import { Conditions } from "../../features/conditions.ts";
+import { Excel } from "../../features/excel.ts";
+import { Pivot } from "../../features/pivot.ts";
+import { Views } from "../../features/views.ts";
+import { Export } from "../../features/export.ts";
+import { Expressions } from "./modules/expressions.ts";
+import { Filters } from "../../features/filters.ts";
+import { Formulas } from "../../features/formulas.ts";
+import { FullScreen } from "./modules/fullscreen.ts";
+import { Grips } from "../../features/grips.ts";
+import { History } from "./modules/history.ts";
+import { BesideTables } from "./modules/beside.ts";
+import { CustomMenus } from "../../features/custommenus.ts";
+import { LargeTables } from "./modules/largetables.ts";
+import { Lazy } from "../../features/lazy.ts";
+import { LongText } from "./modules/longtext.ts";
+import { Names } from "../../features/names.ts";
+import { PageLinks } from "../../features/pagelinks.ts";
+import { Paste } from "../../features/paste.ts";
+import { CellPopup } from "./modules/popup.ts";
+import { Selection } from "../../features/selection.ts";
+import { Sheet } from "./modules/sheet.ts";
+import { Sheets } from "../../features/sheets.ts";
+import { Sources } from "../../features/sources.ts";
+import type { SourceTables } from "../../sources.ts";
+import { Sticky } from "./modules/sticky.ts";
+import { TableLabels } from "./modules/labels.ts";
+import { Themes } from "../../features/themes.ts";
+import { Widths } from "../../features/widths.ts";
 
-/**
- * A feature to create: a module (by its name), or one always there (no name);
- * made with its host: a module's its own (core/modulehost.ts), the core's for the others
- */
-export type FeatureEntry = { readonly name: FeatureName | undefined; readonly create: (host: TableHost) => AdapterFeature };
 
 /**
  * The features in the order they get events; `metadata` is the controller's own (Remove metadata, also a page
@@ -97,4 +99,17 @@ export function featureEntries(metadata: Feature, sources: SourceTables): readon
     always((host) => new CustomMenus(host)),
     always((host) => new CellPopup(host)),
   ];
+}
+
+/** Silverware Table bound to SilverBullet: what the entry (index.ts) hands the controller */
+export const silverBulletBinding: TableBinding = {
+  adapter: (doc, rows, context) => new SilverBulletAdapter(doc, rows, context),
+  features: featureEntries,
+  markRendered: (widget, rows, look) => markTable(widget, look(decode(metadataOnly(renderedMeta(rows))))),
+  layoutProvider: tablesLayoutProvider,
+};
+
+/** A table of its metadata only (read from a rendering, before the table is): what features read of it as a whole */
+function metadataOnly(meta: TableMeta | undefined): Table {
+  return { indent: "", align: [], rows: [], padded: false, ...(meta ? tableMetaOf(meta) : {}) };
 }

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { TableRegister } from "../../core/tables.ts";
-import { luaCallPlaces } from "../../host/lua.ts";
+import { luaCallPlaces } from "../../host/silverbullet/lua.ts";
 import { serializeTable } from "../../markdown.ts";
 import { defineFormulaPlaces, formulaPlacesIn, pageFormulaPlace, pageFormulasIn } from "./pageformulas.ts";
 import { MarkdownStore } from "./store.ts";

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { parseTable, serializeTable } from "../markdown.ts";
-import { decode, encode } from "../store/markdown/codec.ts";
+import { parseTable, serializeTable } from "../../markdown.ts";
+import { decode, encode } from "../../store/markdown/codec.ts";
 import { tablesLayoutProvider } from "./layoutprovider.ts";
 
 /** A table widget as SilverBullet renders one, its metadata row's <meta> with these attributes (none: no metadata row) */

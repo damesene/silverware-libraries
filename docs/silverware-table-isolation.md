@@ -3,7 +3,7 @@
 Status (2026-10-22, branch `core-view-isolation`): steps 1 to 6 done but the
 second renderer. The modules in `src/features/` are typed against `ModelHost`
 and `TableInfo` (no element of the rendering); the rendering modules are the
-adapter's (`core/silverbullet/modules/`, `AdapterFeature`, `TableHost`);
+adapter's (`host/silverbullet/modules/`, `AdapterFeature`, `TableHost`);
 `isolation.test.ts` checks what types cannot (imports, selectors).
 
 ## Why
@@ -33,7 +33,7 @@ writing every module again.
   writes, menus, and routes events to the modules in model terms. It does not
   touch the DOM of the tables either: it asks **the adapter**.
 - **The adapter** (`core/adapter.ts` the interface `TableAdapter`,
-  `core/silverbullet/` its implementation for SilverBullet) is part of the core
+  `host/silverbullet/` its implementation for SilverBullet) is part of the core
   but behind that interface: it knows the rendering. SilverBullet's adapter
   finds the tables SilverBullet rendered, applies to them what the modules
   asked for (the looks of cells, marks, outlines, handles), turns DOM events

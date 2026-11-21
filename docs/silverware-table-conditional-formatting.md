@@ -16,7 +16,7 @@ Not in scope: arbitrary address ranges (`B2:D9`) as a scope (they break on every
 
 ## What the code has (research, 2026-11-03)
 
-- **Looks are model terms already.** `Feature.looks(info, table)` gives `TableLooks` (cells by markdown row and column), `core/looks.ts` merges every feature's in their order, the adapter (`core/silverbullet/looks.ts`) applies them and takes them back when they change. It works for rows out of the document (largeTables) and for tables the sheet draws. A module needs no DOM: the `conditions` module is a model module in `features/`.
+- **Looks are model terms already.** `Feature.looks(info, table)` gives `TableLooks` (cells by markdown row and column), `core/looks.ts` merges every feature's in their order, the adapter (`host/silverbullet/looks.ts`) applies them and takes them back when they change. It works for rows out of the document (largeTables) and for tables the sheet draws. A module needs no DOM: the `conditions` module is a model module in `features/`.
 - **`CellLook` has no colors.** It has `display`, `value`, `marks` (classes `swt-<mark>`) and `title`. A fixed set of formats would work with marks alone; a color picked by the user, a data bar's length or a color scale's shade would not (a class per color is not possible). This is the one real gap in the core.
 - **The looks of one view are computed side by side.** `mergeLooks(this.features.map((f) => f.looks?.(info, table)))`: one feature does not see another's looks of the same pass, so the conditions module cannot read the column types module's `value` through `host.shownValue` while looks are made (that reads what was applied before). It needs the typed value another way: an offer of the column types module.
 - **Column types** (`columntypes/type.ts`): `sortValue(text, params)` is what sorting and filters compare; `check` tells a valid value; both pure. `view.ts asNumber` reads numbers as sorting does.
@@ -253,7 +253,7 @@ Before: one change in the dialog kept the main thread busy for 0.8 to 1.1 s: the
 Three changes, each its own commit:
 
 1. **The cells' inputs read once per table** (`readers` in features/conditions.ts, by the parsed table, emptied on `tablesChanged` as a column type defined anew may read a value otherwise; none kept for a table with `${…}` cells): the looks and the dialog's sample share them.
-2. **A cell's look applied again only where it changed** (core/silverbullet/looks.ts: the look applied kept as a key; the same look, and what it shows still in the cell, is left alone): generic, for every module's `looksChanged`.
+2. **A cell's look applied again only where it changed** (host/silverbullet/looks.ts: the look applied kept as a key; the same look, and what it shows still in the cell, is left alone): generic, for every module's `looksChanged`.
 3. **The table shows the rules edited only as the dialog is put aside** (its eye; shared/dialog.ts `peeked`), kept shown back in the dialog (decided by the user: no repainting on the way back, the next look away showing them as they are then), taken back unless saved. While editing, the open rule's sample shows it on the table's own cells. No Apply button: the eye and Save cover it.
 
 After: a change in the dialog costs 70 to 200 ms (the dialog and its sample drawn anew). Putting the dialog aside costs about 0.75 s once, Cancel after it about 0.67 s (the table's looks applied as written again).

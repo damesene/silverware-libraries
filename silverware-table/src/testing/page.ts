@@ -6,6 +6,7 @@ import type { SourceProvider } from "../sources.ts";
 import { afterEach, beforeEach, vi } from "vitest";
 import type { Bridge } from "../bridge.ts";
 import { tablePlatform } from "../host/silverbullet/platform.ts";
+import { silverBulletBinding } from "../host/silverbullet/binding.ts";
 import { Controller } from "../controller.ts";
 import type { InsertControls, InsertTarget } from "../core/insert.ts";
 import { findTables, parseTable, writesMetaRow, writtenMeta } from "../markdown.ts";
@@ -122,7 +123,7 @@ export async function setup(page: string, settings: Record<string, unknown> = {}
     ...bridgeExtras,
   };
   // (Made of the bridge as SilverBullet's is: a test replaces a member of the bridge to watch or answer it)
-  controller = new Controller(document, tablePlatform(bridge, document), sources);
+  controller = new Controller(document, tablePlatform(bridge, document), silverBulletBinding, sources);
   controller.start();
   await controller.scan();
   // The settings are read asynchronously: tests start once they are

@@ -329,6 +329,8 @@ export function encode(model: TableModel, base: Table, deleted: (column: number)
   });
   // A row as it was read only where it is the base's (a row of another table, read with its indent, is written anew)
   const baseRows = new Set(base.rows);
+  // The rows' names (any case): a name typed into a cell's text is the row's once written, where no other row has it
+  const names = new Set(model.rows.flatMap((row) => attributeIn(row.attributes, CORE, LINE_NAME_KEY)?.toLowerCase() ?? []));
   const bodyRows = model.rows.map((row): Row => {
     const read = rows.get(row);
     if (read && baseRows.has(read)) return read;
@@ -340,8 +342,12 @@ export function encode(model: TableModel, base: Table, deleted: (column: number)
     // typed into a cell's text, the row having none, is the text's: read as the row's name once written)
     const name = attributeIn(row.attributes, CORE, LINE_NAME_KEY);
     const at = rowNameIn(rowCells);
-    const named = name !== undefined || (from !== undefined && rowNameIn(from.cells.slice(0, model.columns.length)) !== undefined) || nameChanged(row.attributes);
-    if (at?.name !== name && rowCells.length && named) {
+    const named = name !== undefined || (from !== undefined && rowNameIn(from.cells.slice(0, base.align.length)) !== undefined) || nameChanged(row.attributes);
+    // (A name typed that another row has already, a copy of a row with it: taken off, as a name is unique)
+    const typed = !named && at !== undefined;
+    const taken = typed && names.has(at.name.toLowerCase());
+    if (typed && !taken) names.add(at.name.toLowerCase());
+    if (at?.name !== name && rowCells.length && (named || taken)) {
       const column = at?.column ?? 0;
       rowCells[column] = withName(rowCells[column]!, name);
     }

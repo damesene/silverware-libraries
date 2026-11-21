@@ -7,6 +7,7 @@ import { withColumnType } from "../../columntypes/registry.ts";
 import { findTables, parseTable, serializeTable, type Table } from "../../markdown.ts";
 import { metaValue, withColumnValues, withMetaSort, withMetaValue } from "../../meta.ts";
 import { attributeIn, type ModelCell, type TableModel, withAttributeIn } from "../../model/model.ts";
+import { duplicateRow, withContentAt } from "../../model/ops.ts";
 import { reorderRows, setCell } from "../../testing/markdownops.ts";
 import { cellTags } from "../../tags.ts";
 import { withTagValue } from "../../tagvalues.ts";
@@ -135,6 +136,13 @@ describe("the markdown codec", () => {
       const written = md(encode(renamed, tagged));
       expect(written).toContain("| Cost #currency-usd <meta note='x'> |");
       expect(written).toContain("widths.-c-cost.size='90'");
+    });
+
+    it("a row's name typed into a cell written as typed, once: a copy of the row has none", () => {
+      const plain = parseTable("| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |");
+      const typed = withContentAt(decode(plain), 1, 0, "1 <meta core.n='x'>");
+      expect(md(encode(typed, plain))).toBe("| A | B |\n|---|---|\n| 1 <meta core.n='x'> | 2 |\n| 3 | 4 |");
+      expect(md(encode(duplicateRow(typed, 1), plain))).toBe("| A | B |\n|---|---|\n| 1 <meta core.n='x'> | 2 |\n| 1 | 2 |\n| 3 | 4 |");
     });
 
     it("plain markdown of a table made of the one read (edits held in) in that one's form: padded where it is", () => {

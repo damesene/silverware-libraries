@@ -48,4 +48,16 @@ describe("the sources' store", () => {
     expect(stored!.model).toBe(table);
     expect(store.documentOf(stored!.key)).toBe("@tasks");
   });
+
+  it("names a source's document as the source is defined now: redefined in another case, the same key", async () => {
+    const sources = memorySources({ Tasks: { columns: ["due"], rows: [["today"]] } });
+    const store = new SourceStore(sources, new TableRegister());
+    const [first] = (await store.tables("@Tasks"))!;
+    expect(store.documentOf(first!.key)).toBe("@Tasks");
+    sources.set("Tasks", undefined);
+    sources.set("tasks", { columns: ["due"], rows: [["tomorrow"]] });
+    const [again] = (await store.tables("@tasks"))!;
+    expect(again!.key).toBe(first!.key);
+    expect(store.documentOf(first!.key)).toBe("@tasks");
+  });
 });

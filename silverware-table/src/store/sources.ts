@@ -66,7 +66,11 @@ export class SourceStore implements TableStore, SourceTables {
   }
 
   documentOf(key: TableKey): string | undefined {
-    for (const one of this.keys.values()) if (one.key === key) return sourceDocument(one.name);
+    for (const [lower, one] of this.keys) {
+      if (one.key !== key) continue;
+      // (Named as the source is defined now: redefined in another case, the same source; gone, as it was last)
+      return sourceDocument(this.provider.names().find((n) => n.toLowerCase() === lower) ?? one.name);
+    }
     return undefined;
   }
 

@@ -1039,7 +1039,23 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    `PageChangeKinds` merging), page formulas a part of their own
    (`PAGE_FORMULAS`), the writer's parts read as `partsNow()`; the controller's
    metadata step `asMetadataAllows`; `LayoutTables.write` by a `TableTarget`
-   (`tableOf(widget)`); `SourceStore.plan` takes a `TableTransaction`.
+   (`tableOf(widget)`); `SourceStore.plan` takes a `TableTransaction`; the
+   core's API says *document* where a store keeps tables and the editor shows
+   one (`currentDocument`, `documentNameNow`, `documentTables()`), *page* where
+   a page of the space is meant (formulas' `[[Page]]`, pageLinks, the
+   binding), a write's document on its edit (`WriteEdit` is `WriteOptions &
+   WriteDocument`: `edit.tables`, `edit.key`…); the markdown parts named apart
+   from the edits (`TableReplacement`, `TableAddition`); why a change is left
+   alone said once (`shared/store.ts`: `SkipCause`, `Skip`, the writer's,
+   the table's and the database's); the open page planned anew as a page is
+   planned (`leaveAlone` asked of it as it is now, nothing written where it is
+   already as its changes make it: reported with no change); a source's
+   document named as it is defined now. The history marker on a write planned
+   anew was right already (the store plans the open page's write anew on its
+   text now, `openWrite`, before `beforeWrite`). Not drawn out: the plan's and
+   the report's shapes, which differ for a reason (a table's transaction is one
+   step of one document, written whole or not; a database's is written part by
+   part), and the contract tests' harness (each store's contract its own).
    **Public changes, for the release's changelog** (each a user sees):
    `silverware.table.tables` (and a custom menu's table data) gives a row's
    cells by the columns, none past the header, and a column's name with its

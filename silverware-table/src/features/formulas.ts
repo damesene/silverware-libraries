@@ -88,10 +88,10 @@ import {
   withAreasWritten,
   withColumnKeys,
   writtenArea,
-} from "../formulas/index.ts";
-import { cellName, columnChoicesOf, columnIdText, FormulaError, type FormulaErrorAt, functionHelp, type Grid, parseFormula, withEquals } from "../formulas/index.ts";
-import { addAffected, affectedBy, type Elsewhere, isAffected, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../formulas/page.ts";
-import { functionNamed } from "../formulas/registry.ts";
+} from "../../../shared/formulas/index.ts";
+import { cellName, columnChoicesOf, columnIdText, FormulaError, type FormulaErrorAt, functionHelp, type Grid, parseFormula, withEquals } from "../../../shared/formulas/index.ts";
+import { addAffected, affectedBy, type Elsewhere, isAffected, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../../../shared/formulas/page.ts";
+import { functionNamed } from "../../../shared/formulas/registry.ts";
 import type { FormulaHelpers } from "../formulafield.ts";
 import { FunctionDialog } from "./functiondialog.ts";
 import { ResultView } from "./resultview.ts";
@@ -625,7 +625,7 @@ export class Formulas implements Feature {
   }
 
   /** The whole result of a cell's formula, calculated now as a grid; an error said (its result is one) */
-  private resultOf(info: TableInfo, ref: CellRef): import("../formulas/index.ts").Grid | undefined {
+  private resultOf(info: TableInfo, ref: CellRef): import("../../../shared/formulas/index.ts").Grid | undefined {
     const table = this.modelOf(info, true);
     const result = cellWholeResult(table, ref.row, ref.column, { cells: this.cells, tables: this.tableSource(), name: this.nameOf(table) });
     if (result === undefined) return undefined;

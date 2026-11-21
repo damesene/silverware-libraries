@@ -17,7 +17,7 @@
 import type { TableModel } from "../../../shared/table/model.ts";
 import { columnIdOf, modelHeads } from "../../../shared/table/columns.ts";
 import type { CellLook, CellRef, Feature, HeaderLook, NamingTarget, ModelHost, StoredTable, TableLooks, ToolbarButton, TableInfo } from "../core/feature.ts";
-import { functionNamed } from "../formulas/index.ts";
+import { functionNamed } from "../../../shared/formulas/index.ts";
 import type { MenuNaming } from "../menu.ts";
 import { validateName, sameTableName, validateTableName } from "../../../shared/table/namerules.ts";
 

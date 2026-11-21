@@ -35,7 +35,7 @@ import {
   type StoredRule,
   styleLook,
 } from "../conditions/index.ts";
-import { FormulaError, type FormulasOffer, isErrorText, type Scalar, scalarText } from "../formulas/index.ts";
+import { FormulaError, type FormulasOffer, isErrorText, type Scalar, scalarText } from "../../../shared/formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import type { TableModel } from "../../../shared/table/model.ts";
 import type { MenuEntry } from "../menu.ts";

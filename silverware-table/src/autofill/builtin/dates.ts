@@ -1,4 +1,4 @@
-import { addUnits, type DateTime, formatDate, parseDate } from "../../formulas/dates.ts";
+import { addUnits, type DateTime, formatDate, parseDate } from "../../../../shared/formulas/dates.ts";
 import type { Series } from "../series.ts";
 
 const DAY = 86_400_000;

@@ -7,7 +7,7 @@
 // metadata says is read through the sheet modules' host (SheetMeta), by the
 // sheet's keys: the core makes the attributes' names.
 import type { ModelHost } from "../core/feature.ts";
-import { columnLetters } from "../formulas/index.ts";
+import { columnLetters } from "../../../shared/formulas/index.ts";
 import type { TableModel } from "../../../shared/table/model.ts";
 
 /** How the sheet modules read what tables keep for the sheet (their host) */

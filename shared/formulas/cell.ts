@@ -8,7 +8,7 @@
 // no attribute and reads no metadata. A table is the model (shared/table/model.ts):
 // its rows keep the markdown's numbers here (the header 0, the body from 1),
 // the model's row r being `rows[r - 1]`.
-import { type ModelCell, NO_ATTRIBUTES, type TableModel } from "../../../shared/table/model.ts";
+import { type ModelCell, NO_ATTRIBUTES, type TableModel } from "../table/model.ts";
 import type { Following } from "./edits.ts";
 import { ERROR_CODES, type ErrorCode, type FormulaError, type Result } from "./values.ts";
 

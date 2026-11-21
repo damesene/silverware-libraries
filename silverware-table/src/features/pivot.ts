@@ -15,7 +15,7 @@
 // Without the formulas module nothing is calculated.
 import type { Feature, ModelHost, PageCommand, StoredTable, TableBadge, TableInfo, ToolbarButton } from "../core/feature.ts";
 import { type Calculated, calculatedTable, movedRenames, readRenames, renamedIn, type Renames, sameCells, storedRenames } from "../calculated/index.ts";
-import { type CalculatedBy, type CalculatedOffer, followOwnFormula, type Following, callsPureFunctionsOnly, FormulaError, type FormulaCells, type FormulasOffer, type PageLinksOffer, PLAIN_CELLS } from "../formulas/index.ts";
+import { type CalculatedBy, type CalculatedOffer, followOwnFormula, type Following, callsPureFunctionsOnly, FormulaError, type FormulaCells, type FormulasOffer, type PageLinksOffer, PLAIN_CELLS } from "../../../shared/formulas/index.ts";
 import { columnName, modelHeads } from "../../../shared/table/columns.ts";
 import { headerText } from "../columns.ts";
 import { ICONS } from "../icons.ts";
@@ -575,7 +575,7 @@ function movedId(id: string, moved: ReadonlyMap<string, string>): string {
   return m ? m[1]! + (moved.get(m[2]!) ?? m[2]!) : id;
 }
 
-/** Whether a pivot's result is of its source alone, so it may be kept by it (formulas/references.ts) */
+/** Whether a pivot's result is of its source alone, so it may be kept by it (shared/formulas/references.ts) */
 function keptOf(definition: PivotDefinition): boolean {
   const formulas = [...definition.rows, ...definition.columns].map(groupFormula).concat(definition.values.map((item) => valueParts(item).formula), definition.where ? [definition.where] : []);
   return formulas.every((formula) => callsPureFunctionsOnly(`=${formula}`));

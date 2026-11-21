@@ -7,7 +7,7 @@
 // and writes its attributes through its host, and hands in the pins'.
 import { columnOfHeader, headerText, withHeaderOf } from "../columns.ts";
 import { matchColumns, modelHeads } from "../../../shared/table/columns.ts";
-import { resultContent } from "../formulas/index.ts";
+import { resultContent } from "../../../shared/formulas/index.ts";
 import { type ModelColumn, type ModelRow, NO_ATTRIBUTES, type TableModel } from "../../../shared/table/model.ts";
 import type { Pins } from "../view.ts";
 

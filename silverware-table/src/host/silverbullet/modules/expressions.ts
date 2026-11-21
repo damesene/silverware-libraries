@@ -9,7 +9,7 @@
 // so the evaluation waits a moment for them.
 import type { AdapterFeature, TableHost } from "../../../core/feature.ts";
 import { cellText, renderedTable, UI_CLASS, WIDGET_SELECTOR } from "../../../dom.ts";
-import { formatLuaNumber } from "../../../format.ts";
+import { formatLuaNumber } from "../../../../../shared/formulas/format.ts";
 import { encodeOver } from "../../../store/markdown/codec.ts";
 
 export class Expressions implements AdapterFeature {

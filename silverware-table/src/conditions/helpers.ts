@@ -4,7 +4,7 @@
 import type { Cell, Color, Context, Scope, Style } from "./api.ts";
 import { filterExcelFormula } from "../filter.ts";
 import { asNumber, filterMatcher, normalizeForFilter } from "../../../shared/filter.ts";
-import { now } from "../formulas/dates.ts";
+import { now } from "../../../shared/formulas/dates.ts";
 
 /** The palette's colors, by name: each a tint, a text shade and a strong shade, light and dark (the style page's --swt-cf-<name>-…) */
 export const PALETTE_NAMES = ["red", "orange", "yellow", "green", "teal", "blue", "purple", "pink", "gray"] as const;

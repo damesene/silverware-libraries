@@ -1,4 +1,4 @@
-import { formatClock, parseClock } from "../../formulas/values.ts";
+import { formatClock, parseClock } from "../../../../shared/formulas/values.ts";
 import type { Series } from "../series.ts";
 
 const DAY = 86_400;

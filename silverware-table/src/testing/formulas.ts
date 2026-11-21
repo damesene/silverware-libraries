@@ -6,8 +6,8 @@
 // as the module has it (the codec), and what the domain gives back written
 // back as the module writes it.
 import { formulaCellsOf } from "../features/formulas.ts";
-import * as domain from "../formulas/index.ts";
-import * as page from "../formulas/page.ts";
+import * as domain from "../../../shared/formulas/index.ts";
+import * as page from "../../../shared/formulas/page.ts";
 import { type ExcelTable, excelFormula as excelFormulaOf } from "../excel/formulas.ts";
 import type { ExcelTemplates } from "../excel/functions.ts";
 import type { PageTable, Table } from "../markdown.ts";

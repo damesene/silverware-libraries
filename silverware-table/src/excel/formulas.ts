@@ -19,7 +19,7 @@ import {
   cellsByName,
   type FormulaCells,
   rowsByName,
-} from "../formulas/index.ts";
+} from "../../../shared/formulas/index.ts";
 import { type ExcelTemplates, excelCall, hasTemplate } from "./functions.ts";
 
 // The error values Excel has (ours #CYCLE! and #ERROR! are not among them)

@@ -18,7 +18,7 @@
 // This is the formulas' API for the rest of Silverware Table; the parts are the
 // files beside it, the functions in builtin/ (only functions: what a formula
 // can call), custom functions in custom.ts, which exist in registry.ts.
-import type { KeyedModel, TableModel } from "../../../shared/table/model.ts";
+import type { KeyedModel, TableModel } from "../table/model.ts";
 export { type CalculatedBy, type CalculatedRead, type HeldFormulas, type CellNameAt, cellResult, resultContent, PLAIN_CELLS, withEquals, cellsByName, errorCodeIn, type FormulaCells, formulaCount, forFormulas, hasFormulas, isErrorText, isFormulaInput, type RowName, rowsByName, type StoredFormula } from "./cell.ts";
 
 /**
@@ -75,7 +75,7 @@ export type FormulasOffer = {
    * reads a page not read
    */
   readonly calculated: (table: TableModel) => TableModel | import("./values.ts").FormulaError | undefined;
-  readonly fieldHelpers: (table?: () => TableModel, outside?: import("./help.ts").FormulaHelp) => import("../formulafield.ts").FormulaHelpers;
+  readonly fieldHelpers: (table?: () => TableModel, outside?: import("./help.ts").FormulaHelp) => import("../../silverware-table/src/formulafield.ts").FormulaHelpers;
 };
 
 /**
@@ -132,4 +132,4 @@ export { calculatedFormula, filledFormula, followFormula, followOwnFormula, foll
 export { argumentSpan, type ColumnChoice, columnChoicesOf, type FormulaChoice, type FormulaChoices, choiceText, cycleFixed, findFunctions, type FormulaHelp, formulaChoices, formulaHelp, functionHelp, nameTyped, needsOperator, type PointedSpan, REFERENCE_HELP, referenceSlot, sourceChoices } from "./help.ts";
 export { FUNCTION_CATEGORIES, type AnyFunction, type FormulaFunction, type FunctionCategory } from "./function.ts";
 export { functionNamed, isCustomFunction } from "./registry.ts";
-export type { IndexMap } from "../../../shared/table/ops.ts";
+export type { IndexMap } from "../table/ops.ts";

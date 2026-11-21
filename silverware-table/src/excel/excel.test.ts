@@ -2,8 +2,8 @@
 import { describe, expect, it } from "vitest";
 import { parseTable } from "../markdown.ts";
 import { withMeta } from "../meta.ts";
-import { BUILT_IN_FUNCTIONS } from "../formulas/builtin/index.ts";
-import { clearCustomFunctions, defineCustomFunctions } from "../formulas/registry.ts";
+import { BUILT_IN_FUNCTIONS } from "../../../shared/formulas/builtin/index.ts";
+import { clearCustomFunctions, defineCustomFunctions } from "../../../shared/formulas/registry.ts";
 import { excelHtml, excelText } from "./clipboard.ts";
 import { excelFormula } from "../testing/formulas.ts";
 import { EXCEL_FUNCTIONS, SAME_IN_EXCEL, withFutureNames } from "./functions.ts";

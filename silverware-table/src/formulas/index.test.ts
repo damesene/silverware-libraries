@@ -23,17 +23,17 @@ import {
   REFERENCE_HELP,
   referenceSlot,
   withColumnKeys,
-} from "./index.ts";
+} from "../../../shared/formulas/index.ts";
 import { CELLS, model, calculatedFormula, cellNamesOf, followTable, formulaCell, formulaErrors, formulaOf, qualifyCellNames, recalculate, referredTableNames, shiftReferences, withCalculatedCells } from "../testing/formulas.ts";
-import { formulaErrors as domainFormulaErrors } from "./evaluate.ts";
-import { FormulaError } from "./values.ts";
+import { formulaErrors as domainFormulaErrors } from "../../../shared/formulas/evaluate.ts";
+import { FormulaError } from "../../../shared/formulas/values.ts";
 import { parseMetaRow, parseTable, serializeTable, splitRow } from "../markdown.ts";
 import { metaName, withMetaValue } from "../meta.ts";
 import { cellNameOf, nameOf, rowNameIn, withCellName, withName, withoutName } from "../names.ts";
 import { modelRowName } from "../../../shared/table/names.ts";
 import { decode } from "../store/markdown/codec.ts";
 import { deleteColumn, deleteRow, insertRow, moveColumn, moveRow, reorderRows, setCell } from "../testing/markdownops.ts";
-import { cellResult, errorCodeIn, isErrorText } from "./cell.ts";
+import { cellResult, errorCodeIn, isErrorText } from "../../../shared/formulas/cell.ts";
 
 // A table whose cell `at` holds `formula`; returns what that cell shows after recalculating
 function evaluate(markdown: string, formula: string, at = { row: -1, column: -1 }): string {

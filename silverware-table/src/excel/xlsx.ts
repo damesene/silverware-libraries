@@ -6,7 +6,7 @@
 // table, the sheet's cells are an Excel table too (Insert > Table): its name,
 // its columns (as the header names them), a filter in its header, banded rows,
 // its last row its totals row where asked, its calculated columns' formulas.
-import { columnLetters } from "../formulas/index.ts";
+import { columnLetters } from "../../../shared/formulas/index.ts";
 import type { ExcelValue, NumberFormat } from "./values.ts";
 
 export type XlsxCell = {

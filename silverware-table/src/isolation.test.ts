@@ -15,7 +15,7 @@ const adapter = import.meta.glob(["./host/silverbullet/*.ts", "!./host/silverbul
 const stores = import.meta.glob(["./store/**/*.ts", "!./store/**/*.test.ts"], { query: "?raw", import: "default", eager: true });
 // The domains the modules hand data to: their own pure code
 const domains = import.meta.glob(
-  ["./formulas/**/*.ts", "./calculated/**/*.ts", "./pivot/**/*.ts", "./sheet/**/*.ts", "./excel/**/*.ts", "./export/**/*.ts", "./columntypes/**/*.ts", "./conditions/**/*.ts", "./autofill/**/*.ts", "!./**/*.test.ts"],
+  ["../../shared/formulas/**/*.ts", "./calculated/**/*.ts", "./pivot/**/*.ts", "./sheet/**/*.ts", "./excel/**/*.ts", "./export/**/*.ts", "./columntypes/**/*.ts", "./conditions/**/*.ts", "./autofill/**/*.ts", "!./**/*.test.ts"],
   { query: "?raw", import: "default", eager: true },
 );
 // The model: what a table is, kept by no store in particular (shared: docs/silverware-formulas-shared.md)
@@ -81,7 +81,7 @@ describe("isolation", () => {
   });
 
   it("the domains and the model work on the model too: nothing of the markdown's form, no cell escaped or unescaped", () => {
-    expect(Object.keys(domains)).toEqual(expect.arrayContaining(["./formulas/help.ts", "./columntypes/registry.ts", "./conditions/rule.ts", "./autofill/series.ts", "./pivot/pivot.ts"]));
+    expect(Object.keys(domains)).toEqual(expect.arrayContaining(["../../shared/formulas/help.ts", "./columntypes/registry.ts", "./conditions/rule.ts", "./autofill/series.ts", "./pivot/pivot.ts"]));
     expect(Object.keys(model)).toContain("../../shared/table/rules.ts");
     // (The markdown's files are the folder above: the model has an ops.ts of its own)
     expect(matches({ ...domains, ...model }, /from "(\.\.\/)+(markdown|tags|ops)\.ts"|\b(escapeCell|unescapeCell)\b/)).toEqual([]);
@@ -101,11 +101,13 @@ describe("isolation", () => {
     expect(matches(pivot, /from "[./]*(features|core)\//)).toEqual([]);
   });
 
-  it("the modules and the pivot's domain use the formulas through their API (formulas/index.ts), not their files", () => {
+  it("the modules and the pivot's domain use the formulas through their API (shared/formulas/index.ts), not their files", () => {
     // (The formulas module is theirs: it uses their parts)
     const users = Object.fromEntries(Object.entries({ ...features, ...pivot }).filter(([path]) => path !== "./features/formulas.ts"));
     expect(Object.keys(users)).toContain("./pivot/definition.ts");
-    expect(matches(users, /from "[./]*formulas\/(?!index\.ts")/)).toEqual([]);
+    expect(matches(users, /from "[./]*(shared\/)?formulas\/(?!index\.ts")/)).toEqual([]);
+    // (Where they use them at all: the rule reaches the formulas where they are)
+    expect(matches(users, /from "[./]*shared\/formulas\/index\.ts"/)).not.toEqual([]);
   });
 
   it("SilverBullet's side (its platform, its binding, the sources of the space) is the entry's only: no other file imports host/, no domain the sources", () => {

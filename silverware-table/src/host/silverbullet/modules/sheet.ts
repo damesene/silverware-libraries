@@ -35,7 +35,7 @@ import { claimWindow, releaseWindow } from "../../../core/overwindow.ts";
 import { DRAWN_CLASS, STAND_IN_CLASS, UI_CLASS } from "../../../dom.ts";
 import { el } from "../../../../../shared/elements.ts";
 import { markOverWindow } from "../../../../../shared/overwindow.ts";
-import { columnLetters, isFormulaInput } from "../../../formulas/index.ts";
+import { columnLetters, isFormulaInput } from "../../../../../shared/formulas/index.ts";
 import { ICONS } from "../../../icons.ts";
 import { escapeCell, findTables, pageTablesOf, parseTable, type TableRange } from "../../../markdown.ts";
 import { decode } from "../../../store/markdown/codec.ts";

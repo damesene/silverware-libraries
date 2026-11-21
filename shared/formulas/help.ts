@@ -2,8 +2,8 @@
 // function's syntax (the argument typed marked) and description, where a
 // pointed reference goes; and the functions found by what they are or do
 // (the Functions dialog).
-import { columnIdOf, columnName, type ColumnHead } from "../../../shared/table/columns.ts";
-import { CELL_RE } from "../../../shared/table/namerules.ts";
+import { columnIdOf, columnName, type ColumnHead } from "../table/columns.ts";
+import { CELL_RE } from "../table/namerules.ts";
 import type { AnyFunction, FunctionCategory } from "./function.ts";
 import { functionNamed, functionNames } from "./registry.ts";
 import { cellName, columnRefText, references } from "./references.ts";

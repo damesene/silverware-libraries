@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import libraryPage from "../../../silverware-table.md?raw";
-import { BUILT_IN_FUNCTIONS as FUNCTIONS } from "./index.ts";
-import { FUNCTION_CATEGORIES } from "../function.ts";
-import { parse } from "../parser.ts";
-import { asValue, FormulaError, isError, parseClock, TimeValue, toText, type Value } from "../values.ts";
+import { BUILT_IN_FUNCTIONS as FUNCTIONS } from "../../../../shared/formulas/builtin/index.ts";
+import { FUNCTION_CATEGORIES } from "../../../../shared/formulas/function.ts";
+import { parse } from "../../../../shared/formulas/parser.ts";
+import { asValue, FormulaError, isError, parseClock, TimeValue, toText, type Value } from "../../../../shared/formulas/values.ts";
 import { asInLibraryPage } from "../../testing/librarypage.ts";
 
 // Called in the first cell (A1); ROW() tests set the place itself (a grid a function taking grids gives, as its cells)

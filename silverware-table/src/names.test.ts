@@ -4,7 +4,7 @@ import { columnIdOf, columnKey, findColumn } from "../../shared/table/columns.ts
 import { headsOf } from "./columns.ts";
 import {
   referencedColumn,
-} from "./formulas/index.ts";
+} from "../../shared/formulas/index.ts";
 import { formulaCell, formulaOf, recalculate } from "./testing/formulas.ts";
 import { parseMetaRow, parseTable, serializeTable } from "./markdown.ts";
 import { validateName } from "../../shared/table/namerules.ts";

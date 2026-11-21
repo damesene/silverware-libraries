@@ -50,7 +50,7 @@ import {
   rowBlockTo,
 } from "../core/structure.ts";
 import { lineAfterBlockMove } from "../../../shared/table/ops.ts";
-import { columnLetters } from "../formulas/index.ts";
+import { columnLetters } from "../../../shared/formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import type { MenuEntry } from "../menu.ts";
 import type { TableModel } from "../../../shared/table/model.ts";

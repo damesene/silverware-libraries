@@ -1,6 +1,6 @@
 // Fixing a formula typed with a common slip (a missing ")"), saying what was
 // fixed; and names of cells written as before they were their table's.
-import type { TableModel } from "../../../shared/table/model.ts";
+import type { TableModel } from "../table/model.ts";
 import { cellsByName, type FormulaCells, rowsByName } from "./cell.ts";
 import type { TableSource } from "./evaluate.ts";
 import { parse } from "./parser.ts";

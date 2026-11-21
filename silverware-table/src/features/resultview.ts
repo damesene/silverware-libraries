@@ -8,7 +8,7 @@ import type { Dialog, ModelHost } from "../core/feature.ts";
 import { writeClipboard } from "../../../shared/clipboard.ts";
 import { clipboardHtml, clipboardText } from "../clipboard.ts";
 import { el } from "../../../shared/elements.ts";
-import { columnLetters, type Grid, scalarText } from "../formulas/index.ts";
+import { columnLetters, type Grid, scalarText } from "../../../shared/formulas/index.ts";
 import { ICONS } from "../icons.ts";
 
 /** At most so many rows drawn: the copy has every one */

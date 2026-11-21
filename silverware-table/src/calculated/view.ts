@@ -3,7 +3,7 @@
 // by which a header the user renamed is kept through every recalculation;
 // cells as texts, a column right-aligned where its values are all numbers.
 import { columnName } from "../../../shared/table/columns.ts";
-import { columnLetters, type Grid, scalarText } from "../formulas/index.ts";
+import { columnLetters, type Grid, scalarText } from "../../../shared/formulas/index.ts";
 import type { TableModel } from "../../../shared/table/model.ts";
 import type { Calculated, Renames } from "./table.ts";
 

@@ -1,8 +1,8 @@
 // What formulas refer to and how references are written: cells (A1),
 // ranges, [columns], [@columns] of the row, named cells and rows, other
 // tables and pages; what a table's formulas refer to.
-import { type ColumnId, columnIdOf, columnKey, findColumn, type ColumnHead } from "../../../shared/table/columns.ts";
-import type { TableModel } from "../../../shared/table/model.ts";
+import { type ColumnId, columnIdOf, columnKey, findColumn, type ColumnHead } from "../table/columns.ts";
+import type { TableModel } from "../table/model.ts";
 import { cellsByName, type FormulaCells, forFormulas } from "./cell.ts";
 import { isBuiltInFunction, isCustomFunction } from "./registry.ts";
 import { type Token, tokenize } from "./tokens.ts";

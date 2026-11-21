@@ -10,8 +10,14 @@
 // what is not here yet is still the controller's own DOM code.
 import type { CellRef, ColumnsMeasure, ColumnWidths, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "./feature.ts";
 import type { MergedLooks } from "./looks.ts";
+import type { TableModel } from "../model/model.ts";
+import type { TablePlatform } from "./platform.ts";
+import type { StoredTable, TableRevision } from "./store.ts";
+import type { TableKey } from "./tables.ts";
 
 export interface TableAdapter {
+  /** The table of the page a rendered table is; why none is; undefined: rendered anew meanwhile */
+  pair(widget: HTMLElement, table: HTMLTableElement): Promise<PairedTable | Unpaired | undefined>;
   /** The features' looks applied to a table's cells and headers (`only`: to those); `editing`: the cell edited (its field shows, not a display) */
   applyLooks(info: WidgetInfo, looks: MergedLooks, editing: CellRef | undefined, only?: readonly CellRef[]): void;
   /** A cell's text as its markdown renders, before any look; undefined: not rendered */
@@ -73,7 +79,38 @@ export interface TableAdapter {
 }
 
 /** What the adapter needs to know of the core: which tables it enhanced, and a row taken out of the document put back (largeTables) */
-export type AdapterContext = {
+/**
+ * A rendered table paired with a table of the page (TableAdapter.pair): its
+ * key, model and revision as read now, its document, whether the rendering
+ * shows a metadata row; and, until the core tells tables by their keys alone
+ * (docs/silverware-table-store-plan.md, step 6, A4), the page's text read,
+ * the table's markdown and where it starts in it
+ */
+export type PairedTable = {
+  readonly key: TableKey;
+  readonly model: TableModel;
+  readonly revision: TableRevision;
+  readonly document: string;
+  readonly metaRow: boolean;
+  readonly text: string;
+  readonly source: string;
+  readonly hint: number;
+};
+
+/**
+ * Why a rendered table is paired with none of the page's: no place given to
+ * find it by, or none is it (a table in a block quote; `emptyHeaders`: one
+ * whose headers are empty, which naming them would make a table)
+ */
+export type Unpaired = { readonly unpaired: "unplaced" | "unfound"; readonly emptyHeaders?: { readonly source: string; readonly hint: number } };
+
+/** What pairing a rendered table asks of the core: the platform (the page's text read), a page's tables in a text keyed by the core's register */
+export type PairingContext = {
+  platform(): TablePlatform;
+  tablesOfText(document: string, text: string): readonly StoredTable[];
+};
+
+export type AdapterContext = PairingContext & {
   infoOf(widget: HTMLElement): WidgetInfo | undefined;
   rowNeeded(info: WidgetInfo, row: HTMLTableRowElement): void;
   holdInDocument(info: WidgetInfo, row: HTMLTableRowElement | undefined): void;

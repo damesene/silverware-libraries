@@ -7,7 +7,8 @@ import { dragLines } from "./linedrag.ts";
 import { Overlays } from "./overlays.ts";
 import type { TableMeta } from "../../markdown.ts";
 import { TABLE_MARKER } from "../../metanames.ts";
-import type { AdapterContext, TableAdapter } from "../../core/adapter.ts";
+import type { AdapterContext, PairedTable, TableAdapter, Unpaired } from "../../core/adapter.ts";
+import { pairTable } from "./pairing.ts";
 import type { CellRef, ColumnsMeasure, ColumnWidths, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "../../core/feature.ts";
 import { type MergedLooks, refKey } from "../../core/looks.ts";
 import type { TableRows } from "../../core/rows.ts";
@@ -68,6 +69,10 @@ export class SilverBulletAdapter implements TableAdapter {
       const info = widget && context.infoOf(widget);
       if (info && info.table === table) context.columnsResized(info);
     });
+  }
+
+  pair(widget: HTMLElement, table: HTMLTableElement): Promise<PairedTable | Unpaired | undefined> {
+    return pairTable(widget, table, this.rows, this.context);
   }
 
   applyLooks(info: WidgetInfo, looks: MergedLooks, editing: CellRef | undefined, only?: readonly CellRef[]): void {

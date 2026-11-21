@@ -26,7 +26,7 @@ import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, sameAt
 import { HASHTAGS_KEY, nameEmptyHeaders } from "./columns.ts";
 import { type AttributeRules, cellWrittenOver, withAttributeRules, withoutNewAttributes } from "./model/rules.ts";
 import { type TableData, tableData } from "./tabledata.ts";
-import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
+import { MarkdownStore, tablesIn } from "./store/markdown/store.ts";
 import { SourceStore } from "./store/sources.ts";
 import { tableAt } from "./store/markdown/tableparts.ts";
 import { decode, encode, encodeOver, plainMarkdown } from "./store/markdown/codec.ts";
@@ -46,7 +46,6 @@ import {
   layOutHeaderCell,
   OUT_OF_LINE_CLASS,
   NATIVE_ACTION_SELECTOR,
-  positionHint,
   renderedTable,
   UI_CLASS,
   WIDGET_SELECTOR,
@@ -55,12 +54,9 @@ import { ICONS } from "./icons.ts";
 import {
   cellSourceOffset,
   locateBySource,
-  locateByShape,
-  locateWithEmptyHeaders,
   parseTable,
   serializeTable,
   type Table,
-  writesMetaRow,
 } from "./markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "./menu.ts";
 import { floatingMenu, focusMenu } from "./core/menu.ts";
@@ -254,6 +250,8 @@ export class Controller implements TableHost {
   ) {
     this.sourceStore = new SourceStore(sources, this.register);
     this.adapter = binding.adapter(doc, this.rows, {
+      platform: () => this.platform,
+      tablesOfText: (document, text) => tablesIn(this.register, document, text),
       infoOf: (widget) => this.infos.get(widget),
       rowNeeded: (info, row) => this.rowNeeded(info, row),
       holdInDocument: (info, row) => this.holdInDocument(info, row),
@@ -1122,47 +1120,33 @@ export class Controller implements TableHost {
 
   private async enhanceNow(widget: HTMLElement, table: HTMLTableElement): Promise<void> {
     try {
-      const hint = positionHint(table);
-      if (hint === undefined) {
-        this.markUnsupported(widget, true);
+      // The table of the page it is: the adapter's pairing
+      const paired = await this.adapter.pair(widget, table);
+      if (this.stopped || !paired || renderedTable(widget) !== table) return;
+      if ("unpaired" in paired) {
+        if (paired.emptyHeaders) this.offerHeaderFix(widget, paired.emptyHeaders.source, paired.emptyHeaders.hint);
+        // No place to find it by (it shows as rendered, never asked again); none of the page's (a table in a block quote):
+        // it stays a plain SilverBullet table
+        this.markUnsupported(widget, paired.unpaired === "unplaced");
         return;
       }
-      const rendered = this.rows.renderedRows(table);
-      const header = rendered[0]!;
-      const shape = {
-        rows: rendered.length,
-        columns: header.cells.length,
-        headers: Array.from(header.cells).map(cellText),
-      };
-      const text = await this.platform.editor.text();
-      if (this.stopped || renderedTable(widget) !== table) return;
-      this.pageText = text;
-      const range = locateByShape(text, hint, shape);
-      if (!range) {
-        const broken = locateWithEmptyHeaders(text, hint, shape);
-        if (broken) this.offerHeaderFix(widget, broken.text, broken.from);
-        // e.g. a table in a block quote: it stays a plain SilverBullet table
-        this.markUnsupported(widget, false);
-        return;
-      }
-      const page = await this.platform.editor.documentName();
-      if (this.stopped || renderedTable(widget) !== table) return;
-      this.currentPage = page;
-      const markdown = parseTable(range.text);
+      this.pageText = paired.text;
+      this.currentPage = paired.document;
+      const { model } = paired;
       const info: WidgetInfo = {
         table,
-        source: range.text,
-        model: decode(markdown),
-        revision: revisionOf(range.text),
-        hint: range.from,
-        key: this.register.keysOf(page, text)[range.ordinal]!,
-        columns: shape.columns,
-        metaRow: writesMetaRow(markdown),
-        rows: markdown.rows.length,
-        pins: metaPins(markdown),
+        source: paired.source,
+        model,
+        revision: paired.revision,
+        hint: paired.hint,
+        key: paired.key,
+        columns: model.columns.length,
+        metaRow: paired.metaRow,
+        rows: model.rows.length + 1,
+        pins: metaPins(model),
       };
       // The sorting stored in the table is the view the first time the table shows
-      const stored = metaSort(markdown);
+      const stored = metaSort(model);
       if (stored && !this.views.has(info.key)) this.views.set(info.key, withSort(DEFAULT_VIEW, stored.column, stored.direction));
       // The table under the pointer was rendered anew (after a write): its toolbar moves over
       const replaced = this.hoverWidget && !this.hoverWidget.isConnected && this.infos.get(this.hoverWidget)?.key === info.key;

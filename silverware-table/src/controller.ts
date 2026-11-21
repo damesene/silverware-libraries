@@ -32,7 +32,7 @@ import { SourceStore } from "./store/sources.ts";
 import { pageFormulaPlace, pageFormulasIn } from "./store/markdown/pageformulas.ts";
 import { cursorPlace, newTableMarkdown, removedSpan, tableAt, type TableWrite } from "./store/markdown/tableparts.ts";
 import type { EditResult } from "../../shared/pages/tags/edit.ts";
-import { decode, encode, plainMarkdown } from "./store/markdown/codec.ts";
+import { decode, encode, headerTagAttributes, plainMarkdown } from "./store/markdown/codec.ts";
 import { SettingsDialog } from "./settings.ts";
 import { Metadata } from "./core/metadata.ts";
 import { NO_SOURCES, type SourceProvider } from "./sources.ts";
@@ -817,15 +817,17 @@ export class Controller implements TableHost {
 
   /**
    * The last step of a write with the metadata setting off: the attributes it
-   * would add to a table's cells and rows (model/rules.ts, withoutNewAttributes)
-   * are taken off, counted in `taken` (the write's own: writes may run at once),
-   * said once the write is made
+   * would add to a table's columns, rows and cells (model/rules.ts,
+   * withoutNewAttributes) are taken off, counted in `taken` (the write's own:
+   * writes may run at once), said once the write is made. Checked on the
+   * table as written, read again: a tag typed or pasted into a cell is its
+   * content in the model, and an attribute once the page is read
    */
-  private withoutNewAttributes(before: TableModel, after: TableModel, options: Pick<WriteOptions, "rowMap" | "columnMap">, taken: { n: number }): TableModel {
-    if (this.metadataOn) return after;
-    const result = withoutNewAttributes(before, after, options.rowMap, options.columnMap);
+  private withoutNewAttributes(before: TableModel, written: Table, options: Pick<WriteOptions, "rowMap" | "columnMap">, taken: { n: number }): Table {
+    if (this.metadataOn) return written;
+    const result = withoutNewAttributes(before, decode(written), options.rowMap, options.columnMap, headerTagAttributes(written));
     taken.n += result.taken;
-    return result.table;
+    return result.taken ? encode(result.table, written) : written;
   }
 
   /** Says how many hidden values a write left out (the metadata setting off) */
@@ -2874,8 +2876,8 @@ export class Controller implements TableHost {
       const edit = { ...options, page };
       let stepped = editedModel;
       for (const feature of this.features) if (feature.writeStep) stepped = feature.writeStep(beforeModel, stepped, edit);
-      stepped = this.withoutNewAttributes(beforeModel, this.withPinsStored(beforeModel, stepped, options), options, taken);
-      const changed = encode(stepped, edited);
+      stepped = this.withPinsStored(beforeModel, stepped, options);
+      const changed = this.withoutNewAttributes(beforeModel, encode(stepped, edited), options, taken);
       const changedModel = decode(changed);
       const serialize = await this.serializer();
       const markdown = serialize(changed);
@@ -2913,7 +2915,7 @@ export class Controller implements TableHost {
       for (const [key, model] of others.written) {
         const at = rangeOf.get(key)!;
         const read = parseTable(at.text);
-        const other = serialize(encode(this.withoutNewAttributes(decode(read), model, {}, taken), read));
+        const other = serialize(this.withoutNewAttributes(decode(read), encode(model, read), {}, taken));
         updates.push({ range: at, markdown: other });
         tables.push({ ...tableAt(text, at), markdown: other });
       }

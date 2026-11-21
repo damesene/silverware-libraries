@@ -200,6 +200,15 @@ export function decodeCell(raw: string): ModelCell {
   return { content: unescapeCell(withoutTags(raw)), attributes };
 }
 
+/**
+ * Each column's attributes its header's tags hold, by column (the others are
+ * the metadata row's): what a tag typed into a header becomes once read
+ */
+export function headerTagAttributes(table: Table): readonly Attributes[] {
+  const header = table.rows[0];
+  return table.align.map((_, c) => attributesOf(tagAttributes(header?.cells[c] ?? "")));
+}
+
 /** A cell read alone (decodeCell) written back as a cell of encode's: as read where unchanged */
 export function encodeCell(cell: ModelCell): string {
   return cellMarkdown(cell.content, cell.attributes, () => true);

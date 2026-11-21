@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseTable } from "../markdown.ts";
-import { decode } from "../store/markdown/codec.ts";
+import { decode, headerTagAttributes } from "../store/markdown/codec.ts";
 import { attributeIn, type ModelCell, type TableModel, withAttributeSet } from "./model.ts";
 import { duplicateRow, insertRow, moveRow, withCellAt, withContentAt } from "./ops.ts";
 import { type AttributeRules, withAttributeRules, withoutNewAttributes } from "./rules.ts";
@@ -86,5 +86,16 @@ describe("attributes new to a table (the metadata setting off)", () => {
     expect(withoutNewAttributes(named, renamed, (r) => (r === 1 ? 2 : r === 2 ? 1 : r)).taken).toBe(0);
     // Read as if nothing moved, it is Fig's row, which had none
     expect(withoutNewAttributes(named, renamed).taken).toBe(1);
+  });
+
+  it("of a column, only those its header's text holds (a tag typed there): the metadata row's a module set through canStore", () => {
+    const typed = parseTable(["| Item | Qty <meta x.unit='kg'> | Total |", "|---|---|---|", "| Pear | 3 | 6 |", ""].join("\n"));
+    const read = decode(typed);
+    const sorted = { ...read, columns: read.columns.map((column, c) => (c === 0 ? { ...column, attributes: withAttributeSet(column.attributes, "core", "sort", "asc") } : column)) };
+    const plain = decode(parseTable(["| Item | Qty | Total |", "|---|---|---|", "| Pear | 3 | 6 |", ""].join("\n")));
+    const { table, taken } = withoutNewAttributes(plain, sorted, undefined, undefined, headerTagAttributes(typed));
+    expect(taken).toBe(1);
+    expect(attributeIn(table.columns[1]!.attributes, "x", "unit")).toBeUndefined();
+    expect(attributeIn(table.columns[0]!.attributes, "core", "sort")).toBe("asc");
   });
 });

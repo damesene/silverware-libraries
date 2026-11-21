@@ -13,7 +13,7 @@
 // - Unique in its table (a row's or a cell's name): a row or a cell the edit
 //   made (no row or column before is it: a row duplicated, inserted with
 //   cells) takes none that another row or cell of the table has.
-import { type Attributes, attributeIn, type ModelCell, type ModelRow, type Owner, type TableModel, withAttributeIn, withAttributeSet } from "./model.ts";
+import { type Attributes, attributeIn, type ModelCell, type ModelRow, NO_ATTRIBUTES, type Owner, type TableModel, withAttributeIn, withAttributeSet } from "./model.ts";
 import type { IndexMap } from "./ops.ts";
 
 /** An attribute an owner declares a rule for */
@@ -118,25 +118,37 @@ const valuesOf = (attributes: Attributes): string[] => [...attributes].flatMap((
 
 /**
  * `after`, a table as an edit leaves it (from `before`), without the
- * attributes of its cells and rows new to it: what the metadata setting off
- * lets a write keep. An attribute stays where its cell (its row) had that
- * attribute before (`rowMap`, `columnMap`: where the rows and columns went,
- * rows from 1), or a cell or row of the table had it with that value (a
- * calculated column's new row, a cell moved); else it is taken off, the
- * cell's content staying. With how many were taken off. (The table's and its
- * columns' own are no edit's to add unasked: a module sets one through
- * `canStore`, which the setting answers)
+ * attributes of its columns, rows and cells new to it: what the metadata
+ * setting off lets a write keep. An attribute stays where its column (row,
+ * cell) had that attribute before (`rowMap`, `columnMap`: where the rows and
+ * columns went, rows from 1), or a column, row or cell of the table had it
+ * with that value (a calculated column's new row, a cell moved); else it is
+ * taken off, the content staying. With how many were taken off. The table's
+ * own are kept, and a column's but those its header's text holds
+ * (`headerTags`, by column; none given: none checked): a module sets one
+ * through `canStore`, which the setting answers; one in a header's text (a
+ * tag typed there) is checked as a cell's.
  */
-export function withoutNewAttributes(before: TableModel, after: TableModel, rowMap?: IndexMap, columnMap?: IndexMap): { readonly table: TableModel; readonly taken: number } {
+export function withoutNewAttributes(
+  before: TableModel,
+  after: TableModel,
+  rowMap?: IndexMap,
+  columnMap?: IndexMap,
+  headerTags: readonly Attributes[] = [],
+): { readonly table: TableModel; readonly taken: number } {
   const rowWas = sources(rowMap, before.rows.length, after.rows.length, 1);
   const columnWas = sources(columnMap, before.columns.length, after.columns.length, 0);
-  // Every attribute and value the table's cells and rows had
-  const had = new Set(before.rows.flatMap((row) => [...valuesOf(row.attributes), ...row.cells.flatMap((cell) => valuesOf(cell.attributes))]));
+  // Every attribute and value the table's columns, rows and cells had
+  const had = new Set([
+    ...before.columns.flatMap((column) => valuesOf(column.attributes)),
+    ...before.rows.flatMap((row) => [...valuesOf(row.attributes), ...row.cells.flatMap((cell) => valuesOf(cell.attributes))]),
+  ]);
   let taken = 0;
-  const kept = (attributes: Attributes, was: Attributes | undefined): Attributes => {
+  const kept = (attributes: Attributes, was: Attributes | undefined, checked?: Attributes): Attributes => {
     let result = attributes;
     for (const [owner, own] of attributes) {
       for (const [key, value] of own) {
+        if (checked && attributeIn(checked, owner, key) === undefined) continue;
         if (had.has(`${owner}\u0000${key}\u0000${value}`) || (was && attributeIn(was, owner, key) !== undefined)) continue;
         result = withAttributeIn(result, owner, key, undefined);
         taken++;
@@ -144,7 +156,12 @@ export function withoutNewAttributes(before: TableModel, after: TableModel, rowM
     }
     return result;
   };
-  let changed = false;
+  const columns = after.columns.map((column, c) => {
+    const from = columnWas[c];
+    const attributes = kept(column.attributes, from === undefined ? undefined : before.columns[from]?.attributes, headerTags[c] ?? NO_ATTRIBUTES);
+    return attributes === column.attributes ? column : { ...column, attributes };
+  });
+  let changed = columns.some((column, c) => column !== after.columns[c]);
   const rows = after.rows.map((row, r): ModelRow => {
     const from = rowWas[r];
     const wasRow = from === undefined ? undefined : before.rows[from - 1];
@@ -159,5 +176,5 @@ export function withoutNewAttributes(before: TableModel, after: TableModel, rowM
     changed = true;
     return { cells, attributes: rowAttributes };
   });
-  return { table: changed ? { ...after, rows } : after, taken };
+  return { table: changed ? { ...after, columns, rows } : after, taken };
 }

@@ -105,7 +105,8 @@ describe("isolation", () => {
     // (The formulas module is theirs: it uses their parts)
     const users = Object.fromEntries(Object.entries({ ...features, ...pivot }).filter(([path]) => path !== "./features/formulas.ts"));
     expect(Object.keys(users)).toContain("./pivot/definition.ts");
-    expect(matches(users, /from "[./]*(shared\/)?formulas\/(?!index\.ts")/)).toEqual([]);
+    // (And what the table's modules offer each other about them, formulas/offers.ts)
+    expect(matches(users, /from "[./]*(shared\/)?formulas\/(?!index\.ts"|offers\.ts")/)).toEqual([]);
     // (Where they use them at all: the rule reaches the formulas where they are)
     expect(matches(users, /from "[./]*shared\/formulas\/index\.ts"/)).not.toEqual([]);
   });

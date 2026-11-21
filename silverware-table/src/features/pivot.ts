@@ -15,7 +15,8 @@
 // Without the formulas module nothing is calculated.
 import type { Feature, ModelHost, PageCommand, StoredTable, TableBadge, TableInfo, ToolbarButton } from "../core/feature.ts";
 import { type Calculated, calculatedTable, movedRenames, readRenames, renamedIn, type Renames, sameCells, storedRenames } from "../calculated/index.ts";
-import { type CalculatedBy, type CalculatedOffer, followOwnFormula, type Following, callsPureFunctionsOnly, FormulaError, type FormulaCells, type FormulasOffer, type PageLinksOffer, PLAIN_CELLS } from "../../../shared/formulas/index.ts";
+import { type CalculatedBy, followOwnFormula, type Following, callsPureFunctionsOnly, FormulaError, type FormulaCells, PLAIN_CELLS } from "../../../shared/formulas/index.ts";
+import { type CalculatedOffer, type FormulasOffer, type PageLinksOffer } from "../formulas/offers.ts";
 import { columnName, modelHeads } from "../../../shared/table/columns.ts";
 import { headerText } from "../columns.ts";
 import { ICONS } from "../icons.ts";

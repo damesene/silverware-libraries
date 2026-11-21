@@ -30,7 +30,8 @@ import {
   type TypeTable,
   withColumnType,
 } from "../columntypes/index.ts";
-import { FormulaError, formulaSources, formulaTableNames, type FormulasOffer, type HeldFormulas, type HeldFormulasOffer } from "../../../shared/formulas/index.ts";
+import { FormulaError, formulaSources, formulaTableNames, type HeldFormulas } from "../../../shared/formulas/index.ts";
+import { type FormulasOffer, type HeldFormulasOffer } from "../formulas/offers.ts";
 import { sameTableName } from "../../../shared/table/namerules.ts";
 import { ChoicesDialog } from "./choicesdialog.ts";
 

@@ -25,7 +25,8 @@ import {
 } from "../columntypes/index.ts";
 import type { Dialog, ModelHost, TableInfo } from "../core/feature.ts";
 import { formulaField } from "../formulafield.ts";
-import { type FormulasOffer, withEquals } from "../../../shared/formulas/index.ts";
+import { type FormulasOffer } from "../formulas/offers.ts";
+import { withEquals } from "../../../shared/formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import type { TableModel } from "../../../shared/table/model.ts";
 import { withContentAt } from "../../../shared/table/ops.ts";

@@ -1,29 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { headsOf } from "../columns.ts";
-import {
-  choiceText,
-  functionHelp,
-  withEquals,
-  columnChoicesOf,
-  areaText,
-  autofixFormula,
-  columnLetters,
-  argumentSpan,
-  cycleFixed,
-  filledFormula,
-  findFunctions,
-  needsOperator,
-  formulaHelp,
-  formulaChoices,
-  isFormulaInput,
-  type IndexMap,
-  namedReferences,
-  references,
-  type TableSource,
-  REFERENCE_HELP,
-  referenceSlot,
-  withColumnKeys,
-} from "../../../shared/formulas/index.ts";
+import { choiceText, functionHelp, withEquals, columnChoicesOf, areaText, autofixFormula, columnLetters, argumentSpan, cycleFixed, filledFormula, findFunctions, needsOperator, formulaHelp, formulaChoices, isFormulaInput, type IndexMap, namedReferences, references, type TableSource, REFERENCE_HELP, referenceSlot, withColumnKeys } from "../../../shared/formulas/index.ts";
 import { CELLS, model, calculatedFormula, cellNamesOf, followTable, formulaCell, formulaErrors, formulaOf, qualifyCellNames, recalculate, referredTableNames, shiftReferences, withCalculatedCells } from "../testing/formulas.ts";
 import { formulaErrors as domainFormulaErrors } from "../../../shared/formulas/evaluate.ts";
 import { FormulaError } from "../../../shared/formulas/values.ts";

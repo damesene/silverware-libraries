@@ -12,7 +12,8 @@
 // keep their values.
 import type { Feature, ModelHost, PageCommand, TableBadge, TableInfo, ToolbarButton } from "../core/feature.ts";
 import { type Calculated, calculatedTable, readRenames, renamedColumns, renamedIn, renamedViewIds, sameCells, storedRenames, viewCalculated } from "../calculated/index.ts";
-import { type CalculatedBy, type CalculatedOffer, followFormula, FormulaError, type FormulasOffer, type Grid, referredTableNames, tokenize, viewGrid, withEquals } from "../../../shared/formulas/index.ts";
+import { type CalculatedBy, followFormula, FormulaError, type Grid, referredTableNames, tokenize, viewGrid, withEquals } from "../../../shared/formulas/index.ts";
+import { type CalculatedOffer, type FormulasOffer } from "../formulas/offers.ts";
 import { ICONS } from "../icons.ts";
 import { EMPTY_TABLE } from "../../../shared/table/ops.ts";
 import type { TableModel } from "../../../shared/table/model.ts";

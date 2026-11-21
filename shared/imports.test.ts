@@ -15,7 +15,8 @@ function importsOf(dir: string): { readonly file: string; readonly imports: read
     if (statSync(path).isDirectory()) return importsOf(path);
     if (!name.endsWith(".ts") || name.endsWith(".test.ts")) return [];
     const text = readFileSync(path, "utf8");
-    const imports = Array.from(text.matchAll(/(?:^|\n)\s*(?:import|export)\s[^;]*?from\s+"(\.[^"]+)"/g), (m) =>
+    // (Statements, and types written in place: `import("./x.ts").Name`)
+    const imports = Array.from(text.matchAll(/(?:(?:^|\n)\s*(?:import|export)\s[^;]*?from\s+|\bimport\(\s*)"(\.[^"]+)"/g), (m) =>
       relative(root, resolve(dirname(path), m[1]!.replace(/\?raw$/, ""))).split(sep).join("/"),
     );
     return [{ file: relative(root, path).split(sep).join("/"), imports }];

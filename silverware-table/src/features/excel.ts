@@ -23,7 +23,8 @@ import type { ExcelTemplates } from "../excel/functions.ts";
 import { excelValue } from "../excel/values.ts";
 import { columnWidth, excelColumnNames, excelTableName, xlsxFile, type XlsxCell } from "../excel/xlsx.ts";
 import { currentTable, type ExportedTable, exportedTable } from "../export/table.ts";
-import { type FormulasOffer, totalRows } from "../../../shared/formulas/index.ts";
+import { type FormulasOffer } from "../formulas/offers.ts";
+import { totalRows } from "../../../shared/formulas/index.ts";
 import { ICONS } from "../icons.ts";
 
 const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";

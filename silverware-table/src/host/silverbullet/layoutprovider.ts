@@ -35,9 +35,10 @@ export function tablesLayoutProvider(tables: LayoutTables): LayoutProvider {
     },
     write: async (element, changes: LayoutChanges) => {
       const widget = element as HTMLElement;
-      if (!tables.enhanced(widget)) return "the table is not ready yet";
+      const target = tables.tableOf(widget);
+      if (!target) return "the table is not ready yet";
       let refused = false;
-      const result = await tables.write(widget, (table) => {
+      const result = await tables.write(target, (table) => {
         let changed = table;
         for (const [key, value] of Object.entries(changes)) {
           if (value !== null && !meta.canStore(changed, key)) refused = true;

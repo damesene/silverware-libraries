@@ -365,11 +365,11 @@ export class Controller implements TableHost {
     layoutOf(this.platform.layout).register(
       this.binding.layoutProvider({
         renderedRows: (table) => this.rows.renderedRows(table),
-        enhanced: (widget) => this.infos.has(widget),
-        write: (widget, change) => {
+        tableOf: (widget) => {
           const info = this.infos.get(widget);
-          return info ? this.writeTable(info, change) : Promise.resolve("failed" as const);
+          return info && { key: info.key, revision: info.revision };
         },
+        write: (table, change) => this.writeTable(table, change),
         metadataOn: () => this.metadataOn,
       }),
     );
@@ -777,7 +777,7 @@ export class Controller implements TableHost {
    * table as its store reads it back once written: a tag typed or pasted into
    * a cell is its content in the model, and an attribute once the page is read
    */
-  private withoutNewAttributes(before: TableModel, after: TableModel, options: Pick<WriteOptions, "rowMap" | "columnMap">, taken: { n: number }): TableModel {
+  private asMetadataAllows(before: TableModel, after: TableModel, options: Pick<WriteOptions, "rowMap" | "columnMap">, taken: { n: number }): TableModel {
     if (this.metadataOn) return after;
     const read = this.store.asRead(after);
     const result = withoutNewAttributes(before, read, options.rowMap, options.columnMap, after);
@@ -2760,7 +2760,7 @@ export class Controller implements TableHost {
       let stepped = editedModel;
       for (const feature of this.features) if (feature.writeStep) stepped = feature.writeStep(beforeModel, stepped, edit);
       stepped = this.withPinsStored(beforeModel, stepped, options);
-      const changedModel = this.withoutNewAttributes(beforeModel, stepped, options, taken);
+      const changedModel = this.asMetadataAllows(beforeModel, stepped, options, taken);
       // (Unchanged: written as the page has it, its store says, formatted as asked)
       if (await this.store.writesSame(document, stored, changedModel, options)) {
         for (const pending of held) pending.written();
@@ -2801,7 +2801,7 @@ export class Controller implements TableHost {
       ];
       for (const [other, model] of others.written) {
         const read = tables.find((table) => table.key === other)!;
-        edits.push({ kind: "write", key: other, expects: read.revision, model: this.withoutNewAttributes(read.model, model, {}, taken) });
+        edits.push({ kind: "write", key: other, expects: read.revision, model: this.asMetadataAllows(read.model, model, {}, taken) });
       }
       // The page's formulas in its text that the features change with them (their references to the table)
       const formulas = this.features.flatMap((feature) => feature.pageFormulasWritten?.(beforeModel, changedModel, { ...edit, page: pageNow }) ?? []);

@@ -10,7 +10,7 @@ import type { FeatureName, SETTINGS, SettingValue } from "../bridge.ts";
 import type { TableModel } from "../../../shared/table/model.ts";
 import type { SourceTables } from "../sources.ts";
 import type { AdapterContext, TableAdapter } from "./adapter.ts";
-import type { AdapterFeature, Feature, TableHost, TableLook, WriteResult } from "./feature.ts";
+import type { AdapterFeature, Feature, TableHost, TableLook, TableTarget, WriteResult } from "./feature.ts";
 import type { TableRows } from "./rows.ts";
 import type { TablePlatform } from "./platform.ts";
 import type { MetadataPart, PageFormulaStore, StoredMetadata, StoredTable, TableStore, TableWriteEdit } from "./store.ts";
@@ -63,9 +63,9 @@ export type FeatureEntry = { readonly name: FeatureName | undefined; readonly cr
 export type LayoutTables = {
   // A rendered table's rows as SilverBullet rendered them (some may be out of the document: largeTables)
   renderedRows(table: HTMLTableElement): readonly HTMLTableRowElement[];
-  // Whether a widget is enhanced (known in the page's markdown), so it can be written
-  enhanced(widget: HTMLElement): boolean;
-  write(widget: HTMLElement, change: (table: TableModel) => TableModel | undefined): Promise<WriteResult>;
+  // The table a widget shows, where it is enhanced (known in its store), so it can be written; undefined: not yet
+  tableOf(widget: HTMLElement): TableTarget | undefined;
+  write(table: TableTarget, change: (table: TableModel) => TableModel | undefined): Promise<WriteResult>;
   // The metadata setting
   metadataOn(): boolean;
 };

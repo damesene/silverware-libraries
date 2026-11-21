@@ -4,7 +4,7 @@
 // cells (a hidden tag in one among them): its table is read as a table of a
 // page is, by the markdown codec, so what a renderer hides is an attribute,
 // and the same model while its data are the same.
-import type { StoredTable, TablePlan, TableReport, TableRevision, TableStore } from "../core/store.ts";
+import type { StoredTable, TablePlan, TableReport, TableRevision, TableStore, TableTransaction } from "../core/store.ts";
 import type { TableKey, TableRegister } from "../core/tables.ts";
 import { type Align, escapeCell, type Table } from "../markdown.ts";
 import type { TableModel } from "../../../shared/table/model.ts";
@@ -70,7 +70,7 @@ export class SourceStore implements TableStore, SourceTables {
     return undefined;
   }
 
-  async plan(transaction: { readonly document: string }): Promise<TablePlan> {
+  async plan(transaction: TableTransaction): Promise<TablePlan> {
     return { document: transaction.document, changes: 0, skipped: READ_ONLY };
   }
 

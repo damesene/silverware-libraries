@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { parseTable, serializeTable } from "../../markdown.ts";
 import { decode, encode } from "../../store/markdown/codec.ts";
+import type { TableTarget } from "../../core/feature.ts";
 import { tablesLayoutProvider } from "./layoutprovider.ts";
 
 /** A table widget as SilverBullet renders one, its metadata row's <meta> with these attributes (none: no metadata row) */
@@ -18,7 +19,7 @@ function provider(markdown: string, options: { metadataOn?: boolean; enhanced?: 
   const page = { text: markdown };
   const made = tablesLayoutProvider({
     renderedRows: (table) => Array.from(table.rows),
-    enhanced: () => options.enhanced ?? true,
+    tableOf: () => ((options.enhanced ?? true) ? ({ key: "table", revision: "1" } as unknown as TableTarget) : undefined),
     write: async (_, change) => {
       const read = parseTable(page.text);
       const changed = change(decode(read));

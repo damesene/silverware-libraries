@@ -1417,9 +1417,9 @@ export class Controller implements TableHost {
   private changesFixed(before: TableModel, edited: TableModel, options: WriteOptions): string | undefined {
     const shape = this.fixedShape(before);
     if (shape) {
-      const moved = (map: ((at: number) => number | undefined) | undefined, count: number, from: number) => !!map && Array.from({ length: count }, (_, i) => i + from).some((i) => map(i) !== i);
-      // (The maps count the header as row 0, the body from 1)
-      if (edited.rows.length !== before.rows.length || edited.columns.length !== before.columns.length || moved(options.rowMap, before.rows.length + 1, 0) || moved(options.columnMap, before.columns.length, 0)) return shape;
+      const moved = (map: ((at: number) => number | undefined) | undefined, count: number) => !!map && Array.from({ length: count }, (_, i) => i).some((i) => map(i) !== i);
+      // (The row map counts the header as row 0, the body from 1)
+      if (edited.rows.length !== before.rows.length || edited.columns.length !== before.columns.length || moved(options.rowMap, before.rows.length + 1) || moved(options.columnMap, before.columns.length)) return shape;
     }
     // The cells changed, by their row in the markdown (header 0)
     const changed: CellRef[] = [];
@@ -1427,12 +1427,15 @@ export class Controller implements TableHost {
       const was = before.columns[c];
       if (!was || column.header !== was.header || !sameAttributes(column.attributes, was.attributes)) changed.push({ row: 0, column: c });
     });
-    edited.rows.forEach((row, r) =>
+    edited.rows.forEach((row, r) => {
+      const was = before.rows[r];
+      // (A row's own attributes, its name: written in one of its cells, its first where it has none)
+      if (!was || !sameAttributes(row.attributes, was.attributes)) changed.push({ row: r + 1, column: 0 });
       row.cells.forEach((cell, c) => {
-        const was = before.rows[r]?.cells[c];
-        if (!was || !sameCell(cell, was)) changed.push({ row: r + 1, column: c });
-      }),
-    );
+        const wasCell = was?.cells[c];
+        if (!wasCell || !sameCell(cell, wasCell)) changed.push({ row: r + 1, column: c });
+      });
+    });
     return changed.length ? this.readOnly(before, changed) : undefined;
   }
 

@@ -153,6 +153,36 @@ export function storeContract(
       expect(after[0]!.key).toBe(shop!.key);
     });
 
+    it("puts back a new table and one taken out, the latter under its key; leaves what changed since it was written", async () => {
+      const fixture = make({ Shop: [prices, counts] });
+      const { store } = fixture;
+      const [shop, count] = (await store.tables("Shop"))!;
+      const report = await store.apply(
+        await store.plan({ document: "Shop", edits: [{ kind: "insert", model: table(["New"], ["n"]), after: shop!.key }, { kind: "remove", key: count!.key, expects: count!.revision }] }),
+      );
+      expect(report.written).toBe(true);
+      expect((await store.apply(await store.planUndo(report))).written).toBe(true);
+      const after = (await store.tables("Shop"))!;
+      expect(after.map((t) => texts(t.model))).toEqual([texts(prices), texts(counts)]);
+      expect(after.map((t) => t.key)).toEqual([shop!.key, count!.key]);
+      // Written again, then changed outside the store: its undo is left, the change kept
+      const [again] = (await store.tables("Shop"))!;
+      const kiwi = await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "write", key: again!.key, expects: again!.revision, model: table(["Fruit", "Price"], ["Kiwi", "2"]) }] }));
+      const typed = table(["Fruit", "Price"], ["Plum", "7"]);
+      fixture.replace("Shop", [typed, counts]);
+      const undo = await store.planUndo(kiwi);
+      expect(undo.skipped?.cause ?? (await store.apply(undo)).skipped?.cause).toBe("changed");
+      expect((await store.tables("Shop"))!.map((t) => texts(t.model))).toEqual([texts(typed), texts(counts)]);
+    });
+
+    it("applies a plan writing a table once: applied again, it is left", async () => {
+      const { store } = make({ Shop: [prices] });
+      const [shop] = (await store.tables("Shop"))!;
+      const plan = await store.plan({ document: "Shop", edits: [{ kind: "write", key: shop!.key, expects: shop!.revision, model: counts }] });
+      expect((await store.apply(plan)).written).toBe(true);
+      expect((await store.apply(plan)).written).toBe(false);
+    });
+
     it("reports each table written or made with its revision now, the others not", async () => {
       const { store } = make({ Shop: [prices, counts] });
       const [shop, count] = (await store.tables("Shop"))!;

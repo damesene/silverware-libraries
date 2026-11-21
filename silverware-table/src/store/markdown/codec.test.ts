@@ -7,11 +7,12 @@ import { withColumnType } from "../../columntypes/registry.ts";
 import { findTables, parseTable, serializeTable, type Table } from "../../markdown.ts";
 import { metaValue, withColumnValues, withMetaSort, withMetaValue } from "../../meta.ts";
 import { attributeIn, type ModelCell, type TableModel, withAttributeIn } from "../../model/model.ts";
+import { duplicateRow, withContentAt } from "../../model/ops.ts";
 import { reorderRows, setCell } from "../../testing/markdownops.ts";
 import { cellTags } from "../../tags.ts";
 import { withTagValue } from "../../tagvalues.ts";
-import { HASHTAGS_KEY, headerText } from "../../columns.ts";
-import { decode, decodeCell, encode, encodeCell } from "./codec.ts";
+import { HASHTAGS_KEY, headerText, withHeaderText } from "../../columns.ts";
+import { decode, decodeCell, encode, encodeCell, plainMarkdown } from "./codec.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SAMPLE = readFileSync(join(here, "../../../../playground/sample.md"), "utf8");
@@ -92,6 +93,12 @@ describe("the markdown codec", () => {
     it("a cell's content, the row's cells past its header's kept", () => {
       const wide = parseTable("| A | B |\n|---|---|\n| 1 | 2 | extra |");
       expect(md(encode(withCell(decode(wide), 1, 0, (c) => ({ ...c, content: "x" })), wide))).toBe(md(setCell(wide, 1, 0, "x")));
+      // Every cell of the row made anew (cleared, pasted over), or a one-column table's: still the row's
+      const read = decode(wide);
+      const cleared = { ...read, rows: [{ ...read.rows[0]!, cells: read.rows[0]!.cells.map(() => ({ content: "", attributes: new Map() })) }] };
+      expect(md(encode(cleared, wide))).toBe(md(setCell(setCell(wide, 1, 0, ""), 1, 1, "")));
+      const single = parseTable("| A |\n|---|\n| 1 | x |");
+      expect(md(encode(withCell(decode(single), 1, 0, () => ({ content: "2", attributes: new Map() })), single))).toBe("| A |\n|---|\n| 2 | x |");
     });
 
     it("a row's name in the cell holding it as that cell's content changes", () => {
@@ -129,6 +136,32 @@ describe("the markdown codec", () => {
       const written = md(encode(renamed, tagged));
       expect(written).toContain("| Cost #currency-usd <meta note='x'> |");
       expect(written).toContain("widths.-c-cost.size='90'");
+    });
+
+    it("a row's name typed into a cell written as typed, once: a copy of the row has none", () => {
+      const plain = parseTable("| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |");
+      const typed = withContentAt(decode(plain), 1, 0, "1 <meta core.n='x'>");
+      expect(md(encode(typed, plain))).toBe("| A | B |\n|---|---|\n| 1 <meta core.n='x'> | 2 |\n| 3 | 4 |");
+      expect(md(encode(duplicateRow(typed, 1), plain))).toBe("| A | B |\n|---|---|\n| 1 <meta core.n='x'> | 2 |\n| 1 | 2 |\n| 3 | 4 |");
+    });
+
+    it("plain markdown of a table made of the one read (edits held in) in that one's form: padded where it is", () => {
+      const padded = parseTable("| Name  | Qty |\n| ----- | --- |\n| Apple | 1   |");
+      const read = decode(padded);
+      const held = { ...read, rows: [{ ...read.rows[0]!, cells: [read.rows[0]!.cells[0]!, { content: "5", attributes: new Map() }] }] };
+      expect(plainMarkdown(held, [1], read)).toBe("| Name  | Qty |\n| ----- | --- |\n| Apple | 5   |");
+    });
+
+    it("a header typed written as typed: its hashtags where they were typed, in their order", () => {
+      const plain = parseTable("| Price | B |\n|---|---|\n| 1 | 2 |");
+      expect(md(encode(withHeaderText(decode(plain), 0, "Unit #usd price"), plain))).toBe(md(setCell(plain, 0, 0, "Unit #usd price")));
+      const tagged = parseTable("| X #a #b | B |\n|---|---|\n| 1 | 2 |");
+      expect(md(encode(withHeaderText(decode(tagged), 0, "X #b #a"), tagged))).toBe(md(setCell(tagged, 0, 0, "X #b #a")));
+      // A type set from the menu: the hashtags kept where they are, the type's put at the end
+      const middle = parseTable("| Price #euro total | B |\n|---|---|\n| 1 | 2 |");
+      const read = decode(middle);
+      const typedType = { ...read, columns: read.columns.map((c, i) => (i === 0 ? { ...c, attributes: withAttributeIn(c.attributes, "core", HASHTAGS_KEY, "#euro #number") } : c)) };
+      expect(md(encode(typedType, middle))).toContain("| Price #euro total #number |");
     });
 
     it("a column's and the table's attributes, in the metadata row", () => {

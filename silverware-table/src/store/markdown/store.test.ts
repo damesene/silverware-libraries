@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { serializeTable } from "../../markdown.ts";
+import { parseTable, serializeTable } from "../../markdown.ts";
 import { TableRegister } from "../../core/tables.ts";
 import type { TablePlatform } from "../../core/platform.ts";
 import type { TableModel } from "../../model/model.ts";
@@ -127,6 +127,47 @@ describe("the markdown store", () => {
       expect(seen).toEqual([`| B |\n|---|\n| 2 | ${at + 3}-${at + 3}`, `moved ${before.length + 1}`]);
     });
 
+    it("tells the binding of the write as it is made on the open page changed since it was planned", async () => {
+      const { pages, platform } = pagesOf({ Shop: [table(["A"], ["1"]), table(["B"], ["2"])] }, "Shop");
+      const seen: string[] = [];
+      const store = storeOf(platform, async (text, span) => {
+        seen.push(`${span.from} ${text.length}`);
+        return (moved) => seen.push(String(moved(span.to + 1, false) - (span.to + 1)));
+      });
+      const [, second] = (await store.tables("Shop"))!;
+      const plan = await store.plan({ document: "Shop", edits: [{ kind: "write", key: second!.key, expects: second!.revision, model: table(["B"], ["22"]) }] });
+      const typed = `Typed meanwhile.\n${pages.get("Shop")!}`;
+      pages.set("Shop", typed);
+      expect((await store.apply(plan)).written).toBe(true);
+      // (Where the table is in the page as it is now, in that text)
+      expect(seen).toEqual([`${typed.indexOf("| B |")} ${typed.length}`, "1"]);
+      expect(pages.get("Shop")).toContain("Typed meanwhile.\n");
+    });
+
+    it("tells the binding of no write of a page no longer open: another opened between its plan and its write", async () => {
+      const pages = new Map([["Shop", "Intro.\n\n| A |\n|---|\n| 1 |\n"], ["Other", "Text.\n"]]);
+      let open = "Shop";
+      const platform: Pick<TablePlatform, "editor" | "space"> = {
+        editor: {
+          documentName: () => open,
+          text: () => pages.get(open) ?? "",
+          replace: (from, to, insert) => void pages.set(open, (pages.get(open) ?? "").slice(0, from) + insert + (pages.get(open) ?? "").slice(to)),
+        },
+        space: { read: (name) => pages.get(name)!, write: (name, text) => void pages.set(name, text), list: () => [...pages.keys()] },
+      };
+      const told: string[] = [];
+      const store = storeOf(platform, async (text) => {
+        told.push(text);
+        return undefined;
+      });
+      // (A new table only: nothing of this page to find in another's text)
+      const plan = await store.plan({ document: "Shop", edits: [{ kind: "insert", model: table(["B"], ["2"]) }] });
+      open = "Other";
+      await store.apply(plan);
+      expect(told).toEqual([]);
+      expect(pages.get("Other")).toBe("Text.\n");
+    });
+
     it("makes a new table where the cursor is, or under a key the caller reserved", async () => {
       const { pages, platform } = pagesOf({ Shop: [table(["A"], ["1"])] }, "Shop");
       const store = storeOf(platform);
@@ -146,6 +187,33 @@ describe("the markdown store", () => {
       expect(store.tablesOfText("Shop", `${pages.get("Shop")!}\nMore.\n`)).not.toBe(first);
     });
 
+    it("writes a model over the table it was read from where the page was read anew since, that table parsed anew", async () => {
+      const { pages, platform } = pagesOf({ Shop: [] }, "Shop");
+      pages.set("Shop", "Intro.\n\n| A  | B |\n|---|---|\n| 1  | 2 | extra |\n| <meta core.table widths.-c-b.size='9'> |\n");
+      const store = storeOf(platform);
+      const [shop] = (await store.tables("Shop"))!;
+      // Typed above it, the page read again, the table's text parsed anew (parseTable keeps a few)
+      pages.set("Shop", `Intro typed.\n\n${pages.get("Shop")!.slice("Intro.\n\n".length)}`);
+      for (let i = 0; i < 20; i++) parseTable(`| X${i} |\n|---|\n| 1 |`);
+      await store.tables("Shop");
+      const read = shop!.model;
+      const b = read.columns[1]!;
+      const model = { ...read, columns: [read.columns[0]!, { ...b, attributes: withAttributeIn(b.attributes, "widths", "size", undefined) }] };
+      await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "write", key: shop!.key, expects: shop!.revision, model }] }));
+      // (Its width taken off, the rest as written: the metadata row holding nothing more goes)
+      expect(pages.get("Shop")).toBe("Intro typed.\n\n| A  | B |\n|---|---|\n| 1  | 2 | extra |\n");
+    });
+
+    it("tidies a table keeping the metadata of a column none of its model's comes from, as any write", async () => {
+      const { pages, platform } = pagesOf({ Shop: [] }, "Shop");
+      pages.set("Shop", "| A | B |\n|---|---|\n| 1 | 2 |\n| <meta core.table widths.-c-b.size='9'> |\n");
+      const store = storeOf(platform);
+      const [shop] = (await store.tables("Shop"))!;
+      const withoutB = { ...shop!.model, columns: [shop!.model.columns[0]!], rows: shop!.model.rows.map((row) => ({ ...row, cells: [row.cells[0]!] })) };
+      await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "write", key: shop!.key, expects: shop!.revision, model: withoutB, tidy: true }] }));
+      expect(pages.get("Shop")).toContain("widths.-c-b.size='9'");
+    });
+
     it("writes a table's model over the table it replaces, never over another of the page it was read from", async () => {
       const { pages, platform } = pagesOf({ Shop: [] }, "Shop");
       pages.set("Shop", "- item\n\n    | A |\n    |---|\n    | 1 |\n\nText.\n\n| B |\n|---|\n| 2 |\n");
@@ -153,6 +221,12 @@ describe("the markdown store", () => {
       const [a, b] = (await store.tables("Shop"))!;
       await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "write", key: b!.key, expects: b!.revision, model: a!.model }] }));
       expect(pages.get("Shop")).toBe("- item\n\n    | A |\n    |---|\n    | 1 |\n\nText.\n\n| A |\n|---|\n| 1 |\n");
+      // Nor over a table of another page
+      pages.set("Other", "- item\n\n    | C |\n    |---|\n    | 3 |\n");
+      const [c] = (await store.tables("Other"))!;
+      const [, written] = (await store.tables("Shop"))!;
+      await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "write", key: written!.key, expects: written!.revision, model: c!.model }] }));
+      expect(pages.get("Shop")).toBe("- item\n\n    | A |\n    |---|\n    | 1 |\n\nText.\n\n| C |\n|---|\n| 3 |\n");
     });
 
     it("reads a model back as written: a tag typed into a cell's text is an attribute", () => {

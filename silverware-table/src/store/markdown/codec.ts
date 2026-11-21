@@ -17,7 +17,7 @@
 // names.ts writes it), so a changed table reads as before. What the metadata
 // row has of no column found (a header renamed by hand) is kept as written,
 // but of an attribute the model set on a column (orphansKept).
-import { HASHTAGS_KEY, headerHashtags, headerText, headsOf, withoutHashtags } from "../../columns.ts";
+import { HASHTAGS_KEY, headerHashtags, headerText, headsOf, typedHeader, withoutHashtags } from "../../columns.ts";
 import { escapeCell, type Row, serializeTable, type Table, unescapeCell } from "../../markdown.ts";
 import { columnsAttributes, columnsMetaNamed, columnsMetaOf, parseColumnAttribute } from "../../meta.ts";
 import { attributeName, CORE, escapedForRegExp, splitAttributeName } from "../../metanames.ts";
@@ -46,6 +46,9 @@ const bases = new WeakMap<TableModel, Table>();
 const rows = new WeakMap<ModelRow, Row>();
 // A row's cells past its header's (no column's: SilverBullet shows none of them), kept as written when the row changes
 const beyond = new WeakMap<Row, readonly string[]>();
+// The row a row's attributes were read with (one with cells past its header: a set of its own), so a row whose every
+// cell an edit made anew is still told as the row it was (its attributes go with it through the model's operations)
+const rowOfAttributes = new WeakMap<Attributes, Row>();
 const cells = new WeakMap<ModelCell, { readonly cell: string; readonly row: Row }>();
 const headers = new WeakMap<ModelColumn, string>();
 const tagsRead = new WeakMap<Attributes, { readonly cell: string; readonly inTags: ReadonlySet<string> }>();
@@ -116,7 +119,8 @@ export function decode(table: Table): TableModel {
       cells.set(cell, { cell: raw, row });
       return cell;
     });
-    const attributes: Attributes = named ? new Map([[CORE, new Map([[LINE_NAME_KEY, named.name]])]]) : NO_ATTRIBUTES;
+    const attributes: Attributes = named ? new Map([[CORE, new Map([[LINE_NAME_KEY, named.name]])]]) : beyond.has(row) ? new Map() : NO_ATTRIBUTES;
+    if (attributes !== NO_ATTRIBUTES) rowOfAttributes.set(attributes, row);
     const modelRow: ModelRow = { cells: rowCells, attributes };
     rows.set(modelRow, row);
     return modelRow;
@@ -221,9 +225,10 @@ export function encodeCell(cell: ModelCell): string {
 }
 
 /** A table's header and `rows` (its rows, the first 1, in that order) as plain markdown: no attribute, no metadata row */
-export function plainMarkdown(model: TableModel, rows: readonly number[]): string {
-  // Written as it is in the page (a header's hashtags where they are, padding), its tags then left out
-  const table = encode(model, bases.get(model) ?? NO_TABLE);
+export function plainMarkdown(model: TableModel, rows: readonly number[], read?: TableModel): string {
+  // Written as it is in the page (a header's hashtags where they are, padding: the form of the table it was read from,
+  // or of `read`, the table as the page has it, where it was made of that with edits held), its tags then left out
+  const table = encode(model, bases.get(model) ?? (read && bases.get(read)) ?? NO_TABLE);
   const plain = (row: number) => ({ cells: (table.rows[row]?.cells ?? []).map(withoutTags) });
   return serializeTable({ indent: "", align: table.align, padded: table.padded, rows: [plain(0), ...rows.map(plain)] });
 }
@@ -269,6 +274,21 @@ function orphansKept(model: TableModel, base: Table): Record<string, string> {
   return set.size ? Object.fromEntries(Object.entries(orphans).filter(([name]) => !set.has(parseColumnAttribute(name)?.what ?? ""))) : orphans;
 }
 
+/** Whether a row's name was set or taken off by a change of its attributes since they were read */
+function nameChanged(attributes: Attributes): boolean {
+  for (let change = attributeChangeOf(attributes); change; change = attributeChangeOf(change.from)) if (change.owner === CORE && change.key === LINE_NAME_KEY) return true;
+  return false;
+}
+
+/** The row of `baseRows` a row's attributes were read with, through the changes made to them since */
+function readRowOf(attributes: Attributes, baseRows: ReadonlySet<Row>): Row | undefined {
+  for (let at: Attributes | undefined = attributes; at; at = attributeChangeOf(at)?.from) {
+    const row = rowOfAttributes.get(at);
+    if (row) return baseRows.has(row) ? row : undefined;
+  }
+  return undefined;
+}
+
 /**
  * A model written back as a markdown table, `base` the table it was read from
  * (its form: indent, padding, its rows as written); `deleted`: the columns of
@@ -285,9 +305,13 @@ export function encode(model: TableModel, base: Table, deleted: (column: number)
     const edited = (cell: string) => withHashtags(cell, hashtags ? hashtags.split(" ") : []);
     // Its text as read where its header's text is the same (its hashtags where they are written, its spaces): only an
     // attribute of it changed, or its hashtags (put at its end)
+    // Its text as typed where it was made of one (its hashtags where they were typed), else as read where its text is the
+    // same (its hashtags where they are written, its spaces): only an attribute of it changed, or its hashtags (put at
+    // its end)
+    const typed = typedHeader(column);
     const asRead = changesSinceRead(column.attributes).read?.cell;
     const sameText = asRead !== undefined && unescapeCell(withoutHashtags(withoutTags(asRead))) === column.header;
-    return cellMarkdown(sameText ? unescapeCell(withoutTags(edited(asRead))) : headerText(column), column.attributes, inHeader, edited);
+    return cellMarkdown(typed ?? (sameText ? unescapeCell(withoutTags(edited(asRead))) : headerText(column)), column.attributes, inHeader, edited);
   });
   // The rest of a column's attributes: the metadata row's (its own name and its hashtags are its header's)
   const byColumn = model.columns.map((column): Attributes => {
@@ -305,19 +329,28 @@ export function encode(model: TableModel, base: Table, deleted: (column: number)
   });
   // A row as it was read only where it is the base's (a row of another table, read with its indent, is written anew)
   const baseRows = new Set(base.rows);
+  // The rows' names (any case): a name typed into a cell's text is the row's once written, where no other row has it
+  const names = new Set(model.rows.flatMap((row) => attributeIn(row.attributes, CORE, LINE_NAME_KEY)?.toLowerCase() ?? []));
   const bodyRows = model.rows.map((row): Row => {
     const read = rows.get(row);
     if (read && baseRows.has(read)) return read;
     const rowCells = row.cells.map((cell) => cells.get(cell)?.cell ?? cellMarkdown(cell.content, cell.attributes, () => true));
-    // Its name in the cell holding it, else its first
+    // As an edit of the row it was read from (its first cell read's, else its attributes'): written as it was where its
+    // cells are (markdown.ts), its cells past the header kept
+    const from = row.cells.map((cell) => cells.get(cell)?.row).find((r) => r !== undefined && baseRows.has(r)) ?? readRowOf(row.attributes, baseRows);
+    // Its name in the cell holding it, else its first: where the row has one, had one, or an edit set it (a name tag
+    // typed into a cell's text, the row having none, is the text's: read as the row's name once written)
     const name = attributeIn(row.attributes, CORE, LINE_NAME_KEY);
     const at = rowNameIn(rowCells);
-    if (at?.name !== name && rowCells.length) {
+    const named = name !== undefined || (from !== undefined && rowNameIn(from.cells.slice(0, base.align.length)) !== undefined) || nameChanged(row.attributes);
+    // (A name typed that another row has already, a copy of a row with it: taken off, as a name is unique)
+    const typed = !named && at !== undefined;
+    const taken = typed && names.has(at.name.toLowerCase());
+    if (typed && !taken) names.add(at.name.toLowerCase());
+    if (at?.name !== name && rowCells.length && (named || taken)) {
       const column = at?.column ?? 0;
       rowCells[column] = withName(rowCells[column]!, name);
     }
-    // As an edit of the row it was read from (its first cell read's): written as it was where its cells are (markdown.ts)
-    const from = row.cells.map((cell) => cells.get(cell)?.row).find((r) => r !== undefined && baseRows.has(r));
     return from ? { ...from, cells: [...rowCells, ...(beyond.get(from) ?? [])] } : { cells: rowCells };
   });
   const baseHeader = base.rows[0];

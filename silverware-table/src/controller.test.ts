@@ -3,9 +3,28 @@ import { describe, expect, it, vi } from "vitest";
 import { STICKY_GAP } from "./core/layout.ts";
 import { bridge, PAGE, bodyTexts, cell, clickOn, controller, cursorMoves, editor, edits, flashes, flush, inInsertBand, key, pointInsert, press, renderPage, setText, setup, tableMenuItem, text, toolbarName, useTablePage, tableKey } from "./testing/page.ts";
 import { insertRowWith, pinRowAt } from "./core/structure.ts";
+import { moveColumn } from "./model/ops.ts";
 
 describe("Controller", () => {
   useTablePage();
+
+  it("a write its store leaves (the table changed as it is written) moves no view: the sorting stays on its column", async () => {
+    // The table changed elsewhere right as the write is made (when its history marker is placed): the store leaves it
+    let changeAsWritten = false;
+    await setup("Intro\n\n| A | B |\n|---|---|\n| 2 | x |\n| 1 | y |\n", {}, {
+      setSelection: () => {
+        if (changeAsWritten) setText(text.replace("| 2 | x |", "| 3 | x |"));
+      },
+    });
+    clickOn(cell(0, 1).querySelector(".swt-sort")!);
+    const [info] = controller.shownTables();
+    expect(controller.viewOf(info!).sort?.column).toBe(1);
+    changeAsWritten = true;
+    const moved = await controller.writeTable(info!, (t) => moveColumn(t, 0, 1), { columnMap: (c) => (c === 0 ? 1 : c === 1 ? 0 : c) });
+    expect(moved).toBe("failed");
+    expect(text).toContain("| 3 | x |");
+    expect(controller.viewOf(info!).sort?.column).toBe(1);
+  });
 
   it("takes a table Silverware Table drew itself for the page's table of its key while it is shown", async () => {
     await setup(PAGE);

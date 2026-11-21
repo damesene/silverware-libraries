@@ -565,8 +565,8 @@ export class Controller implements TableHost {
     return decode(table);
   }
 
-  plainMarkdown(table: TableModel, rows: readonly number[]): string {
-    return plainMarkdown(table, rows);
+  plainMarkdown(table: TableModel, rows: readonly number[], read?: TableModel): string {
+    return plainMarkdown(table, rows, read);
   }
 
   tableData(info: TableInfo): TableData {
@@ -1272,7 +1272,8 @@ export class Controller implements TableHost {
       const report =
         table &&
         (await this.store.apply(await this.store.plan({ document: found.document, edits: [{ kind: "write", key: found.key, expects: found.revision, model: nameEmptyHeaders(table.model) }] })));
-      if (!report || report.skipped) this.notify(`Silverware Table: could not name the columns (${report?.skipped?.reason ?? "the table is not there"})`, "error");
+      if (!report) this.notify(NOT_SAVED, "error");
+      else if (report.skipped) this.notify(`Silverware Table: could not name the columns (${report.skipped.reason})`, "error");
     } catch (e) {
       console.error("Silverware Table: could not name the columns", e);
       this.notify(`Silverware Table: could not name the columns (${String(e)})`, "error");
@@ -2616,7 +2617,7 @@ export class Controller implements TableHost {
     widget.closest<HTMLElement>(EDITOR_SELECTOR)?.focus({ preventScroll: true });
   }
 
-  // ---- writing markdown --------------------------------------------------
+  // ---- writing tables -----------------------------------------------------
 
   writeTable(target: TableTarget, change: (table: TableModel) => TableModel | undefined, options: WriteOptions = {}): Promise<WriteResult> {
     return this.writeTo(target, this.modelChange(change, options), options);
@@ -2738,6 +2739,8 @@ export class Controller implements TableHost {
   }
 
   private async writeNow(given: TableTarget, widget: HTMLElement | undefined, change: TableWriteChange, asked: WriteOptions): Promise<WriteResult> {
+    // The row held as it was before this write set it: put back where the write is left
+    let heldBefore: typeof this.held | "unset" = "unset";
     try {
       // What the write needs read is read before the page's tables (other
       // pages, which take a while), so the tables the edit is made from are
@@ -2836,10 +2839,9 @@ export class Controller implements TableHost {
         const which = left.length === 1 ? "a formula" : `${left.length} formulas`;
         this.notify(`Silverware Table: ${which} written in the page (silverware.table.evaluate) did not follow the table, left as written (${left.join("; ")})`, "info");
       }
-      if (columnMap) {
-        this.views.set(key, remapColumns(this.viewOf(given), columnMap));
-        for (const feature of this.features) feature.columnsMoved?.(key, columnMap);
-      }
+      // What follows the table once it is rendered anew (the cell to edit, the row held), set before it is written: put
+      // back where the write is left
+      heldBefore = this.held;
       if (focus) this.cellEditor.editAfterWrite(key, focus);
       this.holdAfterWrite(key, options);
       if (widget && !widget.classList.contains(DRAWN_CLASS)) {
@@ -2851,8 +2853,18 @@ export class Controller implements TableHost {
       const report = await this.store.apply(plan);
       if (report.skipped) {
         this.cellEditor.dropPending();
+        this.held = heldBefore;
         this.notify(`Silverware Table: the table was not saved (${report.skipped.reason})`, "error");
         return "failed";
+      }
+      // Its columns moved: the view and the features follow them, once they are (a table rendered anew already, as
+      // written, applying the view anew; one rendered later applies it as it shows)
+      if (columnMap) {
+        this.views.set(key, remapColumns(this.viewOf(given), columnMap));
+        for (const feature of this.features) feature.columnsMoved?.(key, columnMap);
+        const shown = this.widgetForKey(key);
+        const now = shown && this.infos.get(shown);
+        if (shown && now && now.revision === report.revisions.get(key)) this.viewChanged(shown, now);
       }
       // What this write made of the table: a caller from before it finds the table as it left it (writeTarget)
       const revision = report.revisions.get(key);
@@ -2864,6 +2876,7 @@ export class Controller implements TableHost {
       return "written";
     } catch (e) {
       this.cellEditor.dropPending();
+      if (heldBefore !== "unset") this.held = heldBefore;
       console.error("Silverware Table: could not save the table", e);
       this.notify(`Silverware Table: could not save the table (${String(e)})`, "error");
       return "failed";

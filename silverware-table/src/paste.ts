@@ -172,12 +172,12 @@ export function pasteCells(table: TableModel, plan: PastePlan, data: readonly (r
       if (row === 0) {
         // A header: written as its text (its hashtags with it), a name kept where none is pasted
         const current = headerCell(result, column) ?? EMPTY_CELL;
-        if (value !== "") result = withHeaderText(result, column, rules.headerRenamed ? rules.headerRenamed(current, value).content : value);
+        if (value.trim() !== "") result = withHeaderText(result, column, rules.headerRenamed ? rules.headerRenamed(current, value).content : value);
         return;
       }
       const kept = rules.keptBy(result.rows[row - 1]?.cells[column] ?? EMPTY_CELL);
       if (kept) {
-        if (value !== "") skipped.set(kept, (skipped.get(kept) ?? 0) + 1);
+        if (value.trim() !== "") skipped.set(kept, (skipped.get(kept) ?? 0) + 1);
         return;
       }
       result = withContentAt(result, row, column, value);

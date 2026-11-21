@@ -124,7 +124,7 @@ describe("isolation", () => {
   });
 
   it("modules get tables through the host, never from a page's text: no markdown read, no table's place (store plan, step 2)", () => {
-    // (What a module still takes of markdown.ts until step 3 puts a cell's content and the codec in the store: types, a
+    // (What a module may take of markdown.ts: types, a
     // cell's escapes, two tables compared, Copy as Markdown's serializer)
     expect(matches(features, /\b(parseTable|findTables|locateBySource|pageTablesOf|cellSourceOffset|minimalEdit|tablePlace)\b|host\.(pageText|pageTextNow|tableKeys)\b|\.hint\b|\binfo\.source\b/)).toEqual([]);
   });

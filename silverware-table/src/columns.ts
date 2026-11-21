@@ -50,10 +50,25 @@ export function withHeaderText(model: TableModel, column: number, text: string):
   return { ...model, columns: model.columns.map((c, i) => (i === column ? made : c)) };
 }
 
+// Each column made of a header as written, that text (its hashtags where they were written, its spaces): what a store
+// writes where the column is as made (typedHeader)
+const typed = new WeakMap<ModelColumn, string>();
+
 /** A column of a header as written (its hashtags its attribute), with these attributes besides */
 export function columnOfHeader(text: string, align: Align, attributes: Attributes = NO_ATTRIBUTES): ModelColumn {
   const hashtags = headerHashtags(text);
-  return { header: withoutHashtags(text), align, attributes: withAttributeIn(attributes, CORE, HASHTAGS_KEY, hashtags.length ? hashtags.join(" ") : undefined) };
+  const column: ModelColumn = { header: withoutHashtags(text), align, attributes: withAttributeIn(attributes, CORE, HASHTAGS_KEY, hashtags.length ? hashtags.join(" ") : undefined) };
+  typed.set(column, text.trim());
+  return column;
+}
+
+/**
+ * A column's header as it was written, where the column was made of it and its
+ * text and hashtags are still that text's (columnOfHeader); undefined: none
+ */
+export function typedHeader(column: ModelColumn): string | undefined {
+  const text = typed.get(column);
+  return text !== undefined && headerText(column) === headerText(columnOfHeader(text, column.align)) ? text : undefined;
 }
 
 /**

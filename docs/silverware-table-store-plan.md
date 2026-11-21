@@ -1033,6 +1033,17 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    where the text came out the same, and skips `leaveAlone` (no plugin
    replanning uses it); a source's key keeps the name it was first defined
    with (`documentOf` answers `@Tasks` after it is redefined `tasks`).
+   **Progress (2026-11-21)**: done: exports used by their file alone kept in
+   it; `TableAt` names its text `text`; a plugin's part of the page writer
+   typed by itself (`definePluginPart`, `p.part(it)`; no `PageSections` nor
+   `PageChangeKinds` merging), page formulas a part of their own
+   (`PAGE_FORMULAS`), the writer's parts read as `partsNow()`; the controller's
+   metadata step `asMetadataAllows`; `LayoutTables.write` by a `TableTarget`
+   (`tableOf(widget)`); `SourceStore.plan` takes a `TableTransaction`.
+   **Public changes, for the release's changelog** (each a user sees):
+   `silverware.table.tables` (and a custom menu's table data) gives a row's
+   cells by the columns, none past the header, and a column's name with its
+   spaces between words one (its key as before).
 
 Rough size, not measured, **as estimated on 2026-11-06**: step 1 a day or
 two; step 2 the largest by files (about 25), a week or more; step 3 the

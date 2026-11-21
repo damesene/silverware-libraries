@@ -9,8 +9,11 @@
 // its rows keep the markdown's numbers here (the header 0, the body from 1),
 // the model's row r being `rows[r - 1]`.
 import { type ModelCell, NO_ATTRIBUTES, type TableModel } from "../table/model.ts";
+import type { CellNameAt, RowName } from "../table/names.ts";
 import type { Following } from "./edits.ts";
 import { ERROR_CODES, type ErrorCode, type FormulaError, type Result } from "./values.ts";
+
+export type { CellNameAt, RowName };
 
 export type StoredFormula = {
   // The formula, starting with "="
@@ -18,12 +21,6 @@ export type StoredFormula = {
   // The result written with it: the cell's content
   readonly value: string;
 };
-
-/** A named row: its name as written, its row of the markdown (header 0) */
-export type RowName = { readonly name: string; readonly row: number };
-
-/** A named body cell: its name as written, its row of the markdown (header 0) and column */
-export type CellNameAt = { readonly name: string; readonly row: number; readonly column: number };
 
 /** How the formulas read and write what a table keeps for them (given by the formulas module) */
 export type FormulaCells = {

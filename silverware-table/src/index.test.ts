@@ -204,6 +204,18 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
       expect(plain).not.toHaveProperty("name");
     });
 
+    it("gives the cells by the columns (none past the header), a column's name as the table names it (its spaces one)", () => {
+      const [table] = tables("| Unit  price #euro | Qty |\n|---|---|\n| 1 | 2 | 3 |\n| 4 |\n");
+      expect(table!.columns).toEqual([
+        { name: "Unit price", key: "unit_price" },
+        { name: "Qty", key: "qty" },
+      ]);
+      expect(table!.rows).toEqual([
+        ["1", "2"],
+        ["4", ""],
+      ]);
+    });
+
     it("gives a formula's error as it shows, its # unescaped", () => {
       const [table] = tables("| A | B |\n|---|---|\n| \\#REF! <meta formulas.f='=x!A1'> | #tag |\n");
       expect(table!.rows).toEqual([["#REF!", "#tag"]]);

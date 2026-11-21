@@ -15,7 +15,7 @@ const adapter = import.meta.glob(["./host/silverbullet/*.ts", "!./host/silverbul
 const stores = import.meta.glob(["./store/**/*.ts", "!./store/**/*.test.ts"], { query: "?raw", import: "default", eager: true });
 // The domains the modules hand data to: their own pure code
 const domains = import.meta.glob(
-  ["../../shared/formulas/**/*.ts", "./calculated/**/*.ts", "./pivot/**/*.ts", "./sheet/**/*.ts", "./excel/**/*.ts", "./export/**/*.ts", "./columntypes/**/*.ts", "./conditions/**/*.ts", "./autofill/**/*.ts", "!./**/*.test.ts"],
+  ["../../shared/formulas/**/*.ts", "!../../shared/formulas/**/*.test.ts","./calculated/**/*.ts", "./pivot/**/*.ts", "./sheet/**/*.ts", "./excel/**/*.ts", "./export/**/*.ts", "./columntypes/**/*.ts", "./conditions/**/*.ts", "./autofill/**/*.ts", "!./**/*.test.ts"],
   { query: "?raw", import: "default", eager: true },
 );
 // The model: what a table is, kept by no store in particular (shared: docs/silverware-formulas-shared.md)
@@ -91,9 +91,10 @@ describe("isolation", () => {
     // (Remove metadata is the core's, core/metadata.ts: it names whose each attribute is)
     const modules = { ...features, ...adapterModules };
     // A guard against calling them by mistake: a module could keep its data elsewhere, which nothing here prevents
-    expect(matches(modules, /from "[./]*(meta|metanames|names|tagvalues)\.ts"/)).toEqual([]);
+    // (The model's names, shared/table/names.ts, and the core's owner too: the host names a table's, a row's, a cell's)
+    expect(matches(modules, /from "[./]*(shared\/table\/)?(meta|metanames|names|tagvalues)\.ts"|\bCORE\b/)).toEqual([]);
     expect(matches(modules, /\bmetaAttribute\b/)).toEqual([]);
-    expect(matches(domains, /from "[./]*(meta|metanames|names|tagvalues)\.ts"|\bmetaAttribute\b|[\w)\]?]\.meta\b/)).toEqual([]);
+    expect(matches(domains, /from "[./]*(meta|metanames|names|tagvalues)\.ts"|\bmetaAttribute\b|[\w)\]?]\.meta\b|\bCORE\b/)).toEqual([]);
   });
 
   it("the domains of calculated tables import no module", () => {

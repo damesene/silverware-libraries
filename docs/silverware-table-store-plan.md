@@ -874,6 +874,39 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    model is at hand). The attribute is the model's (owner `layout`, written
    by a transaction as any); reading it off SilverBullet's DOM is the
    adapter's, as the rendered table is. The core keeps no provider.
+   **Done (2026-11-21), as far as no API changes**: the binding is
+   `host/silverbullet/` (the adapter and its modules, the platform, the
+   space's Lua sources, the formulas in Lua calls, Silverware Layout's
+   provider, the Space Lua API `api.ts`, the entry `index.ts` exporting it),
+   handed to the core as a `TableBinding` (core/binding.ts: the adapter, the
+   features in their order, a table rendered anew marked with its look, the
+   provider): the core imports nothing of `host/` (`isolation.test.ts`, the
+   adapter's modules checked there too). The core's write steps are on the
+   model (the pins set; the metadata setting's rule, `withoutNewAttributes`,
+   a cell's and a row's attributes; the columns' attributes follow their
+   columns in the model itself, so the markdown's following,
+   `metadataAfterEdit`, is gone, and `WriteStep` and `byModel` with it); the
+   markdown's operations (ops.ts) are the tests' alone
+   (`testing/markdownops.ts`, with `followColumnMeta`: what the model's are
+   compared with).
+   **Open (needs the user, it changes the hosts' API): the tables'
+   identity.** The core still tells a table by its markdown: `TableInfo`
+   and `TableTarget` carry `source` (its text) and `hint` (its place in the
+   page's text), the write finds the table again by them (`writeTarget`,
+   `writtenAs`), computes the text a write makes (for the register's keys,
+   the history markers, the anchors), and encodes and formats the tables
+   itself before handing them to the store. Taking that out of the core is
+   the adapter's pairing with the markdown store this step names, and it
+   changes `TableInfo` / `TableTarget` (the adapter's modules, the sheet's
+   board above all, read them). Proposed: (A) a table told by its key (and
+   its revision) alone in the core; the markdown store finds it by the
+   register, encodes and formats it, and its report says what the binding
+   needs after a write (where the table is now, the span written: the
+   history markers, the anchors), the adapter pairing a widget with a key
+   (`data-pos` and the register); in parts, the sheet's board last; about as
+   large as step 3. (B) `source` and `hint` kept as the adapter's pairing,
+   only the encoding and formatting moved into the store: smaller, the core
+   still carrying the markdown's identity. Recommended: (A).
 7. **Docs.** CLAUDE.md (Layout, Architecture), docs/silverware-table-isolation.md
    extended by the store's boundary.
 8. **The whole API and its names, reviewed.** With every layer in its place,

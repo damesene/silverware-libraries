@@ -9,8 +9,9 @@
 // The core's; what a table stores beyond its content, and the table without
 // it, are its store's (BoundStore.metadataOf, withoutMetadata: the markdown
 // store's metadata row and hidden tags, those of no column too, which no
-// model holds), written as any change: the features follow it (formulas
-// referring to a name gone, a sheet's data handed on).
+// model holds); a table's written as any change: the features follow it (formulas
+// referring to a name gone, a sheet's data handed on); the page's command
+// writes each table as it is in one transaction, no feature following it.
 import { FEATURE_NAMES, MODULE_LABELS } from "../bridge.ts";
 import { CELL_MENU_ORDER, type CellMenuGroup, type CellRef, type Feature, type MetadataPart, type StoredMetadata, type TableHost, type ToolbarButton, type TableInfo } from "./feature.ts";
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "./feature.ts";

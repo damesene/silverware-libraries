@@ -1,7 +1,8 @@
 # Silverware Table: tables apart from where they are kept
 
-Status (2026-11-20): steps 1 and 2 done in branch `refactor/table-store`
-(*Decided*; what step 2 left to later steps is under it), the rest planned;
+Status (2026-11-21): steps 1 to 6 done in branch `refactor/table-store`
+(each step's *Done* note; what one left to later steps is under it), steps 7
+and 8 planned;
 the plan is in `main`. What it waited for is
 in `main`: the views plan
 (docs/silverware-table-views-plan.md), whose sources (`@tasks`) are the first
@@ -349,8 +350,8 @@ Everything that is SilverBullet's and not markdown's, in one place:
   of the controller), the type hashtags hidden in headers (the codec tells
   which part of a header it wrote);
 - the history markers (the cursor put outside a table around each write, for
-  SilverBullet's undo): the binding's `Editor` places them, as it knows
-  the edit's range;
+  SilverBullet's undo): the binding's History module places them, told of
+  the write by the markdown store's `BeforeWrite` hook (its range);
 - the places in Lua calls (host/silverbullet/lua.ts; found by store/markdown/pageformulas.ts);
 - the Lua API: `silverware.table.tables(text)`, `onWrite(fn(text))`,
   `evaluate(formula, text, page)`, `evaluateText`, `errors(page)`,
@@ -1162,11 +1163,12 @@ is done, by what it took.
      database have none, and the host gives modules page formulas only where
      the store does. Each page formula has an address that holds from a read
      to a write (its document, its order among the page's formulas, its text
-     as read; a write refused where it changed since, as a table's), and is
+     as read; one changed since is left as written, the table written all the
+     same, and said: `formulasLeft`), and is
      written by a writer of its own, not a cell's: a text the string literal
      cannot hold (a quote, a line break) is refused with why. The finder of
-     their places (`host/silverbullet/lua.ts`, `defineFormulaPlaces`, its registry now in
-     `formulas/places.ts`) is the binding's; `FormulaPlace` (offsets) the
+     their places (`host/silverbullet/lua.ts`, `defineFormulaPlaces`, its registry in
+     `store/markdown/pageformulas.ts`) is the binding's; `FormulaPlace` (offsets) the
      markdown store's alone. The formulas module follows a table's edit in
      them through that store in the same write, replacing
      `otherTextWritten`, `TextWritten` and `WritePage.text`. The errors of

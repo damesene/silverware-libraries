@@ -1272,7 +1272,8 @@ export class Controller implements TableHost {
       const report =
         table &&
         (await this.store.apply(await this.store.plan({ document: found.document, edits: [{ kind: "write", key: found.key, expects: found.revision, model: nameEmptyHeaders(table.model) }] })));
-      if (!report || report.skipped) this.notify(`Silverware Table: could not name the columns (${report?.skipped?.reason ?? "the table is not there"})`, "error");
+      if (!report) this.notify(NOT_SAVED, "error");
+      else if (report.skipped) this.notify(`Silverware Table: could not name the columns (${report.skipped.reason})`, "error");
     } catch (e) {
       console.error("Silverware Table: could not name the columns", e);
       this.notify(`Silverware Table: could not name the columns (${String(e)})`, "error");
@@ -2616,7 +2617,7 @@ export class Controller implements TableHost {
     widget.closest<HTMLElement>(EDITOR_SELECTOR)?.focus({ preventScroll: true });
   }
 
-  // ---- writing markdown --------------------------------------------------
+  // ---- writing tables -----------------------------------------------------
 
   writeTable(target: TableTarget, change: (table: TableModel) => TableModel | undefined, options: WriteOptions = {}): Promise<WriteResult> {
     return this.writeTo(target, this.modelChange(change, options), options);

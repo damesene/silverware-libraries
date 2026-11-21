@@ -844,6 +844,26 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    table, not a document's: the sources' store gives each as a document of
    its name (`@tasks`) holding that one table, read only (`writable`:
    nothing), so the interface needs nothing of its own for them.
+   **Done (2026-11-21)**: the store's write side, a transaction of a
+   document's tables (written by key where their revision is still the one
+   read, new ones after a table or at the end, some taken out) as one step,
+   `plan` / `apply` / `planUndo` in the database store's shape, left whole
+   with its cause (`changed`, `missing`, `refused`); the markdown store's
+   through the page writer (lazy saving into a page not open is one now,
+   `replaceTables`). `store/contract.ts` gives its tables as models (what
+   every store keeps alike) and has the write side; the markdown store passes
+   it with the page open and not, `store/memory.ts` (keys by the register's
+   `newKey`, revisions a count) and `store/sources.ts` (each source `@name`,
+   one table, read only: every transaction refused; `oneTable`) too. A
+   source's values are read as a table of a page is (its hidden tags
+   attributes), by the store, so the sources module is given models
+   (`SourceTables`) and reads no markdown: no module does now, and
+   `asModel` is the adapter's alone (`TableHost`). The proof that a module
+   needs no text: the sheet module's write hooks over the memory store
+   (`features/sheets.store.test.ts`), its host only the sheet's attributes
+   and the names. The core still writes the open page through its own
+   pipeline on the markdown (step 6 pairs it with the store); `writable`,
+   `changed(listener)` and `reveal` come with their first callers.
 6. **The SilverBullet binding.** The adapter, its pairing with the markdown
    store, history markers, Lua places and the Lua API into
    `host/silverbullet/`; the dependency rule checked by folder.

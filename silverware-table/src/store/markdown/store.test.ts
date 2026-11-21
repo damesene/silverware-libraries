@@ -135,6 +135,14 @@ describe("the markdown store", () => {
       expect((await store.tables("Shop"))![0]!.key).toBe(report.inserted[0]);
     });
 
+    it("reads a page's text read last again as it read it: the same tables, none decoded anew", () => {
+      const { pages, platform } = pagesOf({ Shop: [table(["A"], ["1"])] }, "Shop");
+      const store = storeOf(platform);
+      const first = store.tablesOfText("Shop", pages.get("Shop")!);
+      expect(store.tablesOfText("Shop", pages.get("Shop")!)).toBe(first);
+      expect(store.tablesOfText("Shop", `${pages.get("Shop")!}\nMore.\n`)).not.toBe(first);
+    });
+
     it("writes a table's model over the table it replaces, never over another of the page it was read from", async () => {
       const { pages, platform } = pagesOf({ Shop: [] }, "Shop");
       pages.set("Shop", "- item\n\n    | A |\n    |---|\n    | 1 |\n\nText.\n\n| B |\n|---|\n| 2 |\n");

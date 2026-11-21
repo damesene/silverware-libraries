@@ -115,6 +115,7 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
   // Where each table was in the page's text as last read, and that text
   private readonly places = new Map<string, ReadonlyMap<TableKey, { readonly from: number; readonly to: number }>>();
   private readonly texts = new Map<string, string>();
+  private readonly tablesRead = new Map<string, readonly StoredTable[]>();
 
   /** Where a table is in its page's text as it is now, with that text; undefined: the page or the table not there */
   async rangeNow(document: string, key: TableKey): Promise<{ readonly text: string; readonly range: TableRange } | undefined> {
@@ -165,6 +166,9 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
    * over, where each is (placeOf)
    */
   tablesOfText(document: string, text: string): readonly StoredTable[] {
+    // (The page's text as read last again, every rendered table paired with it: its tables as read then)
+    const kept = this.texts.get(document) === text ? this.tablesRead.get(document) : undefined;
+    if (kept) return kept;
     const keys = this.register.keysOf(document, text);
     const read = new Map<TableRevision, Table>();
     const places = new Map<TableKey, { readonly from: number; readonly to: number }>();
@@ -178,6 +182,7 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
     this.read.set(document, read);
     this.places.set(document, places);
     this.texts.set(document, text);
+    this.tablesRead.set(document, tables);
     return tables;
   }
 

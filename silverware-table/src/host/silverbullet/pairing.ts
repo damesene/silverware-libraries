@@ -23,13 +23,14 @@ export async function pairTable(widget: HTMLElement, table: HTMLTableElement, ro
   const header = rendered[0]!;
   const shape = { rows: rendered.length, columns: header.cells.length, headers: Array.from(header.cells).map(cellText) };
   const { editor } = context.platform();
+  // The page, then its text, kept as read at once: a write made after it keeps what it read later (nothing awaited
+  // between the text read and kept, which would let an older text be kept after a newer one)
+  const document = await editor.documentName();
   const text = await editor.text();
   if (renderedTable(widget) !== table) return undefined;
   const range = locateByShape(text, hint, shape);
   const broken = range ? undefined : locateWithEmptyHeaders(text, hint, shape);
   if (!range && !broken) return { unpaired: "unfound" };
-  const document = await editor.documentName();
-  if (renderedTable(widget) !== table) return undefined;
   const tables = store.tablesOfText(document, text);
   if (!range) {
     const named = tables[broken!.ordinal]!;

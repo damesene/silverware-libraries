@@ -1,8 +1,12 @@
 # Silverware Table: tables apart from where they are kept
 
 Status (2026-11-21): steps 1 to 6 done in branch `refactor/table-store`
-(each step's *Done* note; what one left to later steps is under it), steps 7
-and 8 planned;
+(each step's *Done* note; what one left to later steps is under it); left, in
+this order (decided 2026-11-21 with the user, to be finished without them:
+public API changes allowed where they make better code or have a real
+benefit): step 6's leftovers, the model and the formulas moved into `shared/`
+(docs/silverware-formulas-shared.md), step 8, then step 7 (the docs last, of
+the final state);
 the plan is in `main`. What it waited for is
 in `main`: the views plan
 (docs/silverware-table-views-plan.md), whose sources (`@tasks`) are the first
@@ -975,8 +979,13 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    `writeMarkdown` and `replaceMarkdown` are gone. **Left**: the core still
    imports the codec for a custom menu's table data (`tableData`, from the
    table's markdown), `asModel` and Copy as Markdown (`plainMarkdown`).
-7. **Docs.** CLAUDE.md (Layout, Architecture), docs/silverware-table-isolation.md
-   extended by the store's boundary.
+   **Formulas apart from the table** (added 2026-11-21, done before step 8 so
+   the names are reviewed once, where they end up): the model and the formulas
+   move into `shared/` (docs/silverware-formulas-shared.md), so formulas work
+   outside tables (Silverware Database next, in its own plan).
+7. **Docs** (done last, after step 8: of the final state). CLAUDE.md (Layout,
+   Architecture), docs/silverware-table-isolation.md extended by the store's
+   boundary, `shared/`'s model and formulas.
 8. **The whole API and its names, reviewed.** With every layer in its place,
    the API is gone through whole, the internal and the public alike (*Decided
    (2026-11-20)*, *Consistency and maintainability before compatibility*):

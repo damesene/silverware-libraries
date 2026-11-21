@@ -112,6 +112,8 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
   private writing: { readonly platform: Pick<TablePlatform, "editor" | "space">; readonly writer: PageWriter } | undefined;
   private readonly plans = new WeakMap<TablePlan, PlanOwn>();
   private readonly reports = new WeakMap<TableReport, ApplyReport>();
+  // The tables the store made of a table read (withoutMetadata): written as they are, over the one they were made of
+  private readonly made = new WeakSet<Table>();
   // Each document's tables as last read, by revision: a write encodes a model over the very table it was decoded from
   // (the codec tells a column the model keeps from one gone by what it read), which a parse again need not be
   private readonly read = new Map<string, ReadonlyMap<TableRevision, Table>>();
@@ -355,7 +357,9 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
 
   withoutMetadata(table: TableModel, part: MetadataPart | "all"): TableModel {
     // (Read back from its markdown without it: written as that markdown is, the metadata of no column gone too)
-    return decode(withoutMetadata(encodeOver(table, table), part));
+    const made = withoutMetadata(encodeOver(table, table), part);
+    this.made.add(made);
+    return decode(made);
   }
 
   async writesSame(document: string, read: StoredTable, model: TableModel, options: Pick<TableWriteEdit, "tidy" | "columnMap"> = {}): Promise<boolean> {
@@ -372,17 +376,18 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
    * A model written as a table of a page over `read`, the table it replaces:
    * over the very table its model was read from (the codec knows what it
    * read of it), the table read or one the store made of it (a table without
-   * its metadata, written as it is), never another of the page's tables; tidy:
+   * its metadata, written as it is), never another table (of this page or
+   * another, read before); tidy:
    * every row written anew, padded; the columns the column map deletes taking
    * their metadata with them
    */
   private encoded(document: string, model: TableModel, read: Table, options: Pick<TableWriteEdit, "tidy" | "columnMap">): Table {
     const from = decodedFrom(model);
-    const another = from !== undefined && from !== read && [...(this.read.get(document)?.values() ?? [])].includes(from);
-    const over = from && !another ? from : read;
-    const base: Table = options.tidy ? { ...over, padded: true } : over;
+    const over = from && (from === read || this.made.has(from)) ? from : read;
     const { columnMap } = options;
-    return encode(model, base, columnMap && ((column) => columnMap(column) === undefined));
+    // (Encoded over the table itself, which the codec knows: the metadata of a column gone kept; padded once written)
+    const encoded = encode(model, over, columnMap && ((column) => columnMap(column) === undefined));
+    return options.tidy ? { ...encoded, padded: true } : encoded;
   }
 
   asRead(model: TableModel): TableModel {

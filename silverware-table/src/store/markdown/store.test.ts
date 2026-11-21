@@ -146,6 +146,16 @@ describe("the markdown store", () => {
       expect(store.tablesOfText("Shop", `${pages.get("Shop")!}\nMore.\n`)).not.toBe(first);
     });
 
+    it("tidies a table keeping the metadata of a column none of its model's comes from, as any write", async () => {
+      const { pages, platform } = pagesOf({ Shop: [] }, "Shop");
+      pages.set("Shop", "| A | B |\n|---|---|\n| 1 | 2 |\n| <meta core.table widths.-c-b.size='9'> |\n");
+      const store = storeOf(platform);
+      const [shop] = (await store.tables("Shop"))!;
+      const withoutB = { ...shop!.model, columns: [shop!.model.columns[0]!], rows: shop!.model.rows.map((row) => ({ ...row, cells: [row.cells[0]!] })) };
+      await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "write", key: shop!.key, expects: shop!.revision, model: withoutB, tidy: true }] }));
+      expect(pages.get("Shop")).toContain("widths.-c-b.size='9'");
+    });
+
     it("writes a table's model over the table it replaces, never over another of the page it was read from", async () => {
       const { pages, platform } = pagesOf({ Shop: [] }, "Shop");
       pages.set("Shop", "- item\n\n    | A |\n    |---|\n    | 1 |\n\nText.\n\n| B |\n|---|\n| 2 |\n");
@@ -153,6 +163,12 @@ describe("the markdown store", () => {
       const [a, b] = (await store.tables("Shop"))!;
       await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "write", key: b!.key, expects: b!.revision, model: a!.model }] }));
       expect(pages.get("Shop")).toBe("- item\n\n    | A |\n    |---|\n    | 1 |\n\nText.\n\n| A |\n|---|\n| 1 |\n");
+      // Nor over a table of another page
+      pages.set("Other", "- item\n\n    | C |\n    |---|\n    | 3 |\n");
+      const [c] = (await store.tables("Other"))!;
+      const [, written] = (await store.tables("Shop"))!;
+      await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "write", key: written!.key, expects: written!.revision, model: c!.model }] }));
+      expect(pages.get("Shop")).toBe("- item\n\n    | A |\n    |---|\n    | 1 |\n\nText.\n\n| C |\n|---|\n| 3 |\n");
     });
 
     it("reads a model back as written: a tag typed into a cell's text is an attribute", () => {

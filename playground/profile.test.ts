@@ -62,7 +62,7 @@ describe("Profiling Silverware Table from outside", () => {
     (globalThis as Record<string, unknown>).__silverwareTable = controller;
     await profileSilverwareTable();
     const widget = editor.querySelector<HTMLElement>(".sb-table-widget")!;
-    await controller.writeMarkdown(controller.infoOf(widget)!, (t) => ({ ...t, padded: true }));
+    await controller.writeTable(controller.infoOf(widget)!, (t) => t, { tidy: true });
     await controller.scan();
     await flush();
     for (const label of ["core · writeAt", "core · enhanceNow", "core · decorate", "core · applyView", "formulas · looks", "columnTypes · looks"]) {

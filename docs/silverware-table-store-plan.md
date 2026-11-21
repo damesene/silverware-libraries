@@ -963,14 +963,16 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    else the codec cannot tell a column gone from one kept; a change of a
    table's markdown (Remove metadata) is written as that markdown is (the
    store encodes a model over the table it was decoded from, `decodedFrom`).
-   **Left**: Remove metadata still changes a table's markdown (made by the
-   codec from its model, `encodeOver`), so the core imports the codec. In
-   model terms it is the attributes of the part, but a header cell's tags and
-   its column's attributes in the metadata row are one column's attributes in
-   the model: taking a header cell's alone needs the store (what it wrote
-   where), so it becomes the store's operation (proposed: a write edit's
-   `withoutAttributes` of the part, the store taking what its form keeps of
-   them), a decision for the user since a part's meaning is shown to users.
+   Remove metadata is the store's (decided 2026-11-21: it stays as it
+   was): the core asks what a table or a part of it stores beyond its content
+   (`BoundStore.metadataOf`: whose, whether any, whether settings go with
+   it) and writes the table with `withoutMetadata` of the part or all, the
+   markdown store taking off its hidden tags and metadata row
+   (`store/markdown/metadata.ts`); a header cell's own tags go, its column's
+   attributes in the metadata row stay (a column's part takes them too).
+   `writeMarkdown` and `replaceMarkdown` are gone. **Left**: the core still
+   imports the codec for a custom menu's table data (`tableData`, from the
+   table's markdown), `asModel` and Copy as Markdown (`plainMarkdown`).
 7. **Docs.** CLAUDE.md (Layout, Architecture), docs/silverware-table-isolation.md
    extended by the store's boundary.
 8. **The whole API and its names, reviewed.** With every layer in its place,

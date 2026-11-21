@@ -21,7 +21,7 @@ import { Panels } from "./core/panel.ts";
 import { type DragContext, followDrag } from "./core/drag.ts";
 import { writingClipboard } from "../../shared/clipboard.ts";
 import type { TablePlatform } from "./core/platform.ts";
-import type { StoredTable, TableEdit, TableRevision } from "./core/store.ts";
+import type { MetadataPart, StoredMetadata, StoredTable, TableEdit, TableRevision } from "./core/store.ts";
 import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, sameAttributes, sameCell, sameTable, type TableModel, withAttributeIn, withAttributesAt } from "./model/model.ts";
 import { HASHTAGS_KEY, nameEmptyHeaders } from "./columns.ts";
 import { type AttributeRules, cellWrittenOver, withAttributeRules, withoutNewAttributes } from "./model/rules.ts";
@@ -617,25 +617,21 @@ export class Controller implements TableHost {
     return this.platform.editor.documentName();
   }
 
-  async replaceTables(document: string, changes: readonly TableChange[]): Promise<WriteResult> {
+  async replaceTables(document: string, changes: readonly TableChange[], options: Pick<WriteOptions, "withoutMetadata"> = {}): Promise<WriteResult> {
     // One transaction of the store's: each table written where it is still as read now
     const tables = await this.store.tables(document);
     const edits: TableEdit[] = [];
     for (const { key, change } of changes) {
       const table = tables?.find((one) => one.key === key);
       if (!table) return "failed";
-      edits.push({ kind: "write", key, expects: table.revision, model: change(table.model) });
+      edits.push({ kind: "write", key, expects: table.revision, model: change(table.model), ...(options.withoutMetadata ? { withoutMetadata: options.withoutMetadata } : {}) });
     }
     const report = await this.store.apply(await this.store.plan({ document, edits }));
     return report.written ? "written" : report.skipped ? "failed" : "unchanged";
   }
 
-  async replaceMarkdown(document: string, changes: readonly { readonly key: TableKey; readonly change: (table: Table) => Table }[]): Promise<WriteResult> {
-    // Each table's markdown as the page has it changed, written as it is (the codec's model of it): one transaction
-    return this.replaceTables(
-      document,
-      changes.map(({ key, change }) => ({ key, change: (model) => decode(change(encodeOver(model, model))) })),
-    );
+  storedMetadata(table: TableModel, part: MetadataPart | "all"): StoredMetadata {
+    return this.store.metadataOf(table, part);
   }
 
   get undoEdit(): (() => Promise<void>) | undefined {
@@ -2616,28 +2612,15 @@ export class Controller implements TableHost {
   // ---- writing markdown --------------------------------------------------
 
   writeTable(target: TableTarget, change: (table: TableModel) => TableModel | undefined, options: WriteOptions = {}): Promise<WriteResult> {
-    return this.writeTo(target, this.modelChange(change, options), options, false);
+    return this.writeTo(target, this.modelChange(change, options), options);
   }
 
-  writeMarkdown(target: TableTarget, change: (table: Table) => Table | undefined, options: WriteOptions = {}): Promise<WriteResult> {
-    // The change made on the table's markdown as the page has it (the edits held for it in), read back as a model
-    return this.writeTo(
-      target,
-      (table, read) => {
-        const edited = change(encodeOver(table, read));
-        return edited && decode(edited);
-      },
-      options,
-      true,
-    );
-  }
-
-  /** A write of a table by its target (`asMarkdown`: a change of its markdown, unchanged only where the store writes nothing) */
-  private writeTo(target: TableTarget, change: TableWriteChange, options: WriteOptions, asMarkdown: boolean): Promise<WriteResult> {
+  /** A write of a table by its target */
+  private writeTo(target: TableTarget, change: TableWriteChange, options: WriteOptions): Promise<WriteResult> {
     // Rendered: written as its widget's, so the view stays where it was
     const widget = this.widgetForKey(target.key);
     const info = widget && this.infos.get(widget);
-    return info && info.revision === target.revision ? this.writeAt(info, widget, change, options, asMarkdown) : this.writeAt(target, undefined, change, options, asMarkdown);
+    return info && info.revision === target.revision ? this.writeAt(info, widget, change, options) : this.writeAt(target, undefined, change, options);
   }
 
   /**
@@ -2710,7 +2693,7 @@ export class Controller implements TableHost {
    * open, a table drawn for its key (the sheet's) would not be drawn anew
    * under it
    */
-  private async writeAt(given: TableTarget, shown: HTMLElement | undefined, change: TableWriteChange, options: WriteOptions, asMarkdown: boolean): Promise<WriteResult> {
+  private async writeAt(given: TableTarget, shown: HTMLElement | undefined, change: TableWriteChange, options: WriteOptions): Promise<WriteResult> {
     const key = given.key;
     if (options.focus && this.cellEditor.active?.key === key) await this.saveEditing();
     const before = this.writing.get(key);
@@ -2719,7 +2702,7 @@ export class Controller implements TableHost {
     this.writing.set(key, mine);
     if (before) await before;
     try {
-      return await this.writeNow(given, this.widgetForKey(key) ?? shown, change, options, asMarkdown);
+      return await this.writeNow(given, this.widgetForKey(key) ?? shown, change, options);
     } finally {
       if (this.writing.get(key) === mine) this.writing.delete(key);
       release();
@@ -2747,7 +2730,7 @@ export class Controller implements TableHost {
     return { stored, options };
   }
 
-  private async writeNow(given: TableTarget, widget: HTMLElement | undefined, change: TableWriteChange, asked: WriteOptions, asMarkdown: boolean): Promise<WriteResult> {
+  private async writeNow(given: TableTarget, widget: HTMLElement | undefined, change: TableWriteChange, asked: WriteOptions): Promise<WriteResult> {
     try {
       // What the write needs read is read before the page's tables (other
       // pages, which take a while), so the tables the edit is made from are
@@ -2787,7 +2770,7 @@ export class Controller implements TableHost {
       stepped = this.withPinsStored(beforeModel, stepped, options);
       const changedModel = this.withoutNewAttributes(beforeModel, stepped, options, taken);
       // (Unchanged: as the page has it; written anew where its form is asked to change)
-      if (!options.tidy && !asMarkdown && sameTable(stored.model, changedModel)) {
+      if (!options.tidy && !options.withoutMetadata && sameTable(stored.model, changedModel)) {
         for (const pending of held) pending.written();
         // (What was left out may be all the write had: said all the same)
         this.sayTaken(taken);
@@ -2822,6 +2805,7 @@ export class Controller implements TableHost {
           model: changedModel,
           ...(columnMap ? { columnMap } : {}),
           ...(options.tidy ? { tidy: true } : {}),
+          ...(options.withoutMetadata ? { withoutMetadata: options.withoutMetadata } : {}),
         },
       ];
       for (const [other, model] of others.written) {

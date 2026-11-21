@@ -37,11 +37,31 @@ export interface PageFormulaStore {
 }
 
 /**
+ * A part of a table whose stored metadata goes (Remove metadata): cells, by
+ * their row in the markdown (header 0) and column (a header cell's own, not
+ * its column's), and whole columns (what the table keeps of them too)
+ */
+export type MetadataPart = { readonly cells: readonly { readonly row: number; readonly column: number }[]; readonly columns: ReadonlySet<number> };
+
+/**
+ * What a table, or a part of it, stores beyond its content (Remove
+ * metadata asks): whose it is (an owner, `<owner>.…` of its attributes'
+ * names, the core first, with how many cells hold some), whether it holds
+ * any, and whether settings shown as a view go with it (a sorting stored)
+ */
+export type StoredMetadata = {
+  readonly owners: readonly { readonly owner: string; readonly cells: number }[];
+  readonly any: boolean;
+  readonly settings: boolean;
+};
+
+/**
  * A table's model written where its revision is still the one read
  * (`expects`). `columnMap`: where its columns went (undefined: deleted), for
  * what follows a write (a markdown page's other plugins, told). `tidy`:
  * written anew in the store's tidiest form (a markdown table's cells padded
- * to line up)
+ * to line up). `withoutMetadata`: what the store keeps of the part (or all)
+ * beyond its content taken off as it is written (metadataOf)
  */
 export type TableWriteEdit = {
   readonly kind: "write";
@@ -50,6 +70,7 @@ export type TableWriteEdit = {
   readonly model: TableModel;
   readonly columnMap?: IndexMap;
   readonly tidy?: true;
+  readonly withoutMetadata?: MetadataPart | "all";
 };
 
 /**

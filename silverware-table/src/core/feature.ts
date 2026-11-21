@@ -3,7 +3,7 @@
 // state and listeners and works through the host.
 import type { TableKey } from "./tables.ts";
 export type { TableKey } from "./tables.ts";
-export type { PageFormula, PageFormulaKey, StoredTable, TableRevision } from "./store.ts";
+export type { MetadataPart, PageFormula, PageFormulaKey, StoredMetadata, StoredTable, TableRevision } from "./store.ts";
 import type { TableParts } from "./parts.ts";
 export type { PartTable, TablePart, TableParts } from "./parts.ts";
 export { tablePartsOf } from "./parts.ts";
@@ -11,7 +11,7 @@ import type { FeatureName, SETTINGS, SettingValue } from "../bridge.ts";
 import type { TablePlatform } from "./platform.ts";
 import type { AttributePlace, KeyedModel, ModelCell, TableModel } from "../model/model.ts";
 import type { PageFormula } from "./store.ts";
-import type { StoredTable, TableRevision } from "./store.ts";
+import type { MetadataPart, StoredMetadata, StoredTable, TableRevision } from "./store.ts";
 import type { Dialog, DialogOptions } from "./dialog.ts";
 import type { Rect } from "./geometry.ts";
 
@@ -456,6 +456,8 @@ export type WriteOptions = {
   readonly also?: readonly TableChange[];
   // The table written anew in its store's tidiest form (Format table: a markdown table's cells padded to line up)
   readonly tidy?: true;
+  // What its store keeps of a part of it (or all of it) beyond its content taken off (Remove metadata)
+  readonly withoutMetadata?: MetadataPart | "all";
 };
 
 /**
@@ -626,7 +628,7 @@ export interface ModelHost {
    * write step taking part (a page command over every table, edits held for a page left). "failed" where one of the
    * tables is not in the document (or it is not there)
    */
-  replaceTables(document: string, changes: readonly TableChange[]): Promise<WriteResult>;
+  replaceTables(document: string, changes: readonly TableChange[], options?: Pick<WriteOptions, "withoutMetadata">): Promise<WriteResult>;
   /**
    * The open page's tables in order, as last read (pageText): the same list while that text is (a module's state kept
    * for the page compares it), a table of the page found in it by its key
@@ -974,16 +976,8 @@ export interface TableHost extends ModelHost {
    * markdown store: docs/silverware-table-store-plan.md, step 6)
    */
   asModel(table: Table): TableModel;
-  /**
-   * A table written as markdown (the change on its markdown): what works on how
-   * markdown keeps a table, which no model expresses (Remove metadata: its
-   * metadata row and every hidden tag; Format table: a table padded), the
-   * core's alone until the markdown store does it (step 4b, through the page
-   * writer); every other write is writeTable's
-   */
-  writeMarkdown(target: TableTarget, change: (table: Table) => Table | undefined, options?: WriteOptions): Promise<WriteResult>;
-  /** As replaceTables, the changes on the tables' markdown (Remove metadata of a page) */
-  replaceMarkdown(document: string, changes: readonly { readonly key: TableKey; readonly change: (table: Table) => Table }[]): Promise<WriteResult>;
+  /** What a table, or a part of it, stores beyond its content (Remove metadata: whose it is, whether any): its store's */
+  storedMetadata(table: TableModel, part: MetadataPart | "all"): StoredMetadata;
   /** The platform (core/platform.ts): the adapter is the host's side, which the modules' host functions stand for */
   readonly platform: TablePlatform;
   infoOf(widget: HTMLElement): WidgetInfo | undefined;

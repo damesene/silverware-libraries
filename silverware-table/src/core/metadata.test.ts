@@ -116,10 +116,11 @@ describe("Table metadata", () => {
   it("with the setting off, takes the hidden values new to a table off a write, and says so; those it has stay", async () => {
     await setup(`| Name | Qty |\n|---|---|\n| Pear <meta x.note='a'> | 3 |\n| apple | 10 |\n`);
     const [info] = controller.shownTables();
-    // (The tags written as markdown: the core's step that takes off what the setting does not let in)
-    await controller.writeMarkdown(info!, (t) => ({
+    // (The tags typed into the cells' text: the core's step that takes off what the setting does not let in)
+    const typed = (contents: readonly string[]) => contents.map((content) => ({ content, attributes: new Map() }));
+    await controller.writeTable(info!, (t) => ({
       ...t,
-      rows: t.rows.map((row, r) => (r === 1 ? { cells: ["Pears <meta x.note='b'>", "3 <meta x.note='c'>"] } : r === 2 ? { cells: ["apple <meta x.other='1'>", "10"] } : row)),
+      rows: t.rows.map((row, r) => (r === 0 ? { ...row, cells: typed(["Pears <meta x.note='b'>", "3 <meta x.note='c'>"]) } : r === 1 ? { ...row, cells: typed(["apple <meta x.other='1'>", "10"]) } : row)),
     }));
     expect(text).toContain("| Pears <meta x.note='b'> | 3 |");
     expect(text).toContain("| apple | 10 |");

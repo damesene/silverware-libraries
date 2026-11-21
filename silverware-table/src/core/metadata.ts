@@ -6,64 +6,20 @@
 // For one table from its toolbar, for all tables of the page with the
 // "Silverware Table: Remove table metadata" command, for cells, rows or
 // columns from their menu (a column's attributes in the metadata row too).
-// The core's: it works on how markdown keeps a table (its metadata row and
-// every hidden tag, those of no column too), which no model expresses, so it
-// reads and writes the markdown (TableHost.writeMarkdown, replaceMarkdown)
-// until the markdown store does (docs/silverware-table-store-plan.md, step 4).
+// The core's; what a table stores beyond its content, and taking it off, are
+// its store's (BoundStore.metadataOf, a write's `withoutMetadata`: the markdown
+// store's metadata row and hidden tags, those of no column too, which no
+// model holds).
 import { FEATURE_NAMES, MODULE_LABELS } from "../bridge.ts";
-import { CELL_MENU_ORDER, type CellMenuGroup, type CellRef, type Feature, type TableHost, type ToolbarButton, type TableInfo } from "./feature.ts";
+import { CELL_MENU_ORDER, type CellMenuGroup, type CellRef, type Feature, type MetadataPart, type StoredMetadata, type TableHost, type ToolbarButton, type TableInfo } from "./feature.ts";
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "./feature.ts";
 import { ICONS } from "../icons.ts";
-import { type Table, writesMetaRow, writtenMeta } from "../markdown.ts";
-import { encodeOver } from "../store/markdown/codec.ts";
 import type { MenuEntry } from "../menu.ts";
-import { columnsAttributes } from "../meta.ts";
-import { CORE, splitAttributeName } from "../metanames.ts";
-import { attributesOf, cellTags, withoutTags } from "../tags.ts";
-
-/** A table without its metadata row and without the hidden tags in its cells (formula cells keep their results) */
-export function withoutMetadata(table: Table): Table {
-  const { meta: _meta, metaSource: _source, attributes: _attributes, ...rest } = table;
-  return { ...rest, rows: table.rows.map((row) => (row.cells.some(hasTags) ? { ...row, cells: row.cells.map(withoutTags) } : row)) };
-}
-
-const hasTags = (cell: string) => cellTags(cell).length > 0;
-
-/** Cells (markdown rows) and whole columns of a table whose metadata goes: the cells' hidden tags, the columns' attributes in the metadata row */
-export type MetadataPart = { readonly cells: readonly CellRef[]; readonly columns: ReadonlySet<number> };
-
-/** What a part holds, as a table of its own: its cells in one row, its columns' attributes as its metadata (for hasMetadata, metadataOwners) */
-function partOf(table: Table, part: MetadataPart): Table {
-  const { meta: _meta, metaSource: _source, attributes: _attributes, ...rest } = table;
-  const names = columnsAttributes(table, part.columns);
-  const cells = { cells: part.cells.map((ref) => table.rows[ref.row]?.cells[ref.column] ?? "") };
-  return { ...rest, rows: [cells], ...(names.length ? { meta: Object.fromEntries(names.map((name) => [name, table.meta![name]!])) } : {}) };
-}
-
-/** A table without the metadata of a part of it: its cells' hidden tags (formula cells keep their results), its columns' attributes */
-export function withoutMetadataOf(table: Table, part: MetadataPart): Table {
-  const names = new Set(columnsAttributes(table, part.columns));
-  const taken = new Map<number, Set<number>>();
-  for (const ref of part.cells) taken.set(ref.row, (taken.get(ref.row) ?? new Set()).add(ref.column));
-  const rows = table.rows.map((row, r) => {
-    const columns = taken.get(r);
-    return columns && row.cells.some((cell, c) => columns.has(c) && hasTags(cell)) ? { ...row, cells: row.cells.map((cell, c) => (columns.has(c) ? withoutTags(cell) : cell)) } : row;
-  });
-  if (names.size === 0) return { ...table, rows };
-  return { ...table, rows, meta: Object.fromEntries(Object.entries(table.meta ?? {}).filter(([name]) => !names.has(name))) };
-}
-
-/** Whether a table holds metadata: a metadata row, or hidden tags in cells */
-function hasMetadata(table: Table): boolean {
-  return writesMetaRow(table) || table.rows.some((row) => row.cells.some(hasTags));
-}
+import { CORE } from "../metanames.ts";
 
 function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
-
-/** Whose an attribute is, by its name ("": no owner's) */
-const ownerOf = (name: string): string => splitAttributeName(name).owner;
 
 /** An owner as the question names it: Silverware Table for the core, a module by its label */
 function ownerLabel(owner: string): string {
@@ -76,24 +32,11 @@ function ownerLabel(owner: string): string {
  * Whose the tables' metadata is, as the question says it: each owner (the
  * core first, then in the order found) with how many of its cells hold some
  */
-export function metadataOwners(tables: readonly Table[]): string[] {
-  const owners = new Map<string, number>([[CORE, 0]]);
-  const seen = new Set<string>();
-  for (const table of tables) {
-    for (const name of Object.keys(writtenMeta(table))) {
-      seen.add(ownerOf(name));
-      if (!owners.has(ownerOf(name))) owners.set(ownerOf(name), 0);
-    }
-    for (const row of table.rows) {
-      for (const cell of row.cells) {
-        for (const owner of new Set(cellTags(cell).flatMap(attributesOf).map(ownerOf))) {
-          seen.add(owner);
-          owners.set(owner, (owners.get(owner) ?? 0) + 1);
-        }
-      }
-    }
-  }
-  return [...owners].filter(([owner]) => seen.has(owner)).map(([owner, cells]) => `${ownerLabel(owner)}${cells ? ` (${plural(cells, "cell")})` : ""}`);
+export function metadataOwners(stored: readonly StoredMetadata[]): string[] {
+  const owners = new Map<string, number>();
+  for (const one of stored) for (const { owner, cells } of one.owners) owners.set(owner, (owners.get(owner) ?? 0) + cells);
+  const ordered = [...owners].sort(([a], [b]) => (a === CORE ? -1 : b === CORE ? 1 : 0));
+  return ordered.map(([owner, cells]) => `${ownerLabel(owner)}${cells ? ` (${plural(cells, "cell")})` : ""}`);
 }
 
 /** Owners listed in a sentence: "a, b and c" */
@@ -112,13 +55,8 @@ const KEPT = "Cells keep their text, a formula's cell its result.";
 export class Metadata implements Feature {
   constructor(private readonly host: TableHost) {}
 
-  /** A shown table's markdown, as the page has it */
-  private markdownOf(info: TableInfo): Table {
-    return encodeOver(info.model, info.model);
-  }
-
   toolbarButtons(info: TableInfo): ToolbarButton[] {
-    if (!hasMetadata(this.markdownOf(info))) return [];
+    if (!this.host.storedMetadata(info.model, "all").any) return [];
     return [
       {
         label: "Remove metadata",
@@ -147,7 +85,7 @@ export class Metadata implements Feature {
 
   /** Remove metadata for a part of the table, where it has some */
   private partEntry(info: TableInfo, part: MetadataPart, what: string): MenuEntry | undefined {
-    if (!hasMetadata(partOf(this.markdownOf(info), part))) return undefined;
+    if (!this.host.storedMetadata(info.model, part).any) return undefined;
     return {
       kind: "item",
       label: "Remove metadata",
@@ -160,13 +98,12 @@ export class Metadata implements Feature {
 
   /** Removes the metadata of a part of a table, once confirmed */
   private async removeFromPart(shownInfo: TableInfo, part: MetadataPart, what: string): Promise<void> {
-    const shown = partOf(this.markdownOf(shownInfo), part);
-    const owners = metadataOwners([shown]);
+    const owners = metadataOwners([this.host.storedMetadata(shownInfo.model, part)]);
     if (!(await this.host.ask(`Remove the metadata of ${what}${whose(owners, what.startsWith("this ") ? "it" : "them")}? ${KEPT} Ctrl+Z brings it back.`))) return;
     // The table as rendered now: the dialog may have outlived the rendering it was asked from
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
-    if (columnsAttributes(this.markdownOf(info), part.columns).length) this.host.forgetStoredView(info.key);
-    await this.host.writeMarkdown(info, (table) => withoutMetadataOf(table, part));
+    if (this.host.storedMetadata(info.model, part).settings) this.host.forgetStoredView(info.key);
+    await this.host.writeTable(info, (table) => table, { withoutMetadata: part });
     // The dialog took the focus: back to the editor, so Ctrl+Z works right away
     this.host.focusPage();
   }
@@ -177,13 +114,12 @@ export class Metadata implements Feature {
    * its cells, which keep their results as plain values
    */
   private async removeFromTable(shownInfo: TableInfo): Promise<void> {
-    const shown = this.markdownOf(shownInfo);
-    const owners = metadataOwners([shown]);
+    const owners = metadataOwners([this.host.storedMetadata(shownInfo.model, "all")]);
     if (!(await this.host.ask(`Remove this table's metadata${whose(owners, "it")}? ${KEPT} Ctrl+Z brings it back.`))) return;
     // The table as rendered now: the dialog may have outlived the rendering it was asked from
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
-    if (writesMetaRow(this.markdownOf(info))) this.host.forgetStoredView(info.key);
-    await this.host.writeMarkdown(info, withoutMetadata);
+    if (this.host.storedMetadata(info.model, "all").settings) this.host.forgetStoredView(info.key);
+    await this.host.writeTable(info, (table) => table, { withoutMetadata: "all" });
     // The dialog took the focus: back to the editor, so Ctrl+Z works right away
     this.host.focusPage();
   }
@@ -192,20 +128,20 @@ export class Metadata implements Feature {
   async removeFromPage(): Promise<void> {
     const { host } = this;
     const page = await host.pageNameNow();
-    // The page's tables as read now, each as its markdown (what metadata is written in)
-    const tables = ((await host.tables(page)) ?? []).map((t) => ({ key: t.key, model: encodeOver(t.model, t.model) })).filter((t) => hasMetadata(t.model));
+    // The page's tables as read now, those that store some
+    const tables = ((await host.tables(page)) ?? []).map((t) => ({ key: t.key, stored: host.storedMetadata(t.model, "all") })).filter((t) => t.stored.any);
     if (tables.length === 0) {
       host.notify("Silverware Table: no table on this page has metadata", "info");
       return;
     }
-    const owners = metadataOwners(tables.map((t) => t.model));
+    const owners = metadataOwners(tables.map((t) => t.stored));
     const question =
       `Remove the metadata of ${tables.length === 1 ? "the 1 table" : `all ${tables.length} tables`} on this page` +
       `${whose(owners, tables.length === 1 ? "it" : "them")}? ${KEPT} Ctrl+Z brings it back.`;
     if (!(await this.host.ask(question))) return;
-    for (const t of tables) if (writesMetaRow(t.model)) host.forgetStoredView(t.key);
+    for (const t of tables) if (t.stored.settings) host.forgetStoredView(t.key);
     // One edit of all those tables, so one Ctrl+Z undoes it
-    await host.replaceMarkdown(page, tables.map((t) => ({ key: t.key, change: withoutMetadata })));
+    await host.replaceTables(page, tables.map((t) => ({ key: t.key, change: (table) => table })), { withoutMetadata: "all" });
     // The dialog took the focus: back to the editor, so Ctrl+Z works right away
     this.host.focusPage();
     host.notify(`Silverware Table: removed the metadata of ${tables.length} table(s)`, "info");

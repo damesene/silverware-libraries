@@ -13,7 +13,7 @@ import type { AdapterContext, TableAdapter } from "./adapter.ts";
 import type { AdapterFeature, Feature, TableHost, TableLook, WriteResult } from "./feature.ts";
 import type { TableRows } from "./rows.ts";
 import type { TablePlatform } from "./platform.ts";
-import type { PageFormulaStore, TableStore } from "./store.ts";
+import type { MetadataPart, PageFormulaStore, StoredMetadata, TableStore } from "./store.ts";
 import type { TableKey, TableRegister } from "./tables.ts";
 import type { Table } from "../markdown.ts";
 
@@ -37,13 +37,15 @@ export type StoreContext = {
 
 /**
  * The store a host keeps the open page's tables in, as the core uses it: its
- * tables, transactions and page formulas, and where a table is in its
- * document as the host counts (a markdown page's offsets: a custom menu's
- * table's `from`, `to`; undefined: not read)
+ * tables, transactions and page formulas, where a table is in its document
+ * as the host counts (a markdown page's offsets: a custom menu's table's
+ * `from`, `to`; undefined: not read), and what a table it read stores beyond
+ * its content (Remove metadata; a write's `withoutMetadata` takes it off)
  */
 export type BoundStore = TableStore &
   PageFormulaStore & {
     placeOf(document: string, key: TableKey): { readonly from: number; readonly to: number } | undefined;
+    metadataOf(table: TableModel, part: MetadataPart | "all"): StoredMetadata;
   };
 
 /**

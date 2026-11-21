@@ -5,10 +5,13 @@
 // of the same text free); written through the page writer (shared/pages/),
 // by the parts of tableparts.ts (step 4b).
 import { findTables, minimalEdit, parseTable, type Table, type TableRange } from "../../markdown.ts";
-import { decode, decodedFrom, encode } from "./codec.ts";
+import { decode, decodedFrom, encode, encodeOver } from "./codec.ts";
+import { metadataOf, withoutMetadata } from "./metadata.ts";
 import type { TablePlatform } from "../../core/platform.ts";
 import {
   type InsertAt,
+  type MetadataPart,
+  type StoredMetadata,
   type PageFormula,
   type PageFormulaStore,
   type StoredTable,
@@ -225,7 +228,8 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
       const over = decodedFrom(edit.model) ?? read;
       const base: Table = edit.tidy ? { ...over, padded: true } : over;
       const { columnMap } = edit;
-      const after = encode(edit.model, base, columnMap && ((column) => columnMap(column) === undefined));
+      const encoded = encode(edit.model, base, columnMap && ((column) => columnMap(column) === undefined));
+      const after = edit.withoutMetadata ? withoutMetadata(encoded, edit.withoutMetadata) : encoded;
       const markdown = serialize(after);
       writes.push({ ...tableAt(text, range), markdown });
       told.push({ before: read, after, markdown, ...(columnMap ? { columnMap } : {}) });
@@ -324,6 +328,11 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
     const plan: TablePlan = { document, changes: page.pages.length };
     this.plans.set(plan, { page, inserted: [], written: [] });
     return plan;
+  }
+
+  metadataOf(table: TableModel, part: MetadataPart | "all"): StoredMetadata {
+    // (Its markdown as read: what it stores is written there, the metadata of no column too)
+    return metadataOf(decodedFrom(table) ?? encodeOver(table, table), part);
   }
 
   asRead(model: TableModel): TableModel {

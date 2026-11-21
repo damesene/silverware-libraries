@@ -397,13 +397,15 @@ export class Grids {
     const isGrid = (node: Node): boolean => node instanceof win.HTMLElement && node.classList.contains("swl-grid") && this.bodies.has(node);
     this.mounted = new win.MutationObserver((records) => {
       let put = false;
+      // (The page's look read once for the grids put in together)
+      let look: EditorLook | undefined;
       for (const record of records)
         for (const node of record.addedNodes) {
           if (!(node instanceof win.HTMLElement)) continue;
           const grids = node.classList.contains("swl-grid") ? [node] : [...node.querySelectorAll<HTMLElement>(".swl-grid")];
           for (const grid of grids) {
             // (Drawn before the page's look last changed: it takes the look now)
-            if ((this.bodies.has(grid) || grid.classList.contains("swl-grid-shown")) && this.lookTaken.get(grid) !== this.lookChanges) this.showPageLook(grid);
+            if ((this.bodies.has(grid) || grid.classList.contains("swl-grid-shown")) && this.lookTaken.get(grid) !== this.lookChanges) this.showPageLook(grid, (look ??= this.host.pageEditorLook?.() ?? {}));
             if (isGrid(grid)) put = true;
           }
         }

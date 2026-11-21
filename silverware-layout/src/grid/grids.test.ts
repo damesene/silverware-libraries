@@ -101,8 +101,10 @@ describe("the grids", () => {
     expect(reads).toBe(1);
     expect(shown.style.getPropertyValue("--swl-h2-above")).toBe("0.2em");
     expect(later.style.getPropertyValue("--swl-h2-above")).toBe("0.375em");
+    reads = 0;
     document.body.append(later, embedded!);
     await vi.waitFor(() => expect([later, embedded!].map((grid) => grid.style.getPropertyValue("--swl-h2-above"))).toEqual(["0.2em", "0.2em"]), { timeout: 5_000 });
+    expect(reads).toBe(1);
   });
 
   it("shows a cell the host could not render as its text, and draws a grid not in the page as one column per cell", async () => {

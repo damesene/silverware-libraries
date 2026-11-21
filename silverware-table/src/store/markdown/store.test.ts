@@ -135,6 +135,15 @@ describe("the markdown store", () => {
       expect((await store.tables("Shop"))![0]!.key).toBe(report.inserted[0]);
     });
 
+    it("writes a table's model over the table it replaces, never over another of the page it was read from", async () => {
+      const { pages, platform } = pagesOf({ Shop: [] }, "Shop");
+      pages.set("Shop", "- item\n\n    | A |\n    |---|\n    | 1 |\n\nText.\n\n| B |\n|---|\n| 2 |\n");
+      const store = storeOf(platform);
+      const [a, b] = (await store.tables("Shop"))!;
+      await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "write", key: b!.key, expects: b!.revision, model: a!.model }] }));
+      expect(pages.get("Shop")).toBe("- item\n\n    | A |\n    |---|\n    | 1 |\n\nText.\n\n| A |\n|---|\n| 1 |\n");
+    });
+
     it("reads a model back as written: a tag typed into a cell's text is an attribute", () => {
       const { platform } = pagesOf({ Shop: [] }, "Shop");
       const typed = table(["A"], ["x <meta x.y='1'>"]);

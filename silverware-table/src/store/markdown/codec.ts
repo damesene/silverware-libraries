@@ -303,9 +303,11 @@ export function encode(model: TableModel, base: Table, deleted: (column: number)
     }
     return rest;
   });
+  // A row as it was read only where it is the base's (a row of another table, read with its indent, is written anew)
+  const baseRows = new Set(base.rows);
   const bodyRows = model.rows.map((row): Row => {
     const read = rows.get(row);
-    if (read) return read;
+    if (read && baseRows.has(read)) return read;
     const rowCells = row.cells.map((cell) => cells.get(cell)?.cell ?? cellMarkdown(cell.content, cell.attributes, () => true));
     // Its name in the cell holding it, else its first
     const name = attributeIn(row.attributes, CORE, LINE_NAME_KEY);
@@ -315,7 +317,7 @@ export function encode(model: TableModel, base: Table, deleted: (column: number)
       rowCells[column] = withName(rowCells[column]!, name);
     }
     // As an edit of the row it was read from (its first cell read's): written as it was where its cells are (markdown.ts)
-    const from = row.cells.map((cell) => cells.get(cell)?.row).find((r) => r !== undefined);
+    const from = row.cells.map((cell) => cells.get(cell)?.row).find((r) => r !== undefined && baseRows.has(r));
     return from ? { ...from, cells: [...rowCells, ...(beyond.get(from) ?? [])] } : { cells: rowCells };
   });
   const baseHeader = base.rows[0];

@@ -814,6 +814,29 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
     made of two stores whose needs differ: batches with a preview, quick
     writes of one step), the common part is drawn out in step 8, from both
     done.
+    **Done (2026-11-21)**: (1) the writer's registry opened
+    (`registerPart`, `definePart`, `PageChangeKinds`) and `replanOpenPage`,
+    the other plugins built and tested with it. (2) The markdown store's
+    parts (`store/markdown/tableparts.ts`): `writeTables` (the tables of a
+    write in one change, each found by its text and its order among those
+    alike before any is written, so two tables alike written in one edit are
+    each the one it was; written, taken out with the empty line after it, a
+    new one put after a table or where the cursor's line was) and
+    `setPageFormula`; `MarkdownStore.write(document, make)` writes through
+    the writer, planned anew where the open page changed, into the space
+    where it is not open (lazy saving's own path gone). Every write of the
+    core (a table's, a new table, a table deleted, empty headers named,
+    tables replaced on a page not open) hands the writer its tables as data;
+    other plugins' edits (`onWrite`) are its `editText`, made once by the core
+    and made again only where the writer plans the write anew. The core still
+    computes the text a write makes beforehand, for what it keeps of it (the
+    register's new keys, a table's place written, the history markers,
+    anchors). A write goes to the page the editor has open as its text is
+    read (its name with it, not the page last scanned). Nothing but the
+    writer writes a page (`isolation.test.ts`). The transactions'
+    `plan` / `apply` / `planUndo` come with the first caller that needs them
+    apart (a preview, an undo of a page not open): the writer's `write` is
+    all the core asks now.
 5. **The other stores.** The memory store and the views plan's sources on the
    store interface, both passing the contract tests; a few module tests over
    the memory store as the proof that modules need no text (the rest keep the

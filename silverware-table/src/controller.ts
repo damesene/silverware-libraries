@@ -1,6 +1,7 @@
 // Enhances SilverBullet's rendered markdown tables in place: sorting, filtering,
 // inline cell editing and row/column editing. Every change to the markdown is
-// one `editor.replaceRange`, so undo works as for any other edit.
+// one write of the page writer's (the markdown store's, store/markdown/): one
+// edit of the open page, so undo works as for any other edit.
 import { type FeatureName, formatRule, moduleOnByDefault, SETTINGS, type SettingValue } from "./bridge.ts";
 import { type AdapterFeature, type AddressFrame, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, type ColumnsMeasure, type ColumnWidths, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type InsertPlace, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget, type KeyedTable, type OtherPages, type PendingEdits, type TableChange } from "./core/feature.ts";
 import { type Dialog, type DialogOptions, Dialogs } from "./core/dialog.ts";
@@ -22,13 +23,15 @@ import { type DragContext, followDrag } from "./core/drag.ts";
 import { writingClipboard } from "../../shared/clipboard.ts";
 import { markTable, renderedMeta, SilverBulletAdapter } from "./core/silverbullet/adapter.ts";
 import type { TablePlatform } from "./core/platform.ts";
-import type { StoredTable } from "./core/store.ts";
+import type { PageFormula, StoredTable } from "./core/store.ts";
 import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt } from "./model/model.ts";
 import { HASHTAGS_KEY, nameEmptyHeaders } from "./columns.ts";
 import { type AttributeRules, cellWrittenOver, withAttributeRules } from "./model/rules.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
 import { pageFormulaPlace, pageFormulasIn } from "./store/markdown/pageformulas.ts";
+import { cursorPlace, removedSpan, tableAt, type TableWrite } from "./store/markdown/tableparts.ts";
+import type { EditResult } from "../../shared/pages/tags/edit.ts";
 import { decode, encode, plainMarkdown } from "./store/markdown/codec.ts";
 import { SettingsDialog } from "./settings.ts";
 import { Metadata } from "./core/metadata.ts";
@@ -592,12 +595,12 @@ export class Controller implements TableHost {
   }
 
   /** The page's tables as a write's hooks see them (by key, with their models), and where each is in `text` (the core's alone) */
-  private writePage(text: string, at: number): { readonly page: WritePage; readonly rangeOf: ReadonlyMap<TableKey, TableRange> } {
+  private writePage(text: string, at: number, document: string): { readonly page: WritePage; readonly rangeOf: ReadonlyMap<TableKey, TableRange> } {
     const ranges = findTables(text);
     const keys = this.register.keysOf(this.currentPage, text);
     const tables = ranges.map((range, i): KeyedTable => ({ key: keys[i]!, model: decode(parseTable(range.text)) }));
     const own = ranges.findIndex((range) => range.from === at);
-    return { page: { tables, read: tables, key: keys[own]!, formulas: pageFormulasIn(this.currentPage, text) }, rangeOf: new Map(ranges.map((range, i) => [keys[i]!, range])) };
+    return { page: { tables, read: tables, key: keys[own]!, formulas: pageFormulasIn(document, text) }, rangeOf: new Map(ranges.map((range, i) => [keys[i]!, range])) };
   }
 
   /**
@@ -660,23 +663,15 @@ export class Controller implements TableHost {
     const changed = new Map(changes.map((c) => [c.key, c.change]));
     if (changes.some((c) => !keys.includes(c.key))) return "failed";
     const serialize = await this.serializer();
-    // From the last table up, so the earlier ones keep their places
-    let written = text;
-    for (let i = ranges.length - 1; i >= 0; i--) {
+    const writes = ranges.flatMap((range, i) => {
       const change = changed.get(keys[i]!);
-      if (!change) continue;
-      const range = ranges[i]!;
-      written = written.slice(0, range.from) + serialize(change(parseTable(range.text))) + written.slice(range.to);
-    }
-    if (written === text) return "unchanged";
-    if (open) {
-      // One edit over all of them: one Ctrl+Z undoes it
-      const edit = minimalEdit(text, written);
-      await editor.replace(edit.from, edit.to, edit.insert);
-    } else {
-      await space!.write(document, written);
-    }
-    return "written";
+      return change ? [{ at: tableAt(text, range), markdown: serialize(change(parseTable(range.text))) }] : [];
+    });
+    // One write of them all: one edit where the page is open (one Ctrl+Z undoes it), else into the space
+    const written = await this.store.write(document, (p) => {
+      p.tables.write(writes.map(({ at, markdown }) => ({ ...at, markdown })));
+    });
+    return written.result;
   }
 
   get undoEdit(): (() => Promise<void>) | undefined {
@@ -908,6 +903,8 @@ export class Controller implements TableHost {
     try {
       for (const feature of this.features) await feature.prepareWrite?.(info);
       const text = await this.platform.editor.text();
+      // The page open as that text is read: what the write writes (the page writer tells it by its name)
+      const document = await this.platform.editor.documentName();
       this.pageText = text;
       // By its key (not its source as last shown: an edit saved just before may not be rendered yet)
       const range = findTables(text)[this.register.keysOf(this.currentPage, text).indexOf(info.key)];
@@ -917,28 +914,18 @@ export class Controller implements TableHost {
       }
       const held = this.features.flatMap((f) => f.pendingEdits?.(info) ?? []);
       const before = decode(parseTable(range.text));
-      const { page, rangeOf } = this.writePage(text, range.from);
+      const { page, rangeOf } = this.writePage(text, range.from, document);
       const serialize = await this.serializer();
       // The other tables the features change for it, each seeing the earlier ones' changes
       const others = this.othersWritten(page, (feature, pageNow) => feature.otherTablesWritten?.(before, undefined, { page: pageNow }));
       // The table and the blank line after it; the last of the page, the blank line before it (one line break kept)
-      let from = range.from;
-      let to = range.to;
-      const next = /^[ \t]*(\r?\n)+/.exec(text.slice(to))?.[0] ?? "";
-      // At the page's start one line break stays: the editor's cursor goes there, not into what follows (a table)
-      if (to + next.length < text.length) to += from === 0 && next.length ? next.length - (next.endsWith("\r\n") ? 2 : 1) : next.length;
-      else {
-        to = text.length;
-        const previous = /(\r?\n)+$/.exec(text.slice(0, from))?.[0] ?? "";
-        from -= Math.max(0, previous.length - (previous.endsWith("\r\n") ? 2 : 1));
-      }
-      const updates = [
-        { from, to, markdown: "" },
-        ...[...others.written].map(([key, model]) => ({ from: rangeOf.get(key)!.from, to: rangeOf.get(key)!.to, markdown: serialize(encode(model, parseTable(rangeOf.get(key)!.text))) })),
-      ];
+      const { from, to } = removedSpan(text, range);
+      const othersWritten = [...others.written].map(([key, model]) => ({ range: rangeOf.get(key)!, markdown: serialize(encode(model, parseTable(rangeOf.get(key)!.text))) }));
+      const updates = [{ from, to, markdown: "" }, ...othersWritten.map(({ range: other, markdown }) => ({ from: other.from, to: other.to, markdown }))];
       let written = text;
       for (const update of [...updates].sort((a, b) => b.from - a.from)) written = written.slice(0, update.from) + update.markdown + written.slice(update.to);
       // What other plugins write with it (silverware.table.onWrite), in the same edit
+      const tablesWritten = written;
       const listened = await withWriteListeners(written);
       written = listened.text;
       const moved = movedBy([updates.map((u): TextEdit => ({ from: u.from, to: u.to, text: u.markdown })), ...listened.edits]);
@@ -954,7 +941,14 @@ export class Controller implements TableHost {
         if (then) after.push(then);
       }
       this.hideFloating(true);
-      await this.platform.editor.replace(replace.from, replace.to, replace.insert);
+      const outcome = await this.store.write(document, (p) => {
+        p.tables.write([{ ...tableAt(text, range), markdown: undefined }, ...othersWritten.map((other) => ({ ...tableAt(text, other.range), markdown: other.markdown }))]);
+        p.editText(this.listenersEdit(tablesWritten, listened, (made) => withWriteListeners(made)));
+      });
+      if (outcome.result === "failed") {
+        this.notify(`Silverware Table: the table was not deleted (${outcome.reason})`, "error");
+        return "failed";
+      }
       this.pageText = written;
       for (const pending of held) pending.written();
       for (const then of after) then(replace.from, written.length - text.length, moved);
@@ -964,6 +958,18 @@ export class Controller implements TableHost {
       this.notify(`Silverware Table: could not delete the table (${String(e)})`, "error");
       return "failed";
     }
+  }
+
+  /**
+   * Other plugins' edits of a write (silverware.table.onWrite) as the page writer's text edit, after the tables' changes:
+   * what they made (`listened`) of the text the write made (`written`); made again where the writer planned the write
+   * anew on a text changed meanwhile (the open page)
+   */
+  private listenersEdit(written: string, listened: { readonly text: string }, again: (text: string) => Promise<{ readonly text: string }>): (text: string) => Promise<EditResult> {
+    return async (text) => {
+      const made = text === written ? listened : await again(text);
+      return { text: made.text, changes: made.text === text ? 0 : 1 };
+    };
   }
 
   columnDeleteWarnings(info: WidgetInfo, column: number): string[] {
@@ -1306,14 +1312,16 @@ export class Controller implements TableHost {
 
   private async fixHeaders(source: string, hint: number): Promise<void> {
     try {
-      const range = locateBySource(await this.platform.editor.text(), hint, source);
+      const text = await this.platform.editor.text();
+      const document = await this.platform.editor.documentName();
+      const range = locateBySource(text, hint, source);
       if (!range) {
         this.notify(NOT_SAVED, "error");
         return;
       }
       const table = parseTable(range.text);
-      const edit = minimalEdit(range.text, serializeTable(encode(nameEmptyHeaders(decode(table)), table)));
-      await this.platform.editor.replace(range.from + edit.from, range.from + edit.to, edit.insert);
+      const written = await this.store.write(document, (p) => p.tables.write([{ ...tableAt(text, range), markdown: serializeTable(encode(nameEmptyHeaders(decode(table)), table)) }]));
+      if (written.result === "failed") this.notify(`Silverware Table: could not name the columns (${written.reason})`, "error");
     } catch (e) {
       console.error("Silverware Table: could not name the columns", e);
       this.notify(`Silverware Table: could not name the columns (${String(e)})`, "error");
@@ -2708,6 +2716,8 @@ export class Controller implements TableHost {
   private async insertTableNow(model: TableModel, place: InsertPlace | undefined, also: TableChange | undefined, key: TableKey | undefined): Promise<WriteResult> {
     try {
       const text = await this.platform.editor.text();
+      // The page open as that text is read: what the write writes (the page writer tells it by its name)
+      const document = await this.platform.editor.documentName();
       // The cursor as it is with that text (the editor moved it with any edit made meanwhile, a dialog open); none: the page's end
       const position = place && "at" in place ? await this.platform.editor.cursor?.() : undefined;
       const after = place && "after" in place ? place.after : undefined;
@@ -2726,12 +2736,15 @@ export class Controller implements TableHost {
       const table = { ...encoded, rows: encoded.rows.map((row) => ({ cells: row.cells })) };
       // The new table's text: its key's once it is in the page
       if (key) this.register.writing(key, serialize(table).trimEnd());
-      const insert = `${before}${serialize(table)}${trail}`;
+      const markdown = serialize(table);
+      const insert = `${before}${markdown}${trail}`;
       const alsoRead = changed && parseTable(changed.text);
-      const updates = [{ from: at, to: at, text: insert }, ...(changed && alsoRead ? [{ from: changed.from, to: changed.to, text: serialize(encode(also!.change(decode(alsoRead)), alsoRead)) }] : [])];
+      const alsoMarkdown = changed && alsoRead ? serialize(encode(also!.change(decode(alsoRead)), alsoRead)) : undefined;
+      const updates = [{ from: at, to: at, text: insert }, ...(changed && alsoMarkdown !== undefined ? [{ from: changed.from, to: changed.to, text: alsoMarkdown }] : [])];
       let written = text;
       for (const update of [...updates].sort((a, b) => b.from - a.from)) written = written.slice(0, update.from) + update.text + written.slice(update.to);
       // What other plugins write with it (silverware.table.onWrite), in the same edit
+      const tablesWritten = written;
       const listened = await withWriteListeners(written);
       written = listened.text;
       const moved = movedBy([updates, ...listened.edits]);
@@ -2744,7 +2757,15 @@ export class Controller implements TableHost {
         const then = await feature.beforeWrite?.(text, spanFrom, spanTo, replace);
         if (then) thens.push(then);
       }
-      await this.platform.editor.replace(replace.from, replace.to, replace.insert);
+      const outcome = await this.store.write(document, (p) => {
+        const place = range ? { after: tableAt(text, range) } : position !== undefined ? cursorPlace(text, position) : undefined;
+        p.tables.write(changed && alsoMarkdown !== undefined ? [{ ...tableAt(text, changed), markdown: alsoMarkdown }] : [], { markdown, ...(place ? { place } : {}) });
+        p.editText(this.listenersEdit(tablesWritten, listened, (made) => withWriteListeners(made)));
+      });
+      if (outcome.result === "failed") {
+        this.notify(`Silverware Table: the table was not written (${outcome.reason})`, "error");
+        return "failed";
+      }
       this.pageText = written;
       for (const then of thens) then(replace.from, written.length - text.length, moved);
       return "written";
@@ -2811,6 +2832,8 @@ export class Controller implements TableHost {
       // by the time it is written
       for (const feature of this.features) await feature.prepareWrite?.(given);
       const text = await this.platform.editor.text();
+      // The page open as that text is read: what the write writes (the page writer tells it by its name)
+      const document = await this.platform.editor.documentName();
       this.pageText = text;
       const target = this.writeTarget(text, given, asked);
       if (!target) {
@@ -2833,7 +2856,7 @@ export class Controller implements TableHost {
         this.notify(`Silverware Table: ${fixed}`, "info");
         return "failed";
       }
-      const { page, rangeOf } = this.writePage(text, range.from);
+      const { page, rangeOf } = this.writePage(text, range.from, document);
       // The features see the tables as models (the codec's: read once, written back as read where unchanged)
       const beforeModel = decode(before);
       const editedModel = decode(edited);
@@ -2876,17 +2899,22 @@ export class Controller implements TableHost {
         others.written.set(changed.key, changed.change(others.written.get(changed.key) ?? decode(parseTable(also.text))));
       }
       const updates: { readonly range: { readonly from: number; readonly to: number }; readonly markdown: string }[] = [{ range, markdown }];
+      // What the page writer is given of them: each found again as read (as data: planned anew on the open page changed)
+      const tables: TableWrite[] = [{ ...tableAt(text, range), markdown }];
+      const formulas: PageFormula[] = [];
       for (const [key, model] of others.written) {
         const at = rangeOf.get(key)!;
         const read = parseTable(at.text);
-        updates.push({ range: at, markdown: serialize(this.withoutNewTags(read, encode(model, read), {}, taken)) });
+        const other = serialize(this.withoutNewTags(read, encode(model, read), {}, taken));
+        updates.push({ range: at, markdown: other });
+        tables.push({ ...tableAt(text, at), markdown: other });
       }
       // The page's formulas in its text that the features change with them (their references to the table)
       const tablesWritten = updates.length;
       const left: string[] = [];
       for (const feature of this.features) {
         for (const formula of feature.pageFormulasWritten?.(beforeModel, changedModel, { ...edit, page: pageNow }) ?? []) {
-          const place = pageFormulaPlace(this.currentPage, text, formula);
+          const place = pageFormulaPlace(document, text, formula);
           if ("problem" in place) {
             left.push(place.problem);
             continue;
@@ -2894,6 +2922,7 @@ export class Controller implements TableHost {
           // (In a table written with it: as the table is written; two features writing one: the first's)
           if (updates.some((u) => place.from < u.range.to && place.to > u.range.from)) continue;
           updates.push({ range: place, markdown: formula.text });
+          formulas.push(formula);
         }
       }
       if (left.length) {
@@ -2915,7 +2944,9 @@ export class Controller implements TableHost {
         written = written.slice(0, update.range.from) + update.markdown + written.slice(update.range.to);
       }
       // What other plugins write with it (silverware.table.onWrite), in the same edit, told what it did to the table
-      const listened = await withWriteListeners(written, [{ before, after: changed, markdown, columnMap }]);
+      const beforeListeners = written;
+      const told = [{ before, after: changed, markdown, columnMap }];
+      const listened = await withWriteListeners(written, told);
       written = listened.text;
       const moved = movedBy([updates.map((u): TextEdit => ({ from: u.range.from, to: u.range.to, text: u.markdown })), ...listened.edits]);
       const replace = minimalEdit(text, written);
@@ -2940,7 +2971,20 @@ export class Controller implements TableHost {
       const last = this.writtenAs.get(info.key);
       const replaced = new Set(last?.source === range.text ? last.replaced : []).add(range.text);
       this.writtenAs.set(info.key, { source: markdown, hint: at, pins: metaPins(parseTable(markdown)), replaced });
-      await this.platform.editor.replace(replace.from, replace.to, replace.insert);
+      const outcome = await this.store.write(document, (p) => {
+        // The page formulas first, on the text as read (found by their order among the page's formulas, a table's cells'
+        // too: a table written first could change that order); the tables then, found by their text
+        for (const formula of formulas) p.tables.setPageFormula(document, formula);
+        p.tables.write(tables);
+        p.editText(this.listenersEdit(beforeListeners, listened, (made) => withWriteListeners(made, told)));
+      });
+      if (outcome.result === "failed") {
+        if (last) this.writtenAs.set(info.key, last);
+        else this.writtenAs.delete(info.key);
+        this.cellEditor.dropPending();
+        this.notify(`Silverware Table: the table was not saved (${outcome.reason})`, "error");
+        return "failed";
+      }
       this.pageText = written;
       for (const pending of held) pending.written();
       for (const then of after) then(replace.from, written.length - text.length, moved);

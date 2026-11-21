@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { completions, defineFormulaPlaces, evaluated, evaluatedText, formulaErrorsIn, formulaErrorsTextIn, formulaPagesIn, luaCallPlaces, onWrite, resetDefinitions, tables } from "./index.ts";
 import { buttonLabel, cell, clickOn, controller, editor, edits, flashes, flush, key, menuButtons, nameInMenu, setup, text, toolbarName, useTablePage } from "./testing/page.ts";
+import { deleteRow } from "./model/ops.ts";
 
 describe("silverware.table.evaluate: a formula calculated on the page shown", () => {
   useTablePage();
@@ -307,6 +308,14 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
       toolbarName("table");
       expect(await nameInMenu("costs")).toBeUndefined();
       expect(text.endsWith(LINES("costs", "cost", "2"))).toBe(true);
+    });
+
+    it("follows a row deleted whose cell held a formula of its own: the page's formula after it written, the table too", async () => {
+      const PAGE = "| Name | Price |\n|---|---|\n| Pear | ${te(\"=1\")} |\n| Fig | 3 |\n| <meta core.table core.name='prices'> |\n\nFig: ${te('=prices!B2')}\n";
+      await setup(PAGE, { "silverware.table.metadata": true });
+      defineFormulaPlaces(luaCallPlaces("te"));
+      await controller.writeTable(controller.shownTables()[0]!, (t) => deleteRow(t, 1), { rowMap: (r) => (r === 1 ? undefined : r > 1 ? r - 1 : r) });
+      expect(text).toBe("| Name | Price |\n|---|---|\n| Fig | 3 |\n| <meta core.table core.name='prices'> |\n\nFig: ${te('=prices!B1')}\n");
     });
 
     it("leaves one as written where its place cannot hold its new text, the table written and that said", async () => {

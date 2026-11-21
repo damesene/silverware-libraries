@@ -75,7 +75,9 @@ export class MemoryStore implements TableStore {
       if (read.revision !== edit.expects) return left({ cause: "changed", reason: "a table of it changed since it was read" });
       after = edit.kind === "remove" ? after.filter((one) => one.key !== edit.key) : after.map((one, i) => (i === index ? { key: one.key, revision: this.revision(), model: edit.model } : one));
     }
-    const plan: TablePlan = { document, changes: transaction.edits.length };
+    // (No page formulas kept here: any given is left)
+    const formulas = transaction.formulas?.length ?? 0;
+    const plan: TablePlan = { document, changes: transaction.edits.length, ...(formulas ? { formulasLeft: Array.from({ length: formulas }, () => "this store keeps no page formulas") } : {}) };
     this.plans.set(plan, { before, after, inserted });
     return plan;
   }
@@ -83,12 +85,15 @@ export class MemoryStore implements TableStore {
   async apply(plan: TablePlan): Promise<TableReport> {
     const { document } = plan;
     const own = this.plans.get(plan);
-    if (plan.skipped || !own) return { document, written: false, inserted: [], skipped: plan.skipped ?? { cause: "refused", reason: "not planned by this store, or applied already" } };
+    const none = new Map<TableKey, TableRevision>();
+    if (plan.skipped || !own) return { document, written: false, inserted: [], revisions: none, skipped: plan.skipped ?? { cause: "refused", reason: "not planned by this store, or applied already" } };
     this.plans.delete(plan);
-    if (this.documents.get(document) !== own.before) return { document, written: false, inserted: [], skipped: { cause: "changed", reason: "the document changed since it was planned" } };
+    if (this.documents.get(document) !== own.before) return { document, written: false, inserted: [], revisions: none, skipped: { cause: "changed", reason: "the document changed since it was planned" } };
     this.documents.set(document, own.after);
     for (const key of own.inserted) this.owners.set(key, document);
-    const report: TableReport = { document, written: plan.changes > 0, inserted: own.inserted };
+    // (A table written or made is a new one of the document's: the others are kept as they were)
+    const revisions = new Map(own.after.filter((table) => !own.before.includes(table)).map((table) => [table.key, table.revision]));
+    const report: TableReport = { document, written: plan.changes > 0, inserted: own.inserted, revisions };
     this.reports.set(report, own);
     return report;
   }
@@ -101,6 +106,10 @@ export class MemoryStore implements TableStore {
     const plan: TablePlan = { document, changes: report.written ? 1 : 0 };
     this.plans.set(plan, { before: own.after, after: own.before, inserted: [] });
     return plan;
+  }
+
+  asRead(model: TableModel): TableModel {
+    return model;
   }
 
   private revision(): TableRevision {

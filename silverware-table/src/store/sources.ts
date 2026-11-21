@@ -75,11 +75,15 @@ export class SourceStore implements TableStore, SourceTables {
   }
 
   async apply(plan: TablePlan): Promise<TableReport> {
-    return { document: plan.document, written: false, inserted: [], skipped: READ_ONLY };
+    return { document: plan.document, written: false, inserted: [], revisions: new Map(), skipped: READ_ONLY };
   }
 
   async planUndo(report: TableReport): Promise<TablePlan> {
     return { document: report.document, changes: 0, skipped: READ_ONLY };
+  }
+
+  asRead(model: TableModel): TableModel {
+    return model;
   }
 
   private read(data: SourceData): { readonly model: TableModel; readonly revision: TableRevision } {

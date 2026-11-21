@@ -1,10 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { serializeTable } from "../../markdown.ts";
 import { TableRegister } from "../../core/tables.ts";
 import type { TablePlatform } from "../../core/platform.ts";
 import type { TableModel } from "../../model/model.ts";
 import { storeContract, table } from "../contract.ts";
-import { MarkdownStore } from "./store.ts";
+import { luaCallPlaces } from "../../host/silverbullet/lua.ts";
+import { attributeIn, withAttributeIn } from "../../model/model.ts";
+import { defineFormulaPlaces, pageFormulasIn } from "./pageformulas.ts";
+import { type BeforeWrite, MarkdownStore } from "./store.ts";
+import { addWriteListener, writeListenersAnew } from "./writelisteners.ts";
 import { newTableMarkdown } from "./tableparts.ts";
 
 /** A page's text of these tables, a line of text before each */
@@ -35,7 +39,7 @@ function pagesOf(documents: Readonly<Record<string, readonly TableModel[]>>, ope
   return { pages, platform };
 }
 
-const storeOf = (platform: Pick<TablePlatform, "editor" | "space">) => new MarkdownStore(() => platform, new TableRegister(), async () => serializeTable);
+const storeOf = (platform: Pick<TablePlatform, "editor" | "space">, beforeWrite?: BeforeWrite) => new MarkdownStore(() => platform, new TableRegister(), async () => serializeTable, beforeWrite);
 
 storeContract("markdown in pages, the open page's through the editor", (documents) => {
   const open = Object.keys(documents)[0] ?? "";
@@ -62,5 +66,82 @@ describe("the markdown store", () => {
     const [first] = (await store.tables("Shop"))!;
     await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "write", key: first!.key, expects: first!.revision, model: table(["A"], ["one | two"]) }] }));
     expect(pages.get("Shop")).toBe("Intro.\n\n| A |\n|---|\n| one \\| two |\n\n| B |\n|---|\n| 2 |\n");
+  });
+
+  describe("a write's text apart from its tables", () => {
+    afterEach(() => {
+      // (No listener left for the next test: a new one replaces those of before)
+      writeListenersAnew();
+      addWriteListener(() => []);
+    });
+
+    it("writes the page formulas given with the tables, leaving one it cannot find, said why", async () => {
+      defineFormulaPlaces(luaCallPlaces("te"));
+      const { pages, platform } = pagesOf({ Shop: [table(["A"], ["1"])] }, "Shop");
+      pages.set("Shop", `${pages.get("Shop")!}\nTotal: \${te("=SUM(a![A])")}\n`);
+      const store = storeOf(platform);
+      const [first] = (await store.tables("Shop"))!;
+      const [formula] = pageFormulasIn("Shop", pages.get("Shop")!);
+      const gone = { ...formula!, key: `${formula!.key}x` as NonNullable<typeof formula>["key"] };
+      const plan = await store.plan({
+        document: "Shop",
+        edits: [{ kind: "write", key: first!.key, expects: first!.revision, model: table(["A"], ["2"]) }],
+        formulas: [{ key: formula!.key, text: "=SUM(b![A])" }, { ...gone, text: "=1" }],
+      });
+      expect(plan.formulasLeft).toHaveLength(1);
+      expect((await store.apply(plan)).written).toBe(true);
+      expect(pages.get("Shop")).toBe(`Intro.\n\n| A |\n|---|\n| 2 |\n\nTotal: \${te("=SUM(b![A])")}\n`);
+    });
+
+    it("lets other plugins write with it, told of the tables written; tidies and writes a table whole where asked", async () => {
+      const told: string[] = [];
+      writeListenersAnew();
+      addWriteListener((text, context) => {
+        told.push(String(context.renamed()));
+        return text.startsWith("Intro.") ? [{ from: 0, to: 6, text: "Begin." }] : [];
+      });
+      const { pages, platform } = pagesOf({ Shop: [table(["A"], ["1"])] }, "Shop");
+      pages.set("Shop", "Intro.\n\n| A |\n|---|\n|  1 |\n| <meta core.table core.-c-gone.sort='asc'> |\n");
+      const store = storeOf(platform);
+      const [first] = (await store.tables("Shop"))!;
+      const renamed = { ...first!.model, columns: first!.model.columns.map((c) => ({ ...c, header: "B" })) };
+      await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "write", key: first!.key, expects: first!.revision, model: renamed, tidy: true, whole: true }] }));
+      expect(told).toEqual(["true"]);
+      expect(pages.get("Shop")).toBe("Begin.\n\n| B   |\n| --- |\n| 1   |\n");
+    });
+
+    it("tells the binding of a write of the open page before it is made: the text read, its tables' span, the edit; then where places went", async () => {
+      const { pages, platform } = pagesOf({ Shop: [table(["A"], ["1"]), table(["B"], ["2"])] }, "Shop");
+      const seen: string[] = [];
+      const store = storeOf(platform, async (text, span, edit) => {
+        seen.push(`${text.slice(span.from, span.to)} ${edit.from}-${edit.to}`);
+        return (moved) => seen.push(`moved ${moved(text.length, false)}`);
+      });
+      const [, second] = (await store.tables("Shop"))!;
+      const before = pages.get("Shop")!;
+      await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "write", key: second!.key, expects: second!.revision, model: table(["B"], ["22"]) }] }));
+      const at = before.indexOf("| 2 |");
+      expect(seen).toEqual([`| B |\n|---|\n| 2 | ${at + 3}-${at + 3}`, `moved ${before.length + 1}`]);
+    });
+
+    it("makes a new table where the cursor is, or under a key the caller reserved", async () => {
+      const { pages, platform } = pagesOf({ Shop: [table(["A"], ["1"])] }, "Shop");
+      const store = storeOf(platform);
+      (platform.editor as { cursor?: () => number }).cursor = () => 3;
+      const at = await store.insertAtCursor("Shop");
+      expect(at).toBeDefined();
+      const report = await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "insert", model: table(["N"], ["n"]), at }] }));
+      expect(pages.get("Shop")).toBe("Intro.\n\n| N |\n|---|\n| n |\n\n| A |\n|---|\n| 1 |\n");
+      expect((await store.tables("Shop"))![0]!.key).toBe(report.inserted[0]);
+    });
+
+    it("reads a model back as written: a tag typed into a cell's text is an attribute", () => {
+      const { platform } = pagesOf({ Shop: [] }, "Shop");
+      const typed = table(["A"], ["x <meta x.y='1'>"]);
+      const read = storeOf(platform).asRead(typed);
+      expect(read.rows[0]!.cells[0]!.content).toBe("x");
+      expect(attributeIn(read.rows[0]!.cells[0]!.attributes, "x", "y")).toBe("1");
+      expect(attributeIn(withAttributeIn(read.rows[0]!.cells[0]!.attributes, "x", "y", undefined), "x", "y")).toBeUndefined();
+    });
   });
 });

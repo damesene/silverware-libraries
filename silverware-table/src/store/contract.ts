@@ -150,6 +150,18 @@ export function storeContract(
       expect(after[0]!.key).toBe(shop!.key);
     });
 
+    it("reports each table written or made with its revision now, the others not", async () => {
+      const { store } = make({ Shop: [prices, counts] });
+      const [shop, count] = (await store.tables("Shop"))!;
+      const report = await store.apply(
+        await store.plan({ document: "Shop", edits: [{ kind: "write", key: shop!.key, expects: shop!.revision, model: table(["Fruit", "Price"], ["Kiwi", "2"]) }, { kind: "insert", model: table(["New"], ["n"]) }] }),
+      );
+      const now = (await store.tables("Shop"))!;
+      expect([...report.revisions.keys()].sort()).toEqual([shop!.key, ...report.inserted].sort());
+      for (const [key, revision] of report.revisions) expect(now.find((t) => t.key === key)!.revision).toBe(revision);
+      expect(report.revisions.has(count!.key)).toBe(false);
+    });
+
     it("applies a plan once: applied again, it is left and nothing is written twice", async () => {
       const { store } = make({ Shop: [prices] });
       const plan = await store.plan({ document: "Shop", edits: [{ kind: "insert", model: counts }] });

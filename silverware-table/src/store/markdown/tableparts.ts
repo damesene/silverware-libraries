@@ -119,8 +119,8 @@ export function newTablePlace(text: string, place: NewTablePlace | undefined): {
 
 const CHANGED = "a table changed since it was read";
 
-/** A write's tables in a page's text as it is: the edits they make, or why they cannot be made */
-function tableEdits(text: string, change: { readonly tables: readonly TableWrite[]; readonly inserts: readonly TableInsert[] }): { readonly from: number; readonly to: number; readonly text: string }[] | { readonly problem: string } {
+/** A write's tables in a page's text as it is: the edits they make, or why they cannot be made (the store's too: where places go) */
+export function tableEdits(text: string, change: { readonly tables: readonly TableWrite[]; readonly inserts: readonly TableInsert[] }): { readonly from: number; readonly to: number; readonly text: string }[] | { readonly problem: string } {
   const edits: { from: number; to: number; text: string }[] = [];
   for (const one of change.tables) {
     const range = found(text, one);

@@ -6,7 +6,7 @@ import { type FeatureName, formatRule, moduleOnByDefault, SETTINGS, type Setting
 import { type AdapterFeature, type AddressFrame, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, type ColumnsMeasure, type ColumnWidths, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type InsertPlace, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type NamingTarget, type KeyedTable, type OtherPages, type PendingEdits, type TableChange } from "./core/feature.ts";
 import { type Dialog, type DialogOptions, Dialogs } from "./core/dialog.ts";
 import { ViewAnchor } from "./core/anchor.ts";
-import { mapPosition, type TextEdit, withWriteListeners } from "./core/writelisteners.ts";
+import { mapPosition, type TextEdit, withWriteListeners } from "./store/markdown/writelisteners.ts";
 import { placeAtEnd, TableRows } from "./core/rows.ts";
 import { CellEditing } from "./core/editor.ts";
 import { InsertControls, type PointerAt } from "./core/insert.ts";

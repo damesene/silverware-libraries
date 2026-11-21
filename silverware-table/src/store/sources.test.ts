@@ -24,6 +24,7 @@ storeContract(
       plan: store.plan.bind(store),
       apply: store.apply.bind(store),
       planUndo: store.planUndo.bind(store),
+      asRead: store.asRead.bind(store),
     };
     return { store: named, replace: put };
   },

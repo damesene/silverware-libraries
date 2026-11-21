@@ -17,7 +17,7 @@ import type { KeyedModel } from "../../model/model.ts";
 import { defineFormulaPlaces as defineFormulaPlacesIn, type FormulaPlaces } from "../../store/markdown/pageformulas.ts";
 import { isError, isRange, type Scalar, single, TimeValue, type Value } from "../../formulas/values.ts";
 import { customFunctionsAnew, defineCustomFunctions } from "../../formulas/registry.ts";
-import { addWriteListener, type WriteListener, writeListenersAnew } from "../../core/writelisteners.ts";
+import { addWriteListener, type WriteListener, writeListenersAnew } from "../../store/markdown/writelisteners.ts";
 import { cellSourceOffset, findTables, pageTablesOf } from "../../markdown.ts";
 import { decodeCell } from "../../store/markdown/codec.ts";
 import { metaName } from "../../meta.ts";

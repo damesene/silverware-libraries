@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { serializeTable } from "../../markdown.ts";
+import { parseTable, serializeTable } from "../../markdown.ts";
 import { TableRegister } from "../../core/tables.ts";
 import type { TablePlatform } from "../../core/platform.ts";
 import type { TableModel } from "../../model/model.ts";
@@ -161,6 +161,23 @@ describe("the markdown store", () => {
       const first = store.tablesOfText("Shop", pages.get("Shop")!);
       expect(store.tablesOfText("Shop", pages.get("Shop")!)).toBe(first);
       expect(store.tablesOfText("Shop", `${pages.get("Shop")!}\nMore.\n`)).not.toBe(first);
+    });
+
+    it("writes a model over the table it was read from where the page was read anew since, that table parsed anew", async () => {
+      const { pages, platform } = pagesOf({ Shop: [] }, "Shop");
+      pages.set("Shop", "Intro.\n\n| A  | B |\n|---|---|\n| 1  | 2 | extra |\n| <meta core.table widths.-c-b.size='9'> |\n");
+      const store = storeOf(platform);
+      const [shop] = (await store.tables("Shop"))!;
+      // Typed above it, the page read again, the table's text parsed anew (parseTable keeps a few)
+      pages.set("Shop", `Intro typed.\n\n${pages.get("Shop")!.slice("Intro.\n\n".length)}`);
+      for (let i = 0; i < 20; i++) parseTable(`| X${i} |\n|---|\n| 1 |`);
+      await store.tables("Shop");
+      const read = shop!.model;
+      const b = read.columns[1]!;
+      const model = { ...read, columns: [read.columns[0]!, { ...b, attributes: withAttributeIn(b.attributes, "widths", "size", undefined) }] };
+      await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "write", key: shop!.key, expects: shop!.revision, model }] }));
+      // (Its width taken off, the rest as written: the metadata row holding nothing more goes)
+      expect(pages.get("Shop")).toBe("Intro typed.\n\n| A  | B |\n|---|---|\n| 1  | 2 | extra |\n");
     });
 
     it("tidies a table keeping the metadata of a column none of its model's comes from, as any write", async () => {

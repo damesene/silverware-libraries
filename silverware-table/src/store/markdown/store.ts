@@ -185,8 +185,11 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
     const keys = this.register.keysOf(document, text);
     const read = new Map<TableRevision, Table>();
     const places = new Map<TableKey, { readonly from: number; readonly to: number }>();
+    // A table of the same text as read before is the table then (the same object, parsed once: what the models read
+    // of it are written over; parseTable keeps a few only)
+    const before = this.read.get(document);
     const tables = findTables(text).map((range): StoredTable => {
-      const table = parseTable(range.text);
+      const table = before?.get(revisionOf(range.text)) ?? parseTable(range.text);
       const key = keys[range.ordinal]!;
       read.set(revisionOf(range.text), table);
       places.set(key, { from: range.from, to: range.to });
@@ -246,7 +249,7 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
       }
       const read = this.tableRead(document, edit.expects, range.text);
       const { columnMap } = edit;
-      const after = this.encoded(document, edit.model, read, edit);
+      const after = this.encoded(edit.model, read, edit);
       const markdown = serialize(after);
       writes.push({ ...tableAt(text, range), markdown });
       told.push({ before: read, after, markdown, ...(columnMap ? { columnMap } : {}) });
@@ -414,7 +417,7 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
 
   async writesSame(document: string, read: StoredTable, model: TableModel, options: Pick<TableWriteEdit, "tidy" | "columnMap"> = {}): Promise<boolean> {
     const serialize = await this.serializer();
-    return serialize(this.encoded(document, model, this.tableRead(document, read.revision, read.revision), options)) === read.revision;
+    return serialize(this.encoded(model, this.tableRead(document, read.revision, read.revision), options)) === read.revision;
   }
 
   /** A table of a page as last read by its revision (its text: parsed again where not kept) */
@@ -431,7 +434,7 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
    * every row written anew, padded; the columns the column map deletes taking
    * their metadata with them
    */
-  private encoded(document: string, model: TableModel, read: Table, options: Pick<TableWriteEdit, "tidy" | "columnMap">): Table {
+  private encoded(model: TableModel, read: Table, options: Pick<TableWriteEdit, "tidy" | "columnMap">): Table {
     const from = decodedFrom(model);
     const over = from && (from === read || this.made.has(from)) ? from : read;
     const { columnMap } = options;

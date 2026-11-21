@@ -12,6 +12,39 @@ import type { SourceTables } from "../sources.ts";
 import type { AdapterContext, TableAdapter } from "./adapter.ts";
 import type { AdapterFeature, Feature, TableHost, TableLook, WriteResult } from "./feature.ts";
 import type { TableRows } from "./rows.ts";
+import type { TablePlatform } from "./platform.ts";
+import type { PageFormulaStore, TableStore } from "./store.ts";
+import type { TableKey, TableRegister } from "./tables.ts";
+import type { Table } from "../markdown.ts";
+
+/**
+ * What the core gives a host to make its store with: the platform as it is,
+ * the register (the one maker of keys), how a table is written (the
+ * formatting setting's), and what to do before a write of the open page (the
+ * features', the history marker), given its text, the span of its tables,
+ * the edit's range; what it gives is run after, told where places went
+ */
+export type StoreContext = {
+  platform(): TablePlatform;
+  readonly register: TableRegister;
+  serializer(): Promise<(table: Table) => string>;
+  beforeWrite(
+    text: string,
+    span: { readonly from: number; readonly to: number },
+    edit: { readonly from: number; readonly to: number },
+  ): Promise<((moved: (position: number, after: boolean) => number) => void) | undefined>;
+};
+
+/**
+ * The store a host keeps the open page's tables in, as the core uses it: its
+ * tables, transactions and page formulas, and where a table is in its
+ * document as the host counts (a markdown page's offsets: a custom menu's
+ * table's `from`, `to`; undefined: not read)
+ */
+export type BoundStore = TableStore &
+  PageFormulaStore & {
+    placeOf(document: string, key: TableKey): { readonly from: number; readonly to: number } | undefined;
+  };
 
 /**
  * A feature to create: a module (by its name), or one always there (no name);
@@ -30,15 +63,18 @@ export type LayoutTables = {
   metadataOn(): boolean;
 };
 
-export type TableBinding = {
+/** A host's binding; `S` its store, which its own adapter and modules are given as it made it */
+export type TableBinding<S extends BoundStore = BoundStore> = {
+  /** The store the open page's tables are kept in, made once for the core */
+  store(context: StoreContext): S;
   /** The adapter of the tables the host renders */
-  adapter(doc: Document, rows: TableRows, context: AdapterContext): TableAdapter;
+  adapter(doc: Document, rows: TableRows, context: AdapterContext, store: S): TableAdapter;
   /**
    * The features in the order they get events; `metadata` the core's own
    * (Remove metadata, also a page command), `sources` the space's sources as
    * the core gives them the sources module
    */
-  features(metadata: Feature, sources: SourceTables): readonly FeatureEntry[];
+  features(metadata: Feature, sources: SourceTables, store: S): readonly FeatureEntry[];
   /** A table rendered anew marked with its look (`look` of the table its rendered metadata makes), before the browser lays it out */
   markRendered(widget: HTMLElement, rows: readonly HTMLTableRowElement[], look: (table: TableModel) => TableLook): void;
   /** The provider of the tables for Silverware Layout */

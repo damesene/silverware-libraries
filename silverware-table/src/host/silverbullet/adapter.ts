@@ -10,6 +10,7 @@ import type { TableMeta } from "../../markdown.ts";
 import { TABLE_MARKER } from "../../metanames.ts";
 import type { AdapterContext, PairedTable, TableAdapter, Unpaired } from "../../core/adapter.ts";
 import { pairTable } from "./pairing.ts";
+import type { MarkdownStore } from "../../store/markdown/store.ts";
 import type { CellRef, ColumnsMeasure, ColumnWidths, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "../../core/feature.ts";
 import { type MergedLooks, refKey } from "../../core/looks.ts";
 import type { TableRows } from "../../core/rows.ts";
@@ -63,6 +64,8 @@ export class SilverBulletAdapter implements TableAdapter {
     // Each table's rows as SilverBullet rendered them, in the document or not
     private readonly rows: TableRows,
     private readonly context: AdapterContext,
+    // The store the page's tables are kept in (pairing reads the page's tables through it)
+    private readonly store: MarkdownStore,
   ) {
     this.overlays = new Overlays(doc, rows);
     this.columns = new ColumnLayouts(doc, (table) => {
@@ -73,7 +76,7 @@ export class SilverBulletAdapter implements TableAdapter {
   }
 
   pair(widget: HTMLElement, table: HTMLTableElement): Promise<PairedTable | Unpaired | undefined> {
-    return pairTable(widget, table, this.rows, this.context);
+    return pairTable(widget, table, this.rows, this.context, this.store);
   }
 
   async showSource(info: WidgetInfo, at?: { readonly ref: CellRef; readonly cell: HTMLTableCellElement; readonly x: number; readonly y: number }): Promise<boolean> {

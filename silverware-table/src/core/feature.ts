@@ -991,17 +991,6 @@ export interface TableHost extends ModelHost {
   replaceMarkdown(document: string, changes: readonly { readonly key: TableKey; readonly change: (table: Table) => Table }[]): Promise<WriteResult>;
   /** The platform (core/platform.ts): the adapter is the host's side, which the modules' host functions stand for */
   readonly platform: TablePlatform;
-  /** The page's text as last read */
-  readonly pageText: string;
-  /** The open page's text as the editor has it now */
-  pageTextNow(): Promise<string>;
-  /**
-   * The keys of a page's tables in its text (as read now: pageTextNow), in
-   * the order findTables gives them: a table found in the text by its key. How
-   * tables are told apart is the core's (core/tables.ts): a key is made by it
-   * only, never from a table's place
-   */
-  tableKeys(page: string, text: string): readonly TableKey[];
   infoOf(widget: HTMLElement): WidgetInfo | undefined;
   /** The rendered table a key belongs to, if it is enhanced and on screen */
   widgetForKey(key: TableKey): HTMLElement | undefined;

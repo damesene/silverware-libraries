@@ -87,18 +87,19 @@ export interface TableAdapter {
 /** What the adapter needs to know of the core: which tables it enhanced, and a row taken out of the document put back (largeTables) */
 /**
  * A rendered table paired with a table of the page (TableAdapter.pair): its
- * key, model and revision as read now, its document, whether the rendering
- * shows a metadata row; and, until the core tells tables by their keys alone
- * (docs/silverware-table-store-plan.md, step 6, A4), the page's text read,
- * the table's markdown and where it starts in it
+ * key, model and revision as read now, its document and the document's
+ * tables as read with it, whether the rendering shows a metadata row; and,
+ * until the core tells tables by their keys alone
+ * (docs/silverware-table-store-plan.md, step 6, A4), the table's markdown and
+ * where it starts in its text
  */
 export type PairedTable = {
   readonly key: TableKey;
   readonly model: TableModel;
   readonly revision: TableRevision;
   readonly document: string;
+  readonly tables: readonly StoredTable[];
   readonly metaRow: boolean;
-  readonly text: string;
   readonly source: string;
   readonly hint: number;
 };
@@ -113,10 +114,9 @@ export type EmptyHeaders = { readonly document: string; readonly key: TableKey; 
  */
 export type Unpaired = { readonly unpaired: "unplaced" | "unfound"; readonly emptyHeaders?: EmptyHeaders };
 
-/** What pairing a rendered table asks of the core: the platform (the page's text read), a page's tables in a text keyed by the core's register */
+/** What pairing a rendered table asks of the core: the platform (the page's text read) */
 export type PairingContext = {
   platform(): TablePlatform;
-  tablesOfText(document: string, text: string): readonly StoredTable[];
 };
 
 export type AdapterContext = PairingContext & {

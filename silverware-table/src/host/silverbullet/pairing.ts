@@ -7,6 +7,7 @@
 import { cellText, positionHint, renderedTable } from "../../dom.ts";
 import { locateByShape, locateWithEmptyHeaders, parseTable, writesMetaRow } from "../../markdown.ts";
 import type { PairedTable, PairingContext, Unpaired } from "../../core/adapter.ts";
+import type { MarkdownStore } from "../../store/markdown/store.ts";
 import type { TableRows } from "../../core/rows.ts";
 
 /**
@@ -15,7 +16,7 @@ import type { TableRows } from "../../core/rows.ts";
  * headers a fix would name); undefined: rendered anew meanwhile, asked again
  * by the next scan
  */
-export async function pairTable(widget: HTMLElement, table: HTMLTableElement, rows: TableRows, context: PairingContext): Promise<PairedTable | Unpaired | undefined> {
+export async function pairTable(widget: HTMLElement, table: HTMLTableElement, rows: TableRows, context: PairingContext, store: MarkdownStore): Promise<PairedTable | Unpaired | undefined> {
   const hint = positionHint(table);
   if (hint === undefined) return { unpaired: "unplaced" };
   const rendered = rows.renderedRows(table);
@@ -29,7 +30,7 @@ export async function pairTable(widget: HTMLElement, table: HTMLTableElement, ro
   if (!range && !broken) return { unpaired: "unfound" };
   const document = await editor.documentName();
   if (renderedTable(widget) !== table) return undefined;
-  const tables = context.tablesOfText(document, text);
+  const tables = store.tablesOfText(document, text);
   if (!range) {
     const named = tables[broken!.ordinal]!;
     return { unpaired: "unfound", emptyHeaders: { document, key: named.key, revision: named.revision } };
@@ -41,7 +42,7 @@ export async function pairTable(widget: HTMLElement, table: HTMLTableElement, ro
     model: stored.model,
     revision: stored.revision,
     document,
-    text,
+    tables,
     metaRow: writesMetaRow(markdown),
     source: range.text,
     hint: range.from,

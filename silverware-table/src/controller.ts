@@ -26,7 +26,7 @@ import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, sameAt
 import { HASHTAGS_KEY, nameEmptyHeaders } from "./columns.ts";
 import { type AttributeRules, cellWrittenOver, withAttributeRules, withoutNewAttributes } from "./model/rules.ts";
 import { type TableData, tableData } from "./tabledata.ts";
-import { MarkdownStore, tablesIn } from "./store/markdown/store.ts";
+import { tablesIn } from "./store/markdown/store.ts";
 import { SourceStore } from "./store/sources.ts";
 import { decode, encodeOver, plainMarkdown } from "./store/markdown/codec.ts";
 import { SettingsDialog } from "./settings.ts";
@@ -75,7 +75,7 @@ import { Parts } from "./core/parts.ts";
 import { underWindow } from "./core/overwindow.ts";
 import { layoutOf } from "../../shared/layout.ts";
 import { overWindowOf } from "../../shared/overwindow.ts";
-import type { TableBinding } from "./core/binding.ts";
+import type { BoundStore, TableBinding } from "./core/binding.ts";
 
 // The cell editor as features see it, and what it takes to put the cell back
 
@@ -123,8 +123,6 @@ export class Controller implements TableHost {
   // The tables enhanced as the page was last scanned: one gone since (another page opened, a table out of CodeMirror's
   // viewport) has the features' layout follow, as what they placed for it (a table's tab) would stay otherwise
   private scanned = new Set<HTMLElement>();
-  // The page's text as last read
-  pageText = "";
   currentPage = "";
   // The page's tables as last read (pageTables), made once per page and text
   private shownPage: { readonly page: string; readonly tables: readonly StoredTable[] } | undefined;
@@ -133,13 +131,8 @@ export class Controller implements TableHost {
   private readonly enhancing = new WeakMap<HTMLElement, Promise<void>>();
   // Which table is which (keys for the session; core/tables.ts)
   private readonly register = new TableRegister();
-  // The tables kept as markdown in pages, read through the platform as it is now (a new one comes with Space Lua loaded again)
-  private readonly store = new MarkdownStore(
-    () => this.platform,
-    this.register,
-    () => this.serializer(),
-    (text, span, edit) => this.beforeWrite(text, span, edit),
-  );
+  // The store the open page's tables are kept in: the host's (core/binding.ts)
+  private readonly store: BoundStore;
   // The space's sources as tables (the sources module offers them to formulas)
   private readonly sourceStore: SourceStore;
   // The modules' parts for each table (core/parts.ts)
@@ -244,19 +237,29 @@ export class Controller implements TableHost {
     sources: SourceProvider = NO_SOURCES,
   ) {
     this.sourceStore = new SourceStore(sources, this.register);
-    this.adapter = binding.adapter(doc, this.rows, {
+    this.store = binding.store({
       platform: () => this.platform,
-      tablesOfText: (document, text) => this.notePageTables(document, this.store.tablesOfText(document, text)),
-      infoOf: (widget) => this.infos.get(widget),
-      rowNeeded: (info, row) => this.rowNeeded(info, row),
-      holdInDocument: (info, row) => this.holdInDocument(info, row),
-      floating: (className) => this.floating("div", className),
-      place: (element, left, top) => this.place(element, left, top),
-      columnsResized: (info) => {
-        this.tableResized(info);
-        for (const feature of this.features) feature.columnsResized?.(info);
-      },
+      register: this.register,
+      serializer: () => this.serializer(),
+      beforeWrite: (text, span, edit) => this.beforeWrite(text, span, edit),
     });
+    this.adapter = binding.adapter(
+      doc,
+      this.rows,
+      {
+        platform: () => this.platform,
+        infoOf: (widget) => this.infos.get(widget),
+        rowNeeded: (info, row) => this.rowNeeded(info, row),
+        holdInDocument: (info, row) => this.holdInDocument(info, row),
+        floating: (className) => this.floating("div", className),
+        place: (element, left, top) => this.place(element, left, top),
+        columnsResized: (info) => {
+          this.tableResized(info);
+          for (const feature of this.features) feature.columnsResized?.(info);
+        },
+      },
+      this.store,
+    );
     this.dragContext = {
       doc,
       targetOf: (target) => this.targetOf(target),
@@ -418,7 +421,7 @@ export class Controller implements TableHost {
    * page is loaded again.
    */
   private async startFeatures(): Promise<void> {
-    const all = this.binding.features(this.metadata, this.sourceStore);
+    const all = this.binding.features(this.metadata, this.sourceStore, this.store);
     const enabled = await Promise.all(all.map(({ name }) => (name ? this.featureEnabled(name) : true)));
     if (this.stopped) return;
     all.forEach(({ name }, i) => {
@@ -615,14 +618,9 @@ export class Controller implements TableHost {
     return tables;
   }
 
-  /** After a write of the open page: its tables as the store has them now (and its text, which the sheet reads still) */
+  /** After a write of the open page: its tables as the store has them now */
   private async readPageAfterWrite(document: string): Promise<void> {
     this.notePageTables(document, (await this.store.tables(document)) ?? []);
-    this.pageText = await this.platform.editor.text();
-  }
-
-  async pageTextNow(): Promise<string> {
-    return this.platform.editor.text();
   }
 
   async pageNameNow(): Promise<string> {
@@ -1140,7 +1138,7 @@ export class Controller implements TableHost {
         this.markUnsupported(widget, paired.unpaired === "unplaced");
         return;
       }
-      this.pageText = paired.text;
+      this.notePageTables(paired.document, paired.tables);
       this.currentPage = paired.document;
       const { model } = paired;
       const info: WidgetInfo = {
@@ -1526,10 +1524,6 @@ export class Controller implements TableHost {
 
   tableParts<P extends object>(owner: Feature): readonly P[] {
     return this.parts.all<P>(owner);
-  }
-
-  tableKeys(page: string, text: string): readonly TableKey[] {
-    return this.register.keysOf(page, text);
   }
 
   pageOf(key: TableKey): string | undefined {

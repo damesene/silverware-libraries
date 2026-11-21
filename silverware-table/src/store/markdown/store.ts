@@ -108,8 +108,19 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
   // Each document's tables as last read, by revision: a write encodes a model over the very table it was decoded from
   // (the codec tells a column the model keeps from one gone by what it read), which a parse again need not be
   private readonly read = new Map<string, ReadonlyMap<TableRevision, Table>>();
-  // Where each table was in the page's text as last read
+  // Where each table was in the page's text as last read, and that text
   private readonly places = new Map<string, ReadonlyMap<TableKey, { readonly from: number; readonly to: number }>>();
+  private readonly texts = new Map<string, string>();
+
+  /** The keys of a page's tables in a text of it, in order (the register's) */
+  keysOf(document: string, text: string): readonly TableKey[] {
+    return this.register.keysOf(document, text);
+  }
+
+  /** A page's text as last read (its tables': tables, tablesOfText); undefined: not read */
+  lastText(document: string): string | undefined {
+    return this.texts.get(document);
+  }
 
   /** Where a table is in its page's text as last read (a custom menu's table's `from`, `to`); undefined: not read */
   placeOf(document: string, key: TableKey): { readonly from: number; readonly to: number } | undefined {
@@ -154,6 +165,7 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
     });
     this.read.set(document, read);
     this.places.set(document, places);
+    this.texts.set(document, text);
     return tables;
   }
 

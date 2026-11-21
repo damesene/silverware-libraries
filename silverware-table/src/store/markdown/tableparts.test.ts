@@ -60,21 +60,21 @@ describe("the markdown store's parts of the page writer", () => {
 
   it("puts a new table after a table, where the cursor was, or at the page's end, an empty line around it", async () => {
     const { map, writer } = pages({ Shop: TWO });
-    await writer.write(pageChanges().page("Shop", (p) => p.tables.write([], { markdown: NEW, place: { after: at(TWO, 0) } })).build());
+    await writer.write(pageChanges().page("Shop", (p) => p.tables.write([], [{ markdown: NEW, place: { after: at(TWO, 0) } }])).build());
     expect(map.get("Shop")).toBe(`# Shop\n\n| A |\n|---|\n| 1 |\n\n${NEW}\n\nText.\n\n| A |\n|---|\n| 1 |\n`);
     // After a table written in the same change: after it as written
     const both = pages({ Shop: TWO });
-    await both.writer.write(pageChanges().page("Shop", (p) => p.tables.write([{ ...at(TWO, 0), markdown: "| A |\n|---|\n| 9 |" }], { markdown: NEW, place: { after: at(TWO, 0) } })).build());
+    await both.writer.write(pageChanges().page("Shop", (p) => p.tables.write([{ ...at(TWO, 0), markdown: "| A |\n|---|\n| 9 |" }], [{ markdown: NEW, place: { after: at(TWO, 0) } }])).build());
     expect(both.map.get("Shop")).toBe(`# Shop\n\n| A |\n|---|\n| 9 |\n\n${NEW}\n\nText.\n\n| A |\n|---|\n| 1 |\n`);
     const cursor = cursorPlace(TWO, 3);
     const page = pages({ Shop: TWO });
-    await page.writer.write(pageChanges().page("Shop", (p) => p.tables.write([], { markdown: NEW, place: cursor })).build());
+    await page.writer.write(pageChanges().page("Shop", (p) => p.tables.write([], [{ markdown: NEW, place: cursor }])).build());
     expect(page.map.get("Shop")).toBe(`# Shop\n\n${NEW}\n\n| A |\n|---|\n| 1 |\n\nText.\n\n| A |\n|---|\n| 1 |\n`);
     // The cursor's line changed since: refused
     const moved = pages({ Shop: `# Shop!\n${TWO.slice(7)}` });
-    expect((await moved.writer.write(pageChanges().page("Shop", (p) => p.tables.write([], { markdown: NEW, place: cursor })).build())).skipped).toHaveLength(1);
+    expect((await moved.writer.write(pageChanges().page("Shop", (p) => p.tables.write([], [{ markdown: NEW, place: cursor }])).build())).skipped).toHaveLength(1);
     const end = pages({ Shop: "Text." });
-    await end.writer.write(pageChanges().page("Shop", (p) => p.tables.write([], { markdown: NEW })).build());
+    await end.writer.write(pageChanges().page("Shop", (p) => p.tables.write([], [{ markdown: NEW }])).build());
     expect(end.map.get("Shop")).toBe(`Text.\n\n${NEW}`);
   });
 

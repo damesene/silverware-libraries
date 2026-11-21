@@ -23,14 +23,14 @@ import { type DragContext, followDrag } from "./core/drag.ts";
 import { writingClipboard } from "../../shared/clipboard.ts";
 import { markTable, renderedMeta, SilverBulletAdapter } from "./core/silverbullet/adapter.ts";
 import type { TablePlatform } from "./core/platform.ts";
-import type { PageFormula, StoredTable } from "./core/store.ts";
+import type { PageFormula, StoredTable, TableEdit } from "./core/store.ts";
 import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt } from "./model/model.ts";
 import { HASHTAGS_KEY, nameEmptyHeaders } from "./columns.ts";
 import { type AttributeRules, cellWrittenOver, withAttributeRules } from "./model/rules.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
 import { pageFormulaPlace, pageFormulasIn } from "./store/markdown/pageformulas.ts";
-import { cursorPlace, removedSpan, tableAt, type TableWrite } from "./store/markdown/tableparts.ts";
+import { cursorPlace, newTableMarkdown, removedSpan, tableAt, type TableWrite } from "./store/markdown/tableparts.ts";
 import type { EditResult } from "../../shared/pages/tags/edit.ts";
 import { decode, encode, plainMarkdown } from "./store/markdown/codec.ts";
 import { SettingsDialog } from "./settings.ts";
@@ -155,7 +155,7 @@ export class Controller implements TableHost {
   // Which table is which (keys for the session; core/tables.ts)
   private readonly register = new TableRegister();
   // The tables kept as markdown in pages, read through the platform as it is now (a new one comes with Space Lua loaded again)
-  private readonly store = new MarkdownStore(() => this.platform, this.register);
+  private readonly store = new MarkdownStore(() => this.platform, this.register, () => this.serializer());
   // The modules' parts for each table (core/parts.ts)
   private readonly parts = new Parts((key) => this.tableFor(key));
   private readonly views = new Map<TableKey, ViewState>();
@@ -643,8 +643,17 @@ export class Controller implements TableHost {
     return this.platform.editor.documentName();
   }
 
-  replaceTables(document: string, changes: readonly TableChange[]): Promise<WriteResult> {
-    return this.replaceMarkdown(document, changes.map(({ key, change }) => ({ key, change: (read: Table) => encode(change(decode(read)), read) })));
+  async replaceTables(document: string, changes: readonly TableChange[]): Promise<WriteResult> {
+    // One transaction of the store's: each table written where it is still as read now
+    const tables = await this.store.tables(document);
+    const edits: TableEdit[] = [];
+    for (const { key, change } of changes) {
+      const table = tables?.find((one) => one.key === key);
+      if (!table) return "failed";
+      edits.push({ kind: "write", key, expects: table.revision, model: change(table.model) });
+    }
+    const report = await this.store.apply(await this.store.plan({ document, edits }));
+    return report.written ? "written" : report.skipped ? "failed" : "unchanged";
   }
 
   async replaceMarkdown(document: string, changes: readonly { readonly key: TableKey; readonly change: (table: Table) => Table }[]): Promise<WriteResult> {
@@ -2730,13 +2739,10 @@ export class Controller implements TableHost {
       // After the table, at the position, else at the page's end; an empty line around it
       const { at, before, after: trail } = tablePlace(text, range ? { after: range } : position !== undefined ? { position } : undefined);
       const serialize = await this.serializer();
-      // Written as a new table, indented as the table it goes after (the codec's form of the new one: none read), each
-      // row anew: a line read elsewhere (a table made from markdown) is not its line, nor indented as it
-      const encoded = encode(model, { indent: range ? parseTable(range.text).indent : "", align: [], rows: [], padded: false });
-      const table = { ...encoded, rows: encoded.rows.map((row) => ({ cells: row.cells })) };
+      // Written as a new table, indented as the table it goes after
+      const markdown = newTableMarkdown(model, range ? parseTable(range.text).indent : "", serialize);
       // The new table's text: its key's once it is in the page
-      if (key) this.register.writing(key, serialize(table).trimEnd());
-      const markdown = serialize(table);
+      if (key) this.register.writing(key, markdown.trimEnd());
       const insert = `${before}${markdown}${trail}`;
       const alsoRead = changed && parseTable(changed.text);
       const alsoMarkdown = changed && alsoRead ? serialize(encode(also!.change(decode(alsoRead)), alsoRead)) : undefined;
@@ -2759,7 +2765,7 @@ export class Controller implements TableHost {
       }
       const outcome = await this.store.write(document, (p) => {
         const place = range ? { after: tableAt(text, range) } : position !== undefined ? cursorPlace(text, position) : undefined;
-        p.tables.write(changed && alsoMarkdown !== undefined ? [{ ...tableAt(text, changed), markdown: alsoMarkdown }] : [], { markdown, ...(place ? { place } : {}) });
+        p.tables.write(changed && alsoMarkdown !== undefined ? [{ ...tableAt(text, changed), markdown: alsoMarkdown }] : [], [{ markdown, ...(place ? { place } : {}) }]);
         p.editText(this.listenersEdit(tablesWritten, listened, (made) => withWriteListeners(made)));
       });
       if (outcome.result === "failed") {

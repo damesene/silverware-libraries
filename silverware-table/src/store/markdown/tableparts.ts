@@ -12,7 +12,9 @@
 import { definePart, registerPart } from "../../../../shared/pages/parts.ts";
 import type { PageBuilder } from "../../../../shared/pages/changes.ts";
 import type { PageFormula } from "../../core/store.ts";
-import { findTables, tablePlace, type TableRange } from "../../markdown.ts";
+import { findTables, type Table, tablePlace, type TableRange } from "../../markdown.ts";
+import type { TableModel } from "../../model/model.ts";
+import { encode } from "./codec.ts";
 import { pageFormulaPlace } from "./pageformulas.ts";
 
 /** A table of a page as a change finds it: its text as read, its order among the page's tables of that text (from 0), and how many there were */
@@ -31,7 +33,7 @@ declare module "../../../../shared/pages/parts.ts" {
   // (A program's types are one: every plugin's PageChange has these kinds, its builder this section; only this
   // plugin's writer has the parts that write them)
   interface PageChangeKinds {
-    readonly writeTables: { readonly tables: readonly TableWrite[]; readonly insert?: TableInsert };
+    readonly writeTables: { readonly tables: readonly TableWrite[]; readonly inserts: readonly TableInsert[] };
     readonly setPageFormula: { readonly formula: PageFormula; readonly document: string };
   }
   interface PageSections {
@@ -40,13 +42,24 @@ declare module "../../../../shared/pages/parts.ts" {
        * Tables of the page written in one change: each found as read (its
        * text, which of those alike) before any is written, written as its
        * markdown or taken out (the empty line after it with it; the page's
-       * last, the one before); `insert`: a new table put where its place says
+       * last, the one before); `inserts`: new tables, each put where its
+       * place says (found in the text as read too)
        */
-      write(tables: readonly TableWrite[], insert?: TableInsert): PageBuilder;
+      write(tables: readonly TableWrite[], inserts?: readonly TableInsert[]): PageBuilder;
       /** A formula written in the page's text (a page formula, by its key) given its new text */
       setPageFormula(document: string, formula: PageFormula): PageBuilder;
     };
   }
+}
+
+/**
+ * A new table's markdown: the model written as a table of its own (none read),
+ * indented as the table it goes after (`indent`), each row anew (a line read
+ * elsewhere, a table made from markdown, is not its line nor indented as it)
+ */
+export function newTableMarkdown(model: TableModel, indent: string, serialize: (table: Table) => string): string {
+  const encoded = encode(model, { indent, align: [], rows: [], padded: false });
+  return serialize({ ...encoded, rows: encoded.rows.map((row) => ({ cells: row.cells })) });
 }
 
 /** A table range of a page as a change finds it again */
@@ -107,17 +120,17 @@ export function newTablePlace(text: string, place: NewTablePlace | undefined): {
 const CHANGED = "a table changed since it was read";
 
 /** A write's tables in a page's text as it is: the edits they make, or why they cannot be made */
-function tableEdits(text: string, change: { readonly tables: readonly TableWrite[]; readonly insert?: TableInsert }): { readonly from: number; readonly to: number; readonly text: string }[] | { readonly problem: string } {
+function tableEdits(text: string, change: { readonly tables: readonly TableWrite[]; readonly inserts: readonly TableInsert[] }): { readonly from: number; readonly to: number; readonly text: string }[] | { readonly problem: string } {
   const edits: { from: number; to: number; text: string }[] = [];
   for (const one of change.tables) {
     const range = found(text, one);
     if (!range) return { problem: CHANGED };
     edits.push(one.markdown === undefined ? { ...removedSpan(text, range), text: "" } : { from: range.from, to: range.to, text: one.markdown });
   }
-  if (change.insert) {
-    const where = newTablePlace(text, change.insert.place);
+  for (const insert of change.inserts) {
+    const where = newTablePlace(text, insert.place);
     if ("problem" in where) return { problem: where.problem };
-    edits.push({ from: where.at, to: where.at, text: where.before + change.insert.markdown + where.after });
+    edits.push({ from: where.at, to: where.at, text: where.before + insert.markdown + where.after });
   }
   return edits;
 }
@@ -128,7 +141,7 @@ registerPart(
     section: {
       name: "tables",
       make: (add) => ({
-        write: (tables, insert) => add({ kind: "writeTables", tables, ...(insert ? { insert } : {}) }),
+        write: (tables, inserts = []) => add({ kind: "writeTables", tables, inserts }),
         setPageFormula: (document, formula) => add({ kind: "setPageFormula", document, formula }),
       }),
     },

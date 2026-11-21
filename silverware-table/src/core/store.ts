@@ -7,7 +7,7 @@
 // written in a document's text, not as its tables' formula cells, are a store
 // of their own beside it (PageFormulaStore), which a store keeping none does
 // not have.
-import type { KeyedModel } from "../model/model.ts";
+import type { KeyedModel, TableModel } from "../model/model.ts";
 import type { TableKey } from "./tables.ts";
 
 /**
@@ -35,9 +35,45 @@ export interface PageFormulaStore {
   pageFormulas(document: string): Promise<readonly PageFormula[] | null>;
 }
 
+/**
+ * A change of a document's tables in a transaction: a table's model written
+ * where its revision is still the one read (`expects`); a new table (after a
+ * table, else at the document's end); a table taken out where its revision is
+ * still the one read
+ */
+export type TableEdit =
+  | { readonly kind: "write"; readonly key: TableKey; readonly expects: TableRevision; readonly model: TableModel }
+  | { readonly kind: "insert"; readonly model: TableModel; readonly after?: TableKey }
+  | { readonly kind: "remove"; readonly key: TableKey; readonly expects: TableRevision };
+
+/** A document's tables changed as one step (one edit of a page: one undo step where it is open) */
+export type TableTransaction = { readonly document: string; readonly edits: readonly TableEdit[] };
+
+/** Why a transaction was left: a table changed since it was read, the document not there, or the store refusing it (read only, a change it cannot make) */
+export type TableSkip = { readonly cause: "changed" | "missing" | "refused"; readonly reason: string };
+
+/**
+ * What a transaction would do, nothing written: how many tables it changes,
+ * or why it is left (the whole of it: a transaction is one step). Opaque
+ * beyond that: applied by the store that planned it
+ */
+export type TablePlan = { readonly document: string; readonly changes: number; readonly skipped?: TableSkip };
+
+/**
+ * What `apply` did: written (the keys of the tables it made, in its edits'
+ * order) or left, and why; what its undo puts back is the store's
+ */
+export type TableReport = { readonly document: string; readonly written: boolean; readonly inserted: readonly TableKey[]; readonly skipped?: TableSkip };
+
 export interface TableStore {
   /** A document's tables in its order (a page's name in SilverBullet); none where it has none; null where it is not there (or not read) */
   tables(document: string): Promise<readonly StoredTable[] | null>;
   /** The document a table's key is of; undefined: a key the store did not give */
   documentOf(key: TableKey): string | undefined;
+  /** What a transaction would do; nothing written (the database store's shape: plan, apply, planUndo) */
+  plan(transaction: TableTransaction): Promise<TablePlan>;
+  /** A plan written as one step where the document is still as planned (a page open: planned anew where it changed); else left, said why */
+  apply(plan: TablePlan): Promise<TableReport>;
+  /** What `report` wrote put back, where the document is still as it left it */
+  planUndo(report: TableReport): Promise<TablePlan>;
 }

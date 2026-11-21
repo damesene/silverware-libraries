@@ -77,6 +77,7 @@ test.describe("Lazy saving", () => {
     await edit(page, 2, 1, "y");
     // Held: shown in the table, not in the page yet
     await expect(cell(page, 1, 0)).toHaveText("x");
+    await expect(cell(page, 2, 1)).toHaveText("y");
     expect(await markdown(page)).toBe("Intro.\n\n| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n");
     await openPage(page, "UiTests/Elsewhere");
     await openPage(page, name);
@@ -91,6 +92,8 @@ test.describe("Lazy saving", () => {
     const button = page.locator(".swt-bar.swt-visible button[aria-label='Lazy saving']");
     await button.click();
     await edit(page, 1, 1, "z");
+    // Held: shown in the table, not in the page yet
+    await expect(cell(page, 1, 1)).toHaveText("z");
     expect(await markdown(page)).toBe("Intro.\n\n| A | B |\n|---|---|\n| 1 | 2 |\n");
     await hoverCell(page, cell(page, 1, 0));
     await button.click();

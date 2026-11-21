@@ -94,8 +94,8 @@ export function columnIdText(id: ColumnId): string | undefined {
 }
 
 /**
- * The formula with its column references written by the columns' keys, as
- * Silverware Table writes them ([Unit price] becomes [unit_price]); references to
+ * The formula with its column references written by the columns' keys, as a
+ * formula is saved ([Unit price] becomes [unit_price]); references to
  * columns the table does not have stay as written
  */
 export function withColumnKeys(formula: string, headers: readonly ColumnHead[]): string {

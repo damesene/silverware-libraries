@@ -267,7 +267,7 @@ Each a branch's worth, with its tests (unit tests of the domain and the core, Pl
 6. **Peek**: the item's panel.
 7. **Properties**: the schema's dialog, changes over items reviewed, `readonly`.
 8. **Custom views and types** from Space Lua; the library page's API.
-9. **Later** (none of it in the first version; weighed again on 2026-11-09, *What next (2026-11-09)*): relations and rollups; formulas in a database (a formula property calculated per item, by Silverware Table's formulas' language, after the views plan's sources and grids); the database as a source of Silverware Table's formulas (`@tasks`; its id then shares the `@` names with `defineSource`'s, which one wins to decide then); several saved views in one block as tabs; a template for a new item's body; grouping in the table and list views.
+9. **Later** (none of it in the first version; weighed again on 2026-11-09, *What next (2026-11-09)*): relations and rollups; formulas in a database (a formula property calculated per item, by the formulas' language, after the views plan's sources and grids; the formulas and the table model are in `shared/` since 2026-11-21, docs/silverware-formulas-shared.md, whose *Decided* 4 lists what the database's side needs); the database as a source of Silverware Table's formulas (`@tasks`; its id then shares the `@` names with `defineSource`'s, which one wins to decide then); several saved views in one block as tabs; a template for a new item's body; grouping in the table and list views.
 
 ### Step 3 done (2026-11-07)
 

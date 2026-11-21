@@ -4,7 +4,10 @@ Status (2026-10-22, branch `core-view-isolation`): steps 1 to 6 done but the
 second renderer. The modules in `src/features/` are typed against `ModelHost`
 and `TableInfo` (no element of the rendering); the rendering modules are the
 adapter's (`host/silverbullet/modules/`, `AdapterFeature`, `TableHost`);
-`isolation.test.ts` checks what types cannot (imports, selectors).
+`isolation.test.ts` checks what types cannot (imports, selectors). Since
+2026-11-21 (docs/silverware-table-store-plan.md) the tables are kept by a
+store apart from the core, and the model and the formulas are shared with the
+other plugins (docs/silverware-formulas-shared.md): *The boundary* below.
 
 ## Why
 
@@ -54,7 +57,8 @@ writing every module again.
   own** (CLAUDE.md, *Modules and their data*): every module gets a host made
   for it (`core/modulehost.ts`), whose metadata functions (`attribute`,
   `withAttribute`, `columnAttributes`, `canStore`…, a cell's on the model too) make
-  each attribute's name from the module's and its key (`metanames.ts`), so a
+  each attribute's name from the module's and its key (the store writes it
+  whole: `metanames.ts`), so a
   module names no attribute whole and cannot write another's; the names of
   tables, columns, rows and cells are the core's, read and written by host
   functions. Domain code (formulas, the sheet, Excel) reads none itself: its
@@ -62,6 +66,23 @@ writing every module again.
   A module uses another's data through what that one offers (`offer`,
   `offered`). The metadata setting off, the core stores nothing new
   (`withAttribute`, and a write step for cells' tags).
+- **The store** (`core/store.ts`, the interface; the binding makes it,
+  `TableBinding.store`) keeps the tables: the core reads a document's tables
+  as models with their keys and revisions and hands it transactions (`plan`,
+  `apply`, `planUndo`), never a page's text. The core imports no codec and no
+  markdown (the register alone reads a text's tables, to key them); the
+  markdown store (`store/markdown/`: the codec, the metadata row, hidden tags,
+  page formulas, how a table is written) is the one place of the markdown's
+  form, written through the page writer of `shared/pages/` alone; Copy as
+  Markdown and a table's data for other plugins are the store's and the
+  model's.
+- **Shared with the other plugins**: the model (`shared/table/`) and the
+  formulas (`shared/formulas/`) import no plugin's code (`shared/imports.test.ts`),
+  so another plugin bundles them and calculates its own rows; how a formula is
+  kept in a cell, the formulas module, page formulas and sources stay
+  Silverware Table's. Modules use the formulas through their API
+  (`shared/formulas/index.ts`) and offer each other what they make of them
+  through `formulas/offers.ts`.
 - A test fails when a module refers to the rendered table (its element types,
   its selectors and classes, the host's methods that hand out its elements),
   or imports the core's functions for what tables keep (a guard against

@@ -160,8 +160,8 @@ export function single(value: Value): Scalar {
 }
 
 /**
- * One value as a number: an empty cell is 0, TRUE 1, and text a number as
- * Silverware Table reads it in cells (`12,99 €`, `1 000`, `15 %`)
+ * One value as a number: an empty cell is 0, TRUE 1, and text a number as a
+ * table's cell reads one (`12,99 €`, `1 000`, `15 %`: shared/filter.ts)
  */
 export function toNumber(value: Value): number | FormulaError {
   const v = single(value);

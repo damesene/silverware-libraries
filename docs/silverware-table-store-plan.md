@@ -1,12 +1,11 @@
 # Silverware Table: tables apart from where they are kept
 
-Status (2026-11-21): steps 1 to 6 done in branch `refactor/table-store`
-(each step's *Done* note; what one left to later steps is under it); left, in
-this order (decided 2026-11-21 with the user, to be finished without them:
-public API changes allowed where they make better code or have a real
-benefit): step 6's leftovers, the model and the formulas moved into `shared/`
-(docs/silverware-formulas-shared.md), step 8, then step 7 (the docs last, of
-the final state);
+Status (2026-11-21): done in branch `refactor/table-store`: steps 1 to 6
+(each step's *Done* note), then, in this order (decided 2026-11-21 with the
+user, finished without them: public API changes allowed where they make better
+code or have a real benefit), step 6's leftovers, the model and the formulas
+moved into `shared/` (docs/silverware-formulas-shared.md), step 8 (its
+*Progress*) and step 7, the docs, last;
 the plan is in `main`. What it waited for is
 in `main`: the views plan
 (docs/silverware-table-views-plan.md), whose sources (`@tasks`) are the first
@@ -1056,6 +1055,11 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    the report's shapes, which differ for a reason (a table's transaction is one
    step of one document, written whole or not; a database's is written part by
    part), and the contract tests' harness (each store's contract its own).
+   **The public part reviewed (2026-11-21)**: the Space Lua API
+   (`define…` taking their definitions, `defineSource` one source, the
+   `evaluate`/`evaluateText` and `errors`/`errorsText` pairs), the settings,
+   the attributes tables keep (`core.n`, `core.cn`, `formulas.f`…) and the
+   CSS are consistent: no change with a real benefit found, none made.
    **Public changes, for the release's changelog** (each a user sees):
    `silverware.table.tables` (and a custom menu's table data) gives a row's
    cells by the columns, none past the header, and a column's name with its

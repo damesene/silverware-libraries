@@ -1,6 +1,6 @@
 # Formulas apart from Silverware Table: the model and the formulas in `shared/`
 
-Status (2026-11-21): planned with the user as a step of the store plan
+Status (2026-11-21): done (its *Progress*), a step of the store plan
 (docs/silverware-table-store-plan.md, *Order*: after step 6's leftovers, before
 step 8), on branch `refactor/table-store`.
 
@@ -102,5 +102,15 @@ Each a commit (or a few) that leaves `npm run verify` and the UI tests passing.
   `sources`, `views`, and `builtin/index.test.ts`, each function documented
   on the table's library page); `shared/imports.test.ts` checks decided 3;
   the table's isolation test reads the model and the formulas where they are.
-- **Step 5 (docs)** is done with the store plan's step 7, at the end, of the
-  final names.
+- **Step 5 done (2026-11-21)**, with the store plan's step 7: the root
+  CLAUDE.md's *shared/* (`table/`, `formulas/`, `store.ts`),
+  `shared/formulas/CLAUDE.md` (the language: references, names, functions,
+  dates, custom functions) apart from the table's `src/formulas/CLAUDE.md`
+  (storage in cells, references followed by its edits, views, formulas from
+  Space Lua), silverware-table/CLAUDE.md, docs/silverware-table-isolation.md
+  (*The boundary*: the store, shared/), the database's *Later*.
+- **Beyond the steps**: what the table's modules offer each other about
+  formulas is the table's (`silverware-table/src/formulas/offers.ts`), so
+  `shared/formulas/index.ts` names no plugin; `shared/formulas/outside.test.ts`
+  calculates another plugin's rows (its own attribute for a formula, other
+  tables and a source given).

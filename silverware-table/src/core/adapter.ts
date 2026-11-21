@@ -10,7 +10,7 @@
 // what is not here yet is still the controller's own DOM code.
 import type { CellRef, ColumnsMeasure, ColumnWidths, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "./feature.ts";
 import type { MergedLooks } from "./looks.ts";
-import type { TableModel } from "../model/model.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import type { TablePlatform } from "./platform.ts";
 import type { StoredTable, TableRevision } from "./store.ts";
 import type { TableKey } from "./tables.ts";

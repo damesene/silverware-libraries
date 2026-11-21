@@ -7,7 +7,7 @@
 // (pivot/fields.ts) and knows nothing of tables or writing: Insert (Save)
 // hands the module the definition. The dialog is the core's (ModelHost.openDialog).
 import { el, type ElementChild } from "../../../shared/elements.ts";
-import { columnKey } from "../columns.ts";
+import { columnKey } from "../../../shared/table/columns.ts";
 import type { Dialog, ModelHost } from "../core/feature.ts";
 import { type PivotDefinition, type Show, SHOWS, sourceRef, sourceText, type Totals } from "../pivot/definition.ts";
 import {

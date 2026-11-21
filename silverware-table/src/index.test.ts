@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { completions, defineFormulaPlaces, evaluated, evaluatedText, formulaErrorsIn, formulaErrorsTextIn, formulaPagesIn, luaCallPlaces, onWrite, resetDefinitions, tables } from "./index.ts";
 import { buttonLabel, cell, clickOn, controller, editor, edits, flashes, flush, key, menuButtons, nameInMenu, setup, text, toolbarName, useTablePage } from "./testing/page.ts";
-import { deleteRow } from "./model/ops.ts";
+import { deleteRow } from "../../shared/table/ops.ts";
 
 describe("silverware.table.evaluate: a formula calculated on the page shown", () => {
   useTablePage();

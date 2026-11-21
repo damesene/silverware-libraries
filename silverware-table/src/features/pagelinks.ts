@@ -10,7 +10,7 @@
 // results (formula/page.ts: pages not read are `unread`).
 import type { Feature, ModelHost, OtherPages, StoredTable, TableTarget, TableInfo, WritePage } from "../core/feature.ts";
 import { type FormulaCells, type FormulasOffer, formulaPages, type PageLinksOffer, referredPages, tablesWritten } from "../formulas/index.ts";
-import type { TableModel } from "../model/model.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 
 // At most this many other pages are read for one page's formulas (pages that refer on and on)
 const MAX_OTHER_PAGES = 20;

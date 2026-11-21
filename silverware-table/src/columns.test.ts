@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { columnIdOf, columnKey, findColumn, followColumn, headsOf, markdownHeaderText, matchColumns, nameEmptyHeaders, sameColumnId } from "./columns.ts";
+import { columnIdOf, columnKey, findColumn, followColumn, matchColumns, sameColumnId } from "../../shared/table/columns.ts";
+import { headsOf, markdownHeaderText, nameEmptyHeaders } from "./columns.ts";
 import { parseTable, serializeTable } from "./markdown.ts";
 import { decode, encode } from "./store/markdown/codec.ts";
 

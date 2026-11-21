@@ -3,7 +3,7 @@ import { TableRegister } from "../core/tables.ts";
 import { memorySources } from "../sources.ts";
 import { storeContract } from "./contract.ts";
 import { SourceStore, sourceTable } from "./sources.ts";
-import type { TableModel } from "../model/model.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 
 /** A source's data of a table of the contract: its headers the columns, its cells' contents the values */
 const dataOf = (model: TableModel) => ({ columns: model.columns.map((c) => c.header), rows: model.rows.map((r) => r.cells.map((c) => c.content)) });

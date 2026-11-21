@@ -14,9 +14,9 @@ import type { Feature, ModelHost, PageCommand, TableBadge, TableInfo, ToolbarBut
 import { type Calculated, calculatedTable, readRenames, renamedColumns, renamedIn, renamedViewIds, sameCells, storedRenames, viewCalculated } from "../calculated/index.ts";
 import { type CalculatedBy, type CalculatedOffer, followFormula, FormulaError, type FormulasOffer, type Grid, referredTableNames, tokenize, viewGrid, withEquals } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
-import { EMPTY_TABLE } from "../model/ops.ts";
-import type { TableModel } from "../model/model.ts";
-import { freeTableName, sameTableName, validateTableName } from "../namerules.ts";
+import { EMPTY_TABLE } from "../../../shared/table/ops.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
+import { freeTableName, sameTableName, validateTableName } from "../../../shared/table/namerules.ts";
 import { openViewDialog } from "./viewdialog.ts";
 
 // What the dialog says first while the formulas module, which calculates views, is off

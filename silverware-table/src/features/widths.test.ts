@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { cell, controller, editor, flush, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 import { movedEdge, movedTableEdge, wholePixels, widthsAfterEdit } from "./widths.ts";
-import { deleteColumn, insertColumn, moveColumn, withHeader } from "../model/ops.ts";
+import { deleteColumn, insertColumn, moveColumn, withHeader } from "../../../shared/table/ops.ts";
 
 describe("movedTableEdge", () => {
   const columns = (...widths: number[]) => widths.map((width) => ({ width, min: 80 }));

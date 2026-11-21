@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { withAttributeIn } from "../model/model.ts";
+import { withAttributeIn } from "../../../shared/table/model.ts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buttonLabel, cell, clickOn, controller, editor, flashes, flush, key, menuButtons, setup, text, useTablePage } from "../testing/page.ts";
 

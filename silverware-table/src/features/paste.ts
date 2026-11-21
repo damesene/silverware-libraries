@@ -28,8 +28,8 @@ import { growTo, moveRowsTo } from "../core/structure.ts";
 import { ICONS } from "../icons.ts";
 import { moveCells, parseClipboardCells, pasteCells, planPaste } from "../paste.ts";
 import { headerCell } from "../columns.ts";
-import { type ModelCell, sameCell, type TableModel } from "../model/model.ts";
-import { EMPTY_CELL } from "../model/ops.ts";
+import { type ModelCell, sameCell, type TableModel } from "../../../shared/table/model.ts";
+import { EMPTY_CELL } from "../../../shared/table/ops.ts";
 
 const PASTE_BLOCKED = "Clear sorting and filters to paste cells: the rows shown are not where they would go";
 

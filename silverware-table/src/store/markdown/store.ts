@@ -31,7 +31,7 @@ import { pageFormulaPlace } from "./pageformulas.ts";
 import { mapPosition, type TableWritten, type TextEdit, withWriteListeners } from "./writelisteners.ts";
 import { written as textWritten } from "../../../../shared/pages/parts.ts";
 import type { EditResult } from "../../../../shared/pages/tags/edit.ts";
-import type { TableModel } from "../../model/model.ts";
+import type { TableModel } from "../../../../shared/table/model.ts";
 import { type PageBuilder, pageChanges } from "../../../../shared/pages/changes.ts";
 import { type ApplyReport, type PagePlan, type PageWriter, pageWriter } from "../../../../shared/pages/writer.ts";
 import type { Space } from "../../../../shared/platform.ts";

@@ -21,10 +21,10 @@ import {
   rowBlockTo,
 } from "../core/structure.ts";
 import { ICONS } from "../icons.ts";
-import type { Align } from "../model/model.ts";
-import type { TableModel } from "../model/model.ts";
+import type { Align } from "../../../shared/table/model.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import { type MenuEntry, namingThatCloses, wrapRuns } from "../menu.ts";
-import { withAlign } from "../model/ops.ts";
+import { withAlign } from "../../../shared/table/ops.ts";
 import { columnZone, insertColumnAt, insertRowAt, rowZone } from "../pins.ts";
 import { type ViewState, withoutSort, withSort } from "../view.ts";
 import type { TableKey } from "../core/feature.ts";

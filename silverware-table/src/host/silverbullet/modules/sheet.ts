@@ -28,7 +28,7 @@
 // sheet's addresses (addressFrame): a reference is to a record, so sorting a
 // table changes the address shown, not the value.
 import { nameEmptyHeaders } from "../../../columns.ts";
-import type { TableModel } from "../../../model/model.ts";
+import type { TableModel } from "../../../../../shared/table/model.ts";
 import { CELL_MENU_ORDER, type AdapterFeature, type AddressFrame, type TableChange, type CellArea, type CellEditor, type CellMenuGroup, type CellRef, type RenderedEditor, type TableHost, type TableInfo, type TableTarget, type ToolbarButton, type WidgetInfo, type WriteResult } from "../../../core/feature.ts";
 import { oncePerFrame } from "../../../core/frame.ts";
 import { claimWindow, releaseWindow } from "../../../core/overwindow.ts";
@@ -39,7 +39,7 @@ import { columnLetters, isFormulaInput } from "../../../formulas/index.ts";
 import { ICONS } from "../../../icons.ts";
 import { escapeCell, findTables, pageTablesOf, parseTable, type TableRange } from "../../../markdown.ts";
 import { decode } from "../../../store/markdown/codec.ts";
-import { sameTableName } from "../../../namerules.ts";
+import { sameTableName } from "../../../../../shared/table/namerules.ts";
 import { AT_KEY, formatAt, freeNameOf, freeSheetName, SHEET_KEY, WIDTH_PREFIX, sameSheet, type SheetCell, canPlace, sheetDataTable, type SheetPlace, validateSheetName, sheetOfTable, sheetsOf, sheetTablesOf, sheetWidths } from "../../../sheet/page.ts";
 import { parseClipboardCells } from "../../../paste.ts";
 import { validatePlace, roomFor } from "../../../sheet/layout.ts";

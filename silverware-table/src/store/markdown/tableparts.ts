@@ -13,7 +13,7 @@ import { definePart, registerPart } from "../../../../shared/pages/parts.ts";
 import type { PageBuilder } from "../../../../shared/pages/changes.ts";
 import type { PageFormula } from "../../core/store.ts";
 import { findTables, type Table, tablePlace, type TableRange } from "../../markdown.ts";
-import type { TableModel } from "../../model/model.ts";
+import type { TableModel } from "../../../../shared/table/model.ts";
 import { encode } from "./codec.ts";
 import { pageFormulaPlace } from "./pageformulas.ts";
 

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { insertRow } from "../model/ops.ts";
+import { insertRow } from "../../../shared/table/ops.ts";
 import { bridge, controller, edits, flashes, flush, nameInMenu, setup, tableMenuItem, text, toolbarName, useTablePage } from "../testing/page.ts";
 
 const PAGE = [

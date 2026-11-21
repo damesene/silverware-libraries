@@ -7,8 +7,8 @@
 // written in a document's text, not as its tables' formula cells, are a store
 // of their own beside it (PageFormulaStore), which a store keeping none does
 // not have.
-import type { KeyedModel, TableModel } from "../model/model.ts";
-import type { IndexMap } from "../model/ops.ts";
+import type { KeyedModel, TableModel } from "../../../shared/table/model.ts";
+import type { IndexMap } from "../../../shared/table/ops.ts";
 import type { TableKey } from "./tables.ts";
 
 /**

@@ -5,7 +5,7 @@
 //
 // With the metadata setting off, nothing new is stored: an attribute the table
 // has may change or go, none is added (`enabled`: whether the setting is on).
-import { attributeIn, type AttributePlace, attributesAt, type ModelCell, NO_ATTRIBUTES, type Owner, type TableModel, withAttributeIn, withAttributeSet, withAttributesAt } from "../model/model.ts";
+import { attributeIn, type AttributePlace, attributesAt, type ModelCell, NO_ATTRIBUTES, type Owner, type TableModel, withAttributeIn, withAttributeSet, withAttributesAt } from "../../../shared/table/model.ts";
 
 /** An owner's attributes, read and written: a table's at any place (the table, a column, a row, a cell), or a cell's given alone */
 export type OwnMeta = {

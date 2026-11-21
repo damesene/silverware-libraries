@@ -49,12 +49,12 @@ import {
   moveRowsTo,
   rowBlockTo,
 } from "../core/structure.ts";
-import { lineAfterBlockMove } from "../model/ops.ts";
+import { lineAfterBlockMove } from "../../../shared/table/ops.ts";
 import { columnLetters } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import type { MenuEntry } from "../menu.ts";
-import type { TableModel } from "../model/model.ts";
-import { EMPTY_CELL, withCellAt } from "../model/ops.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
+import { EMPTY_CELL, withCellAt } from "../../../shared/table/ops.ts";
 import type { TableKey } from "../core/feature.ts";
 
 // Ctrl+Alt + these keys move the rows (up, down, 10 rows) or columns (left, right, to the first or last) selected, as in the cell editor

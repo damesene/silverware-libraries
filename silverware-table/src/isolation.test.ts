@@ -18,8 +18,8 @@ const domains = import.meta.glob(
   ["./formulas/**/*.ts", "./calculated/**/*.ts", "./pivot/**/*.ts", "./sheet/**/*.ts", "./excel/**/*.ts", "./export/**/*.ts", "./columntypes/**/*.ts", "./conditions/**/*.ts", "./autofill/**/*.ts", "!./**/*.test.ts"],
   { query: "?raw", import: "default", eager: true },
 );
-// The model: what a table is, kept by no store in particular
-const model = import.meta.glob(["./model/**/*.ts", "!./model/**/*.test.ts"], { query: "?raw", import: "default", eager: true });
+// The model: what a table is, kept by no store in particular (shared: docs/silverware-formulas-shared.md)
+const model = import.meta.glob(["../../shared/table/**/*.ts", "!../../shared/table/**/*.test.ts"], { query: "?raw", import: "default", eager: true });
 // The pivot module's domain, and what it shares with views (calculated tables)
 const pivot = import.meta.glob(["./pivot/**/*.ts", "./calculated/**/*.ts", "!./**/*.test.ts"], { query: "?raw", import: "default", eager: true });
 
@@ -82,7 +82,7 @@ describe("isolation", () => {
 
   it("the domains and the model work on the model too: nothing of the markdown's form, no cell escaped or unescaped", () => {
     expect(Object.keys(domains)).toEqual(expect.arrayContaining(["./formulas/help.ts", "./columntypes/registry.ts", "./conditions/rule.ts", "./autofill/series.ts", "./pivot/pivot.ts"]));
-    expect(Object.keys(model)).toContain("./model/rules.ts");
+    expect(Object.keys(model)).toContain("../../shared/table/rules.ts");
     // (The markdown's files are the folder above: the model has an ops.ts of its own)
     expect(matches({ ...domains, ...model }, /from "(\.\.\/)+(markdown|tags|ops)\.ts"|\b(escapeCell|unescapeCell)\b/)).toEqual([]);
   });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { headerText } from "../columns.ts";
 import { parseTable } from "../markdown.ts";
-import { attributeIn, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
+import { attributeIn, NO_ATTRIBUTES, type TableModel } from "../../../shared/table/model.ts";
 import { decode } from "../store/markdown/codec.ts";
 import type { Pins } from "../view.ts";
 import { type Calculated, calculatedTable, movedRenames, readRenames, renamedIn, sameCells, storedRenames } from "./table.ts";

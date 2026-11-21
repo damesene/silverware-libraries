@@ -15,7 +15,7 @@
 // A table on a sheet that grows makes room on it in the same edit: the other
 // tables' places (`at`) as sheet/layout.ts has them (refusesWrite where it
 // cannot).
-import type { TableModel } from "../model/model.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import type { Feature, KeyedTable, ModelHost, TableInfo, TableKey, ToolbarButton, WriteEdit } from "../core/feature.ts";
 import { type LayoutId, type Room, roomFor } from "../sheet/layout.ts";
 import {

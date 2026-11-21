@@ -9,7 +9,7 @@ export type { PartTable, TablePart, TableParts } from "./parts.ts";
 export { tablePartsOf } from "./parts.ts";
 import type { FeatureName, SETTINGS, SettingValue } from "../bridge.ts";
 import type { TablePlatform } from "./platform.ts";
-import type { AttributePlace, KeyedModel, ModelCell, TableModel } from "../model/model.ts";
+import type { AttributePlace, KeyedModel, ModelCell, TableModel } from "../../../shared/table/model.ts";
 import type { PageFormula } from "./store.ts";
 import type { MetadataPart, StoredMetadata, StoredTable, TableRevision } from "./store.ts";
 import type { Dialog, DialogOptions } from "./dialog.ts";
@@ -17,10 +17,10 @@ import type { Rect } from "./geometry.ts";
 
 export type { Dialog, DialogOptions } from "./dialog.ts";
 export type { Rect } from "./geometry.ts";
-import type { IndexMap } from "../model/ops.ts";
+import type { IndexMap } from "../../../shared/table/ops.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "../menu.ts";
 import type { MenuBuilder, MenuGroup, MenuSection } from "../../../shared/menuslots.ts";
-import type { CellNameAt, RowName } from "../names.ts";
+import type { CellNameAt, RowName } from "../../../shared/table/names.ts";
 import type { Pins, ViewState } from "../view.ts";
 import type { TableData } from "../tabledata.ts";
 
@@ -172,7 +172,7 @@ export type HeldEdit = { readonly row: number; readonly column: number; readonly
 /**
  * Edits a feature holds for a table: every write of it starts from the table
  * with them (`apply`), so they are written with whatever the write changes,
- * the rules of an edit applied to them as to it (model/rules.ts); `written`
+ * the rules of an edit applied to them as to it (shared/table/rules.ts); `written`
  * once that write is in the page
  */
 export type PendingEdits = { readonly apply: (table: TableModel) => TableModel; readonly written: () => void };
@@ -658,7 +658,7 @@ export interface ModelHost {
    * it is rendered or not: what modules write with. The change is made on the
    * model (`rowMap` and `columnMap` say how its rows and columns moved); what an
    * edit does with the attributes declared bound to their cell's content and
-   * unique is applied after it (model/rules.ts), before the write steps
+   * unique is applied after it (shared/table/rules.ts), before the write steps
    */
   writeTable(target: TableTarget, change: (table: TableModel) => TableModel | undefined, options?: WriteOptions): Promise<WriteResult>;
   /**
@@ -938,7 +938,7 @@ export interface ModelHost {
    * A cell written over another (a value typed, cleared, copied or filled: a
    * cell of no attributes; a cell moved): its content and what is bound to it
    * (a formula) with it, so a value ends a formula even where it equals its
-   * result; the other's other attributes (its name) staying (model/rules.ts)
+   * result; the other's other attributes (its name) staying (shared/table/rules.ts)
    */
   cellWrittenOver(cell: ModelCell, over: ModelCell): ModelCell;
   /** Why one of these cells of the table is not changed by hand (Feature.readOnly), the first said; undefined: none is */
@@ -1285,7 +1285,7 @@ export interface Feature {
   /**
    * Keys of the module's cells' attributes bound to their cell's content
    * (formulas: f): a cell whose content an edit changed (typed, pasted,
-   * cleared over) loses them unless the edit set them (model/rules.ts, the
+   * cleared over) loses them unless the edit set them (shared/table/rules.ts, the
    * core's write step); every other attribute of a cell, whoever's, is kept
    */
   boundToContent?(): readonly string[];

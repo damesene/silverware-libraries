@@ -7,7 +7,7 @@
 import type { StoredTable, TablePlan, TableReport, TableRevision, TableStore } from "../core/store.ts";
 import type { TableKey, TableRegister } from "../core/tables.ts";
 import { type Align, escapeCell, type Table } from "../markdown.ts";
-import type { TableModel } from "../model/model.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import type { SourceData, SourceProvider, SourceTables } from "../sources.ts";
 import { decode } from "./markdown/codec.ts";
 

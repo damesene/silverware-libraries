@@ -10,7 +10,8 @@
 // now, a column's name now) is the contract, how the write keeps it is not,
 // so it can change without breaking a listener.
 import { listOf } from "../../bridge.ts";
-import { columnKey, columnName, markdownHeaderText } from "../../columns.ts";
+import { columnKey, columnName } from "../../../../shared/table/columns.ts";
+import { markdownHeaderText } from "../../columns.ts";
 import { findTables, type Table } from "../../markdown.ts";
 import { metaName } from "../../meta.ts";
 import { nameOf } from "../../names.ts";

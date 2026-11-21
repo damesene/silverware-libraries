@@ -3,10 +3,10 @@
 // custom menu entries). Read off the model: its cells' content (no hidden tag,
 // no escape), its columns' headers and own names; its name is given, as who
 // calls it reads it (the entry from the metadata, a module through its host).
-import { columnKey, columnName } from "./columns.ts";
+import { columnKey, columnName } from "../../shared/table/columns.ts";
 import { errorCodeIn } from "./formulas/index.ts";
-import type { TableModel } from "./model/model.ts";
-import { modelColumnName } from "./names.ts";
+import type { TableModel } from "../../shared/table/model.ts";
+import { modelColumnName } from "../../shared/table/names.ts";
 
 /** A table as data: its name, its place in the text, its columns, its body's cells */
 export type TableData = {

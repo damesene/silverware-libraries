@@ -7,7 +7,7 @@ import { EVERYWHERE, heldBounds, innerBox, intersect, isEmpty, scrollNearEdge, s
 import { dragLines } from "./linedrag.ts";
 import { Overlays } from "./overlays.ts";
 import { type TableMeta, tableMetaOf } from "../../markdown.ts";
-import type { TableModel } from "../../model/model.ts";
+import type { TableModel } from "../../../../shared/table/model.ts";
 import { decode } from "../../store/markdown/codec.ts";
 import { TABLE_MARKER } from "../../metanames.ts";
 import type { AdapterContext, PairedTable, TableAdapter, Unpaired } from "../../core/adapter.ts";

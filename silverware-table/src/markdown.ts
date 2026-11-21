@@ -1,7 +1,7 @@
 // Markdown table model: parse a GFM table from page text and write it back.
 // Rows that were not changed are written back byte for byte.
 import { attributeName, escapedForRegExp, isColumnAttributeName, splitAttributeName, TABLE_MARKER } from "./metanames.ts";
-import type { Align, Attributes } from "./model/model.ts";
+import type { Align, Attributes } from "../../shared/table/model.ts";
 import { metaTagPattern, TAG_BODY } from "./tags.ts";
 
 // (A column's alignment is the model's; the markdown writes it in its delimiter row)

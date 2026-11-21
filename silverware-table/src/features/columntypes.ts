@@ -9,7 +9,7 @@ import { type CellEditor, type CellLook, type CellRef, type Feature, HEADER_ICON
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget, StoredTable } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
 import type { MenuDetail, MenuEntry } from "../menu.ts";
-import type { ModelCell, TableModel } from "../model/model.ts";
+import type { ModelCell, TableModel } from "../../../shared/table/model.ts";
 import {
   type Choice,
   type ColumnType,
@@ -31,7 +31,7 @@ import {
   withColumnType,
 } from "../columntypes/index.ts";
 import { FormulaError, formulaSources, formulaTableNames, type FormulasOffer, type HeldFormulas, type HeldFormulasOffer } from "../formulas/index.ts";
-import { sameTableName } from "../namerules.ts";
+import { sameTableName } from "../../../shared/table/namerules.ts";
 import { ChoicesDialog } from "./choicesdialog.ts";
 
 /** A type's icon, or a tag for a type without one */

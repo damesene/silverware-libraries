@@ -22,9 +22,9 @@ import { type DragContext, followDrag } from "./core/drag.ts";
 import { writingClipboard } from "../../shared/clipboard.ts";
 import type { TablePlatform } from "./core/platform.ts";
 import type { MetadataPart, StoredMetadata, StoredTable, TableEdit, TableRevision } from "./core/store.ts";
-import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, sameAttributes, sameCell, type TableModel, withAttributeIn, withAttributesAt } from "./model/model.ts";
+import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, sameAttributes, sameCell, type TableModel, withAttributeIn, withAttributesAt } from "../../shared/table/model.ts";
 import { HASHTAGS_KEY, nameEmptyHeaders } from "./columns.ts";
-import { type AttributeRules, cellWrittenOver, withAttributeRules, withoutNewAttributes } from "./model/rules.ts";
+import { type AttributeRules, cellWrittenOver, withAttributeRules, withoutNewAttributes } from "../../shared/table/rules.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { SourceStore } from "./store/sources.ts";
 import { SettingsDialog } from "./settings.ts";
@@ -50,9 +50,9 @@ import { ICONS } from "./icons.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "./menu.ts";
 import { floatingMenu, focusMenu } from "./core/menu.ts";
 import { CORE, metaName, metaPins, metaSort, withMetaPins, withMetaSort, writtenName } from "./meta.ts";
-import { CELL_NAME_KEY, type CellNameAt, LINE_NAME_KEY, modelCellName, modelCellNames, modelColumnName, modelRowName, modelRowNames, type RowName, withModelName } from "./names.ts";
+import { CELL_NAME_KEY, type CellNameAt, LINE_NAME_KEY, modelCellName, modelCellNames, modelColumnName, modelRowName, modelRowNames, type RowName, withModelName } from "../../shared/table/names.ts";
 import { ownMeta } from "./core/metaaccess.ts";
-import { reorderRows } from "./model/ops.ts";
+import { reorderRows } from "../../shared/table/ops.ts";
 import {
   cycleSort,
   DEFAULT_VIEW,
@@ -771,7 +771,7 @@ export class Controller implements TableHost {
 
   /**
    * The last step of a write with the metadata setting off: the attributes it
-   * would add to a table's columns, rows and cells (model/rules.ts,
+   * would add to a table's columns, rows and cells (shared/table/rules.ts,
    * withoutNewAttributes) are taken off, counted in `taken` (the write's own:
    * writes may run at once), said once the write is made. Checked on the
    * table as its store reads it back once written: a tag typed or pasted into
@@ -1907,7 +1907,7 @@ export class Controller implements TableHost {
 
   /**
    * A table as read with the edits features hold for it, as a write would put them: the rules of an edit applied
-   * (a value held over a formula ends it, model/rules.ts); the same table where none is held
+   * (a value held over a formula ends it, shared/table/rules.ts); the same table where none is held
    */
   private withHeld(before: TableModel, held: readonly PendingEdits[]): TableModel {
     if (!held.length) return before;
@@ -2616,7 +2616,7 @@ export class Controller implements TableHost {
   /**
    * A change of the model as the write pipeline takes it: made on its model,
    * what an edit does with attributes their owners declare a rule for applied
-   * (model/rules.ts)
+   * (shared/table/rules.ts)
    */
   private modelChange(change: (table: TableModel) => TableModel | undefined, options: WriteOptions): TableWriteChange {
     return (before) => {

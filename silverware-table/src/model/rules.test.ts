@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { parseTable } from "../markdown.ts";
 import { decode } from "../store/markdown/codec.ts";
-import { attributeIn, type ModelCell, type TableModel, withAttributeSet } from "./model.ts";
-import { duplicateRow, insertRow, moveRow, withCellAt, withContentAt } from "./ops.ts";
-import { type AttributeRules, withAttributeRules, withoutNewAttributes } from "./rules.ts";
+import { attributeIn, type ModelCell, type TableModel, withAttributeSet } from "../../../shared/table/model.ts";
+import { duplicateRow, insertRow, moveRow, withCellAt, withContentAt } from "../../../shared/table/ops.ts";
+import { type AttributeRules, withAttributeRules, withoutNewAttributes } from "../../../shared/table/rules.ts";
 
 const RULES: AttributeRules = {
   boundToContent: [{ owner: "formulas", key: "f" }],

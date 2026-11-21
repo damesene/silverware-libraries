@@ -12,8 +12,8 @@
 // browser asks whether to leave.
 import { type CellEditor, type Feature, type HeldEdit, type ModelHost, type PartTable, type PendingEdits, type TableInfo, type TableKey, type TableLooks, tablePartsOf, type ToolbarButton } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
-import { sameCell, type TableModel } from "../model/model.ts";
-import { withCellAt } from "../model/ops.ts";
+import { sameCell, type TableModel } from "../../../shared/table/model.ts";
+import { withCellAt } from "../../../shared/table/ops.ts";
 
 // After a navigation started, what is held waits this long at most for the page loaded
 const LEAVING_MS = 5000;

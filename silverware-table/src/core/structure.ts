@@ -2,7 +2,7 @@
 // moving and pinning rows and columns; moving and copying cells. Each is one write, rows and columns
 // pinned to the edges stay there (pins.ts), and formulas and the stored
 // sorting follow through the write steps (rowMap, columnMap).
-import type { TableModel } from "../model/model.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import { metaPins } from "../meta.ts";
 import {
   columnAfterMove,
@@ -16,8 +16,8 @@ import {
   moveColumns,
   moveRow,
   moveRows,
-} from "../model/ops.ts";
-import { EMPTY_CELL, withCellAt } from "../model/ops.ts";
+} from "../../../shared/table/ops.ts";
+import { EMPTY_CELL, withCellAt } from "../../../shared/table/ops.ts";
 import { moveCells } from "../paste.ts";
 import {
   clampColumnMove,

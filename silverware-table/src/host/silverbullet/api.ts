@@ -13,7 +13,7 @@ import { customTypesAnew, defineCustomTypes } from "../../columntypes/registry.t
 import { checkedConditions, checkedFormats, customDefinitionsAnew, defineCustomConditions, defineCustomFormats } from "../../conditions/index.ts";
 import { customFunctions } from "../../formulas/custom.ts";
 import { cellResult, choiceText, type FormulasOffer, functionNamed, givesList, scalarText, withEquals } from "../../formulas/index.ts";
-import type { KeyedModel } from "../../model/model.ts";
+import type { KeyedModel } from "../../../../shared/table/model.ts";
 import { defineFormulaPlaces as defineFormulaPlacesIn, type FormulaPlaces } from "../../store/markdown/pageformulas.ts";
 import { isError, isRange, type Scalar, single, TimeValue, type Value } from "../../formulas/values.ts";
 import { customFunctionsAnew, defineCustomFunctions } from "../../formulas/registry.ts";

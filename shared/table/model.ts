@@ -1,9 +1,10 @@
-// A table as Silverware Table works on it, apart from where it is kept
-// (docs/silverware-table-store-plan.md, *The model*): columns, body rows and
-// cells, each with its content and its attributes. Nothing of a store's form
-// is here (escapes, hidden tags, a metadata row, lines, places): a store's
-// codec reads its form into a model and writes a model back
-// (store/markdown/codec.ts), and is the one place that knows that form.
+// A table apart from where it is kept (docs/silverware-table-store-plan.md,
+// *The model*): columns, body rows and cells, each with its content and its
+// attributes; what Silverware Table works on and formulas read
+// (docs/silverware-formulas-shared.md), whoever's rows it holds. Nothing of a
+// store's form is here (escapes, hidden tags, a metadata row, lines, places):
+// a store reads its form into a model and writes a model back (Silverware
+// Table's markdown codec, silverware-table/src/store/markdown/codec.ts).
 //
 // Immutable: an edit makes a new version, sharing what it did not change, so
 // a write, an undo and a module may each hold a version that never changes
@@ -14,6 +15,9 @@ export type Align = "" | "left" | "center" | "right";
 
 /** Whose an attribute is: a module's name in lowercase, the core's (`core`), or none (`""`: a tag typed by hand without one) */
 export type Owner = string;
+
+/** The owner of the attributes the model itself defines: names (names.ts), and a table's own (its name, sorting, pins) */
+export const CORE: Owner = "core";
 
 /**
  * Attributes by owner, then key, each value text: what a value means is its
@@ -80,7 +84,7 @@ export function withAttributeIn(attributes: Attributes, owner: Owner, key: strin
 /**
  * As withAttributeIn, but a new set recorded as the change even where the
  * value stays: an attribute an edit sets explicitly (a formula typed again),
- * which the rules of an edit tell from one the edit left (model/rules.ts)
+ * which the rules of an edit tell from one the edit left (rules.ts)
  */
 export function withAttributeSet(attributes: Attributes, owner: Owner, key: string, value: string | undefined): Attributes {
   const changed = withAttributeIn(attributes, owner, key, value);

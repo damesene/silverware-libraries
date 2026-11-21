@@ -10,7 +10,7 @@
 // formula/; this is the module around it.) Turned off, nothing is
 // recalculated: results stay as written.
 
-import { columnIdOf, modelHeads } from "../columns.ts";
+import { columnIdOf, modelHeads } from "../../../shared/table/columns.ts";
 import { CELL_MENU_ORDER } from "../core/feature.ts";
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/feature.ts";
 import type {
@@ -98,9 +98,9 @@ import { ResultView } from "./resultview.ts";
 import { el } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
 import type { SourcesOffer } from "../sources.ts";
-import { type KeyedModel, type ModelCell, NO_ATTRIBUTES, type TableModel } from "../model/model.ts";
-import { EMPTY_CELL, insertColumn, withCellAt, withHeader } from "../model/ops.ts";
-import { sameTableName } from "../namerules.ts";
+import { type KeyedModel, type ModelCell, NO_ATTRIBUTES, type TableModel } from "../../../shared/table/model.ts";
+import { EMPTY_CELL, insertColumn, withCellAt, withHeader } from "../../../shared/table/ops.ts";
+import { sameTableName } from "../../../shared/table/namerules.ts";
 import { insertColumnAt } from "../pins.ts";
 import type { TableKey } from "../core/feature.ts";
 

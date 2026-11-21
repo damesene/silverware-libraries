@@ -13,7 +13,7 @@
 // as the table is rendered (its metadata as rendered, before the browser lays
 // it out), so a table rendered anew after an edit does not show SilverBullet's
 // look for a moment; once its markdown is read, again from it.
-import type { TableModel } from "../model/model.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import type { Feature, ModelHost, TableLook, TablePreview, ToolbarButton, TableInfo } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
 import type { MenuDetail, MenuEntry } from "../menu.ts";

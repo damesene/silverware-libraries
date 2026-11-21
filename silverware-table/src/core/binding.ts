@@ -7,7 +7,7 @@
 // API's `init` (host/silverbullet/api.ts) and the tests' page: the core imports nothing of a host.
 import type { LayoutProvider } from "../../../shared/layout.ts";
 import type { FeatureName, SETTINGS, SettingValue } from "../bridge.ts";
-import type { TableModel } from "../model/model.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import type { SourceTables } from "../sources.ts";
 import type { AdapterContext, TableAdapter } from "./adapter.ts";
 import type { AdapterFeature, Feature, TableHost, TableLook, WriteResult } from "./feature.ts";

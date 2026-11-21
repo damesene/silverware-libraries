@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { metaName, metaValue } from "../meta.ts";
 import { pageTablesOf, parseTable } from "../markdown.ts";
-import type { TableModel } from "../model/model.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import { decode, encode } from "../store/markdown/codec.ts";
 import { VIEW_CELLS } from "../testing/formulas.ts";
 import { evaluateFormula, FormulaError, Grid, recalculate, referredPages, referredTableNames, viewResult } from "./index.ts";

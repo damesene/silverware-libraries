@@ -17,7 +17,7 @@
 // the cells, so they move with the table as it scrolls and go under its held
 // header; the drag is the core's too (drag), the cell nearest the pointer told.
 import { cellValue, type Cell, type FillCells, type FillLine, filled, fillLine } from "../autofill/index.ts";
-import type { TableModel } from "../model/model.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import {
   CELL_MENU_ORDER,
   type CellMenuGroup,

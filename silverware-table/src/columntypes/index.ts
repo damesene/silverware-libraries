@@ -12,4 +12,4 @@ export { choiceIndex, distinctValues, LIST_NAME_RE, listFormula, listKey, type L
  * column's type compares it (sorting, filters), from the column's header and the cell's text as shown; the text
  * where the column has no type or the text is not a value of it
  */
-export type ColumnTypesOffer = { readonly valueOf: (table: import("../model/model.ts").TableModel, column: number, text: string) => string };
+export type ColumnTypesOffer = { readonly valueOf: (table: import("../../../shared/table/model.ts").TableModel, column: number, text: string) => string };

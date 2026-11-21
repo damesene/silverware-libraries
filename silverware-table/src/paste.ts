@@ -2,8 +2,8 @@
 // Their text on the clipboard has a tab between cells and a line break between
 // rows; a cell holding a tab, a line break or a quote is quoted as in CSV.
 import { headerCell, withHeaderText } from "./columns.ts";
-import type { ModelCell, TableModel } from "./model/model.ts";
-import { EMPTY_CELL, insertColumn, insertRow, withCellAt, withContentAt } from "./model/ops.ts";
+import type { ModelCell, TableModel } from "../../shared/table/model.ts";
+import { EMPTY_CELL, insertColumn, insertRow, withCellAt, withContentAt } from "../../shared/table/ops.ts";
 import { insertRowAt } from "./pins.ts";
 import type { Pins } from "./view.ts";
 

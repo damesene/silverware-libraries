@@ -31,7 +31,7 @@ import { parseMetaRow, parseTable, serializeTable, splitRow } from "../markdown.
 import { metaName, withMetaValue } from "../meta.ts";
 import { cellNameOf, modelRowName, nameOf, rowNameIn, withCellName, withName, withoutName } from "../names.ts";
 import { decode } from "../store/markdown/codec.ts";
-import { deleteColumn, deleteRow, insertRow, moveColumn, moveRow, reorderRows, setCell } from "../ops.ts";
+import { deleteColumn, deleteRow, insertRow, moveColumn, moveRow, reorderRows, setCell } from "../testing/markdownops.ts";
 import { cellResult, errorCodeIn, isErrorText } from "./cell.ts";
 
 // A table whose cell `at` holds `formula`; returns what that cell shows after recalculating

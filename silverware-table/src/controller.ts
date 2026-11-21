@@ -25,7 +25,7 @@ import type { TablePlatform } from "./core/platform.ts";
 import type { PageFormula, StoredTable, TableEdit } from "./core/store.ts";
 import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt } from "./model/model.ts";
 import { HASHTAGS_KEY, nameEmptyHeaders } from "./columns.ts";
-import { type AttributeRules, cellWrittenOver, withAttributeRules } from "./model/rules.ts";
+import { type AttributeRules, cellWrittenOver, withAttributeRules, withoutNewAttributes } from "./model/rules.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
 import { SourceStore } from "./store/sources.ts";
@@ -74,7 +74,6 @@ import { floatingMenu, focusMenu } from "./core/menu.ts";
 import { CORE, metadataAfterEdit, metaName, metaPins, metaSort, withMetaPins, withMetaSort, writtenName } from "./meta.ts";
 import { CELL_NAME_KEY, type CellNameAt, LINE_NAME_KEY, modelCellName, modelCellNames, modelColumnName, modelRowName, modelRowNames, type RowName, withModelName } from "./names.ts";
 import { ownMeta } from "./core/metaaccess.ts";
-import { withoutNewTagValues } from "./tagvalues.ts";
 import { reorderRows } from "./model/ops.ts";
 import {
   cycleSort,
@@ -811,14 +810,14 @@ export class Controller implements TableHost {
   }
 
   /**
-   * The last step of a write with the metadata setting off: the hidden values
-   * it would add to a table's cells (withoutNewTagValues) are taken off,
-   * counted in `taken` (the write's own: writes may run at once), said once
-   * the write is made
+   * The last step of a write with the metadata setting off: the attributes it
+   * would add to a table's cells and rows (model/rules.ts, withoutNewAttributes)
+   * are taken off, counted in `taken` (the write's own: writes may run at once),
+   * said once the write is made
    */
-  private withoutNewTags(before: Table, after: Table, options: Pick<WriteOptions, "rowMap" | "columnMap">, taken: { n: number }): Table {
+  private withoutNewAttributes(before: TableModel, after: TableModel, options: Pick<WriteOptions, "rowMap" | "columnMap">, taken: { n: number }): TableModel {
     if (this.metadataOn) return after;
-    const result = withoutNewTagValues(before, after, options.rowMap, options.columnMap);
+    const result = withoutNewAttributes(before, after, options.rowMap, options.columnMap);
     taken.n += result.taken;
     return result.table;
   }
@@ -2869,9 +2868,9 @@ export class Controller implements TableHost {
       const edit = { ...options, page };
       let stepped = editedModel;
       for (const feature of this.features) if (feature.writeStep) stepped = feature.writeStep(beforeModel, stepped, edit);
+      stepped = this.withoutNewAttributes(beforeModel, stepped, options, taken);
       let changed = encode(stepped, edited);
       changed = this.writeSteps.reduce((table, step) => step(before, table, options, byModel), changed);
-      changed = this.withoutNewTags(before, changed, options, taken);
       const changedModel = decode(changed);
       const serialize = await this.serializer();
       const markdown = serialize(changed);
@@ -2909,7 +2908,7 @@ export class Controller implements TableHost {
       for (const [key, model] of others.written) {
         const at = rangeOf.get(key)!;
         const read = parseTable(at.text);
-        const other = serialize(this.withoutNewTags(read, encode(model, read), {}, taken));
+        const other = serialize(encode(this.withoutNewAttributes(decode(read), model, {}, taken), read));
         updates.push({ range: at, markdown: other });
         tables.push({ ...tableAt(text, at), markdown: other });
       }

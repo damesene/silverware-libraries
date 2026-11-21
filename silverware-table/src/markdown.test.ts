@@ -12,7 +12,7 @@ import {
   tablePlace,
   unescapeCell,
 } from "./markdown.ts";
-import { setCell } from "./ops.ts";
+import { setCell } from "./testing/markdownops.ts";
 
 describe("splitRow", () => {
   it("splits cells and trims them", () => {

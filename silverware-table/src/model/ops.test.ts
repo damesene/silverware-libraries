@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { escapeCell, parseTable, serializeTable, type Table } from "../markdown.ts";
 import { followColumnMeta } from "../meta.ts";
-import * as markdown from "../ops.ts";
+import * as markdown from "../testing/markdownops.ts";
 import { decode, encode } from "../store/markdown/codec.ts";
 import { cellTags } from "../tags.ts";
 import { attributeIn, type TableModel } from "./model.ts";

@@ -1,8 +1,10 @@
 // Structural edits of a markdown table (its rows the header's and the body's,
-// its cells markdown). Each returns a new table. The model's are model/ops.ts,
-// which the modules move onto (docs/silverware-table-store-plan.md, step 3).
-import type { Align, Row, Table } from "./markdown.ts";
-export { columnAfterMove, type IndexMap, lineAfterBlockMove } from "./model/ops.ts";
+// its cells markdown), for tests alone: tables made for a test, and what the
+// model's operations (model/ops.ts, which every write uses) are compared with,
+// as the markdown wrote them before the model (docs/silverware-table-store-plan.md,
+// step 6). Each returns a new table.
+import type { Align, Row, Table } from "../markdown.ts";
+export { columnAfterMove, type IndexMap, lineAfterBlockMove } from "../model/ops.ts";
 
 function withRows(table: Table, rows: readonly Row[]): Table {
   return { ...table, rows };

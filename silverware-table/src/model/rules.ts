@@ -112,3 +112,52 @@ export function withAttributeRules(before: TableModel, after: TableModel, rules:
   });
   return changed ? { ...after, rows } : after;
 }
+
+/** Every attribute and value of a set of attributes, as one text each */
+const valuesOf = (attributes: Attributes): string[] => [...attributes].flatMap(([owner, own]) => [...own].map(([key, value]) => `${owner}\u0000${key}\u0000${value}`));
+
+/**
+ * `after`, a table as an edit leaves it (from `before`), without the
+ * attributes of its cells and rows new to it: what the metadata setting off
+ * lets a write keep. An attribute stays where its cell (its row) had that
+ * attribute before (`rowMap`, `columnMap`: where the rows and columns went,
+ * rows from 1), or a cell or row of the table had it with that value (a
+ * calculated column's new row, a cell moved); else it is taken off, the
+ * cell's content staying. With how many were taken off. (The table's and its
+ * columns' own are no edit's to add unasked: a module sets one through
+ * `canStore`, which the setting answers)
+ */
+export function withoutNewAttributes(before: TableModel, after: TableModel, rowMap?: IndexMap, columnMap?: IndexMap): { readonly table: TableModel; readonly taken: number } {
+  const rowWas = sources(rowMap, before.rows.length, after.rows.length, 1);
+  const columnWas = sources(columnMap, before.columns.length, after.columns.length, 0);
+  // Every attribute and value the table's cells and rows had
+  const had = new Set(before.rows.flatMap((row) => [...valuesOf(row.attributes), ...row.cells.flatMap((cell) => valuesOf(cell.attributes))]));
+  let taken = 0;
+  const kept = (attributes: Attributes, was: Attributes | undefined): Attributes => {
+    let result = attributes;
+    for (const [owner, own] of attributes) {
+      for (const [key, value] of own) {
+        if (had.has(`${owner}\u0000${key}\u0000${value}`) || (was && attributeIn(was, owner, key) !== undefined)) continue;
+        result = withAttributeIn(result, owner, key, undefined);
+        taken++;
+      }
+    }
+    return result;
+  };
+  let changed = false;
+  const rows = after.rows.map((row, r): ModelRow => {
+    const from = rowWas[r];
+    const wasRow = from === undefined ? undefined : before.rows[from - 1];
+    const rowAttributes = kept(row.attributes, wasRow?.attributes);
+    const cells = row.cells.map((cell, c) => {
+      const column = columnWas[c];
+      const wasCell = wasRow && column !== undefined ? wasRow.cells[column] : undefined;
+      const attributes = kept(cell.attributes, wasCell?.attributes);
+      return attributes === cell.attributes ? cell : { ...cell, attributes };
+    });
+    if (rowAttributes === row.attributes && cells.every((cell, c) => cell === row.cells[c])) return row;
+    changed = true;
+    return { cells, attributes: rowAttributes };
+  });
+  return { table: changed ? { ...after, rows } : after, taken };
+}

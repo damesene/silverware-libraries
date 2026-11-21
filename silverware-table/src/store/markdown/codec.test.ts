@@ -6,7 +6,7 @@ import { withColumnType } from "../../columntypes/registry.ts";
 import { findTables, parseTable, serializeTable, type Table } from "../../markdown.ts";
 import { followColumnMeta, metaValue, withColumnValues, withMetaValue } from "../../meta.ts";
 import { attributeIn, type ModelCell, type TableModel, withAttributeIn } from "../../model/model.ts";
-import { reorderRows, setCell } from "../../ops.ts";
+import { reorderRows, setCell } from "../../testing/markdownops.ts";
 import { cellTags } from "../../tags.ts";
 import { withTagValue } from "../../tagvalues.ts";
 import { HASHTAGS_KEY, headerText } from "../../columns.ts";

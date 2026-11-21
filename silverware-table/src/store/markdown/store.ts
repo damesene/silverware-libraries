@@ -26,7 +26,7 @@ import {
   validateTransaction,
 } from "../../core/store.ts";
 import { pageFormulasIn } from "./pageformulas.ts";
-import { cursorPlace, found, newTableMarkdown, newTablePlace, type NewTablePlace, tableAt, tableEdits, type TableInsert, type TableWrite } from "./tableparts.ts";
+import { cursorPlace, found, newTableMarkdown, newTablePlace, type NewTablePlace, PAGE_FORMULAS, TABLES, tableAt, tableEdits, type TableInsert, type TableWrite } from "./tableparts.ts";
 import { pageFormulaPlace } from "./pageformulas.ts";
 import { mapPosition, type TableWritten, type TextEdit, withWriteListeners } from "./writelisteners.ts";
 import { written as textWritten } from "../../../../shared/pages/parts.ts";
@@ -352,8 +352,8 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
 
   /** A transaction's changes of the writer's: its page formulas first (found by their order, which a table written first could change), its tables */
   private tablesChanges(p: PageBuilder, document: string, formulas: readonly PageFormula[], tables: { readonly tables: readonly TableWrite[]; readonly inserts: readonly TableInsert[] }): void {
-    for (const formula of formulas) p.tables.setPageFormula(document, formula);
-    if (tables.tables.length || tables.inserts.length) p.tables.write(tables.tables, tables.inserts);
+    for (const formula of formulas) p.part(PAGE_FORMULAS).set(document, formula);
+    if (tables.tables.length || tables.inserts.length) p.part(TABLES).write(tables.tables, tables.inserts);
   }
 
   async apply(plan: TablePlan): Promise<TableReport> {

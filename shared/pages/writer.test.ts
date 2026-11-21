@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Editor, Space } from "../platform.ts";
-import { type PageBuilder, pageChanges } from "./changes.ts";
+import { type PageBuilder, type PageSections, pageChanges } from "./changes.ts";
 import { diffLines, minimalEdit } from "./diff.ts";
 import { PageHistory } from "./history.ts";
-import { type Part, PARTS } from "./parts.ts";
+import { builtInParts, type Part } from "./parts.ts";
 import { readGrids } from "../markdown/grid.ts";
 import { pageWriter } from "./writer.ts";
 
@@ -564,8 +564,8 @@ describe("the page writer", () => {
 });
 
 describe("the builder", () => {
-  it("has every section the parts make, each a part of its own", () => {
-    const sections = PARTS.flatMap((one) => (one.section ? [one.section.name] : []));
+  it("has every section the built-in parts make, each a part of its own", () => {
+    const sections = builtInParts().flatMap((one) => (one.section ? [one.section.name as keyof PageSections] : []));
     expect(sections).toEqual(["text", "properties", "tags", "codeBlocks", "grids", "embeds", "links"]);
     pageChanges().page("A", (p) => {
       for (const name of sections) expect(Object.values(p[name]).every((method) => typeof method === "function"), name).toBe(true);
@@ -619,27 +619,35 @@ describe("edits and diffs", () => {
 });
 
 describe("a plugin's own part", () => {
-  it("is registered: its section in the builder, its kind written by it, once; a kind or a section another has refused", async () => {
+  it("is registered: its section given by p.part, its kind written by it, once; a kind or a section another has refused; one not registered refused", async () => {
     // (Modules of their own: the registry of the other tests keeps the built-in parts alone)
     vi.resetModules();
     const parts = await import("./parts.ts");
     const changes = await import("./changes.ts");
     const { pageWriter: writerOf } = await import("./writer.ts");
-    // (Its kind and section in no type: a plugin adds them to PageChangeKinds and PageSections)
-    const shout = {
+    // (Its change and section typed by the part itself: no other plugin's types see them)
+    const shout = parts.definePluginPart<{ readonly kind: "shout" }, { all(): PageBuilder }>({
+      name: "shouting",
       kinds: ["shout"],
-      section: { name: "shouting", make: (add: (change: unknown) => unknown) => ({ all: () => add({ kind: "shout" }) }) },
-      write: (text: string) => ({ text: text.toUpperCase(), changes: 1 }),
-    } as unknown as Part;
+      section: (add) => ({ all: () => add({ kind: "shout" }) }),
+      write: (text) => ({ text: text.toUpperCase(), changes: 1 }),
+    });
+    const whisper = parts.definePluginPart<{ readonly kind: "whisper" }, { all(): PageBuilder }>({
+      name: "whispering",
+      kinds: ["whisper"],
+      section: (add) => ({ all: () => add({ kind: "whisper" }) }),
+      write: (text) => ({ text: text.toLowerCase(), changes: 1 }),
+    });
+    expect(() => changes.pageChanges().page("A", (p) => p.part(whisper).all())).toThrow(/not registered/);
     parts.registerPart(shout);
     parts.registerPart(shout);
-    expect(parts.PARTS.filter((one) => one === shout)).toHaveLength(1);
+    expect(parts.partsNow().filter((one) => one === shout)).toHaveLength(1);
     const { map, writer } = memory({ A: "quiet" }, undefined, writerOf);
-    const built = changes.pageChanges().page("A", (p) => (p as unknown as { shouting: { all(): unknown } }).shouting.all()).build();
+    const built = changes.pageChanges().page("A", (p) => p.part(shout).all()).build();
     expect(built[0]!.changes.map((change) => change.kind)).toEqual(["shout"]);
     await writer.write(built);
     expect(map.get("A")).toBe("QUIET");
     expect(() => parts.registerPart({ ...shout, section: undefined } as Part)).toThrow(/kind shout/);
-    expect(() => parts.registerPart({ ...shout, kinds: ["whisper"], section: { ...shout.section!, name: "properties" } } as unknown as Part)).toThrow(/section properties/);
+    expect(() => parts.registerPart({ ...whisper, section: { ...whisper.section, name: "properties" } })).toThrow(/section properties/);
   });
 });

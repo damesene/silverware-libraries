@@ -9,7 +9,7 @@
 // edit are each the one it was. The codec stays the table's: the markdown written is
 // made by it, these parts only put it in its place. Registered with this
 // plugin's writer as this module loads (each plugin bundles shared/ of its own).
-import { definePart, registerPart } from "../../../../shared/pages/parts.ts";
+import { definePluginPart, registerPart } from "../../../../shared/pages/parts.ts";
 import type { PageBuilder } from "../../../../shared/pages/changes.ts";
 import type { PageFormula } from "../../core/store.ts";
 import { findTables, type Table, tablePlace, type TableRange } from "../../markdown.ts";
@@ -29,28 +29,10 @@ export type TableWrite = TableAt & { readonly markdown: string | undefined };
 /** A new table of a write: its markdown and where it goes (none: the page's end), an empty line around it */
 export type TableInsert = { readonly markdown: string; readonly place?: NewTablePlace };
 
-declare module "../../../../shared/pages/parts.ts" {
-  // (A program's types are one: every plugin's PageChange has these kinds, its builder this section; only this
-  // plugin's writer has the parts that write them)
-  interface PageChangeKinds {
-    readonly writeTables: { readonly tables: readonly TableWrite[]; readonly inserts: readonly TableInsert[] };
-    readonly setPageFormula: { readonly formula: PageFormula; readonly document: string };
-  }
-  interface PageSections {
-    readonly tables: {
-      /**
-       * Tables of the page written in one change: each found as read (its
-       * text, which of those alike) before any is written, written as its
-       * markdown or taken out (the empty line after it with it; the page's
-       * last, the one before); `inserts`: new tables, each put where its
-       * place says (found in the text as read too)
-       */
-      write(tables: readonly TableWrite[], inserts?: readonly TableInsert[]): PageBuilder;
-      /** A formula written in the page's text (a page formula, by its key) given its new text */
-      setPageFormula(document: string, formula: PageFormula): PageBuilder;
-    };
-  }
-}
+/** The changes the tables' part writes: tables of the page written in one change */
+type WriteTables = { readonly kind: "writeTables"; readonly tables: readonly TableWrite[]; readonly inserts: readonly TableInsert[] };
+/** The change the page formulas' part writes: a formula written in the page's text */
+type SetPageFormula = { readonly kind: "setPageFormula"; readonly formula: PageFormula; readonly document: string };
 
 /**
  * A new table's markdown: the model written as a table of its own (none read),
@@ -135,30 +117,39 @@ export function tableEdits(text: string, change: { readonly tables: readonly Tab
   return edits;
 }
 
-registerPart(
-  definePart({
-    kinds: ["writeTables", "setPageFormula"],
-    section: {
-      name: "tables",
-      make: (add) => ({
-        write: (tables, inserts = []) => add({ kind: "writeTables", tables, inserts }),
-        setPageFormula: (document, formula) => add({ kind: "setPageFormula", document, formula }),
-      }),
-    },
-    write: (text, change) => {
-      if (change.kind === "setPageFormula") {
-        const place = pageFormulaPlace(change.document, text, change.formula);
-        if ("problem" in place) return { text, changes: 0, problem: `a formula written in the page: ${place.problem}` };
-        return { text: text.slice(0, place.from) + change.formula.text + text.slice(place.to), changes: 1 };
-      }
-      const edits = tableEdits(text, change);
-      if ("problem" in edits) return { text, changes: 0, problem: edits.problem };
-      // From the last up, so each edit's place is as found (a new table after one written: after it, as it is written);
-      // new tables at one place the last given first, so each goes before the one after it, in the order given
-      let written = text;
-      const order = edits.map((edit, index) => ({ edit, index })).sort((a, b) => b.edit.from - a.edit.from || b.edit.to - a.edit.to || b.index - a.index);
-      for (const { edit } of order) written = written.slice(0, edit.from) + edit.text + written.slice(edit.to);
-      return { text: written, changes: written === text ? 0 : edits.length };
-    },
-  }),
-);
+/**
+ * The tables of a page (a page's builder: `p.part(TABLES).write(…)`): tables written in one change, each found as
+ * read (its text, which of those alike) before any is written, written as its markdown or taken out (the empty line
+ * after it with it; the page's last, the one before); `inserts`: new tables, each put where its place says (found in
+ * the text as read too)
+ */
+export const TABLES = definePluginPart<WriteTables, { write(tables: readonly TableWrite[], inserts?: readonly TableInsert[]): PageBuilder }>({
+  name: "tables",
+  kinds: ["writeTables"],
+  section: (add) => ({ write: (tables, inserts = []) => add({ kind: "writeTables", tables, inserts }) }),
+  write: (text, change) => {
+    const edits = tableEdits(text, change);
+    if ("problem" in edits) return { text, changes: 0, problem: edits.problem };
+    // From the last up, so each edit's place is as found (a new table after one written: after it, as it is written);
+    // new tables at one place the last given first, so each goes before the one after it, in the order given
+    let written = text;
+    const order = edits.map((edit, index) => ({ edit, index })).sort((a, b) => b.edit.from - a.edit.from || b.edit.to - a.edit.to || b.index - a.index);
+    for (const { edit } of order) written = written.slice(0, edit.from) + edit.text + written.slice(edit.to);
+    return { text: written, changes: written === text ? 0 : edits.length };
+  },
+});
+
+/** The formulas written in a page's text (a page's builder: `p.part(PAGE_FORMULAS).set(…)`), each by its key, given its new text */
+export const PAGE_FORMULAS = definePluginPart<SetPageFormula, { set(document: string, formula: PageFormula): PageBuilder }>({
+  name: "pageFormulas",
+  kinds: ["setPageFormula"],
+  section: (add) => ({ set: (document, formula) => add({ kind: "setPageFormula", document, formula }) }),
+  write: (text, change) => {
+    const place = pageFormulaPlace(change.document, text, change.formula);
+    if ("problem" in place) return { text, changes: 0, problem: `a formula written in the page: ${place.problem}` };
+    return { text: text.slice(0, place.from) + change.formula.text + text.slice(place.to), changes: 1 };
+  },
+});
+
+registerPart(TABLES);
+registerPart(PAGE_FORMULAS);

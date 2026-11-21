@@ -5,7 +5,7 @@ import type { Editor, Space } from "../../../../shared/platform.ts";
 import { luaCallPlaces } from "../../host/silverbullet/lua.ts";
 import { findTables } from "../../markdown.ts";
 import { defineFormulaPlaces, pageFormulasIn } from "./pageformulas.ts";
-import { cursorPlace, removedSpan, tableAt } from "./tableparts.ts";
+import { cursorPlace, PAGE_FORMULAS, removedSpan, TABLES, tableAt } from "./tableparts.ts";
 
 /** Pages in memory, `open` the one in the editor; the writer over them */
 function pages(texts: Record<string, string>, open?: string) {
@@ -41,10 +41,10 @@ describe("the markdown store's parts of the page writer", () => {
     const { map, writer } = pages({ Shop: TWO });
     const second = at(TWO, 1);
     expect(second).toEqual({ text: "| A |\n|---|\n| 1 |", occurrence: 1, of: 2 });
-    await writer.write(pageChanges().page("Shop", (p) => p.tables.write([{ ...second, markdown: "| A |\n|---|\n| 2 |" }])).build());
+    await writer.write(pageChanges().page("Shop", (p) => p.part(TABLES).write([{ ...second, markdown: "| A |\n|---|\n| 2 |" }])).build());
     expect(map.get("Shop")).toBe("# Shop\n\n| A |\n|---|\n| 1 |\n\nText.\n\n| A |\n|---|\n| 2 |\n");
     // The first one alike no more: changed since it was read
-    const report = await writer.write(pageChanges().page("Shop", (p) => p.tables.write([{ ...second, markdown: "| A |\n|---|\n| 3 |" }])).build());
+    const report = await writer.write(pageChanges().page("Shop", (p) => p.part(TABLES).write([{ ...second, markdown: "| A |\n|---|\n| 3 |" }])).build());
     expect(report.skipped.map((one) => [one.cause, one.reason])).toEqual([["refused", "a table changed since it was read"]]);
   });
 
@@ -52,7 +52,7 @@ describe("the markdown store's parts of the page writer", () => {
     const { map, writer } = pages({ Shop: TWO });
     await writer.write(
       pageChanges()
-        .page("Shop", (p) => p.tables.write([{ ...at(TWO, 0), markdown: "| A |\n|---|\n| 2 |" }, { ...at(TWO, 1), markdown: "| A |\n|---|\n| 3 |" }]))
+        .page("Shop", (p) => p.part(TABLES).write([{ ...at(TWO, 0), markdown: "| A |\n|---|\n| 2 |" }, { ...at(TWO, 1), markdown: "| A |\n|---|\n| 3 |" }]))
         .build(),
     );
     expect(map.get("Shop")).toBe("# Shop\n\n| A |\n|---|\n| 2 |\n\nText.\n\n| A |\n|---|\n| 3 |\n");
@@ -60,38 +60,38 @@ describe("the markdown store's parts of the page writer", () => {
 
   it("puts a new table after a table, where the cursor was, or at the page's end, an empty line around it", async () => {
     const { map, writer } = pages({ Shop: TWO });
-    await writer.write(pageChanges().page("Shop", (p) => p.tables.write([], [{ markdown: NEW, place: { after: at(TWO, 0) } }])).build());
+    await writer.write(pageChanges().page("Shop", (p) => p.part(TABLES).write([], [{ markdown: NEW, place: { after: at(TWO, 0) } }])).build());
     expect(map.get("Shop")).toBe(`# Shop\n\n| A |\n|---|\n| 1 |\n\n${NEW}\n\nText.\n\n| A |\n|---|\n| 1 |\n`);
     // After a table written in the same change: after it as written
     const both = pages({ Shop: TWO });
-    await both.writer.write(pageChanges().page("Shop", (p) => p.tables.write([{ ...at(TWO, 0), markdown: "| A |\n|---|\n| 9 |" }], [{ markdown: NEW, place: { after: at(TWO, 0) } }])).build());
+    await both.writer.write(pageChanges().page("Shop", (p) => p.part(TABLES).write([{ ...at(TWO, 0), markdown: "| A |\n|---|\n| 9 |" }], [{ markdown: NEW, place: { after: at(TWO, 0) } }])).build());
     expect(both.map.get("Shop")).toBe(`# Shop\n\n| A |\n|---|\n| 9 |\n\n${NEW}\n\nText.\n\n| A |\n|---|\n| 1 |\n`);
     const cursor = cursorPlace(TWO, 3);
     const page = pages({ Shop: TWO });
-    await page.writer.write(pageChanges().page("Shop", (p) => p.tables.write([], [{ markdown: NEW, place: cursor }])).build());
+    await page.writer.write(pageChanges().page("Shop", (p) => p.part(TABLES).write([], [{ markdown: NEW, place: cursor }])).build());
     expect(page.map.get("Shop")).toBe(`# Shop\n\n${NEW}\n\n| A |\n|---|\n| 1 |\n\nText.\n\n| A |\n|---|\n| 1 |\n`);
     // The cursor's line changed since: refused
     const moved = pages({ Shop: `# Shop!\n${TWO.slice(7)}` });
-    expect((await moved.writer.write(pageChanges().page("Shop", (p) => p.tables.write([], [{ markdown: NEW, place: cursor }])).build())).skipped).toHaveLength(1);
+    expect((await moved.writer.write(pageChanges().page("Shop", (p) => p.part(TABLES).write([], [{ markdown: NEW, place: cursor }])).build())).skipped).toHaveLength(1);
     const end = pages({ Shop: "Text." });
-    await end.writer.write(pageChanges().page("Shop", (p) => p.tables.write([], [{ markdown: NEW }])).build());
+    await end.writer.write(pageChanges().page("Shop", (p) => p.part(TABLES).write([], [{ markdown: NEW }])).build());
     expect(end.map.get("Shop")).toBe(`Text.\n\n${NEW}`);
     // Several at one place: in the order given
     const LAST = "| C |\n|---|\n| y |";
     const two = pages({ Shop: TWO });
-    await two.writer.write(pageChanges().page("Shop", (p) => p.tables.write([], [{ markdown: NEW, place: { after: at(TWO, 0) } }, { markdown: LAST, place: { after: at(TWO, 0) } }])).build());
+    await two.writer.write(pageChanges().page("Shop", (p) => p.part(TABLES).write([], [{ markdown: NEW, place: { after: at(TWO, 0) } }, { markdown: LAST, place: { after: at(TWO, 0) } }])).build());
     expect(two.map.get("Shop")).toBe(`# Shop\n\n| A |\n|---|\n| 1 |\n\n${NEW}\n\n${LAST}\n\nText.\n\n| A |\n|---|\n| 1 |\n`);
     const ends = pages({ Shop: "Text." });
-    await ends.writer.write(pageChanges().page("Shop", (p) => p.tables.write([], [{ markdown: NEW }, { markdown: LAST }])).build());
+    await ends.writer.write(pageChanges().page("Shop", (p) => p.part(TABLES).write([], [{ markdown: NEW }, { markdown: LAST }])).build());
     expect(ends.map.get("Shop")).toBe(`Text.\n\n${NEW}\n\n${LAST}`);
   });
 
   it("takes a table out with the empty line after it, the page's last with the one before", async () => {
     const { map, writer } = pages({ Shop: TWO });
-    await writer.write(pageChanges().page("Shop", (p) => p.tables.write([{ ...at(TWO, 0), markdown: undefined }])).build());
+    await writer.write(pageChanges().page("Shop", (p) => p.part(TABLES).write([{ ...at(TWO, 0), markdown: undefined }])).build());
     expect(map.get("Shop")).toBe("# Shop\n\nText.\n\n| A |\n|---|\n| 1 |\n");
     const last = pages({ Shop: TWO });
-    await last.writer.write(pageChanges().page("Shop", (p) => p.tables.write([{ ...at(TWO, 1), markdown: undefined }])).build());
+    await last.writer.write(pageChanges().page("Shop", (p) => p.part(TABLES).write([{ ...at(TWO, 1), markdown: undefined }])).build());
     expect(last.map.get("Shop")).toBe("# Shop\n\n| A |\n|---|\n| 1 |\n\nText.\n");
     const range = findTables(TWO)[0]!;
     const span = removedSpan(TWO, range);
@@ -103,13 +103,13 @@ describe("the markdown store's parts of the page writer", () => {
     const TEXT = `${TWO}\nTotal: \${te("=SUM(prices![price])")}\n`;
     const { map, writer } = pages({ Shop: TEXT });
     const [formula] = pageFormulasIn("Shop", TEXT);
-    await writer.write(pageChanges().page("Shop", (p) => p.tables.setPageFormula("Shop", { key: formula!.key, text: "=SUM(costs![price])" })).build());
+    await writer.write(pageChanges().page("Shop", (p) => p.part(PAGE_FORMULAS).set("Shop", { key: formula!.key, text: "=SUM(costs![price])" })).build());
     expect(map.get("Shop")).toContain(`\${te("=SUM(costs![price])")}`);
   });
 
   it("finds its table again on the open page changed since it was read, the write planned anew", async () => {
     const { map, writer } = pages({ Shop: TWO }, "Shop");
-    const plan = await writer.plan(pageChanges().page("Shop", (p) => p.tables.write([{ ...at(TWO, 1), markdown: "| A |\n|---|\n| 2 |" }])).build(), { replanOpenPage: true });
+    const plan = await writer.plan(pageChanges().page("Shop", (p) => p.part(TABLES).write([{ ...at(TWO, 1), markdown: "| A |\n|---|\n| 2 |" }])).build(), { replanOpenPage: true });
     map.set("Shop", `Typed meanwhile.\n${TWO}`);
     expect((await writer.apply(plan)).written).toHaveLength(1);
     expect(map.get("Shop")).toBe("Typed meanwhile.\n# Shop\n\n| A |\n|---|\n| 1 |\n\nText.\n\n| A |\n|---|\n| 2 |\n");

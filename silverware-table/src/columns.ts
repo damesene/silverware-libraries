@@ -16,15 +16,20 @@ import { metaTagPattern } from "./tags.ts";
 export type ColumnId = { readonly name: string; readonly nth: number };
 
 /**
- * A column as its name tells it: its header's text (as markdown writes it or
- * as the model has it: its tags, hashtags and emphasis are no part of its key
- * either way) and its fixed name, if it has one
+ * A column as its name tells it: its header's text as the model has it (no
+ * escape, no tag; its hashtags and emphasis are no part of its key) and its
+ * fixed name, if it has one
  */
 export type ColumnHead = { readonly text: string; readonly fixed: string | undefined };
 
-/** Markdown header cells as their columns' heads: a fixed name read from the cell's tag (names.ts) */
+/** Markdown header cells as their columns' heads: their text as the model's, a fixed name read from the cell's tag (names.ts) */
 export function headsOf(headers: readonly string[]): ColumnHead[] {
-  return headers.map((text) => ({ text, fixed: nameOf(text) }));
+  return headers.map((cell) => ({ text: markdownHeaderText(cell), fixed: nameOf(cell) }));
+}
+
+/** A markdown header cell's text as the model has a header's: unescaped, its tags out (SilverBullet leaves `<meta>` out of a column's key) */
+export function markdownHeaderText(cell: string): string {
+  return unescapeCell(cell).replace(metaTagPattern(), "").trim();
 }
 
 /** A column's hashtags (its header's), as text: its type among them (the core's attribute; the column types' module reads it) */
@@ -125,13 +130,11 @@ export function withoutHashtagsWhere(header: string, drop: (tag: string) => bool
 }
 
 /**
- * A header cell as a column name: markdown escapes, hashtags and the
- * emphasis around it (**Qty**) dropped
+ * A header's text (the model's, markdownHeaderText of a markdown cell) as a
+ * column name: its hashtags and the emphasis around it (**Qty**) dropped
  */
 export function columnName(header: string): string {
-  return unescapeCell(header)
-    // Tags are not part of it either: SilverBullet leaves <meta> out of the key
-    .replace(metaTagPattern(), "")
+  return header
     .replace(HASHTAG_RE, "$1")
     .trim()
     .replace(/^[*_`]+|[*_`]+$/g, "")

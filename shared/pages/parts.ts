@@ -2,10 +2,12 @@
 // change, what a plugin asks of it (its section of the builder, `p.properties`,
 // `p.tags`) and how that is written in the text. The builder (changes.ts)
 // makes its sections and the writer (writer.ts) writes the changes by this
-// registry alone, so a part is added here, its types included, and nowhere
-// else. Built in only for now (decided 2026-11-07); another plugin's part
-// would be registered the same way, its types added to `PageChange` and
-// `PageSections` (TypeScript's interface merging for the latter).
+// registry alone. The built-in parts are here; a plugin registers a part of
+// its own (`registerPart(definePluginPart({…}))`: Silverware Table's tables,
+// whose codec stays the table's), its changes and its section typed by the
+// part itself (a page's builder gives the section with `p.part(it)`), so no
+// other plugin's code sees them. Each plugin bundles shared/ of its own, so a
+// part registered is that plugin's writer's alone.
 import { validateAttributeName, writeAttributes } from "../markdown/attributes.ts";
 import { embedAsLink, type EmbedChanges, linkAsEmbed, linkAsText, linkWithText, readEmbeds, readLinks, writeEmbed } from "../markdown/embed.ts";
 import { readGrids } from "../markdown/grid.ts";
@@ -40,55 +42,55 @@ export type TagsRemoval = {
   readonly keepWord?: boolean;
 };
 
-/** One change of a page's content, of a kind a part below writes */
-export type PageChange =
-  | { readonly kind: "setProperty"; readonly path: readonly string[]; readonly value: PropertyValue }
-  | { readonly kind: "removeProperty"; readonly path: readonly string[] }
-  | { readonly kind: "renameTags"; readonly tags: readonly string[]; readonly into: string; readonly subtags: boolean }
-  | { readonly kind: "removeTags"; readonly tags: readonly string[]; readonly subtags: boolean; readonly from: TagsFrom; readonly keepWord: boolean }
-  | { readonly kind: "addTags"; readonly tags: readonly string[] }
+/** The kinds of change of a page's content the built-in parts write (below), each its fields */
+export interface PageChangeKinds {
+  readonly setProperty: { readonly path: readonly string[]; readonly value: PropertyValue };
+  readonly removeProperty: { readonly path: readonly string[] };
+  readonly renameTags: { readonly tags: readonly string[]; readonly into: string; readonly subtags: boolean };
+  readonly removeTags: { readonly tags: readonly string[]; readonly subtags: boolean; readonly from: TagsFrom; readonly keepWord: boolean };
+  readonly addTags: { readonly tags: readonly string[] };
   // A user's script editing the text itself (Silverware Tags' custom operations): the one way past the model
-  | { readonly kind: "editText"; readonly edit: (text: string) => EditResult | Promise<EditResult> }
+  readonly editText: { readonly edit: (text: string) => EditResult | Promise<EditResult> };
   // The body, all after the frontmatter (a database item's); `was`: written only where it is still that
-  | { readonly kind: "setBody"; readonly text: string; readonly was?: string }
+  readonly setBody: { readonly text: string; readonly was?: string };
   // A fenced code block of a language and body (the `occurrence`-th of those alike, counted from 0) written anew
-  | { readonly kind: "replaceCodeBlock"; readonly language: string; readonly body: string; readonly occurrence: number; readonly of?: number; readonly text: string }
+  readonly replaceCodeBlock: { readonly language: string; readonly body: string; readonly occurrence: number; readonly of?: number; readonly text: string };
   // Such a block taken out of the page whole, its fences with it
-  | { readonly kind: "removeCodeBlock"; readonly language: string; readonly body: string; readonly occurrence: number; readonly of?: number }
+  readonly removeCodeBlock: { readonly language: string; readonly body: string; readonly occurrence: number; readonly of?: number };
   // A cell of a grid (Silverware Layout's columns, shared/markdown/grid.ts) given new content: the grid of that body
   // (the `occurrence`-th of those alike), its `cell`-th cell counted from 0
-  | { readonly kind: "replaceGridCell"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly cell: number; readonly content: string }
+  readonly replaceGridCell: { readonly body: string; readonly occurrence: number; readonly of?: number; readonly cell: number; readonly content: string };
   // Several cells of one grid given new content at once (a text moved from one to another): by their index
-  | { readonly kind: "replaceGridCells"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly contents: Readonly<Record<number, string>> }
+  readonly replaceGridCells: { readonly body: string; readonly occurrence: number; readonly of?: number; readonly contents: Readonly<Record<number, string>> };
   // A range of the page's text taken out where it is still `was` (moved elsewhere by the same change: one edit)
-  | { readonly kind: "takeText"; readonly from: number; readonly to: number; readonly was: string }
+  readonly takeText: { readonly from: number; readonly to: number; readonly was: string };
   // A grid's `<grid>` line given attributes (a value set, or null: taken off), the others on it kept
-  | { readonly kind: "setGridAttributes"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly attributes: Readonly<Record<string, string | null>> }
-  | { readonly kind: "changeGridCells"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly cells: GridCellsChange }
-  | { readonly kind: "putIntoGrid"; readonly from: number; readonly to: number; readonly was: string; readonly mode: GridMode; readonly columns: GridColumns }
+  readonly setGridAttributes: { readonly body: string; readonly occurrence: number; readonly of?: number; readonly attributes: Readonly<Record<string, string | null>> };
+  readonly changeGridCells: { readonly body: string; readonly occurrence: number; readonly of?: number; readonly cells: GridCellsChange };
+  readonly putIntoGrid: { readonly from: number; readonly to: number; readonly was: string; readonly mode: GridMode; readonly columns: GridColumns };
   // The blocks of a range moved into a grid (found as a cell's grid is) at a place, by a mode
-  | {
-      readonly kind: "moveIntoGrid";
-      readonly from: number;
-      readonly to: number;
-      readonly was: string;
-      readonly body: string;
-      readonly occurrence: number;
-      readonly of?: number;
-      readonly mode: MoveMode;
-      readonly place: GridPlace;
-    }
+  readonly moveIntoGrid: { readonly from: number; readonly to: number; readonly was: string; readonly body: string; readonly occurrence: number; readonly of?: number; readonly mode: MoveMode; readonly place: GridPlace };
   // An embed (shared/markdown/embed.ts) given an alt text, a size or metadata: the embed of that text (the
   // `occurrence`-th of those alike), written in its own style
-  | { readonly kind: "setEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number; readonly changes: EmbedChanges }
-  | { readonly kind: "embedToLink"; readonly text: string; readonly occurrence: number; readonly of?: number }
-  | { readonly kind: "removeEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number }
-  | { readonly kind: "linkToEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number; readonly changes?: EmbedChanges }
-  | { readonly kind: "linkToText"; readonly text: string; readonly occurrence: number; readonly of?: number }
+  readonly setEmbed: { readonly text: string; readonly occurrence: number; readonly of?: number; readonly changes: EmbedChanges };
+  readonly embedToLink: { readonly text: string; readonly occurrence: number; readonly of?: number };
+  readonly removeEmbed: { readonly text: string; readonly occurrence: number; readonly of?: number };
+  readonly linkToEmbed: { readonly text: string; readonly occurrence: number; readonly of?: number; readonly changes?: EmbedChanges };
+  readonly linkToText: { readonly text: string; readonly occurrence: number; readonly of?: number };
   // A link given another text it shows (a wiki link's alias, a markdown link's text): found as `linkToText` finds it
-  | { readonly kind: "setLinkText"; readonly text: string; readonly occurrence: number; readonly of?: number; readonly shown: string };
+  readonly setLinkText: { readonly text: string; readonly occurrence: number; readonly of?: number; readonly shown: string };
+}
 
-/** The builder's sections, one per part of a page's content (their parts below make them); every method gives the page's builder back */
+/** One change of a page's content, of a kind a built-in part writes (PageChangeKinds) */
+export type BuiltInChange = { readonly [K in keyof PageChangeKinds]: { readonly kind: K } & PageChangeKinds[K] }[keyof PageChangeKinds];
+
+/** A change a plugin's part writes: its kind, and the fields its part reads (definePluginPart) */
+export type PluginChange = { readonly kind: string };
+
+/** One change of a page's content: a built-in part's, or a plugin's part's */
+export type PageChange = BuiltInChange | PluginChange;
+
+/** The builder's sections, one per built-in part of a page's content (below makes them); every method gives the page's builder back */
 export interface PageSections {
   readonly text: {
     /**
@@ -202,23 +204,40 @@ export type WriterOptions = {
   readonly newTagsForm?: FrontmatterForm;
 };
 
-type Kind = PageChange["kind"];
-type ChangeOf<K extends Kind> = Extract<PageChange, { kind: K }>;
+type Kind = BuiltInChange["kind"];
+type ChangeOf<K extends Kind> = Extract<BuiltInChange, { kind: K }>;
 
 /** A part: the kinds of change it writes, how, and the builder's section that makes them (none: a page's own method) */
 export type Part = {
-  readonly kinds: readonly Kind[];
-  readonly section?: { readonly name: keyof PageSections; readonly make: (add: (change: PageChange) => PageBuilder) => unknown };
+  readonly kinds: readonly string[];
+  readonly section?: { readonly name: string; readonly make: (add: (change: PageChange) => PageBuilder) => unknown };
   readonly write: (text: string, change: PageChange, options: WriterOptions) => EditResult | Promise<EditResult>;
 };
 
-/** A part made with its types checked: its section gives only its kinds, its write gets only them */
-function part<K extends Kind, N extends keyof PageSections>(definition: {
+/** A built-in part made with its types checked: its section gives only its kinds, its write gets only them */
+function definePart<K extends Kind, N extends keyof PageSections>(definition: {
   readonly kinds: readonly K[];
   readonly section?: { readonly name: N; readonly make: (add: (change: ChangeOf<K>) => PageBuilder) => PageSections[N] };
   readonly write: (text: string, change: ChangeOf<K>, options: WriterOptions) => EditResult | Promise<EditResult>;
 }): Part {
   return definition as unknown as Part;
+}
+
+/** A plugin's part, the section it gives a page's builder its type (`S`, given by `p.part(it)`) */
+export type PluginPart<S> = Part & { readonly section: { readonly name: string; readonly make: (add: (change: PageChange) => PageBuilder) => S } };
+
+/**
+ * A plugin's part (registered with registerPart) made with its types checked: the changes it writes (`C`, each of
+ * its kinds), the section a page's builder gives of it (named `name`: no two parts the same), how it writes them
+ */
+export function definePluginPart<C extends PluginChange, S>(definition: {
+  readonly name: string;
+  readonly kinds: readonly C["kind"][];
+  readonly section: (add: (change: C) => PageBuilder) => S;
+  readonly write: (text: string, change: C, options: WriterOptions) => EditResult | Promise<EditResult>;
+}): PluginPart<S> {
+  const { name, kinds, section, write } = definition;
+  return { kinds, section: { name, make: section as (add: (change: PageChange) => PageBuilder) => S }, write: write as Part["write"] };
 }
 
 const list = (tags: string | readonly string[]) => (typeof tags === "string" ? [tags] : [...tags]);
@@ -371,8 +390,8 @@ const BODY: ReadonlySet<TagContext> = new Set(["paragraph", "item", "task", "tab
 const removeHow = (from: TagsFrom, keepWord: boolean): RemoveHow =>
   from === "body" ? { frontmatter: false, contexts: BODY, keepWord } : from === "pageTags" ? { contexts: new Set<TagContext>(["page"]) } : { keepWord };
 
-export const PARTS: readonly Part[] = [
-  part({
+const BUILT_IN: readonly Part[] = [
+  definePart({
     kinds: ["takeText"],
     section: {
       name: "text",
@@ -385,7 +404,7 @@ export const PARTS: readonly Part[] = [
       return { text: text.slice(0, change.from) + text.slice(change.to), changes: change.from < change.to ? 1 : 0 };
     },
   }),
-  part({
+  definePart({
     kinds: ["setProperty", "removeProperty"],
     section: {
       name: "properties",
@@ -396,7 +415,7 @@ export const PARTS: readonly Part[] = [
     },
     write: (text, change) => propertyEdit(text, change.path, change.kind === "setProperty" ? change.value : undefined),
   }),
-  part({
+  definePart({
     kinds: ["renameTags", "removeTags", "addTags"],
     section: {
       name: "tags",
@@ -416,8 +435,8 @@ export const PARTS: readonly Part[] = [
           : addPageTags(text, change.tags, options.newTagsForm ?? "flow"),
   }),
   // A user's script editing the text itself: the page builder's own `editText`, no section
-  part({ kinds: ["editText"], write: (text, change) => change.edit(text) }),
-  part({
+  definePart({ kinds: ["editText"], write: (text, change) => change.edit(text) }),
+  definePart({
     kinds: ["replaceCodeBlock", "removeCodeBlock"],
     section: {
       name: "codeBlocks",
@@ -445,7 +464,7 @@ export const PARTS: readonly Part[] = [
       return { text: text.slice(0, block.bodyFrom) + insert + text.slice(block.bodyTo), changes: 1 };
     },
   }),
-  part({
+  definePart({
     kinds: ["replaceGridCell", "replaceGridCells", "setGridAttributes", "changeGridCells", "putIntoGrid", "moveIntoGrid"],
     section: {
       name: "grids",
@@ -552,7 +571,7 @@ export const PARTS: readonly Part[] = [
       return after === text ? { text, changes: 0 } : { text: after, changes: 1 };
     },
   }),
-  part({
+  definePart({
     kinds: ["setEmbed", "embedToLink", "removeEmbed"],
     section: {
       name: "embeds",
@@ -587,7 +606,7 @@ export const PARTS: readonly Part[] = [
       return { text: text.slice(0, embed.from) + written + text.slice(embed.to), changes: 1 };
     },
   }),
-  part({
+  definePart({
     kinds: ["linkToEmbed", "linkToText", "setLinkText"],
     section: {
       name: "links",
@@ -612,7 +631,7 @@ export const PARTS: readonly Part[] = [
     },
   }),
   // The body: the page builder's own `body`, no section
-  part({
+  definePart({
     kinds: ["setBody"],
     write: (text, change) => {
       const start = readFrontmatter(text).bodyStart;
@@ -626,7 +645,38 @@ export const PARTS: readonly Part[] = [
   }),
 ];
 
-const partOf = new Map(PARTS.flatMap((one) => one.kinds.map((kind) => [kind, one] as const)));
+const parts: Part[] = [...BUILT_IN];
+const partOf = new Map(parts.flatMap((one) => one.kinds.map((kind) => [kind, one] as const)));
+
+/** The parts as they are now: the built-in ones, then those registered, in that order */
+export function partsNow(): readonly Part[] {
+  return [...parts];
+}
+
+/** Whether a part is the writer's (built in, or registered) */
+export function isPart(one: Part): boolean {
+  return parts.includes(one);
+}
+
+/** The built-in parts: their sections are a page's builder's own (PageSections) */
+export function builtInParts(): readonly Part[] {
+  return BUILT_IN;
+}
+
+/**
+ * A plugin's part added to the writer's (the same part again: nothing). A
+ * kind another part writes, or a section another makes, is refused: a part is
+ * its kinds' and its section's one writer
+ */
+export function registerPart(one: Part): void {
+  if (parts.includes(one)) return;
+  const taken = one.kinds.find((kind) => partOf.has(kind));
+  if (taken) throw new Error(`a part writes changes of the kind ${taken} already`);
+  const section = one.section?.name;
+  if (section && parts.some((other) => other.section?.name === section)) throw new Error(`a part makes the section ${String(section)} already`);
+  parts.push(one);
+  for (const kind of one.kinds) partOf.set(kind, one);
+}
 
 /** One change applied to a page's text, by the part that writes its kind */
 export async function written(text: string, change: PageChange, options: WriterOptions): Promise<EditResult> {

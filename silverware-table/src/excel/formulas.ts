@@ -5,20 +5,9 @@
 // [@qty] (the cell in the formula's row), the table's named cells and rows.
 // Anything that cannot be written so (another table or page, a function
 // Excel has no form of) makes the formula its cell's value, with the reason.
-import { type Table } from "../markdown.ts";
-import {
-  columnLetters,
-  type FormulaNode,
-  FormulaError,
-  functionNamed,
-  isCustomFunction,
-  parseFormula,
-  referencedColumn,
-  totalRows,
-  cellsByName,
-  type FormulaCells,
-  rowsByName,
-} from "../formulas/index.ts";
+import { modelHeads } from "../../../shared/table/columns.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
+import { columnLetters, type FormulaNode, FormulaError, functionNamed, isCustomFunction, parseFormula, referencedColumn, totalRows, cellsByName, type FormulaCells, rowsByName } from "../../../shared/formulas/index.ts";
 import { type ExcelTemplates, excelCall, hasTemplate } from "./functions.ts";
 
 // The error values Excel has (ours #CYCLE! and #ERROR! are not among them)
@@ -49,7 +38,7 @@ type Written = { readonly text: string; readonly range: boolean };
  * Table1[[#This Row],[qty]])
  */
 export type ExcelTable = {
-  readonly table: Table;
+  readonly table: TableModel;
   readonly name?: string;
   readonly cells: FormulaCells;
   readonly structured?: { readonly name: string; readonly columns: readonly string[]; readonly totalsRow: boolean };
@@ -65,8 +54,8 @@ export function structuredColumn(name: string): string {
 export function excelFormula(formula: string, { table, name, cells, structured, totals: given }: ExcelTable, row: number, column: number, templates: ExcelTemplates = {}): ExcelFormula {
   const tree = parseFormula(formula);
   if (tree instanceof FormulaError) return { reason: `it cannot be read: ${tree.detail}` };
-  const headers = table.rows[0]?.cells ?? [];
-  const bodyRows = table.rows.length - 1;
+  const headers = modelHeads(table);
+  const bodyRows = table.rows.length;
   let array = false;
   let totals: ReadonlySet<number> | undefined = given;
 

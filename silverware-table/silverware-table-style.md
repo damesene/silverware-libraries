@@ -419,7 +419,7 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
 .sb-table-widget.swt-over-window > table {
   margin-top: 66px;
 }
-/* A table Silverware Table draws itself (the sheet: core/silverbullet/drawn.ts),
+/* A table Silverware Table draws itself (the sheet: host/silverbullet/drawn.ts),
    outside SilverBullet's editor: SilverBullet's own rules for its tables
    (#sb-main .cm-editor) do not reach it, so they are said again here */
 .sb-table-widget.swt-drawn {
@@ -524,7 +524,7 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
   display: none;
 }
 
-/* The sheet module (core/silverbullet/modules/sheet.ts): the board, one box
+/* The sheet module (host/silverbullet/modules/sheet.ts): the board, one box
    over the window holding the sheet's tables (drawn by the module), each at
    its place, on a grid of rows of one height (--swt-sheet-row) and the
    sheet's columns' widths. The room for the letters (above) and the numbers

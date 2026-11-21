@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseTable } from "../markdown.ts";
-import { CELLS } from "../testing/formulas.ts";
+import { CELLS, model } from "../testing/formulas.ts";
 import { definitionAttributes, groupFormula, type Key, type PivotDefinition, readDefinition, sourceRef, sourceText, splitList, valueItem, valueParts } from "./definition.ts";
 import { pivotOf } from "./pivot.ts";
 
@@ -24,7 +24,7 @@ const definition = (attributes: Partial<Record<Key, string>>): PivotDefinition =
   if (!read || "problem" in read) throw new Error(`no definition: ${read && read.problem}`);
   return read;
 };
-const pivot = (attributes: Partial<Record<Key, string>>, source = ORDERS) => pivotOf(source, definition(attributes), { cells: CELLS });
+const pivot = (attributes: Partial<Record<Key, string>>, source = ORDERS) => pivotOf(model(source), definition(attributes), { cells: CELLS });
 const table = (attributes: Partial<Record<Key, string>>) => {
   const { columns, body } = pivot(attributes);
   return [columns.map((c) => c.header), ...body];
@@ -146,7 +146,7 @@ describe("a pivot calculated", () => {
 |---|--:|
 | a | 1<meta formulas.f='=1+1'> |
 | a | 3 |`);
-    const { columns, body } = pivotOf(priced, definition({ rows: "item", values: "SUM([price]), COUNTA([price])" }), { cells: CELLS });
+    const { columns, body } = pivotOf(model(priced), definition({ rows: "item", values: "SUM([price]), COUNTA([price])" }), { cells: CELLS });
     expect(columns.map((c) => c.header)).toEqual(["Item", "Sum of Price #euro", "Count of Price"]);
     // The formula's result as written (1), not calculated anew (2)
     expect(body[0]).toEqual(["a", "4", "2"]);
@@ -162,7 +162,7 @@ describe("a pivot calculated", () => {
 
   it("keeps a type's hashtag apart from the value's name, wherever the source's header had it", () => {
     const rated = parseTable("| Item | #stars Rating |\n|---|---|\n| a | 4 |\n| a | 2 |");
-    expect(pivotOf(rated, definition({ rows: "item", values: "AVERAGE([rating])" }), { cells: CELLS }).columns.map((c) => c.header)).toEqual(["Item", "Average of Rating #stars"]);
+    expect(pivotOf(model(rated), definition({ rows: "item", values: "AVERAGE([rating])" }), { cells: CELLS }).columns.map((c) => c.header)).toEqual(["Item", "Average of Rating #stars"]);
   });
 
   it("shows a value as its share of the grand total, beside the value itself, as a percentage", () => {

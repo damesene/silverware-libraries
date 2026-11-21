@@ -601,7 +601,7 @@ if js and js.window then
     end
   end
   -- Formulas written in a page's text, in a call of silverware.table.evaluate, evaluateText or an alias of either: their places
-  -- found by the finder made for those names (the JS's Lua side, host/lua.ts), so their references follow the
+  -- found by the finder made for those names (the JS's Lua side, host/silverbullet/lua.ts), so their references follow the
   -- edits of tables made with Silverware Table, in the same edit. Made again when an alias is added (the API
   -- page's evaluateAlias and evaluateTextAlias, which may run before or after this block)
   silverware_internal = silverware_internal or {}

@@ -121,6 +121,21 @@ describe("Silverware Layout's app over a page of no host's", () => {
     expect(root.getAttribute("data-swl-font-size")).toBe("20");
   });
 
+  it("tells what reads the page's look once its font shows at another size, not when it shows at the same", async () => {
+    const { page } = plainPage();
+    const { api, store } = memoryStore({ Page: undefined }, { fontSize: 20 });
+    const app = new LayoutApp(document, page, new Registry(() => undefined));
+    let told = 0;
+    app.fontSizeChanged = () => void told++;
+    await app.start(api);
+    expect(told).toBe(1);
+    await app.start(api);
+    expect(told).toBe(1);
+    store.zoom = 30;
+    await app.start(api);
+    expect(told).toBe(2);
+  });
+
   it("closes its dialog as another page opens under it, the page put back: its Save would write into the other", async () => {
     const { page, shown } = plainPage();
     const { api, store } = memoryStore({ First: undefined, Second: { amount: 700, unit: "px" } });

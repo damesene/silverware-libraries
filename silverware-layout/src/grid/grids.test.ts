@@ -74,6 +74,39 @@ describe("the grids", () => {
     expect(state.settled).toEqual([grid]);
   });
 
+  it("takes the host's editor's look as it draws a grid, and again once the page's look changed (its font zoomed)", async () => {
+    const { gridHost } = host(`# A\n\n<grid>\n${body}\n</grid>\n`);
+    let above = "0.375em";
+    const grids = new Grids(document, { ...gridHost, pageEditorLook: () => ({ heading2: { "padding-top": above } }) });
+    const grid = await grids.render(body);
+    document.body.append(grid);
+    expect(grid.style.getPropertyValue("--swl-h2-above")).toBe("0.375em");
+    above = "0.2em";
+    grids.pageLookChanged();
+    expect(grid.style.getPropertyValue("--swl-h2-above")).toBe("0.2em");
+  });
+
+  it("reads the page's look once for every grid as it changed, and a grid drawn before it and put into the page after takes it then", async () => {
+    const { gridHost } = host(`# A\n\n<grid>\n${body}\n</grid>\n\n<grid>\n${body}\n</grid>\n`);
+    let above = "0.375em";
+    let reads = 0;
+    const grids = new Grids(document, { ...gridHost, pageEditorLook: () => (reads++, { heading2: { "padding-top": above } }) });
+    const shown = await grids.render(body);
+    const later = await grids.render(body);
+    const embedded = await grids.drawText(`<grid>\n${body}\n</grid>`);
+    document.body.append(shown);
+    above = "0.2em";
+    reads = 0;
+    grids.pageLookChanged();
+    expect(reads).toBe(1);
+    expect(shown.style.getPropertyValue("--swl-h2-above")).toBe("0.2em");
+    expect(later.style.getPropertyValue("--swl-h2-above")).toBe("0.375em");
+    reads = 0;
+    document.body.append(later, embedded!);
+    await vi.waitFor(() => expect([later, embedded!].map((grid) => grid.style.getPropertyValue("--swl-h2-above"))).toEqual(["0.2em", "0.2em"]), { timeout: 5_000 });
+    expect(reads).toBe(1);
+  });
+
   it("shows a cell the host could not render as its text, and draws a grid not in the page as one column per cell", async () => {
     const { gridHost } = host("no grid here", "Right");
     const grid = await new Grids(document, gridHost).render(body);

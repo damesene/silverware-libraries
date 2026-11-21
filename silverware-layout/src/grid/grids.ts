@@ -195,6 +195,10 @@ export class Grids {
   private changedSinceTold = false;
   // The watch of grids put into the page (`watchMounted`)
   private mounted: MutationObserver | undefined;
+  // How often the page's look changed (`pageLookChanged`), and which change each grid took: one drawn before a change
+  // and put into the page after it takes it then
+  private lookChanges = 0;
+  private readonly lookTaken = new WeakMap<HTMLElement, number>();
   private readonly listeners = new Set<(items: readonly RenderedItem[]) => void>();
   /** What the grids drew in their cells and where it is in the page, for another to decorate (shared/rendered.ts; what draws embeds in their fields is the API's, src/index.ts) */
   readonly rendered: Rendered = {
@@ -392,15 +396,22 @@ export class Grids {
     if (!win || !this.doc.body) return;
     const isGrid = (node: Node): boolean => node instanceof win.HTMLElement && node.classList.contains("swl-grid") && this.bodies.has(node);
     this.mounted = new win.MutationObserver((records) => {
+      let put = false;
+      // (The page's look read once for the grids put in together)
+      let look: EditorLook | undefined;
       for (const record of records)
         for (const node of record.addedNodes) {
           if (!(node instanceof win.HTMLElement)) continue;
-          if (isGrid(node) || [...node.querySelectorAll(".swl-grid")].some(isGrid)) {
-            this.changedSinceTold = true;
-            this.refreshSoon();
-            return;
+          const grids = node.classList.contains("swl-grid") ? [node] : [...node.querySelectorAll<HTMLElement>(".swl-grid")];
+          for (const grid of grids) {
+            // (Drawn before the page's look last changed: it takes the look now)
+            if ((this.bodies.has(grid) || grid.classList.contains("swl-grid-shown")) && this.lookTaken.get(grid) !== this.lookChanges) this.showPageLook(grid, (look ??= this.host.pageEditorLook?.() ?? {}));
+            if (isGrid(grid)) put = true;
           }
         }
+      if (!put) return;
+      this.changedSinceTold = true;
+      this.refreshSoon();
     });
     this.mounted.observe(this.doc.body, { childList: true, subtree: true });
   }
@@ -421,6 +432,8 @@ export class Grids {
     this.host.highlightCode?.(element);
     this.showPageLook(element);
     element.classList.add("swl-grid-shown");
+    // (Put into the page later: the look it takes then, `watchMounted`)
+    this.watchMounted();
     return element;
   }
 
@@ -472,11 +485,24 @@ export class Grids {
   }
 
   /**
+   * The grids drawn given the host's editor's look as it is now (its font shown at another size: a zoom), what their
+   * cells' rendering takes of it read again, once for all of them; one drawn but not in the page yet takes it as it is
+   * put in (`watchMounted`)
+   */
+  pageLookChanged(): void {
+    this.lookChanges++;
+    const grids = [...this.doc.querySelectorAll<HTMLElement>(".swl-grid")].filter((element) => this.bodies.has(element) || element.classList.contains("swl-grid-shown"));
+    if (!grids.length) return;
+    const look = this.host.pageEditorLook?.() ?? {};
+    for (const element of grids) this.showPageLook(element, look);
+  }
+
+  /**
    * A grid drawn given what its cells' rendering takes of the host's editor's look where no theme's variable tells it
    * (`PAGE_LOOK`), as variables of its own the style page reads; none where the host reads none (the style page's own)
    */
-  private showPageLook(element: HTMLElement): void {
-    const look = this.host.pageEditorLook?.() ?? {};
+  private showPageLook(element: HTMLElement, look: EditorLook = this.host.pageEditorLook?.() ?? {}): void {
+    this.lookTaken.set(element, this.lookChanges);
     for (const [part, property, variable] of PAGE_LOOK) {
       const value = look[part]?.[property];
       if (value) element.style.setProperty(variable, value);

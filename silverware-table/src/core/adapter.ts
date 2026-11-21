@@ -2,7 +2,7 @@
 // keeps the model (tables by key, cells by their row in the markdown and
 // their column), the view, the editor's state and the writes, and asks the
 // adapter to show what the features want; the adapter knows the rendering
-// (SilverBullet's tables today: core/silverbullet/) and answers in model
+// (SilverBullet's tables today: host/silverbullet/) and answers in model
 // terms. Another rendering (the sheet's own tables, the page's tables drawn
 // by Silverware Table itself) is another adapter.
 //
@@ -10,8 +10,20 @@
 // what is not here yet is still the controller's own DOM code.
 import type { CellRef, ColumnsMeasure, ColumnWidths, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "./feature.ts";
 import type { MergedLooks } from "./looks.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
+import type { TablePlatform } from "./platform.ts";
+import type { StoredTable, TableRevision } from "./store.ts";
+import type { TableKey } from "./tables.ts";
 
 export interface TableAdapter {
+  /** The table of the page a rendered table is; why none is; undefined: rendered anew meanwhile */
+  pair(widget: HTMLElement, table: HTMLTableElement): Promise<PairedTable | Unpaired | undefined>;
+  /**
+   * The table's source shown: the editor's cursor put into it, at its start
+   * or (`at`) in a cell, where a point of it is in its text (a plain cell's
+   * character there, else the cell's start); false: the table not found
+   */
+  showSource(info: WidgetInfo, at?: { readonly ref: CellRef; readonly cell: HTMLTableCellElement; readonly x: number; readonly y: number }): Promise<boolean>;
   /** The features' looks applied to a table's cells and headers (`only`: to those); `editing`: the cell edited (its field shows, not a display) */
   applyLooks(info: WidgetInfo, looks: MergedLooks, editing: CellRef | undefined, only?: readonly CellRef[]): void;
   /** A cell's text as its markdown renders, before any look; undefined: not rendered */
@@ -71,3 +83,43 @@ export interface TableAdapter {
   /** Silverware Table stops: what the adapter added to the page goes */
   stop(): void;
 }
+
+/**
+ * A rendered table paired with a table of the page (TableAdapter.pair): its
+ * key, model and revision as read now, its document and the document's
+ * tables as read with it, whether the rendering shows a metadata row
+ */
+export type PairedTable = {
+  readonly key: TableKey;
+  readonly model: TableModel;
+  readonly revision: TableRevision;
+  readonly document: string;
+  readonly tables: readonly StoredTable[];
+  readonly metaRow: boolean;
+};
+
+/** A table of the page whose empty headers keep it from being paired (by its key and revision): naming them makes it a table shown */
+export type EmptyHeaders = { readonly document: string; readonly key: TableKey; readonly revision: TableRevision };
+
+/**
+ * Why a rendered table is paired with none of the page's: no place given to
+ * find it by, or none is it (a table in a block quote; `emptyHeaders`: one
+ * whose headers are empty, which naming them would make a table)
+ */
+export type Unpaired = { readonly unpaired: "unplaced" } | { readonly unpaired: "unfound"; readonly emptyHeaders?: EmptyHeaders };
+
+/** What pairing a rendered table asks of the core: the platform (the page's text read) */
+export type PairingContext = {
+  platform(): TablePlatform;
+};
+
+/** What the adapter needs to know of the core: which tables it enhanced, and a row taken out of the document put back (largeTables) */
+export type AdapterContext = PairingContext & {
+  infoOf(widget: HTMLElement): WidgetInfo | undefined;
+  rowNeeded(info: WidgetInfo, row: HTMLTableRowElement): void;
+  holdInDocument(info: WidgetInfo, row: HTMLTableRowElement | undefined): void;
+  floating(className: string): HTMLElement;
+  place(element: HTMLElement, left: number, top: number): void;
+  // A table's columns took other widths after layout (ColumnLayouts): what is placed by them follows
+  columnsResized(info: WidgetInfo): void;
+};

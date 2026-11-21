@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { metaName, metaValue } from "../meta.ts";
-import { pageTablesOf, parseTable, type Table } from "../markdown.ts";
+import { pageTablesOf, parseTable } from "../markdown.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
+import { decode, encode } from "../store/markdown/codec.ts";
 import { VIEW_CELLS } from "../testing/formulas.ts";
-import { evaluateFormula, FormulaError, Grid, recalculate, referredPages, referredTableNames, viewResult } from "./index.ts";
-import { pageTables, tablesWritten } from "./page.ts";
+import { evaluateFormula, FormulaError, Grid, recalculate, referredPages, referredTableNames, viewResult } from "../../../shared/formulas/index.ts";
+import { pageTables, tablesWritten } from "../../../shared/formulas/page.ts";
 
 const TASKS = [
   "| Name | Assignee | Hours |",
@@ -19,15 +21,15 @@ const VIEW = (formula: string, name = "mine", body = "| x |\n|---|\n| old |") =>
 
 /** The page's tables as formulas see them, with views */
 function sourceOf(page: string, here = "Page", others?: Record<string, string>) {
-  const named = (text: string) => pageTablesOf(text).map((t) => ({ ...t, name: metaName(t.table) }));
+  const named = (text: string) => pageTablesOf(text).map((t) => ({ key: String(t.range.from), table: decode(t.table), name: metaName(t.table) }));
   return pageTables(VIEW_CELLS, () => named(page), here, undefined, others && { pages: { tables: (p) => (p in others ? named(others[p]!) : undefined) } });
 }
 
-/** The page's table named so */
-const tableNamed = (page: string, name: string): Table => pageTablesOf(page).find((t) => metaName(t.table) === name)!.table;
+/** The page's table named so, as the model */
+const tableNamed = (page: string, name: string): TableModel => decode(pageTablesOf(page).find((t) => metaName(t.table) === name)!.table);
 
 /** A view's formula as written in its metadata row */
-const formulaOf = (table: Table) => metaValue(table, "view", "formula") ?? "";
+const formulaOf = (table: TableModel) => metaValue(table, "view", "formula") ?? "";
 
 const resultOf = (page: string, name: string) => {
   const table = tableNamed(page, name);
@@ -79,7 +81,7 @@ describe("views in formulas", () => {
     expect((resultOf(pair, "a") as FormulaError).code).toBe("#CYCLE!");
     expect((resultOf(pair, "b") as FormulaError).code).toBe("#CYCLE!");
     // Told by its name, whichever object of its table is calculated (a copy, as a view's Out of date check holds)
-    const copy = parseTable(pageTablesOf(pair)[0]!.range.text);
+    const copy = decode(parseTable(pageTablesOf(pair)[0]!.range.text));
     const cycle = viewResult(copy, { cells: VIEW_CELLS, tables: sourceOf(pair), name: "a" }, formulaOf(copy)) as FormulaError;
     expect(cycle.detail).toBe("the table b cannot be calculated: the table a depends on its own result");
   });
@@ -102,7 +104,8 @@ describe("views in formulas", () => {
     const second = VIEW("=CHOOSECOLS(big![#Data], 3)", "hours");
     const total = "| Total |\n|---|\n| 0 <meta formulas.f='=SUM(hours![hours])'> |";
     const page = `${TASKS}\n\n${first}\n\n${second}\n\n${total}\n`;
-    const table = recalculate(parseTable(total), { cells: VIEW_CELLS, tables: sourceOf(page) });
+    const written = parseTable(total);
+    const table = encode(recalculate(decode(written), { cells: VIEW_CELLS, tables: sourceOf(page) }), written);
     expect(table.rows[1]!.cells[0]).toBe("5 <meta formulas.f='=SUM(hours![hours])'>");
   });
 
@@ -115,12 +118,12 @@ describe("views in formulas", () => {
   });
 
   it("counts a view's formula among what its table refers to: tables, pages, and so the tables a write recalculates", () => {
-    const view = parseTable(VIEW("=SORT(tasks![#Data])"));
+    const view = decode(parseTable(VIEW("=SORT(tasks![#Data])")));
     expect(referredTableNames(VIEW_CELLS, view)).toEqual(new Set(["tasks"]));
-    expect(referredPages(VIEW_CELLS, parseTable(VIEW("=SORT([[Other]]tasks![#Data])")))).toEqual(new Set(["Other"]));
+    expect(referredPages(VIEW_CELLS, decode(parseTable(VIEW("=SORT([[Other]]tasks![#Data])"))))).toEqual(new Set(["Other"]));
     const total = "| Total |\n|---|\n| 0 <meta formulas.f='=SUM(mine![hours])'> |";
     const page = `${TASKS}\n\n${VIEW("=SORT(tasks![#Data])")}\n\n${total}\n`;
-    const all = pageTablesOf(page).map((t) => ({ ...t, name: metaName(t.table) }));
-    expect(tablesWritten(VIEW_CELLS, all, all[0]!.range.text).length).toBe(3);
+    const all = pageTablesOf(page).map((t) => ({ key: String(t.range.from), table: decode(t.table), name: metaName(t.table) }));
+    expect(tablesWritten(VIEW_CELLS, all, all[0]!.key).length).toBe(3);
   });
 });

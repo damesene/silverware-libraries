@@ -14,12 +14,12 @@
 // table copied with it): formulas elsewhere use the first of them, so each
 // such table's name shows in the danger color in the toolbar, whatever the
 // setting, and it is said once (again once it was not shared meanwhile).
-import { columnIdOf } from "../columns.ts";
-import type { CellLook, CellRef, Feature, HeaderLook, NamingTarget, ModelHost, TableLooks, ToolbarButton, TableInfo } from "../core/feature.ts";
-import { functionNamed } from "../formulas/index.ts";
-import { findTables, locateBySource, parseTable, type Table } from "../markdown.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
+import { columnIdOf, modelHeads } from "../../../shared/table/columns.ts";
+import type { CellLook, CellRef, Feature, HeaderLook, NamingTarget, ModelHost, StoredTable, TableLooks, ToolbarButton, TableInfo } from "../core/feature.ts";
+import { functionNamed } from "../../../shared/formulas/index.ts";
 import type { MenuNaming } from "../menu.ts";
-import { validateName, sameTableName, validateTableName } from "../namerules.ts";
+import { validateName, sameTableName, validateTableName } from "../../../shared/table/namerules.ts";
 
 /** Names, as a sentence lists them: "pear, fig and 3 more" */
 function listed(names: readonly string[]): string {
@@ -33,26 +33,26 @@ export class Names implements Feature {
   constructor(private readonly host: ModelHost) {}
 
   // The names (lowercase) more than one table of the page has, by how many, for the page's text as last read
-  private shared: { readonly text: string; readonly names: ReadonlyMap<string, number> } | undefined;
+  private shared: { readonly tables: readonly StoredTable[]; readonly names: ReadonlyMap<string, number> } | undefined;
   // The names said to be shared on this page so far
   private readonly told = new Set<string>();
 
   private sharedNames(): ReadonlyMap<string, number> {
-    const text = this.host.pageText;
-    if (this.shared?.text !== text) {
+    const tables = this.host.documentTables();
+    if (this.shared?.tables !== tables) {
       const counts = new Map<string, number>();
-      for (const range of findTables(text)) {
-        const name = this.host.tableName(parseTable(range.text))?.toLowerCase();
+      for (const { model } of tables) {
+        const name = this.host.tableName(model)?.toLowerCase();
         if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
       }
-      this.shared = { text, names: new Map([...counts].filter(([, n]) => n > 1)) };
+      this.shared = { tables, names: new Map([...counts].filter(([, n]) => n > 1)) };
     }
     return this.shared.names;
   }
 
   /** The table's name, if another table of the page has it too */
   private sharedName(info: TableInfo): string | undefined {
-    const name = this.host.tableName(parseTable(info.source));
+    const name = this.host.tableName(info.model);
     return name && this.sharedNames().has(name.toLowerCase()) ? name : undefined;
   }
 
@@ -63,17 +63,17 @@ export class Names implements Feature {
 
   /** A table whose name another has too: said, once for that name on the page */
   enhanced(info: TableInfo): void {
-    // (The page's text as last read without this table as rendered: read before it, nothing to tell by)
-    if (!this.host.pageText.includes(info.source)) return;
+    // (The page's tables as last read without this table as rendered: read before it, nothing to tell by)
+    if (!this.host.documentTables().some((t) => t.key === info.key && t.revision === info.revision)) return;
     const shared = this.sharedNames();
-    const own = this.host.tableName(parseTable(info.source))?.toLowerCase();
+    const own = this.host.tableName(info.model)?.toLowerCase();
     // No longer shared (renamed): said again should it be shared again
     if (own && !shared.has(own)) this.told.delete(own);
     const name = this.sharedName(info);
     if (!name || this.told.has(name.toLowerCase())) return;
     this.told.add(name.toLowerCase());
     const count = shared.get(name.toLowerCase())!;
-    void this.host.bridge.flash(
+    this.host.notify(
       `Silverware Table: ${count} tables on this page are named ${name}: formulas in other tables use the first of them. Rename the others (their name in the toolbar, in red)`,
       "error",
       // Until closed: what is wrong stays wrong until a table is renamed
@@ -81,25 +81,22 @@ export class Names implements Feature {
     );
   }
 
-  /** Deleting a column removes the names of the rows and cells it holds, and the formulas using them break */
+  /**
+   * Deleting a column removes the names of the cells it holds, and the formulas using them break (a row's name is
+   * the row's: it stays, wherever the table keeps it)
+   */
   columnDeleteWarning(info: TableInfo, column: number): string | undefined {
-    const table = parseTable(info.source);
-    const rows = this.host.rowNames(table).flatMap((named) => (named.column === column ? [named.name] : []));
-    const cells = this.host.cellNames(table).flatMap((named) => (named.column === column ? [named.name] : []));
-    if (!rows.length && !cells.length) return undefined;
-    const lost = [
-      ...(rows.length ? [`the name${rows.length === 1 ? "" : "s"} of ${rows.length === 1 ? "the row" : `${rows.length} rows`} ${listed(rows)}`] : []),
-      ...(cells.length ? [`the name${cells.length === 1 ? "" : "s"} of ${cells.length === 1 ? "the cell" : `${cells.length} cells`} ${listed(cells)}`] : []),
-    ];
-    return `${lost.join(" and ")}: formulas that use ${rows.length + cells.length === 1 ? "it" : "them"} show #REF! or #NAME?`;
+    const cells = this.host.cellNames(info.model).flatMap((named) => (named.column === column ? [named.name] : []));
+    if (!cells.length) return undefined;
+    return `the name${cells.length === 1 ? "" : "s"} of ${cells.length === 1 ? "the cell" : `${cells.length} cells`} ${listed(cells)}: formulas that use ${cells.length === 1 ? "it" : "them"} show #REF! or #NAME?`;
   }
 
   /** Named cells show a mark in their corner, and their name on hover */
-  looks(_info: TableInfo, table: Table): TableLooks | undefined {
+  looks(_info: TableInfo, table: TableModel): TableLooks | undefined {
     const headers: ({ column: number } & HeaderLook)[] = [];
     const cells: (CellRef & CellLook)[] = [];
     // A column's name: the same mark in its header
-    table.rows[0]?.cells.forEach((_, column) => {
+    table.columns.forEach((_, column) => {
       const name = this.host.columnName(table, column);
       if (name) headers.push({ column, marks: ["named"], title: `Column name: ${name}` });
     });
@@ -111,7 +108,7 @@ export class Names implements Feature {
 
   /** The table's name in the toolbar's row of names, Table (muted) without one: a click on it its field */
   toolbarButtons(info: TableInfo): ToolbarButton[] {
-    const name = this.host.tableName(parseTable(info.source));
+    const name = this.host.tableName(info.model);
     const shared = this.sharedName(info) !== undefined;
     const title = shared
       ? `Another table on this page is named ${name} too: formulas in other tables use the first of them (${name}!A1). Click to rename this one`
@@ -130,7 +127,7 @@ export class Names implements Feature {
    * the setting off only one already there can be changed or removed.
    */
   menuNaming(info: TableInfo, target: NamingTarget): MenuNaming | undefined {
-    const table = parseTable(info.source);
+    const table = info.model;
     const needs = "Needs the Store table metadata setting";
     if (target.kind === "table") {
       const name = this.host.tableName(table);
@@ -179,19 +176,18 @@ export class Names implements Feature {
    * why, when it is not a valid name or another table on the page has it
    */
   private async renameTable(shownInfo: TableInfo, name: string): Promise<string | undefined> {
-    const shown = parseTable(shownInfo.source);
+    const shown = shownInfo.model;
     // Against the name as stored, so an empty answer also clears a name that is not valid
     if (name === (this.host.writtenTableName(shown)?.trim() ?? "")) return this.unchanged();
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
     const problem = name === "" ? undefined : validateTableName(name);
     if (problem) return problem;
     if (name !== "") {
-      const text = await this.host.bridge.getText();
-      // This table where it is now: its position may have moved since it was rendered
-      const self = locateBySource(text, info.hint, info.source);
-      const taken = findTables(text).some((range) => {
-        if (range.from === self?.from) return false;
-        const other = this.host.tableName(parseTable(range.text));
+      // The page's tables as they are now, this one by its key (it may have moved since it was rendered)
+      const tables = (await this.host.tables(await this.host.documentNameNow())) ?? [];
+      const taken = tables.some(({ key, model }) => {
+        if (key === info.key) return false;
+        const other = this.host.tableName(model);
         return other !== undefined && sameTableName(other, name);
       });
       if (taken) return `another table on this page is named ${name}`;
@@ -203,7 +199,7 @@ export class Names implements Feature {
 
   /** Names a row (empty: unnames it); refused, with why, when not valid or another row of the table has it */
   private async nameRow(shownInfo: TableInfo, row: number, name: string): Promise<string | undefined> {
-    const table = parseTable(shownInfo.source);
+    const table = shownInfo.model;
     const current = this.host.rowName(table, row) ?? "";
     if (name === current) return this.unchanged();
     let problem = name === "" ? undefined : validateName(name, "row");
@@ -242,8 +238,8 @@ export class Names implements Feature {
 
   /** Names a column (empty: unnames it); refused, with why, when not valid or another column answers to it */
   private async rename(shownInfo: TableInfo, column: number, name: string): Promise<string | undefined> {
-    const table = parseTable(shownInfo.source);
-    const headers = table.rows[0]?.cells ?? [];
+    const table = shownInfo.model;
+    const headers = modelHeads(table);
     const current = this.host.columnName(table, column) ?? "";
     if (name === current) return this.unchanged();
     const problem = name === "" ? undefined : validateName(name, "column");

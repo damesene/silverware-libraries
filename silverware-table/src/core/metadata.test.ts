@@ -1,0 +1,423 @@
+// @vitest-environment jsdom
+import { describe, expect, it, vi } from "vitest";
+import { STORE_SORT_DELAY_MS } from "../controller.ts";
+import { parseTable } from "../markdown.ts";
+import { decode } from "../store/markdown/codec.ts";
+import { bridge, PAGE, bodyTexts, buttonLabel, cell, cellMenuItem, clickOn, controller, editor, flashes, flush, key, menuButtons, nameInMenu, setup, tableMenuItem, text, toolbarName, useTablePage } from "../testing/page.ts";
+
+describe("Table metadata", () => {
+  useTablePage();
+
+  // The sorting stored once the clicks have settled, after the controller's delay: time moved on by the fake timers
+  // the test starts before its setup, not waited for; the write that follows run to its end (a test that nothing is
+  // written sees what would have been)
+  const sortStored = async () => {
+    await vi.advanceTimersByTimeAsync(STORE_SORT_DELAY_MS);
+    await flush();
+  };
+  const META_PAGE = `| Name | Qty |\n|---|---|\n| Pear | 3 |\n| apple | 10 |\n| <meta core.table core.-c-qty.sort='desc'> |\n`;
+
+  it("names a table from its toolbar, refusing a name that is taken or not valid", async () => {
+    const TWO = `| A |\n|---|\n| 1 |\n\n| B |\n|---|\n| 2 |\n| <meta core.table core.name='prices'> |\n`;
+    await setup(TWO, { "silverware.table.metadata": true });
+    const title = () => document.querySelector(".swt-menu-title")!.textContent;
+    // No name: the ⋯ menu's title is Table, its pencil the name's field
+    tableMenuItem(/^Edit markdown$/);
+    expect(title()).toBe("Table");
+    toolbarName("table");
+    // Taken by the other table (ignoring case)
+    expect(await nameInMenu("Prices")).toBe("another table on this page is named Prices");
+    expect(text).toBe(TWO);
+    // Not a name
+    expect(await nameInMenu("A1")).toContain('"A1" would read as a cell');
+    expect(text).toBe(TWO);
+    expect(await nameInMenu("fruit")).toBeUndefined();
+    expect(text).toBe(TWO.replace("| 1 |\n", `| 1 |\n| <meta core.table core.name='fruit'> |\n`));
+    // Saved, the menu closes; opened again, its title is the name
+    expect(document.querySelector(".swt-menu")).toBeNull();
+    await controller.scan();
+    tableMenuItem(/^Edit markdown$/);
+    expect(title()).toBe("fruit");
+    toolbarName("table");
+    expect(document.querySelector<HTMLInputElement>(".swt-menu .swt-menu-name")!.value).toBe("fruit");
+    // An empty name removes it
+    expect(await nameInMenu("")).toBeUndefined();
+    expect(text).toBe(TWO);
+  });
+
+  it("keeps a name's field to itself: arrows skip the pencil, a copy there copies no cells, Enter on the name as it was hands the keyboard back", async () => {
+    await setup(`| A |\n|---|\n| 1 |\n| <meta core.table core.name='fruit'> |\n`, { "silverware.table.metadata": true });
+    tableMenuItem(/^Edit markdown$/);
+    const menu = document.querySelector<HTMLElement>(".swt-menu")!;
+    menu.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+    // The first of its items, not the pencil: Full screen
+    expect(document.activeElement?.classList.contains("swt-menu-rename")).toBe(false);
+    expect(document.activeElement?.textContent).toBe("Full screen");
+    // The cell selected, then the name's field: a copy there is the field's
+    clickOn(cell(1, 0));
+    key(document.activeElement ?? editor, "Escape");
+    toolbarName("table");
+    const field = document.querySelector<HTMLInputElement>(".swt-menu .swt-menu-name")!;
+    expect(document.activeElement).toBe(field);
+    field.setSelectionRange(5, 5);
+    window.dispatchEvent(new Event("copy", { bubbles: true, cancelable: true }));
+    expect(flashes).toEqual([]);
+    key(field, "Enter");
+    await flush();
+    expect(text).toBe(`| A |\n|---|\n| 1 |\n| <meta core.table core.name='fruit'> |\n`);
+    expect(document.querySelector(".swt-menu")).toBeNull();
+    expect(document.activeElement).toBe(editor);
+  });
+
+  it("offers a name only with the setting on, or to rename a table named already", async () => {
+    const pencil = () => document.querySelector<HTMLElement>(".swt-menu .swt-menu-rename")!;
+    await setup(PAGE);
+    toolbarName("table");
+    expect(pencil().getAttribute("aria-disabled")).toBe("true");
+    // A metadata row without a name: nothing new is stored with the setting off
+    controller.stop();
+    document.body.replaceChildren();
+    await setup(`| A |\n|---|\n| 1 |\n| 2 |\n| <meta core.table core.pin-top='1'> |\n`);
+    toolbarName("table");
+    expect(pencil().getAttribute("aria-disabled")).toBe("true");
+    // A name it has may change
+    controller.stop();
+    document.body.replaceChildren();
+    await setup(`| A |\n|---|\n| 1 |\n| 2 |\n| <meta core.table core.name='fruit'> |\n`);
+    // (Allowed: the name's field opens at once)
+    toolbarName("table");
+    expect(document.querySelector(".swt-menu .swt-menu-name")).not.toBeNull();
+  });
+
+  it("does not change the table when sorting with the setting off", async () => {
+    vi.useFakeTimers();
+    await setup(PAGE);
+    clickOn(cell(0, 0).querySelector(".swt-sort")!);
+    await sortStored();
+    expect(text).toBe(PAGE);
+  });
+
+  it("with the setting off, changes a sorting stored, but stores none in a table that has none (a name only)", async () => {
+    vi.useFakeTimers();
+    const SORTED = `| Name | Qty |\n|---|---|\n| Pear | 3 |\n| apple | 10 |\n| <meta core.table core.-c-qty.sort='desc'> |\n`;
+    await setup(SORTED);
+    clickOn(cell(0, 0).querySelector(".swt-sort")!);
+    await sortStored();
+    expect(text).toContain("core.-c-name.sort='asc'");
+    controller.stop();
+    document.body.replaceChildren();
+    const NAMED = `| Name | Qty |\n|---|---|\n| Pear | 3 |\n| apple | 10 |\n| <meta core.table core.name='fruit'> |\n`;
+    await setup(NAMED);
+    clickOn(cell(0, 0).querySelector(".swt-sort")!);
+    await sortStored();
+    expect(text).toBe(NAMED);
+  });
+
+  it("with the setting off, takes the hidden values new to a table off a write, and says so; those it has stay", async () => {
+    await setup(`| Name | Qty |\n|---|---|\n| Pear <meta x.note='a'> | 3 |\n| apple | 10 |\n`);
+    const [info] = controller.shownTables();
+    // (The tags typed into the cells' text: the core's step that takes off what the setting does not let in)
+    const typed = (contents: readonly string[]) => contents.map((content) => ({ content, attributes: new Map() }));
+    await controller.writeTable(info!, (t) => ({
+      ...t,
+      rows: t.rows.map((row, r) => (r === 0 ? { ...row, cells: typed(["Pears <meta x.note='b'>", "3 <meta x.note='c'>"]) } : r === 1 ? { ...row, cells: typed(["apple <meta x.other='1'>", "10"]) } : row)),
+    }));
+    expect(text).toContain("| Pears <meta x.note='b'> | 3 |");
+    expect(text).toContain("| apple | 10 |");
+    expect(flashes.some((f) => f.includes("2 new hidden values") && f.includes("not stored"))).toBe(true);
+    // (Pins: only where the table has them)
+    const pinned = decode(parseTable(`| A |\n|---|\n| 1 |\n| <meta core.table core.pin-top='1'> |`));
+    expect(controller.canPin(pinned, "top")).toBe(true);
+    expect(controller.canPin(pinned, "bottom")).toBe(false);
+  });
+
+  it("writes a row's name typed into a cell as typed with the setting on, and takes it off saying so with it off", async () => {
+    const typeName = async () => {
+      clickOn(cell(1, 0));
+      editor.querySelector<HTMLInputElement>(".swt-cell-editor")!.value = "Pears <meta core.n='p'>";
+      key(editor.querySelector(".swt-cell-editor")!, "Enter");
+      await flush();
+    };
+    await setup(`| Name | Qty |\n|---|---|\n| Pear | 3 |\n`, { "silverware.table.metadata": true, "silverware.table.editor.enterKey": "save" });
+    await typeName();
+    expect(text).toBe(`| Name | Qty |\n|---|---|\n| Pears <meta core.n='p'> | 3 |\n`);
+    controller.stop();
+    document.body.replaceChildren();
+    await setup(`| Name | Qty |\n|---|---|\n| Pear | 3 |\n`, { "silverware.table.editor.enterKey": "save" });
+    await typeName();
+    expect(text).toBe(`| Name | Qty |\n|---|---|\n| Pears | 3 |\n`);
+    expect(flashes.some((f) => f.includes("1 new hidden value") && f.includes("not stored"))).toBe(true);
+  });
+
+  it("with the setting off, takes a tag typed into a cell's or a header's text off a write, as one written new", async () => {
+    await setup(`| Name | Qty |\n|---|---|\n| Pear | 3 |\n`);
+    const [info] = controller.shownTables();
+    // (Typed or pasted: the model's content, which the page reads as an attribute)
+    await controller.writeTable(info!, (t) => ({
+      ...t,
+      columns: t.columns.map((column, c) => (c === 1 ? { ...column, header: "Qty <meta x.unit='kg'>" } : column)),
+      rows: t.rows.map((row) => ({ ...row, cells: row.cells.map((cell, c) => (c === 0 ? { ...cell, content: "Pears <meta x.note='a'>" } : cell)) })),
+    }));
+    expect(text).toBe(`| Name | Qty |\n|---|---|\n| Pears | 3 |\n`);
+    expect(flashes.some((f) => f.includes("2 new hidden values") && f.includes("not stored"))).toBe(true);
+  });
+
+  it("stores the sorting with the setting on, only where the clicks end", async () => {
+    vi.useFakeTimers();
+    await setup(PAGE, { "silverware.table.metadata": true });
+    clickOn(cell(0, 1).querySelector(".swt-sort")!); // Qty ascending
+    clickOn(cell(0, 1).querySelector(".swt-sort")!); // Qty descending
+    // Nothing stored before the clicks have settled: the delay counted from the last click
+    await vi.advanceTimersByTimeAsync(STORE_SORT_DELAY_MS - 1);
+    await flush();
+    expect(text).toBe(PAGE);
+    await sortStored();
+    await controller.scan();
+    expect(text).toBe(PAGE.replace("| Fig | 2 |\n", `| Fig | 2 |\n| <meta core.table core.-c-qty.sort='desc'> |\n`));
+    expect(bodyTexts()).toEqual(["apple", "Pear", "Fig"]);
+    clickOn(cell(0, 1).querySelector(".swt-sort")!); // back to the order as written
+    await sortStored();
+    expect(text).toBe(PAGE);
+  });
+
+  it("hides the metadata row and uses its sorting as the first view", async () => {
+    await setup(META_PAGE);
+    expect(bodyTexts()).toEqual(["apple", "Pear"]);
+    const rows = editor.querySelectorAll("table tr");
+    expect(rows[rows.length - 1]!.classList.contains("swt-meta-row")).toBe(true);
+  });
+
+  it("keeps updating a table's metadata with the setting off", async () => {
+    vi.useFakeTimers();
+    await setup(META_PAGE); // the setting is off; the table stores Qty descending
+    clickOn(cell(0, 1).querySelector(".swt-sort")!); // Qty: descending → the order as written
+    await sortStored();
+    // the stored sorting is cleared, and the row, now empty, goes
+    expect(text).toBe("| Name | Qty |\n|---|---|\n| Pear | 3 |\n| apple | 10 |\n");
+  });
+
+  it("removes a table's metadata from its toolbar, and of all tables with the command", async () => {
+    await setup(META_PAGE);
+    const remove = () => tableMenuItem(/^Remove metadata$/)!;
+    let agree = false;
+    const questions: string[] = [];
+    bridge.confirm = (message: string) => {
+      questions.push(message);
+      return agree;
+    };
+    remove().click(); // declined: nothing changes
+    await flush();
+    expect(text).toBe(META_PAGE);
+    expect(questions[0]).toContain("this table's metadata");
+    agree = true;
+    remove().click();
+    await flush();
+    expect(text).toBe("| Name | Qty |\n|---|---|\n| Pear | 3 |\n| apple | 10 |\n");
+
+    controller.stop();
+    document.body.replaceChildren();
+    await setup(`${META_PAGE}\n${META_PAGE.replace("Qty:desc", "Name:asc")}`);
+    const asked: string[] = [];
+    let answer = false;
+    bridge.confirm = (message: string) => {
+      asked.push(message);
+      return answer;
+    };
+    await controller.removeAllMetadata(); // declined: nothing changes
+    expect(text).toContain("<meta");
+    expect(asked[0]).toContain("all 2 tables on this page");
+    answer = true;
+    await controller.removeAllMetadata();
+    expect(text).not.toContain("<meta");
+    expect(flashes).toEqual(["Silverware Table: removed the metadata of 2 table(s)"]);
+  });
+
+  it("writes the tables the command removes metadata from as any edit writes them: aligned with auto-format on", async () => {
+    // (One table's Remove metadata is a write as any other: the page's command writes alike)
+    const written = async (all: boolean) => {
+      controller.stop();
+      document.body.replaceChildren();
+      await setup(META_PAGE, { "silverware.table.autoFormat": true });
+      bridge.confirm = () => true;
+      if (all) await controller.removeAllMetadata();
+      else {
+        tableMenuItem(/^Remove metadata$/)!.click();
+        await flush();
+      }
+      return text;
+    };
+    const one = await written(false);
+    expect(one).not.toContain("<meta");
+    expect(one).not.toBe("| Name | Qty |\n|---|---|\n| Pear | 3 |\n| apple | 10 |\n");
+    expect(await written(true)).toBe(one);
+  });
+
+  it("shows the rows as written once the metadata with their sorting is removed", async () => {
+    await setup(META_PAGE);
+    expect(bodyTexts()).toEqual(["apple", "Pear"]); // stored: Qty descending
+    bridge.confirm = () => true;
+    tableMenuItem(/^Remove metadata$/)!.click();
+    await flush();
+    await controller.scan();
+    expect(text).toBe("| Name | Qty |\n|---|---|\n| Pear | 3 |\n| apple | 10 |\n");
+    expect(bodyTexts()).toEqual(["Pear", "apple"]);
+    expect(cell(0, 1).querySelector(".swt-sort")!.textContent).toBe("⇅");
+
+    // The same with the command for the whole page
+    controller.stop();
+    document.body.replaceChildren();
+    await setup(META_PAGE);
+    bridge.confirm = () => true;
+    await controller.removeAllMetadata();
+    await controller.scan();
+    expect(bodyTexts()).toEqual(["Pear", "apple"]);
+  });
+
+  describe("of cells, rows and columns, from their menu", () => {
+    const PAGE_TAGS =
+      `| Name <meta core.n='who'> | Qty |\n|---|---|\n| Pear <meta core.n='pear'> | 3 <meta core.cn='three'> |\n| apple | 10 |\n| Total | 13 <meta formulas.f='=SUM([qty])'> |\n` +
+      `| <meta core.table core.name='fruit'> |\n`;
+    // A column's attributes in the metadata row: Qty's sorting, the filter of the column named who
+    const WITH_COLUMNS = PAGE_TAGS.replace("core.name='fruit'>", "core.name='fruit' core.-c-qty.sort='desc' filters.-c-who.condition='p'>");
+    const answering = (answer: boolean) => {
+      const questions: string[] = [];
+      bridge.confirm = (message: string) => {
+        questions.push(message);
+        return answer;
+      };
+      return questions;
+    };
+    const info = () => controller.infoOf(editor.querySelector<HTMLElement>(".sb-table-widget")!)!;
+    const rowGrip = () => document.querySelector<HTMLElement>(".swt-grip:not(.swt-grip-column)")!;
+
+    it("of the cells selected, once confirmed: their hidden tags only, the others' and the metadata row kept", async () => {
+      const page = `| Name | Qty |\n|---|---|\n| Pear <meta core.n='pear'> | 3 <meta core.cn='three'> |\n| apple | 10 <meta formulas.f='=1+9'> |\n| <meta core.table core.name='fruit'> |\n`;
+      await setup(page);
+      controller.selectCells(info(), { row: 1, column: 1 }, { row: 2, column: 1 });
+      let questions = answering(false);
+      cellMenuItem(cell(1, 1), /^Remove metadata$/)!.click();
+      await flush();
+      expect(questions).toEqual(["Remove the metadata of these 2 cells, what Silverware Table (1 cell) and Formulas (1 cell) keep in them? Cells keep their text, a formula's cell its result. Ctrl+Z brings it back."]);
+      expect(text).toBe(page);
+      questions = answering(true);
+      await controller.scan();
+      controller.selectCells(info(), { row: 1, column: 1 }, { row: 2, column: 1 });
+      cellMenuItem(cell(1, 1), /^Remove metadata$/)!.click();
+      await flush();
+      expect(text).toBe(`| Name | Qty |\n|---|---|\n| Pear <meta core.n='pear'> | 3 |\n| apple | 10 |\n| <meta core.table core.name='fruit'> |\n`);
+    });
+
+    it("is not offered for cells without metadata", async () => {
+      await setup(PAGE_TAGS);
+      expect(cellMenuItem(cell(2, 0), /^Remove metadata$/)).toBeUndefined();
+      expect(cellMenuItem(cell(1, 0), /^Remove metadata$/)).toBeDefined();
+    });
+
+    it("of a row, from its grip's menu: every cell of it", async () => {
+      await setup(PAGE_TAGS);
+      const questions = answering(true);
+      cell(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      rowGrip().dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }));
+      window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, button: 0 }));
+      menuButtons().find((b) => buttonLabel(b) === "Remove metadata")!.click();
+      await flush();
+      expect(questions[0]).toBe("Remove the metadata of this row, what Silverware Table (2 cells) keeps in it? Cells keep their text, a formula's cell its result. Ctrl+Z brings it back.");
+      expect(text).toBe(PAGE_TAGS.replace("| Pear <meta core.n='pear'> | 3 <meta core.cn='three'> |", "| Pear | 3 |"));
+    });
+
+    it("of a column, from its menu: its cells, its header's too, and its attributes in the metadata row", async () => {
+      await setup(WITH_COLUMNS);
+      const questions = answering(true);
+      cellMenuItem(cell(0, 1), /^Remove metadata$/)!.click();
+      await flush();
+      expect(questions[0]).toBe("Remove the metadata of this column, what Silverware Table (1 cell) and Formulas (1 cell) keep in it? Cells keep their text, a formula's cell its result. Ctrl+Z brings it back.");
+      expect(text).toBe(
+        `| Name <meta core.n='who'> | Qty |\n|---|---|\n| Pear <meta core.n='pear'> | 3 |\n| apple | 10 |\n| Total | 13 |\n| <meta core.table core.name='fruit' filters.-c-who.condition='p'> |\n`,
+      );
+    });
+  });
+
+  it("says it removes what a module turned off keeps in cells too", async () => {
+    const page = `| Name | Qty |\n|---|---|\n| Pear <meta core.n='pear'> | 3 |\n| Total | 3 <meta formulas.f='=SUM([Qty])'> |\n`;
+    await setup(page, { "silverware.table.modules.formulas.enabled": false });
+    const questions: string[] = [];
+    bridge.confirm = (message: string) => {
+      questions.push(message);
+      return true;
+    };
+    tableMenuItem(/^Remove metadata$/)!.click();
+    await flush();
+    // Named by whose it is, the module turned off too
+    expect(questions[0]).toBe("Remove this table's metadata, what Silverware Table (1 cell) and Formulas (1 cell) keep in it? Cells keep their text, a formula's cell its result. Ctrl+Z brings it back.");
+    expect(text).toBe("| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Total | 3 |\n");
+  });
+
+  it("asks without naming anyone when the metadata row holds nothing", async () => {
+    await setup("| A |\n|---|\n| 1 |\n| <meta core.table> |\n");
+    const questions: string[] = [];
+    bridge.confirm = (message: string) => {
+      questions.push(message);
+      return true;
+    };
+    tableMenuItem(/^Remove metadata$/)!.click();
+    await flush();
+    expect(questions[0]).toBe("Remove this table's metadata? Cells keep their text, a formula's cell its result. Ctrl+Z brings it back.");
+  });
+
+  it("removes formulas with the metadata, keeping their results, and says so", async () => {
+    const page = `| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Total | 3 <meta formulas.f='=SUM([Qty])'> |\n| <meta core.table core.-c-qty.sort='desc'> |\n`;
+    await setup(page);
+    const questions: string[] = [];
+    bridge.confirm = (message: string) => {
+      questions.push(message);
+      return true;
+    };
+    tableMenuItem(/^Remove metadata$/)!.click();
+    await flush();
+    expect(questions[0]).toContain("what Silverware Table and Formulas (1 cell) keep in it? Cells keep their text, a formula's cell its result");
+    expect(text).toBe("| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Total | 3 |\n");
+
+    // A table with formulas only: the button shows, and the command counts it
+    controller.stop();
+    document.body.replaceChildren();
+    await setup(`| A |\n|---|\n| 1 |\n| 2 <meta formulas.f='=A1*2'> |\n`);
+    const asked: string[] = [];
+    bridge.confirm = (message: string) => {
+      asked.push(message);
+      return true;
+    };
+    await controller.removeAllMetadata();
+    expect(asked[0]).toContain("the 1 table on this page, what Formulas (1 cell) keeps in it?");
+    expect(text).toBe("| A |\n|---|\n| 1 |\n| 2 |\n");
+  });
+
+  it("written as any change: a formula of another table referring to the name it took is followed in the same edit", async () => {
+    await setup(`| Item | Price |\n|---|---|\n| Pear | 12 |\n| <meta core.table core.name='prices'> |\n\n| Total |\n|---|\n| 24 <meta formulas.f='=prices!B1*2'> |\n`, {
+      "silverware.table.metadata": true,
+    });
+    bridge.confirm = () => true;
+    tableMenuItem(/^Remove metadata$/)!.click();
+    await flush();
+    expect(text).toContain("| Item | Price |\n|---|---|\n| Pear | 12 |\n\n");
+    // (Its name gone: the formula referring to it is an error now, as a rename's would be)
+    expect(text).toContain("| \\#REF! <meta formulas.f='=prices!B1*2'> |");
+  });
+
+  it("keeps the metadata row last and follows a renamed column", async () => {
+    // Enter only saves the header: the cell below would open
+    await setup(META_PAGE, { "silverware.table.editor.enterKey": "save" });
+    clickOn(cell(0, 1)); // the Qty header
+    editor.querySelector<HTMLInputElement>(".swt-cell-editor")!.value = "Count";
+    key(editor.querySelector(".swt-cell-editor")!, "Enter");
+    await flush();
+    await controller.scan();
+    expect(text).toBe(`| Name | Count |\n|---|---|\n| Pear | 3 |\n| apple | 10 |\n| <meta core.table core.-c-count.sort='desc'> |\n`);
+    // a row added at the end goes above the metadata row
+    clickOn(editor.querySelector('tr[data-swt-row="1"]')!.querySelector("td")!); // Pear (shown last)
+    key(editor.querySelector(".swt-cell-editor")!, "Tab");
+    key(editor.querySelector(".swt-cell-editor")!, "Tab");
+    await flush();
+    await controller.scan();
+    expect(text.split("\n").slice(-3)).toEqual(["| | |", `| <meta core.table core.-c-count.sort='desc'> |`, ""]);
+  });
+});

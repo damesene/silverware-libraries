@@ -442,8 +442,11 @@ export async function openPage(page: Page, name: string): Promise<void> {
  */
 export async function pickerOfCommand(page: Page, name: string): Promise<Locator> {
   if (target !== "silverbullet") throw new Error("pickerOfCommand: SilverBullet only");
-  // Not awaited: the command waits for the picker's answer
-  void page.evaluate((name) => (window as unknown as { client: { runCommandByName(name: string): Promise<void> } }).client.runCommandByName(name), name);
+  // Not awaited: the command waits for the picker's answer. What it does after (the page picked opened) the test checks
+  // on screen; under load the command may still run as the test ends, its page closed under it, which is no failure
+  void page
+    .evaluate((name) => (window as unknown as { client: { runCommandByName(name: string): Promise<void> } }).client.runCommandByName(name), name)
+    .catch(() => undefined);
   const picker = page.locator("dialog.sb-modal-box");
   await expect(picker).toBeVisible();
   return picker;

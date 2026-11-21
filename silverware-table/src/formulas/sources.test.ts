@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { sourceTable } from "../features/sources.ts";
+import { headsOf } from "../columns.ts";
+import { sourceTable } from "../store/sources.ts";
 import { parseTable, type Table } from "../markdown.ts";
-import { CELLS, formulaCell, formulaErrors, pageTables, recalculate, shiftReferences } from "../testing/formulas.ts";
-import { evaluateFormula, formulaChoices, FormulaError, formulaSources, formulaTableNames, listResult, references, sourceChoices, tokenize, withColumnKeys } from "./index.ts";
-import { parse } from "./parser.ts";
-import { isError } from "./values.ts";
+import { CELLS, formulaCell, formulaErrors, formulaOf, model, pageTables, recalculate, shiftReferences } from "../testing/formulas.ts";
+import { evaluateFormula, formulaChoices, FormulaError, formulaSources, formulaTableNames, listResult, references, sourceChoices, tokenize, withColumnKeys } from "../../../shared/formulas/index.ts";
+import { parse } from "../../../shared/formulas/parser.ts";
+import { isError } from "../../../shared/formulas/values.ts";
 
 const TASKS = sourceTable({
   columns: ["name", "due", "done"],
@@ -49,7 +50,7 @@ describe("sources in formulas", () => {
     const reading = parseTable(["| Open |", "|---|", `| ${formulaCell("7", "=COUNTA(@tasks[name])")} |`].join("\n"));
     expect(recalculate(reading, pageTables(() => [], "Page"))).toBe(reading);
     // Read: calculated
-    expect(CELLS.formulaOf(recalculate(reading, tables()).rows[1]!.cells[0]!)?.value).toBe("3");
+    expect(formulaOf(recalculate(reading, tables()).rows[1]!.cells[0]!)?.value).toBe("3");
     // None yet and not read: why, as its error
     const empty = parseTable(["| Open |", "|---|", `| ${formulaCell("", "=COUNTA(@people[name])")} |`].join("\n"));
     expect(formulaErrors(empty, tables()).get("1,0")).toMatch(/the source people is not read yet/);
@@ -73,12 +74,12 @@ describe("sources in formulas", () => {
 
   it("leaves a source's columns out of the page's references: nothing follows the table's own columns into them", () => {
     expect(references("=@tasks[due] + [due]").map((r) => r.from)).toEqual([15]);
-    expect(withColumnKeys("=@tasks[Due] & [Due]", ["Due"])).toBe("=@tasks[Due] & [due]");
+    expect(withColumnKeys("=@tasks[Due] & [Due]", headsOf(["Due"]))).toBe("=@tasks[Due] & [due]");
     // The table's column due renamed: its own reference follows, the source's stays
     const before = parseTable(["| Due | Late |", "|---|---|", `| x | ${formulaCell("", "=COUNTIFS(@tasks[due], [@due])")} |`].join("\n"));
     const after = parseTable(["| When | Late |", "|---|---|", `| x | ${formulaCell("", "=COUNTIFS(@tasks[due], [@due])")} |`].join("\n"));
     const followed = shiftReferences(before, after);
-    expect(CELLS.formulaOf(followed.rows[1]!.cells[1]!)?.formula).toBe("=COUNTIFS(@tasks[due], [@when])");
+    expect(formulaOf(followed.rows[1]!.cells[1]!)?.formula).toBe("=COUNTIFS(@tasks[due], [@when])");
   });
 });
 
@@ -103,7 +104,7 @@ describe("sources offered while a formula is typed", () => {
 
 describe("a list's formula (a choice list made by one)", () => {
   const own = parseTable(["| Status | Done |", "|---|---|", "| open | 1 |", "| done | TRUE |", "| open | 2.5 |"].join("\n"));
-  const list = (formula: string) => listResult(own, { cells: CELLS, tables: tables() }, formula);
+  const list = (formula: string) => listResult(model(own), { cells: CELLS, tables: tables() }, formula);
 
   it("gives a source's values, its own table's columns, numbers and logical values as cells show them", () => {
     expect(list("=@tasks[name]")).toEqual(["Write", "Test", "Ship"]);
@@ -114,7 +115,7 @@ describe("a list's formula (a choice list made by one)", () => {
 
   it("takes plain cells as written where a number would lose what they show, numbers calculated as the table writes them, errors left out", () => {
     const named = parseTable(["| P | Q |", "|---|---|", "| 2024 Roadmap | 2,5 |", "| 2024 Budget | 1,25 |", "| 007 | \\#REF! |", "| 12 | 3 |"].join("\n"));
-    const of = (formula: string) => listResult(named, { cells: CELLS, tables: tables() }, formula);
+    const of = (formula: string) => listResult(model(named), { cells: CELLS, tables: tables() }, formula);
     expect(of("=[p]")).toEqual(["2024 Roadmap", "2024 Budget", "007", "12"]);
     expect(of("=[q]")).toEqual(["2,5", "1,25", "3"]);
     expect(of("=SUM(B4, 0.5)")).toEqual(["3,5"]);

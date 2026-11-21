@@ -1,36 +1,16 @@
 import { describe, expect, it } from "vitest";
-import {
-  choiceText,
-  functionHelp,
-  withEquals,
-  columnChoicesOf,
-  areaText,
-  autofixFormula,
-  columnLetters,
-  argumentSpan,
-  cycleFixed,
-  filledFormula,
-  findFunctions,
-  needsOperator,
-  formulaHelp,
-  formulaChoices,
-  isFormulaInput,
-  type IndexMap,
-  namedReferences,
-  references,
-  type TableSource,
-  REFERENCE_HELP,
-  referenceSlot,
-  withColumnKeys,
-} from "./index.ts";
-import { CELLS, calculatedFormula, cellNamesOf, followTable, formulaCell, formulaErrors, formulaOf, qualifyCellNames, recalculate, referredTableNames, shiftReferences, withCalculatedCells } from "../testing/formulas.ts";
-import { formulaErrors as domainFormulaErrors } from "./evaluate.ts";
-import { FormulaError } from "./values.ts";
+import { headsOf } from "../columns.ts";
+import { choiceText, functionHelp, withEquals, columnChoicesOf, areaText, autofixFormula, columnLetters, argumentSpan, cycleFixed, filledFormula, findFunctions, needsOperator, formulaHelp, formulaChoices, isFormulaInput, type IndexMap, namedReferences, references, type TableSource, REFERENCE_HELP, referenceSlot, withColumnKeys } from "../../../shared/formulas/index.ts";
+import { CELLS, model, calculatedFormula, cellNamesOf, followTable, formulaCell, formulaErrors, formulaOf, qualifyCellNames, recalculate, referredTableNames, shiftReferences, withCalculatedCells } from "../testing/formulas.ts";
+import { formulaErrors as domainFormulaErrors } from "../../../shared/formulas/evaluate.ts";
+import { FormulaError } from "../../../shared/formulas/values.ts";
 import { parseMetaRow, parseTable, serializeTable, splitRow } from "../markdown.ts";
-import { metaName, withMetaName } from "../meta.ts";
-import { cellNameOf, namedRows, nameOf, rowNameIn, withCellName, withName, withoutName } from "../names.ts";
-import { deleteColumn, deleteRow, insertRow, moveColumn, moveRow, reorderRows, setCell } from "../ops.ts";
-import { cellResult, errorCodeIn, isErrorText } from "./cell.ts";
+import { metaName, withMetaValue } from "../meta.ts";
+import { cellNameOf, nameOf, rowNameIn, withCellName, withName, withoutName } from "../names.ts";
+import { modelRowName } from "../../../shared/table/names.ts";
+import { decode } from "../store/markdown/codec.ts";
+import { deleteColumn, deleteRow, insertRow, moveColumn, moveRow, reorderRows, setCell } from "../testing/markdownops.ts";
+import { cellResult, errorCodeIn, isErrorText } from "../../../shared/formulas/cell.ts";
 
 // A table whose cell `at` holds `formula`; returns what that cell shows after recalculating
 function evaluate(markdown: string, formula: string, at = { row: -1, column: -1 }): string {
@@ -82,6 +62,13 @@ describe("formulas in cells", () => {
     const right = parseTable('| A | B |\n|---|---|\n| 2 | 4 <meta formulas.f="=A1*2"> |\n| 3 | big <meta formulas.f="=IF(A2&gt;1,&quot;big&quot;,&quot;&quot;)"> |\n');
     expect(recalculate(right)).toBe(right);
     expect(recalculate(table).rows[2]!.cells[1]).toBe(`big <meta formulas.f='=IF(A2&gt;1,"big","")'>`);
+  });
+
+  it("writes a result as a cell holds it, without spaces around, so it is up to date once written", () => {
+    const table = recalculate(parseTable(`| A |\n|---|\n| ${formulaCell("", '="p"&" "&"q "')} |\n`));
+    expect(table.rows[1]!.cells[0]).toMatch(/^p q <meta/);
+    const read = parseTable(serializeTable(table));
+    expect(recalculate(read)).toBe(read);
   });
 
   it("reads a formula written in quotes, as tables before apostrophes have it", () => {
@@ -283,7 +270,7 @@ describe("evaluation", () => {
   });
 
   it("writes column references by the columns' keys, leaving unknown ones as written", () => {
-    const headers = ["Name", "Unit price", "Qty", "qty"];
+    const headers = headsOf(["Name", "Unit price", "Qty", "qty"]);
     expect(withColumnKeys("=[@Unit price]*[QTY:2]+[Nope]", headers)).toBe("=[@unit_price]*[qty:2]+[Nope]");
     expect(withColumnKeys("=SUM(A1:A3)", headers)).toBe("=SUM(A1:A3)");
   });
@@ -326,7 +313,7 @@ describe("evaluation", () => {
     const rows = table.rows.map((r, i) => (i === 4 ? { cells: [r.cells[0]!, r.cells[1]!, formulaCell("", "=Q1")] } : r));
     expect(formulaErrors({ ...table, rows })).toEqual(new Map([["4,2", "#REF! Q1 is outside the table"]]));
     // The domain gives the error itself, its code and why apart (Space Lua's errors read them so)
-    const [error] = domainFormulaErrors({ ...table, rows }, { cells: CELLS }).values();
+    const [error] = domainFormulaErrors(model({ ...table, rows }), { cells: CELLS }).values();
     expect(error).toBeInstanceOf(FormulaError);
     expect(error).toMatchObject({ code: "#REF!", detail: "Q1 is outside the table" });
   });
@@ -552,7 +539,7 @@ describe("formulaChoices of functions", () => {
 
   it("offers the table's columns in a column reference not closed yet: [ ], [@ ], the table's own name's; none in one closed", () => {
     // Shown by their headers' names, put in by their ids (a second Qty: qty:2), as a click on a header writes them
-    const columns = columnChoicesOf(["Qty #number", "Price", "quality", "Unit price", "Qty"]);
+    const columns = columnChoicesOf(headsOf(["Qty #number", "Price", "quality", "Unit price", "Qty"]));
     expect(columns.map((c) => c.id)).toEqual(["qty", "price", "quality", "unit_price", "qty:2"]);
     // Two columns of one name told apart by their occurrence, as their ids are
     expect(choiceNames(formulaChoices("=[q", 3, 3, [], undefined, columns))).toEqual({ from: 2, to: 3, names: ["Qty", "quality", "Qty (2)"] });
@@ -784,7 +771,10 @@ describe("other tables", () => {
   // The tables of a page by their names, as the controller hands them to formulas
   const tablesOf = (...markdown: string[]): TableSource => {
     const tables = markdown.map((m) => parseTable(m));
-    return (name, page) => (page === undefined ? tables.find((t) => metaName(t)?.toLowerCase() === name.toLowerCase()) : undefined);
+    return (name, page) => {
+      const table = page === undefined ? tables.find((t) => metaName(t)?.toLowerCase() === name.toLowerCase()) : undefined;
+      return table && model(table);
+    };
   };
   const PRICES = `| Name | Price |\n|---|---|\n| Pear | 12 |\n| Fig | 2,5 |\n| Total | 14,5 <meta formulas.f='=SUM([price])'> |\n| <meta core.table core.name='prices'> |`;
   // What `formula` shows in the last cell of a one-cell table, with `tables` around it
@@ -899,7 +889,7 @@ describe("references to another table follow its edits", () => {
   it("follows a renamed column and a renamed table", () => {
     const renamedColumn = setCell(prices, 0, 1, "Cost");
     expect(formulas(followTable(referring("=SUM(prices![price])"), prices, renamedColumn))).toEqual(["=SUM(prices![cost])"]);
-    const renamed = withMetaName(prices, "cost");
+    const renamed = withMetaValue(prices, "core", "name", "cost");
     expect(formulas(followTable(referring("=prices!B1*prices![price]", "=PRICES!A1"), prices, renamed))).toEqual([
       "=cost!B1*cost![price]",
       "=cost!A1",
@@ -909,19 +899,19 @@ describe("references to another table follow its edits", () => {
     expect(formulas(followTable(referring("=1+prices!vat"), prices, renamed))).toEqual(["=1+cost!vat"]);
     expect(referredTableNames(referring("=prices!#REF!"))).toEqual(new Set(["prices"]));
     // The name removed: the references stay, and show #REF!
-    expect(formulas(followTable(referring("=prices!B1"), prices, withMetaName(prices, undefined)))).toEqual(["=prices!B1"]);
+    expect(formulas(followTable(referring("=prices!B1"), prices, withMetaValue(prices, "core", "name", undefined)))).toEqual(["=prices!B1"]);
   });
 
   it("follows the table's own edits in references that name the table itself", () => {
     const mine = parseTable(`| A |\n|---|\n| 5 |\n| 0 <meta formulas.f='=mine!A1*2'> |\n| <meta core.table core.name='mine'> |`);
     const inserted = insertRow(mine, 1);
     expect(formulas(shiftReferences(mine, inserted, (r) => (r === 0 ? 0 : r + 1)))).toEqual(["=mine!A2*2"]);
-    expect(formulas(shiftReferences(mine, withMetaName(mine, "ours")))).toEqual(["=ours!A1*2"]);
+    expect(formulas(shiftReferences(mine, withMetaValue(mine, "core", "name", "ours")))).toEqual(["=ours!A1*2"]);
   });
 
   it("evaluates a reference to deleted cells of another table as #REF!", () => {
     const table = referring("=prices!#REF!");
-    const tables: TableSource = (name) => (name === "prices" ? prices : undefined);
+    const tables: TableSource = (name) => (name === "prices" ? model(prices) : undefined);
     expect(formulaErrors(table, tables).get("1,0")).toBe("#REF! a reference to deleted cells of prices");
   });
 });
@@ -937,10 +927,13 @@ describe("named cells", () => {
       list(page).flatMap((table) =>
         table.rows.flatMap((row, r) => {
           const column = row.cells.findIndex((cell) => cellNameOf(cell)?.toLowerCase() === name.toLowerCase());
-          return r > 0 && column >= 0 ? [{ table, tableName: metaName(table), row: r, column }] : [];
+          return r > 0 && column >= 0 ? [{ table: model(table), tableName: metaName(table), row: r, column }] : [];
         }),
       );
-    return Object.assign((name: string, page?: string) => list(page).find((table) => metaName(table)?.toLowerCase() === name.toLowerCase()), {
+    return Object.assign((name: string, page?: string) => {
+      const table = list(page).find((t) => metaName(t)?.toLowerCase() === name.toLowerCase());
+      return table && model(table);
+    }, {
       cell: (name: string, page?: string) => cells(name, page)[0],
       cellsNamed: cells,
     });
@@ -1022,7 +1015,7 @@ describe("the formula's row from one column to another, [@[a]:[b]]", () => {
 
   it("is written by the columns' keys, and follows its columns renamed, moved and deleted", () => {
     const named = setCell(table, 0, 1, "Jan 2026");
-    expect(withColumnKeys("=SUM([@[Jan 2026]:[Mar]])", named.rows[0]!.cells)).toBe("=SUM([@[jan_2026]:[mar]])");
+    expect(withColumnKeys("=SUM([@[Jan 2026]:[Mar]])", headsOf(named.rows[0]!.cells))).toBe("=SUM([@[jan_2026]:[mar]])");
     const written = at(table, "=SUM([@[jan]:[mar]])");
     expect(formulaOf(shiftReferences(written, setCell(written, 0, 3, "March")).rows[1]!.cells[4]!)!.formula).toBe("=SUM([@[jan]:[march]])");
     expect(formulaOf(shiftReferences(written, deleteColumn(written, 3), undefined, (c) => (c === 3 ? undefined : c > 3 ? c - 1 : c)).rows[1]!.cells[3]!)!.formula).toBe(
@@ -1033,7 +1026,7 @@ describe("the formula's row from one column to another, [@[a]:[b]]", () => {
 
 describe("named rows", () => {
   const PRICES = parseTable(`| Name | Price |\n|---|---|\n| Pear <meta core.n='pear'> | 12 |\n| Fig <meta core.n='fig'> | 3 |\n| <meta core.table core.name='prices'> |`);
-  const source: TableSource = (name, page) => (name.toLowerCase() === "prices" && (page === undefined || page === "Shop") ? PRICES : undefined);
+  const source: TableSource = (name, page) => (name.toLowerCase() === "prices" && (page === undefined || page === "Shop") ? model(PRICES) : undefined);
   const result = (formula: string, own = "| A |\n|---|\n| |") => {
     const table = parseTable(own);
     const rows = table.rows.map((r, i) => (i === table.rows.length - 1 ? { cells: [formulaCell("", formula)] } : r));
@@ -1099,6 +1092,6 @@ describe("named rows", () => {
   it("finds a row's name a column inserted before the first one moved", () => {
     const table = parseTable(`| New | Name | Price |\n|---|---|---|\n| | Pear <meta core.n='pear'> | 12 |`);
     expect(rowNameIn(table.rows[1]!.cells)).toEqual({ name: "pear", column: 1 });
-    expect(namedRows(table).get("pear")).toBe(1);
+    expect(modelRowName(decode(table), 1)).toBe("pear");
   });
 });

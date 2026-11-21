@@ -9,12 +9,12 @@
 /** What a list's name may be: lower case ASCII letters and digits, words joined by single dashes, starting with a letter */
 export const LIST_NAME_RE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
-/** The key of a list's name in the choice type's data in a table (ModelHost.setMeta) */
+/** The key of a list's name in the choice type's data in a table (ModelHost.withAttribute) */
 export function listKey(name: string): string {
   return `choice.${name}`;
 }
 
-/** The names of the lists a table keeps, from its column types' data (ModelHost.metaOf), in the order written */
+/** The names of the lists a table keeps, from its column types' data (ModelHost.attributes), in the order written */
 export function listNames(stored: ReadonlyMap<string, string>): string[] {
   return [...stored.keys()].filter((key) => key.startsWith("choice.")).map((key) => key.slice("choice.".length));
 }

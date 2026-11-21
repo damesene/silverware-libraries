@@ -108,6 +108,41 @@ describe("Lazy saving", () => {
     expect(text).toBe(PAGE.replace("| apple | 10 |", "| apple | 12 |"));
   });
 
+  it("a value held over a formula ends it, as written at once would: shown in its editor as typed, written without it", async () => {
+    const page = "| A | B |\n|---|---|\n| 1 | 2 <meta formulas.f='=A1*2'> |\n";
+    await setup(page, { "silverware.table.modules.lazy.delay": 10000, "silverware.table.metadata": true, "silverware.table.editor.enterKey": "save" });
+    button().click();
+    type(1, 1, "5");
+    key(field()!, "Enter");
+    await flush();
+    clickOn(cell(1, 1));
+    expect(field()!.value).toBe("5");
+    key(field()!, "Escape");
+    await flush();
+    button().click();
+    await flush();
+    expect(text).toBe("| A | B |\n|---|---|\n| 1 | 5 |\n");
+  });
+
+  it("a text typed as '= over a formula, held, then written into the page's file: written without the formula", async () => {
+    const formula = "| A | B |\n|---|---|\n| 1 | 2 <meta formulas.f='=A1*2'> |\n";
+    let page = "Test";
+    const files: Record<string, string> = {};
+    await setup(formula, { "silverware.table.modules.lazy.delay": 10000, "silverware.table.metadata": true, "silverware.table.editor.enterKey": "save" }, {
+      getCurrentPage: () => page,
+      readPage: (name) => files[name] ?? "",
+      writePage: (name, content) => void (files[name] = content),
+    });
+    button().click();
+    type(1, 1, "'=text");
+    key(field()!, "Enter");
+    await flush();
+    files.Test = text;
+    page = "Other";
+    await controller.pageLoaded();
+    expect(files.Test).toBe("| A | B |\n|---|---|\n| 1 | =text |\n");
+  });
+
   it("switched off while a cell is being edited: that cell and those held are written at once", async () => {
     await setup(PAGE, { "silverware.table.modules.lazy.delay": 10000, "silverware.table.editor.enterKey": "moveDown" });
     button().click();

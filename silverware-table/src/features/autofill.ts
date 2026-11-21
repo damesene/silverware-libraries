@@ -16,7 +16,8 @@
 // The handle and the outline are the core's (handleLayer, outlineLayer): in
 // the cells, so they move with the table as it scrolls and go under its held
 // header; the drag is the core's too (drag), the cell nearest the pointer told.
-import { cellValue, type Cell, type FillLine, filled, fillLine } from "../autofill/index.ts";
+import { cellValue, type Cell, type FillCells, type FillLine, filled, fillLine } from "../autofill/index.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import {
   CELL_MENU_ORDER,
   type CellMenuGroup,
@@ -204,7 +205,7 @@ export class AutoFill implements Feature {
     // The crosshair on that table's cells
     this.host.tableMark(info.key, "fill-picking", true);
     const cancel = press === "tap" ? "a tap outside the table cancels" : "Esc cancels";
-    void this.host.bridge.flash(`Silverware Table: ${press} the last cell to fill to; ${cancel}`, "info");
+    this.host.notify(`Silverware Table: ${press} the last cell to fill to; ${cancel}`, "info");
   }
 
   private endPicking(): void {
@@ -265,7 +266,7 @@ export class AutoFill implements Feature {
     const selected = this.selection();
     const extent = selected && selected.info.key === key ? this.extentTo(selected, on) : undefined;
     if (selected && extent) void this.apply(selected, extent);
-    else void this.host.bridge.flash("Silverware Table: nothing to fill there: pick a cell below, above or beside the cells selected", "info");
+    else this.host.notify("Silverware Table: nothing to fill there: pick a cell below, above or beside the cells selected", "info");
     return true;
   }
 
@@ -386,10 +387,10 @@ export class AutoFill implements Feature {
     }));
   }
 
-  private fillCells(info: TableInfo) {
+  private fillCells(info: TableInfo): FillCells {
     return {
-      claim: (cell: string, from: Cell, to: Cell) => this.host.fillCell(info, cell, from, to),
-      keepTags: (value: string, from: string) => this.host.keepTags(value, from),
+      claim: (cell, from, to) => this.host.fillCell(info, cell, from, to),
+      placed: (cell, over) => this.host.cellWrittenOver(cell, over),
     };
   }
 
@@ -433,7 +434,7 @@ export class AutoFill implements Feature {
   }
 
   /** By the pointer: the value the farthest cell filled gets (else how many cells are filled) */
-  private showTip(selected: Selected, extent: Extent | undefined, table: ReturnType<ModelHost["tableOf"]>, x: number, y: number): void {
+  private showTip(selected: Selected, extent: Extent | undefined, table: TableModel, x: number, y: number): void {
     if (!extent) {
       this.tip.hide();
       return;
@@ -456,11 +457,14 @@ export class AutoFill implements Feature {
     const selected = this.selection();
     if (!selected) return;
     const table = this.host.tableOf(selected.info);
-    const columns = table.rows[0]?.cells.length ?? 0;
+    const columns = table.columns.length;
     const beside = [selected.left - 1, selected.right + 1].filter((c) => c >= 0 && c < columns);
     const last = selected.rowZone[1];
-    const filledBeside = (column: number, shown: number) =>
-      shown <= last && cellValue(table.rows[selected.rows[shown]!]?.cells[column] ?? "") !== "";
+    // (Rows as the markdown's: the model's row r is rows[r - 1])
+    const filledBeside = (column: number, shown: number) => {
+      const cell = shown <= last ? table.rows[selected.rows[shown]! - 1]?.cells[column] : undefined;
+      return !!cell && cellValue(cell) !== "";
+    };
     let to = selected.bottom;
     for (const column of beside) {
       if (!filledBeside(column, selected.bottom + 1)) continue;

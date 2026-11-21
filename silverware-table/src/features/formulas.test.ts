@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buttonLabel, cell, cellMenuItem, clickOn, controller, cursorMoves, edits, editor, flashes, flush, key, menuButtons, nameInMenu, pointInsert, press, renderPage, setup as setupPage, tableMenuItem, text, toolbarName, useTablePage, tableKey } from "../testing/page.ts";
+import { bridge, buttonLabel, cell, cellMenuItem, clickOn, controller, cursorMoves, edits, editor, flashes, flush, key, menuButtons, nameInMenu, pointInsert, press, renderPage, setup as setupPage, tableMenuItem, text, toolbarName, useTablePage, tableKey } from "../testing/page.ts";
 import { FORMULAS_NEED_METADATA } from "./formulas.ts";
 import { insertRowWith } from "../core/structure.ts";
-import { clearCustomFunctions, defineCustomFunctions, functionNamed } from "../formulas/registry.ts";
-import { toNumber, type Value } from "../formulas/values.ts";
+import { clearCustomFunctions, defineCustomFunctions, functionNamed } from "../../../shared/formulas/registry.ts";
+import { toNumber, type Value } from "../../../shared/formulas/values.ts";
 import { defineFunctions, resetDefinitions } from "../index.ts";
 
 describe("Formulas", () => {
@@ -33,6 +33,24 @@ describe("Formulas", () => {
     expect(cell(3, 1).textContent).toBe("13");
     expect(cell(3, 1).classList.contains("swt-formula")).toBe(true);
     expect(cell(3, 1).title).toBe("=SUM(B1:B2)");
+  });
+
+  it("keeps a formula typed again as it was, and its cell's name; a value typed over it ends it, the name staying", async () => {
+    const named = "| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Total | 3 <meta formulas.f='=SUM(B1:B1)' core.cn='total'> |\n";
+    await setup(named, { "silverware.table.editor.enterKey": "save" });
+    clickOn(cell(2, 1));
+    await type("=SUM(B1:B1)");
+    expect(text).toBe(named);
+    clickOn(cell(2, 1));
+    await type("7");
+    expect(text).toBe("| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Total | 7 <meta core.cn='total'> |\n");
+  });
+
+  it("ends a formula with a value typed over it that equals its result, as a spreadsheet does", async () => {
+    await setup("| A |\n|---|\n| 3 <meta formulas.f='=1+2'> |\n", { "silverware.table.editor.enterKey": "save" });
+    clickOn(cell(1, 0));
+    await type("3");
+    expect(text).toBe("| A |\n|---|\n| 3 |\n");
   });
 
   it("inserts a numbered column (=ROW() in every row) from a column's menu; rows added or moved are numbered again", async () => {
@@ -539,11 +557,10 @@ describe("Formulas", () => {
     it("writes the results of the tables that refer to an edited one, in the same edit", async () => {
       await setup(PAGE2, { "silverware.table.editor.enterKey": "save" });
       let edits = 0;
-      const bridge = (controller as unknown as { bridge: { replaceRange: (...a: unknown[]) => unknown } }).bridge;
       const replace = bridge.replaceRange;
-      bridge.replaceRange = (...args: unknown[]) => {
+      bridge.replaceRange = (from, to, insert) => {
         edits++;
-        return replace(...args);
+        return replace(from, to, insert);
       };
       clickOn(cell(2, 1)); // Fig's price
       await type("4");
@@ -618,20 +635,21 @@ describe("Formulas", () => {
   describe("referring to tables on other pages", () => {
     const OTHER = `# Prices\n\n| Name | Price |\n|---|---|\n| Pear | 12 |\n| Fig | 3 |\n| <meta core.table core.name='fruit'> |\n`;
     const HERE = "| Item | Cost |\n|---|---|\n| Fig | |\n";
+    // The pages read from `pages` (the bridge's readPage, handed to setup), each name read listed
     const withPages = (pages: Record<string, string>) => {
       const read: string[] = [];
-      (controller as unknown as { bridge: Record<string, unknown> }).bridge.readPage = (name: string) => {
+      const readPage = (name: string) => {
         read.push(name);
         if (!(name in pages)) throw new Error(`no page ${name}`);
         return pages[name]!;
       };
-      return read;
+      return { read, readPage };
     };
 
     it("reads a table of another page, again for every edit", async () => {
-      await setup(HERE, { "silverware.table.editor.enterKey": "save" });
       const pages: Record<string, string> = { Prices: OTHER };
-      const read = withPages(pages);
+      const { read, readPage } = withPages(pages);
+      await setup(HERE, { "silverware.table.editor.enterKey": "save" }, { readPage });
       clickOn(cell(1, 1));
       await type("=XLOOKUP([@item], [[Prices]]fruit![name], [[Prices]]fruit![price])");
       expect(text).toBe(`| Item | Cost |\n|---|---|\n| Fig | 3 <meta formulas.f='=XLOOKUP([@item], [[Prices]]fruit![name], [[Prices]]fruit![price])'> |\n`);
@@ -724,8 +742,7 @@ describe("Formulas", () => {
     });
 
     it("says when the page or its table is not there", async () => {
-      await setup(HERE, { "silverware.table.editor.enterKey": "save" });
-      withPages({ Prices: OTHER });
+      await setup(HERE, { "silverware.table.editor.enterKey": "save" }, { readPage: withPages({ Prices: OTHER }).readPage });
       clickOn(cell(1, 1));
       await type("=[[Nowhere]]fruit!B1");
       expect(text).toContain("| Fig | \\#REF! <meta");
@@ -833,7 +850,7 @@ describe("Formulas", () => {
       expect(text).toContain(`| Figs <meta core.n='fig'> | 3 |`);
     });
 
-    it("asks before deleting a column that holds names of rows or cells", async () => {
+    it("asks before deleting a column that holds names of cells; the names of rows stay with their rows", async () => {
       const NAMED = `| Name | Price | Note |\n|---|---|---|\n| Pear <meta core.n='pear'> | 12 | a |\n| Fig <meta core.n='fig'> | 3 <meta core.cn='fig_price'> | b |\n`;
       await setup(NAMED);
       const confirm = vi.spyOn(window, "confirm");
@@ -848,11 +865,6 @@ describe("Formulas", () => {
         await flush();
       };
       confirm.mockReturnValue(false);
-      await deleteColumn(0);
-      expect(confirm).toHaveBeenLastCalledWith(
-        "Deleting this column also removes the names of 2 rows pear and fig: formulas that use them show #REF! or #NAME?. Delete the column? Ctrl+Z brings it back.",
-      );
-      expect(text).toBe(NAMED);
       await deleteColumn(1);
       expect(confirm).toHaveBeenLastCalledWith(
         "Deleting this column also removes the name of the cell fig_price: formulas that use it show #REF! or #NAME?. Delete the column? Ctrl+Z brings it back.",
@@ -864,9 +876,10 @@ describe("Formulas", () => {
       expect(confirm).not.toHaveBeenCalled();
       expect(text).toBe(`| Name | Price |\n|---|---|\n| Pear <meta core.n='pear'> | 12 |\n| Fig <meta core.n='fig'> | 3 <meta core.cn='fig_price'> |\n`);
       await controller.scan();
-      confirm.mockReturnValue(true);
+      // The column holding the rows' names: nothing asked, the names written in their rows' cells left
       await deleteColumn(0);
-      expect(text).toBe(`| Price |\n|---|\n| 12 |\n| 3 <meta core.cn='fig_price'> |\n`);
+      expect(confirm).not.toHaveBeenCalled();
+      expect(text).toBe(`| Price |\n|---|\n| 12 <meta core.n='pear'> |\n| 3 <meta core.n='fig' core.cn='fig_price'> |\n`);
     });
 
     const TWO_TABLES = `| A | B |\n|---|---|\n| 1 <meta core.cn='one'> | 2 |\n\n| C |\n|---|\n| 3 <meta core.cn='two'> |\n`;
@@ -1190,7 +1203,7 @@ describe("Formulas when a table they refer to is deleted", () => {
     const prices = (price: number) => `| Item | Price |\n|---|---|\n| Pear | ${price} |\n| <meta core.table core.name='prices'> |\n`;
     await setupPage(`${prices(12)}\n${prices(5)}\n| Double |\n|---|\n| 24 <meta formulas.f='=prices!B1*2'> |\n| <meta core.table core.name='costs'> |\n`, { "silverware.table.metadata": true });
     const questions: string[] = [];
-    (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = (message: string) => {
+    bridge.confirm = (message: string) => {
       questions.push(message);
       return true;
     };
@@ -1206,7 +1219,7 @@ describe("Formulas when a table they refer to is deleted", () => {
   it("say so when asked, and show #REF! in the same edit", async () => {
     await setupPage("| Item | Price |\n|---|---|\n| Pear | 12 |\n| <meta core.table core.name='prices'> |\n\n| Double |\n|---|\n| 24 <meta formulas.f='=prices!B1*2'> |\n| <meta core.table core.name='costs'> |\n", { "silverware.table.metadata": true });
     const questions: string[] = [];
-    (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = (message: string) => {
+    bridge.confirm = (message: string) => {
       questions.push(message);
       return true;
     };

@@ -9,7 +9,8 @@
 import { settingRow, switchControl } from "../../shared/controls.ts";
 import { type Dialog, Dialogs } from "../../shared/dialog.ts";
 import { tabs } from "../../shared/tabs.ts";
-import { type Bridge, FEATURE_NAMES, type FeatureName, MODULE_CATEGORIES, MODULE_CATEGORY, MODULE_DESCRIPTIONS, MODULE_LABELS, type ModuleCategory, moduleOnByDefault, settingChoices, SETTINGS } from "./bridge.ts";
+import type { TablePlatform } from "./core/platform.ts";
+import { FEATURE_NAMES, type FeatureName, MODULE_CATEGORIES, MODULE_CATEGORY, MODULE_DESCRIPTIONS, MODULE_LABELS, type ModuleCategory, moduleOnByDefault, settingChoices, SETTINGS } from "./bridge.ts";
 import { UI_CLASS } from "./dom.ts";
 import { ICONS } from "./icons.ts";
 
@@ -20,7 +21,7 @@ type Key = keyof typeof SETTINGS;
 
 export type SettingsContext = {
   readonly doc: Document;
-  readonly bridge: Bridge;
+  readonly platform: TablePlatform;
   // Whether the settings can be saved here (else the dialog only shows them)
   readonly canSave: boolean;
   // Saves settings by path
@@ -93,10 +94,10 @@ export class SettingsDialog {
   /** Reads the settings as configured now and shows them */
   async open(): Promise<void> {
     if (this.isOpen) return;
-    const { bridge } = this.context;
+    const { settings } = this.context.platform;
     const read = async (path: string, fallback: unknown) => {
       try {
-        return (await bridge.getConfig?.(path, fallback)) ?? fallback;
+        return (await settings.get(path, fallback)) ?? fallback;
       } catch {
         return fallback;
       }
@@ -123,9 +124,9 @@ export class SettingsDialog {
   private async dismiss(): Promise<boolean> {
     if (this.saving) return false;
     if (this.changed().length === 0) return true;
-    const { bridge } = this.context;
+    const { ui } = this.context.platform;
     const question = "Close the Silverware Table settings without saving your changes?";
-    return bridge.confirm ? await bridge.confirm(question) : this.context.doc.defaultView!.confirm(question);
+    return ui.ask ? await ui.ask(question) : this.context.doc.defaultView!.confirm(question);
   }
 
   // ---- the dialog --------------------------------------------------------------
@@ -317,14 +318,15 @@ export class SettingsDialog {
       await this.context.save(values);
     } catch (e) {
       this.saving = false;
-      void this.context.bridge.flash(`Silverware Table: the settings could not be saved (${String(e)})`, "error");
+      this.context.platform.ui.notify(`Silverware Table: the settings could not be saved (${String(e)})`, { type: "error" });
       this.update();
       return;
     }
     this.saving = false;
     this.close();
     if (reload) {
-      if (this.context.bridge.reloadUI) await this.context.bridge.reloadUI();
+      const { ui } = this.context.platform;
+      if (ui.reload) await ui.reload();
       else this.context.doc.defaultView?.location.reload();
       return;
     }

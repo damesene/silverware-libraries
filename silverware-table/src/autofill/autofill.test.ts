@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { parseTable, serializeTable } from "../markdown.ts";
-import { metaTagPattern } from "../tags.ts";
-import { allSeries, clearCustomSeries, customSeries, customSeriesAnew, defineCustomSeries, type FillLine, filled, fillLine, seriesFor } from "./index.ts";
+import { NO_ATTRIBUTES } from "../../../shared/table/model.ts";
+import { cellWrittenOver } from "../../../shared/table/rules.ts";
+import { decode, encode, encodeCell } from "../store/markdown/codec.ts";
+import { allSeries, clearCustomSeries, customSeries, customSeriesAnew, defineCustomSeries, type FillCells, type FillLine, filled, fillLine, seriesFor } from "./index.ts";
 
 /** The values after (and, backward, before) the ones given, as a drag fills them */
 const after = (values: string[], count = 3) => {
@@ -82,11 +84,13 @@ describe("series", () => {
 });
 
 describe("filling a table", () => {
-  const TABLE = parseTable("| N | Day | F |\n|---|---|---|\n| 1 | Mon | =A1 |\n| 2 | Tue | x |\n|  |  | <meta core.cn='keep'> |\n|  |  |  |\n");
-  // A claim as the formulas module makes one: cells written "=…" copied with the rows they moved
-  const cells = {
-    claim: (cell: string, from: { row: number }, to: { row: number }) => (cell.startsWith("=") ? `=moved ${to.row - from.row}` : undefined),
-    keepTags: (value: string, from: string) => [value, ...(from.match(metaTagPattern()) ?? [])].join(" ").trim(),
+  const READ = parseTable("| N | Day | F |\n|---|---|---|\n| 1 | Mon | =A1 |\n| 2 | Tue | x |\n|  |  | <meta core.cn='keep'> |\n|  |  |  |\n");
+  const TABLE = decode(READ);
+  // A claim as the formulas module makes one: cells written "=…" copied with the rows they moved; a cell placed as a
+  // move places it, nothing bound to the content here
+  const cells: FillCells = {
+    claim: (cell, from, to) => (cell.content.startsWith("=") ? { content: `=moved ${to.row - from.row}`, attributes: NO_ATTRIBUTES } : undefined),
+    placed: (cell, over) => cellWrittenOver(cell, over, { boundToContent: [], unique: [] }),
   };
   const column = (c: number, backward = false): FillLine => ({
     sources: [1, 2].map((row) => ({ row, column: c })),
@@ -95,12 +99,12 @@ describe("filling a table", () => {
   });
 
   it("fills each column on its own, keeping the tags of the cells written over", () => {
-    const result = filled(TABLE, [column(0), column(1)], cells);
+    const result = encode(filled(TABLE, [column(0), column(1)], cells), READ);
     expect(serializeTable(result).split("\n").slice(4, 6)).toEqual(["| 3 | Wed | <meta core.cn='keep'> |", "| 4 | Thu | |"]);
   });
 
   it("copies the cells another part claims, the selected cells over again, others as their values", () => {
-    expect(fillLine(TABLE, column(2), cells)).toEqual([`=moved 2 <meta core.cn='keep'>`, "x"]);
+    expect(fillLine(TABLE, column(2), cells).map(encodeCell)).toEqual([`=moved 2 <meta core.cn='keep'>`, "x"]);
   });
 });
 

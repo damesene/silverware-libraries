@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { completions, defineFormulaPlaces, evaluated, evaluatedText, formulaErrorsIn, formulaErrorsTextIn, formulaPagesIn, luaCallPlaces, onWrite, resetDefinitions, tables } from "./index.ts";
-import { buttonLabel, cell, clickOn, controller, editor, edits, flush, key, menuButtons, nameInMenu, setup, text, toolbarName, useTablePage } from "./testing/page.ts";
+import { buttonLabel, cell, clickOn, controller, editor, edits, flashes, flush, key, menuButtons, nameInMenu, setup, text, toolbarName, useTablePage } from "./testing/page.ts";
+import { deleteRow } from "../../shared/table/ops.ts";
 
 describe("silverware.table.evaluate: a formula calculated on the page shown", () => {
   useTablePage();
@@ -203,6 +204,18 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
       expect(plain).not.toHaveProperty("name");
     });
 
+    it("gives the cells by the columns (none past the header), a column's name as the table names it (its spaces one)", () => {
+      const [table] = tables("| Unit  price #euro | Qty |\n|---|---|\n| 1 | 2 | 3 |\n| 4 |\n");
+      expect(table!.columns).toEqual([
+        { name: "Unit price", key: "unit_price" },
+        { name: "Qty", key: "qty" },
+      ]);
+      expect(table!.rows).toEqual([
+        ["1", "2"],
+        ["4", ""],
+      ]);
+    });
+
     it("gives a formula's error as it shows, its # unescaped", () => {
       const [table] = tables("| A | B |\n|---|---|\n| \\#REF! <meta formulas.f='=x!A1'> | #tag |\n");
       expect(table!.rows).toEqual([["#REF!", "#tag"]]);
@@ -307,6 +320,25 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
       toolbarName("table");
       expect(await nameInMenu("costs")).toBeUndefined();
       expect(text.endsWith(LINES("costs", "cost", "2"))).toBe(true);
+    });
+
+    it("follows a row deleted whose cell held a formula of its own: the page's formula after it written, the table too", async () => {
+      const PAGE = "| Name | Price |\n|---|---|\n| Pear | ${te(\"=1\")} |\n| Fig | 3 |\n| <meta core.table core.name='prices'> |\n\nFig: ${te('=prices!B2')}\n";
+      await setup(PAGE, { "silverware.table.metadata": true });
+      defineFormulaPlaces(luaCallPlaces("te"));
+      await controller.writeTable(controller.shownTables()[0]!, (t) => deleteRow(t, 1), { rowMap: (r) => (r === 1 ? undefined : r > 1 ? r - 1 : r) });
+      expect(text).toBe("| Name | Price |\n|---|---|\n| Fig | 3 |\n| <meta core.table core.name='prices'> |\n\nFig: ${te('=prices!B1')}\n");
+    });
+
+    it("leaves one as written where its place cannot hold its new text, the table written and that said", async () => {
+      await setup(TABLE + LINES("prices", "price", "1"), { "silverware.table.metadata": true });
+      // (A finder whose places hold no text: as a string literal a quote of its own)
+      defineFormulaPlaces((page: string) => luaCallPlaces("te")(page).map((place) => ({ ...place, holds: () => false })));
+      toolbarName("table");
+      expect(await nameInMenu("costs")).toBeUndefined();
+      expect(text).toContain("core.name='costs'");
+      expect(text.endsWith(LINES("prices", "price", "1"))).toBe(true);
+      expect(flashes.pop()).toContain("2 formulas written in the page (silverware.table.evaluate) did not follow the table");
     });
 
     it("leaves them as written without a finder, and where the finder gives places that are none", async () => {

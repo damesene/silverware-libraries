@@ -3,7 +3,7 @@
 // number format, a logical value, an error, or text. Dates and times become
 // Excel's serial numbers (days since 1899-12-30), shown in their format, so
 // they are dates in Excel whatever its language.
-import { errorCodeIn, parseClock, parseDate } from "../formulas/index.ts";
+import { errorCodeIn, parseClock, parseDate } from "../../../shared/formulas/index.ts";
 import { asNumber } from "../../../shared/filter.ts";
 import { EXCEL_ERRORS } from "./formulas.ts";
 

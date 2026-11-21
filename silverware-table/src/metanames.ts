@@ -11,9 +11,9 @@
 // The metadata row carries `core.table`, by which it is told from a last row
 // whose one cell holds only a tag.
 
-/** Whose an attribute is: a module's name in lowercase, or the core's */
-export type Owner = string;
-export const CORE: Owner = "core";
+import { CORE, type Owner } from "../../shared/table/model.ts";
+
+export { CORE, type Owner };
 
 /** The mark of a table's metadata row (an attribute without a value) */
 export const TABLE_MARKER = `${CORE}.table`;
@@ -21,12 +21,29 @@ export const TABLE_MARKER = `${CORE}.table`;
 /** The segment before a column's name in an attribute of a column */
 export const COLUMN_MARK = "-c-";
 
+// `<owner>.-c-<column>.<key>` and `<owner>.-c-<column>:<occurrence>.<key>`: a
+// column's key or fixed name has no "." or ":"; it is empty for a header with
+// only hashtags (`#stars`). Its groups: the owner, the column, its occurrence, the key
+export const COLUMN_ATTRIBUTE_RE = new RegExp(String.raw`^([^.]+)\.${COLUMN_MARK}([^.:]*)(?::(\d+))?\.(.+)$`);
+
+/** Whether a whole name is of a column's attribute (else of a table's) */
+export function isColumnAttributeName(name: string): boolean {
+  return COLUMN_ATTRIBUTE_RE.test(name);
+}
+
 /**
  * The name of an owner's attribute: of a table, in a cell's hidden tags, and,
- * with the column between them (meta.ts), of a column
+ * with the column between them (meta.ts), of a column; no owner's (`""`, a tag
+ * typed by hand), its key alone
  */
 export function attributeName(owner: Owner, key: string): string {
-  return `${owner}.${key}`;
+  return owner === "" ? key : `${owner}.${key}`;
+}
+
+/** An attribute's name (of a table's, or in a cell's tags) as its owner and key: before and after its first dot; without one, no owner's */
+export function splitAttributeName(name: string): { readonly owner: Owner; readonly key: string } {
+  const dot = name.indexOf(".");
+  return dot < 0 ? { owner: "", key: name } : { owner: name.slice(0, dot), key: name.slice(dot + 1) };
 }
 
 /** A text to find as it is in a regular expression */

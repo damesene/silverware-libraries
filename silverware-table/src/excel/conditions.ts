@@ -7,7 +7,7 @@
 // column names, levels) is not written: listed with why. Excel's formulas in
 // rules are relative to the range's first cell.
 import { type Color, conditionNamed, type ExcelLook, type ExcelTest, formatNamed, type Params, readParams, type Rule, type Style } from "../conditions/index.ts";
-import { columnLetters } from "../formulas/index.ts";
+import { columnLetters } from "../../../shared/formulas/index.ts";
 import { xmlText } from "./xlsx.ts";
 
 /** A rule with the cells it applies to: the markdown's body rows (first to last) and columns, the pinned ones left out */

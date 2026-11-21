@@ -34,9 +34,8 @@ import {
 import { el } from "../../../shared/elements.ts";
 import { asNumber, type FilterOptions, normalizeForFilter, parseFilter } from "../../../shared/filter.ts";
 import { ICONS } from "../icons.ts";
-import { parseTable } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
-import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget, TableKey } from "../core/feature.ts";
+import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget, TableKey, TableRevision } from "../core/feature.ts";
 
 // A column with at most this many different values offers them to tick
 const MAX_VALUES = 12;
@@ -102,8 +101,8 @@ function sameFilters(a: readonly string[], b: readonly string[]): boolean {
 class FilterTable {
   // Filters typed that the table does not store (as typed, by column)
   private typed: string[] | undefined;
-  // The filters stored in the table, read from its markdown (as of `source`)
-  private stored: { readonly source: string; readonly filters: readonly string[] } | undefined;
+  // The filters stored in the table, read from its model (as of `revision`)
+  private stored: { readonly revision: TableRevision; readonly filters: readonly string[] } | undefined;
   // Its filter row shown, and its fields, one per column (made once, given to the core each time the view applies)
   private shown = false;
   private rows: readonly RowField[] | undefined;
@@ -123,13 +122,13 @@ class FilterTable {
 
   /** The filters stored in the table (filter.*), by column */
   private storedFilters(info: TableInfo): readonly string[] {
-    if (this.stored?.source === info.source) return this.stored.filters;
+    if (this.stored?.revision === info.revision) return this.stored.filters;
     const filters: string[] = [];
-    for (const [column, value] of this.host.columnsMeta(parseTable(info.source), "condition")) {
+    for (const [column, value] of this.host.columnAttributes(info.model, "condition")) {
       while (filters.length < column) filters.push("");
       filters[column] = value;
     }
-    this.stored = { source: info.source, filters };
+    this.stored = { revision: info.revision, filters };
     return filters;
   }
 
@@ -379,11 +378,11 @@ class FilterTable {
       if (filter.trim() !== "") filters.set(column, filter.trim());
     });
     // A filter the table cannot take (the metadata setting off, none stored for its column) stays typed: a view
-    const table = parseTable(info.source);
-    const storable = [...filters.keys()].every((column) => this.host.canStoreMeta(table, "condition", { column }));
+    const table = info.model;
+    const storable = [...filters.keys()].every((column) => this.host.canStore(table, "condition", { column }));
     // (Nothing it can take and nothing to change: no write, whose step would recalculate every formula for nothing)
-    if (this.host.setColumnsMeta(table, "condition", filters) === table) return;
-    const result = await this.host.writeTable(info, (t) => this.host.setColumnsMeta(t, "condition", filters));
+    if (this.host.withColumnAttributes(table, "condition", filters) === table) return;
+    const result = await this.host.writeTable(info, (t) => this.host.withColumnAttributes(t, "condition", filters));
     // Stored: the table's markdown has them now
     if (result !== "failed" && storable && sameFilters(this.typed ?? [], written)) this.typed = undefined;
   }

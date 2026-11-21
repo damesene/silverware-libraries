@@ -8,16 +8,17 @@
 // read again as they change too.
 // Turned off, no page is read, and formulas referring to one keep their
 // results (formula/page.ts: pages not read are `unread`).
-import type { Feature, ModelHost, TableTarget, TableInfo, WritePage } from "../core/feature.ts";
-import { type FormulaCells, type FormulasOffer, formulaPages, type PageLinksOffer, referredPages, tablesWritten } from "../formulas/index.ts";
-import { type OtherPages, type PageTable, pageTablesOf, parseTable, type Table } from "../markdown.ts";
+import type { Feature, ModelHost, OtherPages, StoredTable, TableTarget, TableInfo, WriteDocument } from "../core/feature.ts";
+import { type FormulaCells, formulaPages, referredPages, tablesWritten } from "../../../shared/formulas/index.ts";
+import { type FormulasOffer, type PageLinksOffer } from "../formulas/offers.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 
 // At most this many other pages are read for one page's formulas (pages that refer on and on)
 const MAX_OTHER_PAGES = 20;
 
 export class PageLinks implements Feature {
   // The other pages read: their tables, or null where there is no such page
-  private readonly pages = new Map<string, readonly PageTable[] | null>();
+  private readonly pages = new Map<string, readonly StoredTable[] | null>();
   // Counts the pages read, so what formulas computed from them is computed anew
   private version = 0;
   // The pages being read: asked again meanwhile (a table shown and a pivot of it at once), the same reading
@@ -28,7 +29,7 @@ export class PageLinks implements Feature {
   }
 
   /** The pages these formulas and tables refer to (and theirs, in turn), read anew: a formula calculated in no table */
-  private async readFor(formulas: readonly string[], tables: readonly Table[]): Promise<readonly string[]> {
+  private async readFor(formulas: readonly string[], tables: readonly TableModel[]): Promise<readonly string[]> {
     const visited = new Set<string>();
     await this.load(tables, true, formulas.flatMap(formulaPages), visited);
     return [...visited];
@@ -45,7 +46,7 @@ export class PageLinks implements Feature {
   }
 
   enhanced(info: TableInfo): void {
-    void this.load([parseTable(info.source)], false).then((read) => {
+    void this.load([info.model], false).then((read) => {
       if (read) this.host.tablesChanged();
     });
   }
@@ -54,13 +55,13 @@ export class PageLinks implements Feature {
   async prepareWrite(info: TableTarget): Promise<void> {
     const cells = this.cells();
     if (!cells) return;
-    const tables = pageTablesOf(this.host.pageText).map((t) => ({ ...t, name: this.host.tableName(t.table) }));
-    await this.load(tablesWritten(cells, tables, info.source), true);
+    const tables = this.host.documentTables().map((t) => ({ key: t.key, table: t.model, name: this.host.tableName(t.model) }));
+    await this.load(tablesWritten(cells, tables, info.key), true);
   }
 
   /** After the edit: pages the page's tables and the edited one refer to, if not read yet */
-  async prepareEdit(edited: Table, page: WritePage): Promise<void> {
-    await this.load([...page.tables.map((t) => t.table), edited], false);
+  async prepareEdit(edited: TableModel, edit: WriteDocument): Promise<void> {
+    await this.load([...edit.tables.map((t) => t.model), edited], false);
   }
 
   /**
@@ -71,7 +72,7 @@ export class PageLinks implements Feature {
    */
   async pageIndexed(name: string): Promise<void> {
     if (!this.pages.has(name)) return;
-    if (name === this.host.currentPage) {
+    if (name === this.host.currentDocument) {
       this.pages.delete(name);
       return;
     }
@@ -80,8 +81,8 @@ export class PageLinks implements Feature {
   }
 
   /** The tables shown, as last read */
-  private tablesShown(): Table[] {
-    return this.host.shownTables().map((info) => parseTable(info.source));
+  private tablesShown(): TableModel[] {
+    return this.host.shownTables().map((info) => info.model);
   }
 
   /**
@@ -89,10 +90,10 @@ export class PageLinks implements Feature {
    * pages those pages' tables refer to; `fresh`: also those read before.
    * Whether a page was read.
    */
-  private async load(tables: Iterable<Table>, fresh: boolean | ReadonlySet<string>, pages: readonly string[] = [], visited?: Set<string>): Promise<boolean> {
+  private async load(tables: Iterable<TableModel>, fresh: boolean | ReadonlySet<string>, pages: readonly string[] = [], visited?: Set<string>): Promise<boolean> {
     // Read for formulas only (a pivot is calculated by them too)
     const cells = this.cells();
-    if (!this.host.bridge.readPage || !cells) return false;
+    if (!this.host.readsOtherPages || !cells) return false;
     const queue = new Set<string>(pages);
     for (const table of tables) for (const page of referredPages(cells, table)) queue.add(page);
     const done = new Set<string>();
@@ -100,13 +101,13 @@ export class PageLinks implements Feature {
     for (const page of queue) {
       if (done.size >= MAX_OTHER_PAGES) break;
       done.add(page);
-      if (page === this.host.currentPage) continue;
+      if (page === this.host.currentDocument) continue;
       visited?.add(page);
       if (fresh === true || (fresh && fresh.has(page)) || !this.pages.has(page)) {
         await this.read(page);
         read = true;
       }
-      for (const { table } of this.pages.get(page) ?? []) for (const next of referredPages(cells, table)) queue.add(next);
+      for (const { model } of this.pages.get(page) ?? []) for (const next of referredPages(cells, model)) queue.add(next);
     }
     return read;
   }
@@ -120,15 +121,9 @@ export class PageLinks implements Feature {
     return read;
   }
 
-  /** Reads another page's tables; the earlier ones stay until it is read, so formulas never see it missing meanwhile */
+  /** Reads another page's tables (null: no such page); the earlier ones stay until it is read, so formulas never see it missing meanwhile */
   private async readNow(page: string): Promise<void> {
-    let tables: readonly PageTable[] | null;
-    try {
-      tables = pageTablesOf(await this.host.bridge.readPage!(page));
-    } catch {
-      tables = null;
-    }
-    this.pages.set(page, tables);
+    this.pages.set(page, await this.host.tables(page));
     this.version++;
   }
 }

@@ -5,9 +5,11 @@
 import type { SourceProvider } from "../sources.ts";
 import { afterEach, beforeEach, vi } from "vitest";
 import type { Bridge } from "../bridge.ts";
+import { tablePlatform } from "../host/silverbullet/platform.ts";
+import { silverBulletBinding } from "../host/silverbullet/binding.ts";
 import { Controller } from "../controller.ts";
 import type { InsertControls, InsertTarget } from "../core/insert.ts";
-import { findTables, parseTable } from "../markdown.ts";
+import { findTables, parseTable, writesMetaRow, writtenMeta } from "../markdown.ts";
 import { metaTagPattern } from "../tags.ts";
 import type { TableKey } from "../core/tables.ts";
 
@@ -18,6 +20,8 @@ export let flashes: string[];
 // The edits written (each one replaceRange, one undo step)
 export let edits: number;
 export let controller: Controller;
+/** The bridge the page's platform is made of: a test replaces a member to watch an edit or answer a question */
+export let bridge: { -readonly [K in keyof Bridge]: Bridge[K] };
 
 export const PAGE = "Intro\n\n| Name | Qty |\n|---|---|\n| Pear | 3 |\n| apple | 10 |\n| Fig | 2 |\n";
 
@@ -73,12 +77,12 @@ export function renderPage(page: string, into: HTMLElement, moves: number[]): vo
       (r === 0 ? thead : tbody).append(tr);
     });
     // The metadata row renders too, its <meta> unseen
-    if (model.meta) {
+    if (writesMetaRow(model)) {
       const tr = document.createElement("tr");
       const td = document.createElement("td");
       // With its attributes, as SilverBullet renders it (verified)
       const meta = document.createElement("meta");
-      for (const [name, value] of Object.entries(model.meta)) meta.setAttribute(name, value);
+      for (const [name, value] of Object.entries(writtenMeta(model))) meta.setAttribute(name, value);
       td.append(meta);
       tr.append(td);
       tbody.append(tr);
@@ -105,7 +109,7 @@ export async function setup(page: string, settings: Record<string, unknown> = {}
   flashes = [];
   edits = 0;
   renderPage(text, editor, cursorMoves);
-  const bridge: Bridge = {
+  bridge = {
     getText: () => text,
     replaceRange: (from, to, insert) => {
       text = text.slice(0, from) + insert + text.slice(to);
@@ -118,7 +122,8 @@ export async function setup(page: string, settings: Record<string, unknown> = {}
     getConfig: (path, defaultValue) => (path in config ? config[path] : defaultValue),
     ...bridgeExtras,
   };
-  controller = new Controller(document, bridge, sources);
+  // (Made of the bridge as SilverBullet's is: a test replaces a member of the bridge to watch or answer it)
+  controller = new Controller(document, tablePlatform(bridge, document), silverBulletBinding, sources);
   controller.start();
   await controller.scan();
   // The settings are read asynchronously: tests start once they are
@@ -225,7 +230,7 @@ const insertControls = () => (controller as unknown as { insert: InsertControls 
 
 /** A + shown where the pointer would bring it up (undefined: none), the pointer in the band around the table or not */
 /** The key the core gives the page's table at `index` (as findTables counts them) */
-export const tableKey = (index = 0): TableKey => controller.tableKeys(controller.currentPage, text)[index]!;
+export const tableKey = (index = 0): TableKey => controller.documentTables()[index]!.key;
 
 export function pointInsert(at: InsertTarget | undefined, inBand = false): void {
   const insert = insertControls();

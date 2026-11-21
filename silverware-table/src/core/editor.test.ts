@@ -174,6 +174,13 @@ describe("Cell editor", () => {
     );
   });
 
+  it("aligns a table written with no value changed, the autoFormat setting on: written as it would be, not as it was", async () => {
+    await setup("| Name | Qty |\n|---|--:|\n| Pear | 3 |\n| Apple | 10 |\n", { "silverware.table.autoFormat": true });
+    // (A write whose change changes nothing: a feature's, a cell set to its own value)
+    expect(await controller.writeTable(controller.shownTables()[0]!, (t) => t)).toBe("written");
+    expect(text).toBe("| Name  | Qty |\n| ----- | --: |\n| Pear  |   3 |\n| Apple |  10 |\n");
+  });
+
   it("adds a row below with Ctrl+Enter, unless the setting is off", async () => {
     await setup(PAGE);
     clickOn(cell(1, 1)); // Pear's Qty

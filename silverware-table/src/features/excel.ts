@@ -23,7 +23,8 @@ import type { ExcelTemplates } from "../excel/functions.ts";
 import { excelValue } from "../excel/values.ts";
 import { columnWidth, excelColumnNames, excelTableName, xlsxFile, type XlsxCell } from "../excel/xlsx.ts";
 import { currentTable, type ExportedTable, exportedTable } from "../export/table.ts";
-import { type FormulasOffer, totalRows } from "../formulas/index.ts";
+import { type FormulasOffer } from "../formulas/offers.ts";
+import { totalRows } from "../../../shared/formulas/index.ts";
 import { ICONS } from "../icons.ts";
 
 const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -134,7 +135,7 @@ export class Excel implements Feature {
       workbook = await this.workbook(info);
     } catch (e) {
       console.error("Silverware Table: the table could not be prepared for Excel", e);
-      void this.host.bridge.flash(`Silverware Table: could not prepare the table for Excel (${String(e)})`, "error");
+      this.host.notify(`Silverware Table: could not prepare the table for Excel (${String(e)})`, "error");
       return;
     } finally {
       this.opening = false;
@@ -311,14 +312,14 @@ export class Excel implements Feature {
     const exported = exportedTable(this.host, info, "all");
     // The markdown, edits held (lazy saving) included: the formulas
     const model = this.host.tableOf(info);
-    const templates = excelTemplates(await this.host.bridge.getConfig?.(FUNCTIONS_PATH, {}));
+    const templates = excelTemplates(await this.host.configured(FUNCTIONS_PATH, {}));
     const skipped: Skipped[] = [];
     let formulas = 0;
     const cells = this.host.offered<FormulasOffer>("formulas")?.cells;
     // An Excel table: its name, its columns named as its header shows them (unique), its last row its totals row
     // where that is the table's only total row (a total of its own column: what [qty] leaves out)
     const columns = excelColumnNames(exported.header);
-    const bodyRows = Math.max(0, model.rows.length - 1);
+    const bodyRows = model.rows.length;
     const totals = cells ? totalRows(cells, model) : new Set<number>();
     const totalsRow = bodyRows >= 2 && totals.size === 1 && totals.has(bodyRows - 1);
     const tableName = excelTableName(this.host.tableName(model));
@@ -329,7 +330,8 @@ export class Excel implements Feature {
       rows[row - 1] = values.map((text, column) => {
         const value = excelValue(text);
         // (Without the formulas module, no formulas: the cells' values)
-        const stored = cells?.formulaOf(model.rows[row]?.cells[column] ?? "");
+        const cell = model.rows[row - 1]?.cells[column];
+        const stored = cell && cells?.formulaOf(cell);
         if (!stored) return { value };
         formulas++;
         const formula = excelFormula(stored.formula, own!, row - 1, column, templates);
@@ -340,7 +342,7 @@ export class Excel implements Feature {
         return { value, formula };
       });
     }
-    const page = await this.host.bridge.getCurrentPage();
+    const page = await this.host.documentNameNow();
     const name = this.host.tableName(model) ?? page.split("/").pop() ?? "Table";
     const widths = columns.map((h, c) => columnWidth([h, ...exported.rows.map((r) => r.values[c] ?? "")]));
     // A calculated column: the same formula in every row but the totals row, in Excel's form too

@@ -13,9 +13,9 @@
 // as the table is rendered (its metadata as rendered, before the browser lays
 // it out), so a table rendered anew after an edit does not show SilverBullet's
 // look for a moment; once its markdown is read, again from it.
+import type { TableModel } from "../../../shared/table/model.ts";
 import type { Feature, ModelHost, TableLook, TablePreview, ToolbarButton, TableInfo } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
-import { parseTable, type Table } from "../markdown.ts";
 import type { MenuDetail, MenuEntry } from "../menu.ts";
 
 type MenuItem = Extract<MenuEntry, { readonly kind: "item" }>;
@@ -41,17 +41,17 @@ export class Themes implements Feature {
   }
 
   /** A table's own theme, from its metadata row, if it chose one */
-  private ownTheme(table: Table): string | undefined {
-    return themeName(this.host.getMeta(table, "name"));
+  private ownTheme(table: TableModel): string | undefined {
+    return themeName(this.host.attribute(table, "name"));
   }
 
   /** A table's own stripes (none, rows, columns), from its metadata row, if it chose them */
-  private ownStripes(table: Table): Stripes | undefined {
-    return stripesName(this.host.getMeta(table, "stripes"));
+  private ownStripes(table: TableModel): Stripes | undefined {
+    return stripesName(this.host.attribute(table, "stripes"));
   }
 
   /** The table's own theme and stripes (its metadata row), else the settings'; native and rows are SilverBullet's own look: no attribute */
-  tableLook(table: Table): TableLook {
+  tableLook(table: TableModel): TableLook {
     const theme = this.ownTheme(table) ?? this.theme;
     const stripes = this.ownStripes(table) ?? this.stripes;
     return { theme: theme === NATIVE_THEME ? undefined : theme, stripes: stripes === "rows" ? undefined : stripes };
@@ -78,8 +78,8 @@ export class Themes implements Feature {
    * settings become). As names are, only where the table can have metadata.
    */
   toolbarButtons(info: TableInfo): ToolbarButton[] {
-    const table = parseTable(info.source);
-    if (!this.host.canStoreMeta(table, "name") && !this.host.canStoreMeta(table, "stripes")) return [];
+    const table = info.model;
+    if (!this.host.canStore(table, "name") && !this.host.canStore(table, "stripes")) return [];
     const own = this.ownTheme(table);
     const ownStripes = this.ownStripes(table);
     const set = (choices: Readonly<Record<string, string | undefined>>) => () => void this.choose(info, choices);
@@ -105,7 +105,7 @@ export class Themes implements Feature {
       // (The metadata setting off: only a table with a theme of its own may pick another)
       ...allThemes(this.host.doc).map((theme): MenuEntry => {
         const entry = item(`${themeLabel(theme)}${theme === this.theme ? " (default)" : ""}`, own === theme, set({ name: theme }), detail(theme));
-        return this.host.canStoreMeta(table, "name") ? entry : { ...entry, disabled: "Needs the Store table metadata setting" };
+        return this.host.canStore(table, "name") ? entry : { ...entry, disabled: "Needs the Store table metadata setting" };
       }),
       ];
     };
@@ -118,7 +118,7 @@ export class Themes implements Feature {
         title: STRIPES_TITLES[s],
         active: s === ownStripes,
         run: set({ stripes: s }),
-        ...(this.host.canStoreMeta(table, "stripes") ? {} : { disabled: "Needs the Store table metadata setting" }),
+        ...(this.host.canStore(table, "stripes") ? {} : { disabled: "Needs the Store table metadata setting" }),
       })),
     };
     return [
@@ -144,7 +144,7 @@ export class Themes implements Feature {
   /** The table's own choices written into its metadata row, as one edit (undefined: the setting's again) */
   private async choose(shownInfo: TableInfo, choices: Readonly<Record<string, string | undefined>>): Promise<void> {
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
-    await this.host.writeTable(info, (table) => Object.entries(choices).reduce((t, [key, value]) => this.host.setMeta(t, key, value), table));
+    await this.host.writeTable(info, (table) => Object.entries(choices).reduce((t, [key, value]) => this.host.withAttribute(t, key, value), table));
     this.host.focusPage();
   }
 }

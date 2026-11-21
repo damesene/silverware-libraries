@@ -3,8 +3,11 @@
 Status (2026-10-22, branch `core-view-isolation`): steps 1 to 6 done but the
 second renderer. The modules in `src/features/` are typed against `ModelHost`
 and `TableInfo` (no element of the rendering); the rendering modules are the
-adapter's (`core/silverbullet/modules/`, `AdapterFeature`, `TableHost`);
-`isolation.test.ts` checks what types cannot (imports, selectors).
+adapter's (`host/silverbullet/modules/`, `AdapterFeature`, `TableHost`);
+`isolation.test.ts` checks what types cannot (imports, selectors). Since
+2026-11-21 (docs/silverware-table-store-plan.md) the tables are kept by a
+store apart from the core, and the model and the formulas are shared with the
+other plugins (docs/silverware-formulas-shared.md): *The boundary* below.
 
 ## Why
 
@@ -33,8 +36,8 @@ writing every module again.
   writes, menus, and routes events to the modules in model terms. It does not
   touch the DOM of the tables either: it asks **the adapter**.
 - **The adapter** (`core/adapter.ts` the interface `TableAdapter`,
-  `core/silverbullet/` its implementation for SilverBullet) is part of the core
-  but behind that interface: it knows the rendering. SilverBullet's adapter
+  `host/silverbullet/` its implementation for SilverBullet) is SilverBullet's
+  binding's, handed to the core behind that interface (`core/binding.ts`): it knows the rendering. SilverBullet's adapter
   finds the tables SilverBullet rendered, applies to them what the modules
   asked for (the looks of cells, marks, outlines, handles), turns DOM events
   into events on cells and answers geometry; everything about SilverBullet's
@@ -52,16 +55,34 @@ writing every module again.
   settings in code (as CLAUDE.md asks of the core already).
 - **What tables keep is read and written through the host, each module its
   own** (CLAUDE.md, *Modules and their data*): every module gets a host made
-  for it (`core/modulehost.ts`), whose metadata functions (`getMeta`,
-  `setMeta`, `columnsMeta`, `getCellTag`, `withCellTag`, `canStoreMeta`…) make
-  each attribute's name from the module's and its key (`metanames.ts`), so a
+  for it (`core/modulehost.ts`), whose metadata functions (`attribute`,
+  `withAttribute`, `columnAttributes`, `canStore`…, a cell's on the model too) make
+  each attribute's name from the module's and its key (the store writes it
+  whole: `metanames.ts`), so a
   module names no attribute whole and cannot write another's; the names of
   tables, columns, rows and cells are the core's, read and written by host
   functions. Domain code (formulas, the sheet, Excel) reads none itself: its
   module hands it what it needs (`FormulaCells`, `SheetMeta`, a table's name).
   A module uses another's data through what that one offers (`offer`,
   `offered`). The metadata setting off, the core stores nothing new
-  (`setMeta`, and a write step for cells' tags).
+  (`withAttribute`, and a write step for cells' tags).
+- **The store** (`core/store.ts`, the interface; the binding makes it,
+  `TableBinding.store`) keeps the tables: the core reads a document's tables
+  as models with their keys and revisions and hands it transactions (`plan`,
+  `apply`, `planUndo`), never a page's text. The core imports no codec and no
+  markdown (the register alone reads a text's tables, to key them); the
+  markdown store (`store/markdown/`: the codec, the metadata row, hidden tags,
+  page formulas, how a table is written) is the one place of the markdown's
+  form, written through the page writer of `shared/pages/` alone; Copy as
+  Markdown and a table's data for other plugins are the store's and the
+  model's.
+- **Shared with the other plugins**: the model (`shared/table/`) and the
+  formulas (`shared/formulas/`) import no plugin's code (`shared/imports.test.ts`),
+  so another plugin bundles them and calculates its own rows; how a formula is
+  kept in a cell, the formulas module, page formulas and sources stay
+  Silverware Table's. Modules use the formulas through their API
+  (`shared/formulas/index.ts`) and offer each other what they make of them
+  through `formulas/offers.ts`.
 - A test fails when a module refers to the rendered table (its element types,
   its selectors and classes, the host's methods that hand out its elements),
   or imports the core's functions for what tables keep (a guard against
@@ -82,7 +103,7 @@ writing every module again.
 - `CellEditor`: the editor's model (its cell, text, selection, calls);
   `RenderedEditor` adds its widget, cell and field, the adapter's.
 - Order of what modules add without knowing each other: the modules' order in
-  `modules.ts`, and named slots where one list takes several modules'
+  the binding (`host/silverbullet/binding.ts`), and named slots where one list takes several modules'
   entries (`CELL_MENU_ORDER` for the cell menu's groups, `HEADER_ICON_ORDER`
   for icons after a header's name).
 

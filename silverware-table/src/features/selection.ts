@@ -49,14 +49,12 @@ import {
   moveRowsTo,
   rowBlockTo,
 } from "../core/structure.ts";
-import { lineAfterBlockMove } from "../ops.ts";
-import { columnLetters } from "../formulas/index.ts";
+import { lineAfterBlockMove } from "../../../shared/table/ops.ts";
+import { columnLetters } from "../../../shared/formulas/index.ts";
 import { ICONS } from "../icons.ts";
-import { parseTable } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
-import { withoutTags } from "../tags.ts";
-import type { Table } from "../markdown.ts";
-import { setCell } from "../ops.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
+import { EMPTY_CELL, withCellAt } from "../../../shared/table/ops.ts";
 import type { TableKey } from "../core/feature.ts";
 
 // Ctrl+Alt + these keys move the rows (up, down, 10 rows) or columns (left, right, to the first or last) selected, as in the cell editor
@@ -219,7 +217,7 @@ export class Selection implements Feature {
   /** Edit mode, a switch in the toolbar (left of its menu): a click edits a cell; off, a click selects it */
   toolbarButtons(info: TableInfo): ToolbarButton[] {
     // A table none of whose cells is edited by hand (a pivot's): no mode of editing them
-    if (this.host.readOnlyBody(parseTable(info.source))) return [];
+    if (this.host.readOnlyBody(info.model)) return [];
     return [
       {
         label: "Edit mode",
@@ -504,7 +502,7 @@ export class Selection implements Feature {
     if (vertical) {
       if (first === 0) return;
       if (this.host.rearranged(info)) {
-        void this.host.bridge.flash(`Silverware Table: ${MOVE_BLOCKED.toLowerCase()}`, "info");
+        this.host.notify(`Silverware Table: ${MOVE_BLOCKED.toLowerCase()}`, "info");
         return;
       }
     }
@@ -637,9 +635,9 @@ export class Selection implements Feature {
     const values = this.valuesOf(info, cells);
     try {
       await writeClipboard(this.host.doc, clipboardText(values), clipboardHtml(values));
-      void this.host.bridge.flash(`Silverware Table: copied ${values.length} × ${values[0]?.length ?? 0} cells`, "info");
+      this.host.notify(`Silverware Table: copied ${values.length} × ${values[0]?.length ?? 0} cells`, "info");
     } catch (e) {
-      void this.host.bridge.flash(`Silverware Table: could not copy (${String(e)})`, "error");
+      this.host.notify(`Silverware Table: could not copy (${String(e)})`, "error");
     }
   }
 
@@ -812,7 +810,7 @@ export class Selection implements Feature {
     if (top < 1) return undefined;
     const width = area.right - area.left + 1;
     const cells = area.rows.map((row) => Array.from({ length: width }, (_, j) => ({ row, column: area.left + j })));
-    if (this.host.readOnly(parseTable(area.info.source), cells.flat())) return undefined;
+    if (this.host.readOnly(area.info.model, cells.flat())) return undefined;
     return { ...area, order, top, height: area.rows.length, width, cells };
   }
 
@@ -956,7 +954,7 @@ export class Selection implements Feature {
     // Where they would go outlined under the pointer, as while dragging them
     this.host.doc.defaultView!.addEventListener("mousemove", this.showMoveTarget, true);
     const press = this.host.pressedWith === "touch" ? "tap the cell where the first one goes (a tap outside the table cancels)" : "click the cell where the first one goes; Esc cancels";
-    void this.host.bridge.flash(`Silverware Table: ${press}`, "info");
+    this.host.notify(`Silverware Table: ${press}`, "info");
   }
 
   private endMoving(): void {
@@ -1050,15 +1048,17 @@ export class Selection implements Feature {
     if (!area) return;
     const { info } = area;
     const refs = this.refs();
-    const table = parseTable(info.source);
-    const empty = (row: number, column: number) => withoutTags(table.rows[row]?.cells[column] ?? "") === "";
+    const table = info.model;
+    const empty = (row: number, column: number) => (row === 0 ? table.columns[column]?.header : table.rows[row - 1]?.cells[column]?.content)?.trim() === "";
     const rows = [...new Set(refs.map((ref) => ref.row))];
     const columns = [...new Set(refs.map((ref) => ref.column))];
     const body = rows.filter((row) => row > 0);
     const wholeRows = columns.length === info.columns && body.length > 0;
     const wholeColumns = rows.includes(0) && rows.length === this.host.shownOrder(info).length;
     // Every row's cells, also the rows a filter hides: their data would go too
-    if (wholeColumns && columns.length === info.columns && table.rows.every((r, row) => row === 0 || r.cells.every((_, column) => empty(row, column)))) {
+    // (Body rows from 1, as the markdown's: the model's row r is rows[r - 1])
+    const bodyRows = Array.from({ length: table.rows.length }, (_, i) => i + 1);
+    if (wholeColumns && columns.length === info.columns && bodyRows.every((row) => table.columns.every((_, column) => empty(row, column)))) {
       this.clear();
       // Laid out on a grid (the sheet): its cell where the table was selected, the keyboard going on from there
       const frame = this.host.addressFrame(info);
@@ -1072,7 +1072,7 @@ export class Selection implements Feature {
       return;
     }
     // Every row's cell, also the rows a filter hides: their data would go too
-    if (wholeColumns && !wholeRows && columns.every((column) => table.rows.every((_, row) => row === 0 || empty(row, column)))) {
+    if (wholeColumns && !wholeRows && columns.every((column) => bodyRows.every((row) => empty(row, column)))) {
       this.clear();
       await deleteColumnsAt(this.host, info, columns);
       return;
@@ -1096,7 +1096,11 @@ export class Selection implements Feature {
    */
   private async empty(info: TableInfo, cells: readonly CellRef[]): Promise<void> {
     const refs = cells.filter((ref) => ref.row > 0);
-    const emptied = (table: Table, ref: CellRef) => setCell(table, ref.row, ref.column, this.host.keepTags("", table.rows[ref.row]?.cells[ref.column] ?? ""));
+    // (Nothing written over each: its attributes kept, its name; a formula goes, even one whose result is empty)
+    const emptied = (table: TableModel, ref: CellRef) => {
+      const cell = table.rows[ref.row - 1]?.cells[ref.column];
+      return cell ? withCellAt(table, ref.row, ref.column, this.host.cellWrittenOver(EMPTY_CELL, cell)) : table;
+    };
     await this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => refs.reduce(emptied, t));
   }
 
@@ -1110,7 +1114,7 @@ export class Selection implements Feature {
     const area = kind === "copy" ? this.area() : undefined;
     if (!area) return undefined;
     const values = this.valuesOf(area.info, this.refs());
-    void this.host.bridge.flash(`Silverware Table: copied ${values.length} × ${values[0]?.length ?? 0} cells`, "info");
+    this.host.notify(`Silverware Table: copied ${values.length} × ${values[0]?.length ?? 0} cells`, "info");
     return { text: clipboardText(values), html: clipboardHtml(values) };
   }
 }

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import type { LineMenuGroup } from "../core/feature.ts";
-import { bodyTexts, buttonLabel, cell, clickOn, controller, editor, flush, key, menuButtons, PAGE, setup, text, useTablePage } from "../testing/page.ts";
+import { bridge, bodyTexts, buttonLabel, cell, clickOn, controller, editor, flush, key, menuButtons, PAGE, setup, text, useTablePage } from "../testing/page.ts";
 import { customSections } from "../../../shared/menuslots.ts";
 
 describe("Row and column grips", () => {
@@ -240,7 +240,7 @@ describe("Row and column grips", () => {
     const NAMED = `| Name | Price | Note |\n|---|---|---|\n| <meta core.n='pear'> | | a |\n| | <meta core.cn='fig_price'> | b |\n`;
     await setup(NAMED);
     const questions: string[] = [];
-    (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = (message: string) => {
+    bridge.confirm = (message: string) => {
       questions.push(message);
       return true;
     };
@@ -252,9 +252,10 @@ describe("Row and column grips", () => {
     key(editor, "Delete");
     await flush();
     expect(questions).toEqual([
-      "Deleting these columns also removes the name of the row pear: formulas that use it show #REF! or #NAME?, and the name of the cell fig_price: formulas that use it show #REF! or #NAME?. Delete the 2 columns? Ctrl+Z brings it back.",
+      "Deleting these columns also removes the name of the cell fig_price: formulas that use it show #REF! or #NAME?. Delete the 2 columns? Ctrl+Z brings it back.",
     ]);
-    expect(text).toBe("| Note |\n|---|\n| a |\n| b |\n");
+    // (A row's name is the row's: it stays, in the cell left)
+    expect(text).toBe("| Note |\n|---|\n| a <meta core.n='pear'> |\n| b |\n");
   });
 
   it("offers pinning only with the metadata setting", async () => {

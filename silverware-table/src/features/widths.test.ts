@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { cell, controller, editor, flush, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 import { movedEdge, movedTableEdge, wholePixels, widthsAfterEdit } from "./widths.ts";
+import { deleteColumn, insertColumn, moveColumn, withHeader } from "../../../shared/table/ops.ts";
 
 describe("movedTableEdge", () => {
   const columns = (...widths: number[]) => widths.map((width) => ({ width, min: 80 }));
@@ -183,7 +184,7 @@ describe("Column widths", () => {
     Object.defineProperty(widget, "clientWidth", { configurable: true, value: 300 });
     drag(2, [100, 100, 400], [-1000]);
     await flush();
-    expect(text).toBe(`${PAGE}| <meta core.table widths.-c-name.size='100' widths.-c-qty.size='100' widths.-c-note.size='100' widths.box='300'> |\n`);
+    expect(text).toBe(`${PAGE}| <meta core.table widths.box='300' widths.-c-name.size='100' widths.-c-qty.size='100' widths.-c-note.size='100'> |\n`);
   });
 
   it("keeps the box the widths were set in, and shows the table as that share of the box it has", async () => {
@@ -192,7 +193,7 @@ describe("Column widths", () => {
     Object.defineProperty(widget, "clientWidth", { configurable: true, value: 400 });
     drag(0, [100, 100, 100], [20]);
     await flush();
-    expect(text).toBe(`${PAGE}| <meta core.table widths.-c-name.size='120' widths.-c-qty.size='80' widths.-c-note.size='100' widths.box='400'> |\n`);
+    expect(text).toBe(`${PAGE}| <meta core.table widths.box='400' widths.-c-name.size='120' widths.-c-qty.size='80' widths.-c-note.size='100'> |\n`);
     await controller.scan();
     expect(editor.querySelector("table")!.style.width).toBe("75%");
   });
@@ -220,7 +221,7 @@ describe("Column widths", () => {
   it("gives a column inserted into a table with a width for every column its share, the others narrower, the box kept", async () => {
     await setup(`${PAGE}| <meta core.table widths.-c-name.size='120' widths.-c-qty.size='120' widths.-c-note.size='60' widths.box='300'> |\n`, { "silverware.table.metadata": true });
     const widget = editor.querySelector<HTMLElement>(".sb-table-widget")!;
-    await controller.write(widget, (t) => ({ ...t, align: [t.align[0]!, ...t.align], rows: t.rows.map((r, i) => ({ ...r, cells: [r.cells[0]!, i ? "" : "New", ...r.cells.slice(1)] })) }), {
+    await controller.writeTable(controller.infoOf(widget)!, (t) => withHeader(insertColumn(t, 1), 1, "New"), {
       columnMap: (c) => (c === 0 ? 0 : c + 1),
     });
     expect(text).toContain("widths.-c-name.size='90'");
@@ -236,7 +237,7 @@ describe("Column widths", () => {
     const page = "| Price | Price | X |\n|---|---|---|\n| 1 | 2 | 3 |\n";
     await setup(`${page}| <meta core.table widths.-c-price.size='100' widths.-c-price:2.size='100' widths.-c-x.size='100' widths.box='300'> |\n`, { "silverware.table.metadata": true });
     const widget = editor.querySelector<HTMLElement>(".sb-table-widget")!;
-    await controller.write(widget, (t) => ({ ...t, align: t.align.slice(1), rows: t.rows.map((r) => ({ ...r, cells: r.cells.slice(1) })) }), {
+    await controller.writeTable(controller.infoOf(widget)!, (t) => deleteColumn(t, 0), {
       columnMap: (c) => (c === 0 ? undefined : c - 1),
     });
     expect(text).toContain("widths.-c-price.size='100'");
@@ -244,10 +245,28 @@ describe("Column widths", () => {
     expect(text).toContain("widths.box='200'");
   });
 
+  it("moves each width with its column once, a write of the model's: three columns of the same name", async () => {
+    const page = "| x | x | x |\n|---|---|---|\n| 1 | 2 | 3 |\n";
+    await setup(`${page}| <meta core.table widths.-c-x.size='100' widths.-c-x:2.size='200' widths.-c-x:3.size='200' widths.box='500'> |\n`, { "silverware.table.metadata": true });
+    await controller.writeTable(controller.shownTables()[0]!, (t) => moveColumn(t, 0, 2), { columnMap: (c) => (c === 0 ? 2 : c - 1) });
+    expect(text).toContain("| 2 | 3 | 1 |");
+    // (The first of the name `x` or `x:1`, read the same)
+    expect(text).toMatch(/widths\.-c-x(:1)?\.size='200'/);
+    expect(text).toMatch(/widths\.-c-x:2\.size='200'/);
+    expect(text).toMatch(/widths\.-c-x:3\.size='100'/);
+  });
+
+  it("takes a deleted column's width with it, a write of the model's", async () => {
+    await setup(`| A | B | C |\n|---|---|---|\n| 1 | 2 | 3 |\n| <meta core.table widths.-c-a.size='100' widths.-c-b.size='150' widths.-c-c.size='100' widths.box='350'> |\n`, { "silverware.table.metadata": true });
+    await controller.writeTable(controller.shownTables()[0]!, (t) => deleteColumn(t, 1), { columnMap: (c) => (c === 1 ? undefined : c > 1 ? c - 1 : c) });
+    expect(text).toContain("| 1 | 3 |");
+    expect(text).not.toContain("-c-b.");
+  });
+
   it("makes a table automatic again when one column is left", async () => {
     await setup(`| A | B |\n|---|---|\n| 1 | 2 |\n| <meta core.table widths.-c-a.size='100' widths.-c-b.size='200' widths.box='300'> |\n`, { "silverware.table.metadata": true });
     const widget = editor.querySelector<HTMLElement>(".sb-table-widget")!;
-    await controller.write(widget, (t) => ({ ...t, align: t.align.slice(0, 1), rows: t.rows.map((r) => ({ ...r, cells: r.cells.slice(0, 1) })) }), {
+    await controller.writeTable(controller.infoOf(widget)!, (t) => deleteColumn(t, 1), {
       columnMap: (c) => (c === 0 ? 0 : undefined),
     });
     expect(text).not.toContain("widths.");
@@ -261,7 +280,7 @@ describe("Column widths", () => {
     await flush();
     await controller.scan();
     expect(editor.querySelector("table")!.style.width).toBe("100%");
-    await controller.write(editor.querySelector<HTMLElement>(".sb-table-widget")!, (t) => ({ ...t, align: t.align.slice(0, 2), rows: t.rows.map((r) => ({ ...r, cells: r.cells.slice(0, 2) })) }), {
+    await controller.writeTable(controller.infoOf(editor.querySelector<HTMLElement>(".sb-table-widget")!)!, (t) => (t.columns.length > 2 ? deleteColumn(t, 2) : t), {
       columnMap: (c) => (c < 2 ? c : undefined),
     });
     await controller.scan();
@@ -272,7 +291,7 @@ describe("Column widths", () => {
   it("keeps the table filling as much of its box when a column is deleted", async () => {
     await setup(`${PAGE}| <meta core.table widths.-c-name.size='120' widths.-c-qty.size='120' widths.-c-note.size='60' widths.box='300'> |\n`, { "silverware.table.metadata": true });
     const widget = editor.querySelector<HTMLElement>(".sb-table-widget")!;
-    await controller.write(widget, (t) => ({ ...t, align: [t.align[0]!, t.align[2]!], rows: t.rows.map((r) => ({ ...r, cells: [r.cells[0]!, r.cells[2]!] })) }), {
+    await controller.writeTable(controller.infoOf(widget)!, (t) => deleteColumn(t, 1), {
       columnMap: (c) => (c === 0 ? 0 : c === 2 ? 1 : undefined),
     });
     expect(text).toContain("widths.-c-name.size='120' widths.-c-note.size='60'");
@@ -401,9 +420,9 @@ describe("Column widths", () => {
     window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
     expect(down.defaultPrevented).toBe(true);
     expect(editor.querySelector(".swt-cell-editor")).toBeNull();
-    // The column renamed and moved in one edit (as the column menu would): the width goes with it (metadataAfterEdit)
+    // The column moved (as the column menu would): the width goes with it, on its column in the model
     const widget = editor.querySelector<HTMLElement>(".sb-table-widget")!;
-    await controller.write(widget, (t) => ({ ...t, rows: t.rows.map((r) => ({ ...r, cells: [r.cells[1]!, r.cells[0]!] })) }), {
+    await controller.writeTable(controller.infoOf(widget)!, (t) => moveColumn(t, 0, 1), {
       columnMap: (c) => (c === 0 ? 1 : 0),
     });
     await controller.scan();

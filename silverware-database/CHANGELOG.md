@@ -1,5 +1,9 @@
 # Silverware Database: changelog
 
+## 1.3.1 (2026-11-21)
+
+- Shares updated code with Silverware Table 1.4.0; nothing changes in use.
+
 ## 1.3.0 (2026-11-19)
 
 - New property type **Files & media**: images, PDFs, documents, any file of your space or an address of the web, several in one value. Tables, lists and cards show them as small pictures (a PDF, Word or Excel file as its first page with Silverware Assets and its viewer), the item's panel larger; a press opens a file in Silverware Assets' side panel.

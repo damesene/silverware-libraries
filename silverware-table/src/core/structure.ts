@@ -2,24 +2,23 @@
 // moving and pinning rows and columns; moving and copying cells. Each is one write, rows and columns
 // pinned to the edges stay there (pins.ts), and formulas and the stored
 // sorting follow through the write steps (rowMap, columnMap).
-import type { Table } from "../markdown.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import { metaPins } from "../meta.ts";
 import {
   columnAfterMove,
   deleteColumn,
   deleteRow,
   type IndexMap,
-  insertColumn,
-  insertRow,
+  insertColumn as insertModelColumn,
+  insertRow as insertModelRow,
   lineAfterBlockMove,
   moveColumn,
   moveColumns,
   moveRow,
   moveRows,
-  setCell,
-} from "../ops.ts";
-import { type MoveRules, moveCells } from "../paste.ts";
-import { cellTags, withoutTags, withoutTagsWith } from "../tags.ts";
+} from "../../../shared/table/ops.ts";
+import { EMPTY_CELL, withCellAt } from "../../../shared/table/ops.ts";
+import { moveCells } from "../paste.ts";
 import {
   clampColumnMove,
   clampRowMove,
@@ -35,25 +34,6 @@ import {
   type RowZone,
 } from "../pins.ts";
 import type { CellRef, ModelHost, TableInfo, WriteResult } from "./feature.ts";
-
-/**
- * What moving cells does with their hidden tags: the text and the tags a
- * feature manages (a formula's) go with a cell; the others (a row's or a
- * cell's name) stay where they are, at both ends, so names keep naming their
- * rows and places
- */
-export function cellMoveRules(host: ModelHost): MoveRules {
-  // The tags no feature manages: those keepTags keeps from a cell
-  const unmanaged = (cell: string) => new Set(cellTags(host.keepTags("", cell)));
-  return {
-    emptied: (cell) => host.keepTags("", cell),
-    placed: (moved, over) => {
-      const stay = unmanaged(moved);
-      const content = [withoutTags(moved), ...cellTags(moved).filter((tag) => !stay.has(tag))].filter((part) => part !== "").join(" ");
-      return host.keepTags(content, over);
-    },
-  };
-}
 
 /**
  * Moves the cells (rows of the markdown and columns, as they are shown: row
@@ -72,17 +52,21 @@ export function moveCellsTo(
   const columns = (cells[0] ?? []).map((_, j) => to.column + j);
   if (to.row < 1 || rows[rows.length - 1]! >= info.rows || columns[columns.length - 1]! >= info.columns) return Promise.resolve("unchanged");
   const plan = { rows, columns, newRows: { at: 0, count: 0 }, newColumns: { at: 0, count: 0 }, pins: info.pins };
-  if (!copy) return host.writeTable(info, (t) => moveCells(t, cells, plan, cellMoveRules(host)));
+  // (A cell moved or copied over another: its content and its formula with it, the name there staying)
+  if (!copy) return host.writeTable(info, (t) => moveCells(t, cells, plan, (moved, over) => host.cellWrittenOver(moved, over)));
   return host.writeTable(info, (t) => {
     // Read before any is written: the copy may overlap its cells
-    const raw = cells.map((row) => row.map((ref) => t.rows[ref.row]?.cells[ref.column] ?? ""));
+    const read = cells.map((row) => row.map((ref) => t.rows[ref.row - 1]?.cells[ref.column] ?? EMPTY_CELL));
     let result = t;
     cells.forEach((row, i) =>
       row.forEach((from, j) => {
         const dest = { row: rows[i]!, column: columns[j]! };
-        const cell = raw[i]![j]!;
-        const value = host.fillCell(info, cell, from, dest) ?? withoutTags(cell);
-        result = setCell(result, dest.row, dest.column, host.keepTags(value, result.rows[dest.row]?.cells[dest.column] ?? ""));
+        const cell = read[i]![j]!;
+        const over = result.rows[dest.row - 1]?.cells[dest.column];
+        if (!over) return;
+        // A module's copy (a formula, its references moved), else the value alone
+        const copied = host.fillCell(info, cell, from, dest) ?? { content: cell.content, attributes: EMPTY_CELL.attributes };
+        result = withCellAt(result, dest.row, dest.column, host.cellWrittenOver(copied, over));
       }),
     );
     return result;
@@ -101,7 +85,7 @@ export function insertRowWith(
   host: ModelHost, info: TableInfo,
   at: number,
   column: number,
-  prepare: (t: Table) => Table | undefined = (t) => t,
+  prepare: (t: TableModel) => TableModel | undefined = (t) => t,
   // Where the new row shows while it is edited (rows of the markdown before the insert); none: last
   beside: { readonly after?: number; readonly before?: number } = {},
 ): Promise<WriteResult> {
@@ -115,7 +99,7 @@ export function insertRowWith(
     info,
     (t) => {
       const prepared = prepare(t);
-      return prepared && insertRow(prepared, insert.at);
+      return prepared && insertModelRow(prepared, insert.at);
     },
     { focus: { row: insert.at, column }, pins: insert.pins, rowMap, hold },
   );
@@ -127,13 +111,9 @@ export function duplicateRowAt(host: ModelHost, info: TableInfo, row: number): P
   return host.writeTable(
     info,
     (t) => {
-      // What is one cell's or row's (names) the copy does not take
-      const unique = host.uniqueTags();
-      const cells = t.rows[row]?.cells.map((cell) => {
-        const copy = withoutTagsWith(cell, unique);
-        return copy === cell.trim() ? cell : copy;
-      });
-      return cells ? insertRow(t, insert.at, cells) : undefined;
+      // (What is one cell's or row's, a name, the copy does not take: the rule of unique attributes, as the write applies it)
+      const cells = t.rows[row - 1]?.cells;
+      return cells ? insertModelRow(t, insert.at, cells) : undefined;
     },
     { pins: insert.pins, rowMap: rowAfterInsert(insert.at) },
   );
@@ -211,7 +191,7 @@ export function moveColumnsTo(host: ModelHost, info: TableInfo, first: number, l
 /** A table grown to hold a cell past its last row or column (growTo) */
 export type Growth = {
   // The table grown; undefined when it is no longer the shape it was rendered with (its rows, columns and pins)
-  readonly grow: (table: Table) => Table | undefined;
+  readonly grow: (table: TableModel) => TableModel | undefined;
   // Where the cell is in the table grown
   readonly cell: CellRef;
   readonly rowMap: IndexMap;
@@ -234,10 +214,11 @@ export function growTo(info: TableInfo, at: CellRef): Growth {
     grow: (table) => {
       const pins = metaPins(table);
       const same = (["top", "bottom", "left", "right"] as const).every((side) => pins[side] === info.pins[side]);
-      if (table.rows.length !== info.rows || table.align.length !== info.columns || !same) return undefined;
+      // (info.rows counts the header as a row, as the markdown's)
+      if (table.rows.length + 1 !== info.rows || table.columns.length !== info.columns || !same) return undefined;
       let grown = table;
-      for (let i = 0; i < columns; i++) grown = insertColumn(grown, columnsAt + i);
-      for (let i = 0; i < rows; i++) grown = insertRow(grown, rowsAt + i);
+      for (let i = 0; i < columns; i++) grown = insertModelColumn(grown, columnsAt + i);
+      for (let i = 0; i < rows; i++) grown = insertModelRow(grown, rowsAt + i);
       return grown;
     },
     cell: { row: rows ? rowsAt + rows - 1 : at.row, column: columns ? columnsAt + columns - 1 : at.column },
@@ -249,7 +230,7 @@ export function growTo(info: TableInfo, at: CellRef): Growth {
 /** Adds a column asked for at `at` and edits its name */
 export function insertColumnWith(host: ModelHost, info: TableInfo, at: number): Promise<WriteResult> {
   const insert = insertColumnAt(info.pins, info.columns, at);
-  return host.writeTable(info, (t) => insertColumn(t, insert.at), {
+  return host.writeTable(info, (t) => insertModelColumn(t, insert.at), {
     focus: { row: 0, column: insert.at, select: true },
     columnMap: (c) => (c >= insert.at ? c + 1 : c),
     pins: insert.pins,
@@ -269,7 +250,7 @@ export async function deleteColumnsAt(host: ModelHost, info: TableInfo, columns:
   const doomed = [...new Set(columns)].sort((a, b) => b - a);
   if (doomed.length === 0) return "unchanged";
   if (doomed.length >= info.columns) {
-    void host.bridge.flash("Silverware Table: a table keeps at least one column", "info");
+    host.notify("Silverware Table: a table keeps at least one column", "info");
     return "unchanged";
   }
   // Left to right, as the columns are shown

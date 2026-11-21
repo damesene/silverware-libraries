@@ -21,6 +21,16 @@ export class TableRows {
     return rows;
   }
 
+  /**
+   * The rows of a table as rendered, read without taking them: a reader outside the core (Silverware Layout's
+   * provider, whose observer may see a table rendered anew before the core's) must not make a new table a known one,
+   * which the features would then not be told of (tableAdded) before the browser lays it out. Not taken yet, every
+   * row is still in the document.
+   */
+  readRows(table: HTMLTableElement): readonly HTMLTableRowElement[] {
+    return this.rendered.get(table) ?? Array.from(table.rows);
+  }
+
   /** Whether the rows of a table were taken already (it is not new) */
   knows(table: HTMLTableElement): boolean {
     return this.rendered.has(table);

@@ -3,7 +3,7 @@
 // (the page before it comes back with Restore page, or Ctrl+Z), and a log of
 // what Silverware Table spent its time on for each action: its core's phases and
 // each module's hooks (profile.ts), grouped by the action that started them.
-import { cellName } from "../silverware-table/src/formulas/index.ts";
+import { cellName } from "../shared/formulas/index.ts";
 // The formulas as the formulas module reads and writes them (the page is generated without it)
 import { formulaCell, pageTables, recalculate } from "../silverware-table/src/testing/formulas.ts";
 import { type PageTable, pageTablesOf, serializeTable } from "../silverware-table/src/markdown.ts";

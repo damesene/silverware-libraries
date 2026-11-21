@@ -1,10 +1,10 @@
 // The sources of the space: tables no page has, which the host gives as plain
-// data (SilverBullet's: host/sources.ts, a Space Lua function each; the
+// data (SilverBullet's: host/silverbullet/sources.ts, a Space Lua function each; the
 // playground's and the tests': `memorySources`), all through one interface,
 // `SourceProvider`. The sources module (features/sources.ts) offers them to
 // the formulas, which read them as `@name` (`@tasks[due]`). Nothing here knows
 // where they come from.
-import type { Table } from "./markdown.ts";
+import type { TableModel } from "../../shared/table/model.ts";
 
 /** What a source gives: its columns' names, and its rows, each a text per column ("" where empty) */
 export type SourceData = { readonly columns: readonly string[]; readonly rows: readonly (readonly string[])[] };
@@ -25,7 +25,7 @@ export type SourceProvider = {
 
 /**
  * What the sources module offers the formulas (ModelHost.offered("sources")):
- * the sources as tables of the markdown model, the same object while their
+ * the sources as tables of the model, the same object while their
  * data are the same; `version` counts their changes
  */
 export type SourcesOffer = {
@@ -34,8 +34,24 @@ export type SourcesOffer = {
   /** A source's columns' names as it gives them; undefined where it is not read (or there is none) */
   readonly columns: (name: string) => readonly string[] | undefined;
   /** A source as a table: its columns the header; null where none is defined so, undefined where it is not read yet */
-  readonly table: (name: string) => Table | null | undefined;
+  readonly table: (name: string) => TableModel | null | undefined;
   readonly version: () => number;
+};
+
+/**
+ * The sources as tables of the model, as the core gives them to the sources
+ * module (store/sources.ts reads them): each the same object while its data
+ * are the same
+ */
+export type SourceTables = {
+  /** The sources' names, as defined, read or not yet */
+  names(): readonly string[];
+  /** A source's columns' names as it gives them; undefined where it is not read (or there is none) */
+  columns(name: string): readonly string[] | undefined;
+  /** A source as a table: null where none is defined so, undefined where it is not read yet */
+  table(name: string): import("../../shared/table/model.ts").TableModel | null | undefined;
+  /** `listener` called whenever a source changed; the function returned stops it */
+  changed(listener: () => void): () => void;
 };
 
 /** No sources: the provider of a host that gives none */

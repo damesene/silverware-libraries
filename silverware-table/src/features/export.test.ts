@@ -34,6 +34,15 @@ describe("Export", () => {
     expect(flashes.pop()).toBe("Silverware Table: copied 3 rows as Markdown");
   });
 
+  it("copies the table as it is written: padded, a header's hashtags where they are", async () => {
+    await setup(`| Name    | #number Qty |\n| ------- | ----------: |\n| Pear    |           3 |\n`);
+    let copied = "";
+    Object.defineProperty(window.navigator, "clipboard", { value: { writeText: async (t: string) => void (copied = t) }, configurable: true });
+    tableMenuItem(/^Copy as Markdown$/)!.click();
+    await flush();
+    expect(copied).toBe(`| Name | #number Qty |\n| ---- | ----------: |\n| Pear |           3 |\n`);
+  });
+
   it("offers nothing with the export module off", async () => {
     await setup("| A |\n|---|\n| 1 |\n", { "silverware.table.modules.export.enabled": false });
     expect(tableMenuItem(/^Copy as CSV$/)).toBeUndefined();

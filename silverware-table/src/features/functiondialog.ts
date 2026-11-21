@@ -5,7 +5,7 @@
 // click); the dialog is the core's (ModelHost.openDialog), so the cell editor
 // stays open behind it.
 import type { Dialog, ModelHost } from "../core/feature.ts";
-import { type AnyFunction, findFunctions, FUNCTION_CATEGORIES, type FunctionCategory } from "../formulas/index.ts";
+import { type AnyFunction, findFunctions, FUNCTION_CATEGORIES, type FunctionCategory } from "../../../shared/formulas/index.ts";
 
 type Group = FunctionCategory | "custom" | undefined;
 

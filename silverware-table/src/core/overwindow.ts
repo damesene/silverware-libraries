@@ -22,7 +22,7 @@
 // so the + of a new column and its line are in view, clear of the toolbar.
 import { markOverWindow } from "../../../shared/overwindow.ts";
 import { OUT_OF_LINE_CLASS, UI_CLASS, WIDGET_SELECTOR } from "../dom.ts";
-import { columnLetters } from "../formulas/index.ts";
+import { columnLetters } from "../../../shared/formulas/index.ts";
 import type { TableHost, TableKey, WidgetInfo } from "./feature.ts";
 import { oncePerFrame } from "./frame.ts";
 import { firstRowBelow } from "./geometry.ts";

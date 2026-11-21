@@ -110,6 +110,15 @@ describe("Selecting cells", () => {
     expect(text).toContain("| Plum | 5 |");
   });
 
+  it("empties a formula whose result is empty too, its cell's name kept", async () => {
+    await setup(`| Name | Note |\n|---|---|\n| Pear | <meta formulas.f='=""' core.cn='note'> |\n`);
+    // (Selected, not edited: the test's page edits on a click)
+    controller.selectCells(controller.infoOf(editor.querySelector(".sb-table-widget")!)!, { row: 1, column: 1 }, { row: 1, column: 1 });
+    key(editor, "Delete");
+    await flush();
+    expect(text).toBe("| Name | Note |\n|---|---|\n| Pear | <meta core.cn='note'> |\n");
+  });
+
   it("moves the rows or columns of the selection with Ctrl+Alt+arrows, the selection with them", async () => {
     await setup("| A | B | C |\n|---|---|---|\n| 1 | 2 | 3 |\n| 4 | 5 | 6 |\n| 7 | 8 | 9 |\n");
     const marked = () => Array.from(editor.querySelectorAll(".swt-selected"), (c) => c.textContent);

@@ -6,9 +6,10 @@
 // The rows are read as they show (a formula cell by its result), so a group's
 // own formulas are not calculated again in it.
 import type { Calculated, CalculatedColumn } from "../calculated/index.ts";
-import { columnKey, columnName } from "../columns.ts";
-import { type Calculation, isErrorText, rowValues, type Scalar, scalarText, tableValue } from "../formulas/index.ts";
-import type { Table } from "../markdown.ts";
+import { columnKey, columnName } from "../../../shared/table/columns.ts";
+import { headerText } from "../columns.ts";
+import { type Calculation, isErrorText, rowValues, type Scalar, scalarText, tableValue } from "../../../shared/formulas/index.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import { compareValues } from "../../../shared/compare.ts";
 import { groupFormula, type PivotDefinition, valueParts } from "./definition.ts";
 
@@ -40,22 +41,20 @@ function headerOf(item: string, headers: readonly string[], value: boolean, type
   const name = m[1]!.toUpperCase();
   const verb = name === "COUNTA" || name === "COUNT" ? "Count" : name[0] + name.slice(1).toLowerCase();
   // A column's type (its hashtag: #euro) where the value keeps its unit: a sum, not a count
-  const tags = verb === "Count" || !typed ? "" : (unescapeHeader(header).match(/(^|\s)#[^\s#]+/g) ?? []).map((tag) => ` ${tag.trim()}`).join("");
+  const tags = verb === "Count" || !typed ? "" : (header.match(/(^|\s)#[^\s#]+/g) ?? []).map((tag) => ` ${tag.trim()}`).join("");
   return `${verb} of ${columnName(header)}${tags}`;
 }
 
-const unescapeHeader = (header: string) => header.replace(/\\\|/g, "|");
-
 /** The source's rows as formulas read them in a pivot: every formula cell as its result */
-function asShown(source: Table, calculation: Calculation): Table {
-  return { ...source, rows: source.rows.map((row, r) => (r === 0 ? row : { ...row, cells: row.cells.map((cell) => calculation.cells.withoutFormula(cell)) })) };
+function asShown(source: TableModel, calculation: Calculation): TableModel {
+  return { ...source, rows: source.rows.map((row) => ({ ...row, cells: row.cells.map((cell) => calculation.cells.withoutFormula(cell)) })) };
 }
 
 /** The pivot of a source table by its definition: a calculated table, its columns' ids row:<group>, value:<value>, column:<key>|<value>, total:<value> */
-export function pivotOf(source: Table, definition: PivotDefinition, calculation: Calculation): Calculated {
+export function pivotOf(source: TableModel, definition: PivotDefinition, calculation: Calculation): Calculated {
   const table = asShown(source, calculation);
-  const headers = table.rows[0]?.cells ?? [];
-  const count = table.rows.length - 1;
+  const headers = table.columns.map(headerText);
+  const count = table.rows.length;
   // The rows that count, their groups' keys
   const counted = definition.where ? rowValues(table, definition.where, calculation).map(holds) : Array.from({ length: count }, () => true);
   const rowKeys = definition.rows.map((item) => rowValues(table, groupFormula(item), calculation).map(keyOf));
@@ -76,7 +75,7 @@ export function pivotOf(source: Table, definition: PivotDefinition, calculation:
   }
   const columnList = [...columns].sort(compareValues);
   // A formula over some of the rows: over a table of those alone
-  const calculated = (formula: string, rows: readonly number[]): Scalar => tableValue({ ...table, rows: [table.rows[0]!, ...rows.map((i) => table.rows[i + 1]!)] }, formula, calculation);
+  const calculated = (formula: string, rows: readonly number[]): Scalar => tableValue({ ...table, rows: rows.map((i) => table.rows[i]!) }, formula, calculation);
   // The totals shares are of (all rows', a column's), calculated once for a value
   const totals = new Map<string, Scalar>();
   const totalOf = (formula: string, column: string | undefined): Scalar => {

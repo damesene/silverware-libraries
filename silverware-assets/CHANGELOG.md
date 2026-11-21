@@ -1,5 +1,9 @@
 # Silverware Assets: changelog
 
+## 1.1.1 (2026-11-21)
+
+- Shares updated code with Silverware Table 1.4.0; nothing changes in use.
+
 ## 1.1.0 (2026-11-19)
 
 - The insert dialog is simpler: one field at its top adds a link (pasted) or finds a file already in your space by words of its name, offered in a list under the field (arrow keys and Enter, or a click); **Browse…** picks your device's files (on a phone its picker offers the camera); files dropped anywhere on the dialog are added.

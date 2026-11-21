@@ -10,8 +10,8 @@ export function isChoice<T extends { readonly type: ColumnType }>(typed: T | und
   return typed?.type === CHOICE;
 }
 
-/** The list a header's choice type names, lower case; undefined: none, or no choice column */
-export function choiceListOf(header: string): string | undefined {
-  const typed = columnTypeOf(header);
+/** The list a column's choice type names (`hashtags`: the column's, or a header's text with them), lower case; undefined: none, or no choice column */
+export function choiceListOf(hashtags: string | undefined): string | undefined {
+  const typed = columnTypeOf(hashtags);
   return isChoice(typed) ? (typed.params.name as string | undefined)?.toLowerCase() : undefined;
 }

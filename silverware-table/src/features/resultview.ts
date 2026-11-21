@@ -8,7 +8,7 @@ import type { Dialog, ModelHost } from "../core/feature.ts";
 import { writeClipboard } from "../../../shared/clipboard.ts";
 import { clipboardHtml, clipboardText } from "../clipboard.ts";
 import { el } from "../../../shared/elements.ts";
-import { columnLetters, type Grid, scalarText } from "../formulas/index.ts";
+import { columnLetters, type Grid, scalarText } from "../../../shared/formulas/index.ts";
 import { ICONS } from "../icons.ts";
 
 /** At most so many rows drawn: the copy has every one */
@@ -39,9 +39,9 @@ export class ResultView {
     const values = [resultHeader(grid), ...resultRows(grid)];
     try {
       await writeClipboard(this.host.doc, clipboardText(values), clipboardHtml(values));
-      void this.host.bridge.flash(`Silverware Table: result copied (${resultSize(grid)})`, "info");
+      this.host.notify(`Silverware Table: result copied (${resultSize(grid)})`, "info");
     } catch {
-      void this.host.bridge.flash("Silverware Table: the result could not be copied", "error");
+      this.host.notify("Silverware Table: the result could not be copied", "error");
     }
   }
 

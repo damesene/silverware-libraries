@@ -2,6 +2,7 @@
 // the user defines (custom.ts), which replace a built-in one of their name;
 // and how a column's header names its type: a hashtag, `#name`, `#name-param`
 // (its parameters read here, so a type gets them as values), or an alias.
+import { headerHashtags, withoutHashtagsWhere } from "../../../shared/table/columns.ts";
 import { BUILT_IN_TYPES } from "./builtin/index.ts";
 import type { ColumnType, Params, ParamSpec, ParamSpecs } from "./type.ts";
 
@@ -71,9 +72,6 @@ export function clearCustomTypes(): void {
 /** A column's type: the type, its parameters, and the hashtag that gave it (as written, without #) */
 export type TypedColumn = { readonly type: ColumnType; readonly params: Params; readonly tag: string };
 
-// A hashtag in a header: `#` after the start or a space, up to a space or another #
-const HASHTAG_RE = /(^|\s)#([^\s#]+)/g;
-
 /** The type a hashtag names (#stars, #stars-10, #euro), if any */
 export function typeOfTag(tag: string): TypedColumn | undefined {
   const lower = tag.toLowerCase();
@@ -130,20 +128,22 @@ function paramValue(spec: ParamSpec, part: string): number | string | undefined 
   }
 }
 
-/** The type a header's hashtags give its column: the first that names one */
-export function columnTypeOf(header: string): TypedColumn | undefined {
-  for (const match of header.matchAll(HASHTAG_RE)) {
-    const typed = typeOfTag(match[2]!);
+/**
+ * The type a column's hashtags give it (`hashtags`: the column's, or a
+ * header's text with them): the first that names one
+ */
+export function columnTypeOf(hashtags: string | undefined): TypedColumn | undefined {
+  for (const tag of headerHashtags(hashtags ?? "")) {
+    const typed = typeOfTag(tag.slice(1));
     if (typed) return typed;
   }
   return undefined;
 }
 
-/** The header with its type hashtags replaced by `#tag` (none: removed) */
-export function withColumnType(header: string, tag: string | undefined): string {
-  const rest = header.replace(HASHTAG_RE, (all, space: string, name: string) => (typeOfTag(name) ? space : all));
-  const name = rest.replace(/\s+/g, " ").trim();
-  return tag ? `${name} #${tag}` : name;
+/** A column's hashtags (or a header's text with them) with its type's replaced by `#tag` (none: removed) */
+export function withColumnType(hashtags: string, tag: string | undefined): string {
+  const rest = withoutHashtagsWhere(hashtags, (written) => !!typeOfTag(written.slice(1)));
+  return tag ? `${rest} #${tag}`.trim() : rest;
 }
 
 /** Every hashtag that names a type, as CSS can match it: names, names with a parameter, aliases */

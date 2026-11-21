@@ -1,23 +1,23 @@
 # Silverware Table: the core and the SilverBullet adapter
 
-The model of layers, hosts and the write pipeline is in `silverware-table/CLAUDE.md`. Here: what the core's code must keep that the code does not say.
+The model of layers, hosts and the write pipeline is in `silverware-table/CLAUDE.md`. Here: what the core's code must keep that the code does not say. The adapter's files named below (`modules/…`, `columns.ts`, `drawn.ts`, `cells.ts`) are in `host/silverbullet/`.
 
 ## Rules for the core
 
-- The core names no module and touches no table's DOM itself: rendering is the adapter's (`core/adapter.ts`, `core/silverbullet/`), SilverBullet DOM assumptions are `dom.ts`'s. A module-specific need becomes a generic hook or host function in `core/feature.ts`.
+- The core names no module and touches no table's DOM itself: rendering is the adapter's (`core/adapter.ts`, `host/silverbullet/`), SilverBullet DOM assumptions are `dom.ts`'s. A module-specific need becomes a generic hook or host function in `core/feature.ts`.
 - Modules get the host from `modulehost.ts` (members forwarded, methods bound once, fields read live, the module's own `offer`). Metadata access per owner is `metaaccess.ts` (`ownMeta`): an owner reads and writes only its own attributes.
-- `core/silverbullet/modules/` may touch the rendered DOM; the same rules about rows apply (through `TableRows`, not queries).
+- `host/silverbullet/modules/` may touch the rendered DOM; the same rules about rows apply (through `TableRows`, not queries).
 
 ## Tables and their rows
 
-- `TableRows` (`rows.ts`) keeps each table's rows as SilverBullet rendered them, taken in the MutationObserver callback before layout (`tableAdded`), so `bodyRows`/`shownRows`/`cellAt` have every row in the document or not. `rowNeeded` puts one back before it is measured, `rowsAttached` tells rows came back, `holdInDocument` keeps a dragged row; `placeRows` lets a feature place rows itself (largeTables).
+- `TableRows` (`rows.ts`) keeps each table's rows as SilverBullet rendered them, taken in the MutationObserver callback before layout (`tableAdded`), so `bodyRows`/`shownRows`/`cellAt` have every row in the document or not. `renderedRows` takes a table's rows (the core's, as it pairs and enhances); a reader outside the core reads them with `readRows`, which takes nothing: Silverware Layout's provider, whose observer sees a table rendered anew before the core's, made it a known table, which no feature was then told of, and largeTables left every row to be laid out at each write (460 ms for 2000 rows). `rowNeeded` puts one back before it is measured, `rowsAttached` tells rows came back, `holdInDocument` keeps a dragged row; `placeRows` lets a feature place rows itself (largeTables).
 - `scan()` compares the tables enhanced with the last scan and calls `layoutChanged` where one is gone (another page opened, a table out of CodeMirror's viewport), so what features placed for it goes.
 - Tables inside the core's own floating elements (a theme preview) are not enhanced (`ownTable`).
 - A table drawn by a feature (`DRAWN_CLASS`, the sheet's) stands for SilverBullet's table of its key (`tableFor`, `widgetForKey`, `shownTables`). SilverBullet's table under it, rendered anew, is only registered and `enhanced` (`covered`: laying both out cost 210 → 160 ms for 400 rows); once the drawn one goes, every such table is shown as itself (`showEnhanced`, `drawnKeys`). `STAND_IN_CLASS` copies are left out by the core.
 
 ## Writing
 
-- Writes go through `write()` in the controller; see the invariants in the parent file. Extras: `insertTable` (a new table after another or at a `TextPosition`, one edit, through `beforeWrite`), `deleteTable` (asks with `tableDeleteWarning`, deletes the blank line after it, other tables changed in the same edit), `editBeyond` (a cell past the last row/column, written with the table grown in one write; `claims` in WriteOptions; nothing written while empty), `takeEditor` (the editor's value saved in the caller's write), `pendingEdits` (edits a feature holds, applied to the table `write()` read so any write takes them along; `tableOf(info)` is the table with them).
+- Writes go through `writeTable` in the controller, on the model (the core's own too: a sorting, pins, Silverware Layout's entries); what no model expresses is the store's (`tidy`, a write's option: Format table's padding; Remove metadata's change, `TableHost.withoutStoredMetadata`: the table as its store reads it without what it keeps beyond its content); see the invariants in the parent file. Extras: `insertTable` (a new table where an `InsertPlace` says: after another or at the cursor, read as it is written, one edit, through `beforeWrite`), `deleteTable` (asks with `tableDeleteWarning`, deletes the blank line after it, other tables changed in the same edit), `editBeyond` (a cell past the last row/column, written with the table grown in one write; `claims` in WriteOptions; nothing written while empty), `takeEditor` (the editor's value saved in the caller's write), `pendingEdits` (edits a feature holds, applied to the table a write reads (`writeNow`) so any write takes them along; `tableOf(info)` is the table with them).
 - `structure.ts`: structural edits as functions over `ModelHost` (rows above bottom pins, columns left of right pins: `growTo`).
 - History markers (`modules/history.ts`): the editor's cursor is put outside the table before each write (after it, else before it where the edit does not start): CodeMirror keeps a cursor before text inserted at its place, which would put it in the table and show its markdown.
 - `anchor.ts`: a table written keeps its top's offset in the scroller, restored after it renders anew and for `ANCHOR_MS` or until the user wheels, touches, presses or types (CodeMirror scrolled while measuring the new rendering). Not for drawn tables: their feature places them.
@@ -56,7 +56,7 @@ The model of layers, hosts and the write pipeline is in `silverware-table/CLAUDE
 
 Design, limits and decisions: docs/silverware-table-sheets.md. Not obvious from the code:
 
-- The board draws each table of the sheet itself from the page's text (`drawn.ts`, cells by `cells.ts`: plain cells as text, the rest in one `bridge.markdownToHtml` call per table), so tables SilverBullet keeps out of the DOM show too; links go to `bridge.navigate`.
+- The board draws each table of the sheet itself from the page's text (`drawn.ts`, cells by `cells.ts`: plain cells as text, the rest in one call of the platform's `renderer.markdownToHtml` per table), so tables SilverBullet keeps out of the DOM show too; links go to `host.navigate`.
 - The grid's reach only grows while the board shows (a column widened by a write would change how many empty columns follow, and the scrollbars jumped). Rows are one height; columns are the sheet's `sheet.width.*` (kept in the sheet's first table in the page, handed over in the same edit whenever that changes) else the widest table's, capped.
 - After every write and on any page change, changed tables are drawn anew at their place before insertion (else a far table scrolled the board), with a stand-in copy until enhanced (SilverBullet enhances a frame later, as settings are read through Lua). Not under a cell being edited (`putOff`).
 - Empty cells: a press selects or edits them; next to a table it grows that table (`editBeyond`), elsewhere it makes a new table (`writeNew` via `insertTable`, key reserved as the editor opens). A table alone becomes `Sheet1` in the same edit. Needs the metadata setting.

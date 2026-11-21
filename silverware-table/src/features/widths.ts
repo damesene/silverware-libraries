@@ -4,7 +4,7 @@
 // sideways, or narrower down to its box), a column fitted to its text by
 // double-clicking its edge or with "Fit to content" in its menu. With the metadata setting they are
 // stored in the table (widths.-c-price.size='180'), which follows the column
-// through renames and moves (metadataAfterEdit); without it, they hold for
+// through renames and moves (an attribute of its column in the model); without it, they hold for
 // the view only. "Reset column widths" in the table's menu makes every column
 // automatic again.
 //
@@ -14,7 +14,7 @@
 // of the box the table had then (widths.box): the table is shown as that
 // share of whatever box it has, so it widens and narrows with it (full
 // screen, another window; narrower, the rendering holds columns at their
-// headers' need, core/silverbullet/columns.ts). A column added
+// headers' need, host/silverbullet/columns.ts). A column added
 // or deleted keeps the table so (widthsAfterEdit, in the write). A table of
 // its own width (narrower or wider than its box) is a sum other than the box:
 // the same data (docs/silverware-table-column-resize.md).
@@ -29,10 +29,10 @@
 // the table moving as it gets narrower, cannot feed back into them. The widths
 // are the module's (columnWidths); the core shows them, and the handles (a
 // handle layer per table, as every table's headers have them).
-import type { ColumnsMeasure, ColumnWidths, Feature, HandleLayer, LineMenuBuilder, LineMenuGroup, LineMenuTarget, ModelHost, PartTable, TableInfo, TableKey, ToolbarButton, WriteEdit } from "../core/feature.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
+import type { ColumnsMeasure, ColumnWidths, Feature, HandleLayer, LineMenuBuilder, LineMenuGroup, LineMenuTarget, ModelHost, PartTable, TableInfo, TableKey, TableRevision, ToolbarButton, WriteEdit } from "../core/feature.ts";
 import { tablePartsOf } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
-import { parseTable, type Table } from "../markdown.ts";
 
 // The narrowest a column can be dragged to, in pixels
 const MIN_WIDTH = 80;
@@ -144,7 +144,7 @@ class TableWidths {
   private viewed = new Map<number, number | undefined>();
   private viewedBox: { readonly box: number | undefined } | undefined;
   // The widths stored in the table as last read (parsing a large table for its metadata row on every view is slow)
-  private stored: { readonly source: string; readonly widths: ReadonlyMap<number, number>; readonly box: number | undefined } | undefined;
+  private stored: { readonly revision: TableRevision; readonly widths: ReadonlyMap<number, number>; readonly box: number | undefined } | undefined;
   // Its handles
   private readonly handles: HandleLayer;
 
@@ -161,16 +161,16 @@ class TableWidths {
 
   /** Its columns' widths and their box: those set for the view, else those stored */
   layoutOf(info: TableInfo): { readonly widths: Map<number, number>; readonly box: number | undefined } {
-    if (this.stored?.source !== info.source) {
-      const table = parseTable(info.source);
+    if (this.stored?.revision !== info.revision) {
+      const table = info.model;
       const read = new Map<number, number>();
-      for (const [column, value] of this.host.columnsMeta(table, "size")) {
+      for (const [column, value] of this.host.columnAttributes(table, "size")) {
         const n = Number(value);
         // As stored, not raised to MIN_WIDTH: their shares of the box are what they say
         if (Number.isFinite(n) && n > 0) read.set(column, Math.round(n));
       }
-      const box = Number(this.host.getMeta(table, BOX_KEY));
-      this.stored = { source: info.source, widths: read, box: Number.isFinite(box) && box > 0 ? box : undefined };
+      const box = Number(this.host.attribute(table, BOX_KEY));
+      this.stored = { revision: info.revision, widths: read, box: Number.isFinite(box) && box > 0 ? box : undefined };
     }
     const widths = new Map(this.stored.widths);
     for (const [column, width] of this.viewed) {
@@ -233,17 +233,17 @@ class TableWidths {
     // Reset column widths offered or not
     this.host.toolbarChanged();
     // What the table can take (the metadata setting off: only where it has it stored); the rest is the view's
-    const table = parseTable(info.source);
-    const stored = [...set.keys()].filter((column) => set.get(column) === undefined || this.host.canStoreMeta(table, "size", { column }));
-    const boxStored = box === undefined || this.host.canStoreMeta(table, BOX_KEY);
+    const table = info.model;
+    const stored = [...set.keys()].filter((column) => set.get(column) === undefined || this.host.canStore(table, "size", { column }));
+    const boxStored = box === undefined || this.host.canStore(table, BOX_KEY);
     if (!stored.length && !boxStored) return;
     const result = await this.host.writeTable(info, (t) => {
-      const widths = this.host.columnsMeta(t, "size");
+      const widths = this.host.columnAttributes(t, "size");
       for (const [column, width] of set) {
         if (width === undefined) widths.delete(column);
         else widths.set(column, String(width));
       }
-      return this.host.setMeta(this.host.setColumnsMeta(t, "size", widths), BOX_KEY, box === undefined ? undefined : String(box));
+      return this.host.withAttribute(this.host.withColumnAttributes(t, "size", widths), BOX_KEY, box === undefined ? undefined : String(box));
     });
     // Stored (or already so): the table's metadata has them now
     if (result === "failed") return;
@@ -342,23 +342,23 @@ export class Widths implements Feature {
   }
 
   /** Columns added or deleted in a table with a width for every column: every column has one after (widthsAfterEdit) */
-  writeStep(before: Table, after: Table, edit: WriteEdit): Table {
-    const columns = after.rows[0]?.cells.length ?? 0;
-    const count = before.rows[0]?.cells.length ?? 0;
+  writeStep(before: TableModel, after: TableModel, edit: WriteEdit): TableModel {
+    const columns = after.columns.length;
+    const count = before.columns.length;
     if (columns === count || !count || !columns) return after;
-    const sizes = this.host.columnsMeta(before, "size");
+    const sizes = this.host.columnAttributes(before, "size");
     if (sizes.size !== count) return after;
     const old = Array.from({ length: count }, (_, column) => Number(sizes.get(column)));
     if (old.some((width) => !Number.isFinite(width) || width <= 0)) return after;
     const changed = widthsAfterEdit(old, edit.columnMap ?? ((column) => column), columns);
     if (!changed) return after;
     // One column left: its width is the table's, which a share of the box kept from the columns gone means nothing to; automatic again
-    if (columns === 1) return this.host.setMeta(this.host.setColumnsMeta(after, "size", new Map()), BOX_KEY, undefined);
+    if (columns === 1) return this.host.withAttribute(this.host.withColumnAttributes(after, "size", new Map()), BOX_KEY, undefined);
     // Only columns deleted: the others keep theirs, which the core's write step carries (written here, a width equal
     // to the one a column of the same name had would be taken for that column's), the box shrinks with them
-    const widths = changed.added ? this.host.setColumnsMeta(after, "size", new Map(changed.widths.map((width, column) => [column, String(width)]))) : after;
-    const box = Number(this.host.getMeta(before, BOX_KEY));
-    return Number.isFinite(box) && box > 0 ? this.host.setMeta(widths, BOX_KEY, String(Math.ceil(box * changed.scale))) : widths;
+    const widths = changed.added ? this.host.withColumnAttributes(after, "size", new Map(changed.widths.map((width, column) => [column, String(width)]))) : after;
+    const box = Number(this.host.attribute(before, BOX_KEY));
+    return Number.isFinite(box) && box > 0 ? this.host.withAttribute(widths, BOX_KEY, String(Math.ceil(box * changed.scale))) : widths;
   }
 
   mouseDown(e: MouseEvent): boolean {

@@ -21,9 +21,10 @@ import {
   rowBlockTo,
 } from "../core/structure.ts";
 import { ICONS } from "../icons.ts";
-import { type Align, parseTable, type Table } from "../markdown.ts";
+import type { Align } from "../../../shared/table/model.ts";
+import type { TableModel } from "../../../shared/table/model.ts";
 import { type MenuEntry, namingThatCloses, wrapRuns } from "../menu.ts";
-import { setAlign } from "../ops.ts";
+import { withAlign } from "../../../shared/table/ops.ts";
 import { columnZone, insertColumnAt, insertRowAt, rowZone } from "../pins.ts";
 import { type ViewState, withoutSort, withSort } from "../view.ts";
 import type { TableKey } from "../core/feature.ts";
@@ -103,7 +104,7 @@ export class Grips implements Feature {
     if (!target) return;
     const selects = this.host.clickSelects();
     const rearranged = this.host.rearranged(target.info);
-    const fixed = !!this.host.fixedShape(parseTable(target.info.source));
+    const fixed = !!this.host.fixedShape(target.info.model);
     if (this.linesSelected?.key !== target.info.key) {
       this.linesSelected = {
         key: target.info.key,
@@ -187,7 +188,7 @@ export class Grips implements Feature {
     const shown = this.host.rectOf(info, "table");
     if (!shown) return;
     const rearranged = this.host.rearranged(info);
-    const fixed = !!this.host.fixedShape(parseTable(info.source));
+    const fixed = !!this.host.fixedShape(info.model);
     this.columnGrip.classList.toggle("swt-no-drag", fixed);
 
     const rowRect = ref.row > 0 ? this.host.rectOf(info, { row: ref.row }) : undefined;
@@ -286,7 +287,7 @@ export class Grips implements Feature {
             this.openMenu(target, axis);
           }, LONG_PRESS_MS)
         : undefined;
-    const canDrag = !this.host.fixedShape(parseTable(target.info.source)) && (axis === "column" || !this.host.rearranged(target.info));
+    const canDrag = !this.host.fixedShape(target.info.model) && (axis === "column" || !this.host.rearranged(target.info));
     const win = this.host.doc.defaultView!;
     const startX = e.clientX;
     const startY = e.clientY;
@@ -669,7 +670,7 @@ export class Grips implements Feature {
             : "Already at the edge"
           : undefined;
     // Pinning at an edge without pins needs the metadata setting; unpinning (a checked item) always works
-    const pinBlocked = (to: "top" | "bottom" | "left" | "right") => (zone === to || host.canPin(parseTable(info.source), to) ? undefined : PIN_NEEDS_METADATA);
+    const pinBlocked = (to: "top" | "bottom" | "left" | "right") => (zone === to || host.canPin(info.model, to) ? undefined : PIN_NEEDS_METADATA);
     // Nothing goes above the first row pinned to the top, nor below the last one pinned to the bottom
     const insertBlocked = (at: number) =>
       insertRowAt(info.pins, info.rows, at).at === at
@@ -678,7 +679,7 @@ export class Grips implements Feature {
           ? "Rows pinned to the top stay at the top"
           : "Rows pinned to the bottom stay at the bottom";
     // Rows that come from a calculation (a pivot's): none inserted, duplicated, moved, pinned (it moves them) or deleted
-    const fixed = !!host.fixedShape(parseTable(info.source));
+    const fixed = !!host.fixedShape(info.model);
     const shape = (entries: MenuEntry[]) => (fixed ? [] : entries);
     // In the order every menu keeps (cell, row, column): the clipboard and clearing, inserting, moving and pinning, naming, deleting
     const { slot, custom } = this.lineGroups(info, "row", row);
@@ -774,8 +775,9 @@ export class Grips implements Feature {
   private lineSections(info: TableInfo, axis: Axis, line: number, slot: (slot: LineMenuSlot) => MenuEntry[]): MenuEntry[] {
     const lines = this.selectedLines(info, axis, line);
     // Cells not changed by hand (a pivot's): the clipboard's bar alone (which then copies), no Clear
-    const table = parseTable(info.source);
-    const cells = axis === "row" ? lines.flatMap((row) => table.align.map((_, column) => ({ row, column }))) : lines.flatMap((column) => table.rows.map((_, row) => ({ row, column })));
+    const table = info.model;
+    // (Rows as the markdown's: the header 0, as the model's rows count from 1)
+    const cells = axis === "row" ? lines.flatMap((row) => table.columns.map((_, column) => ({ row, column }))) : lines.flatMap((column) => Array.from({ length: table.rows.length + 1 }, (_, row) => ({ row, column })));
     const fixed = !!this.host.readOnly(table, cells);
     return [...this.section(slot("clipboard")), ...(fixed ? [] : this.section(slot("edit")))];
   }
@@ -822,10 +824,10 @@ export class Grips implements Feature {
     const host = this.host;
     const view = host.viewOf(info);
     const sorted = view.sort?.column === column ? view.sort.direction : undefined;
-    const align = parseTable(info.source).align[column] ?? "";
-    const edit = (change: (t: Table) => Table | undefined) => this.runAndClose(() => void host.writeTable(host.tableFor(info.key) ?? info, change));
+    const align = info.model.columns[column]?.align ?? "";
+    const edit = (change: (t: TableModel) => TableModel | undefined) => this.runAndClose(() => void host.writeTable(host.tableFor(info.key) ?? info, change));
     const sortBy = (next: ViewState) => this.runAndClose(() => host.setSort(host.tableFor(info.key) ?? info, next));
-    const alignTo = (target: Align) => edit((t) => setAlign(t, column, align === target ? "" : target));
+    const alignTo = (target: Align) => edit((t) => withAlign(t, column, align === target ? "" : target));
     const act = (run: () => unknown) => this.runAndClose(() => void run());
     const zone = columnZone(info.pins, info.columns, column);
     // The columns selected whole move together when they hold this one
@@ -838,7 +840,7 @@ export class Grips implements Feature {
           : "Already at the edge"
         : undefined;
     // Pinning at an edge without pins needs the metadata setting; unpinning (a checked item) always works
-    const pinBlocked = (to: "top" | "bottom" | "left" | "right") => (zone === to || host.canPin(parseTable(info.source), to) ? undefined : PIN_NEEDS_METADATA);
+    const pinBlocked = (to: "top" | "bottom" | "left" | "right") => (zone === to || host.canPin(info.model, to) ? undefined : PIN_NEEDS_METADATA);
     const insertBlocked = (at: number) =>
       insertColumnAt(info.pins, info.columns, at).at === at
         ? undefined
@@ -846,7 +848,7 @@ export class Grips implements Feature {
           ? "Columns pinned to the left stay at the left"
           : "Columns pinned to the right stay at the right";
     // Columns that come from a calculation (a pivot's): none inserted, moved, pinned (it moves them), aligned (it aligns them) or deleted
-    const fixed = !!host.fixedShape(parseTable(info.source));
+    const fixed = !!host.fixedShape(info.model);
     const shape = (entries: MenuEntry[]) => (fixed ? [] : entries);
     // In the order every menu keeps (cell, row, column): the clipboard and clearing, inserting, moving and pinning, viewing, naming, deleting
     const { slot, custom } = this.lineGroups(info, "column", column);

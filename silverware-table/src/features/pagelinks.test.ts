@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import type { PageLinksOffer } from "../formulas/index.ts";
+import type { PageLinksOffer } from "../formulas/offers.ts";
 import { controller, setup, useTablePage } from "../testing/page.ts";
 
 const TABLE = "| Item | Qty |\n|---|---|\n| Fig | 3 |\n";

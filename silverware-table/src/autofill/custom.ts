@@ -5,7 +5,7 @@
 // Definitions are checked here; what a series gives is checked as it is
 // called, and a series that throws or gives something else fills nothing of
 // its own, so a mistake never breaks a fill.
-import { formatDate, parseDate } from "../formulas/dates.ts";
+import { formatDate, parseDate } from "../../../shared/formulas/dates.ts";
 import { key, listSeries } from "./builtin/lists.ts";
 import type { Generator, Series } from "./series.ts";
 

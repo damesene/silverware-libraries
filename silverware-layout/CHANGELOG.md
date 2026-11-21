@@ -1,5 +1,9 @@
 # Silverware Layout: changelog
 
+## 2.0.3 (2026-11-21)
+
+- Fixed: grids take the page's look again when its text size changes after they are drawn (a zoom), and a grid added to the page after a zoom takes the page's look then.
+
 ## 2.0.2 (2026-11-19)
 
 - Panels, menus and dialogs scroll with a thin scrollbar, the same in every Silverware plugin; SilverBullet's own scrollbar is unchanged.

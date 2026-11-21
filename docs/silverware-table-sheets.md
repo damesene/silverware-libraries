@@ -281,7 +281,7 @@ number, a text, an index query) and a `<meta>`:
 
 **The cell renderer: one interface, static first (decided 2026-10-22).**
 Rendering cells is behind an interface (a `CellRenderer`), part of
-SilverBullet's adapter (`core/silverbullet/`, as it calls SilverBullet's
+SilverBullet's adapter (`host/silverbullet/`, as it calls SilverBullet's
 syscalls), not of the sheet module: whatever in that adapter draws a table
 itself uses it (the sheet now; the theme preview, other pages' tables shown,
 could). Another adapter has a renderer of its own behind the same interface;

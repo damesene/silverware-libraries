@@ -775,6 +775,23 @@ test.describe("Sheet view", () => {
     await expect.poll(() => markdown(page)).toMatch(/\| 24 <meta formulas.f='=prices!B1\*2'> +\|\n\| <meta core.table core.name='table2'/);
   });
 
+  // (Auto-format off: the new table's rows are written as made, not aligned anew)
+  test("a value typed far from a table in a list item, auto-format off: the table made is indented as it, every line", startingOn("# Test\n\n- Plan\n\n  | Item | Price |\n  |---|---|\n  | Pear | 12 |\n  | <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A3'> |\n\nText after.\n"), async ({ page }) => {
+    await setSettings(page, { "silverware.table.autoFormat": false });
+    await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
+    await openSheet(page);
+    const drawn = page.locator(".sb-table-widget.swt-drawn.swt-sheet-table:not(.swt-stand-in)");
+    const letter = (text: string) => page.locator(".swt-sheet-letters > span:not([hidden])", { hasText: new RegExp(`^${text}$`) });
+    const prices = (await drawn.nth(0).boundingBox())!;
+    const rowHeight = (await drawn.nth(0).locator("tr[data-swt-row='1'] > td").first().boundingBox())!.height;
+    const d = (await letter("D").boundingBox())!;
+    await page.mouse.click(d.x + d.width / 2, prices.y + 5 * rowHeight + rowHeight / 2);
+    await page.keyboard.type("Brno");
+    await page.keyboard.press("Enter");
+    await expect(drawn).toHaveCount(2);
+    expect(await markdown(page)).toMatch(/\n\n {2}\| Column 1 \|\n {2}\|-+\|\n {2}\| Brno \|\n {2}\| <meta core.table core.name='table1' sheet.name='Plan' sheet.at='D7'> \|\n\nText after\./);
+  });
+
   test("far from the tables: '= is text as elsewhere, and a cell pressed meanwhile is pressed once the table is made", startingOn("# Test\n\n| Item | Price |\n|---|---|\n| Pear | 12 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A3'> |\n\n| Other |\n|---|\n| x |\n"), async ({ page }) => {
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
     await openSheet(page);

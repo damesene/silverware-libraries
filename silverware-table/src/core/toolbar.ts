@@ -9,7 +9,6 @@
 import { cellText, renderedTable } from "../dom.ts";
 import { el, pressed } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
-import { parseTable } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
 import { hasPins, NO_PINS, withoutSort } from "../view.ts";
 import { TOOLBAR_NAME_ORDER, type TableHost, type ToolbarButton, type ToolbarNameSlot, type WidgetInfo } from "./feature.ts";
@@ -35,7 +34,7 @@ export type ToolbarContext = {
   readonly current: (widget: HTMLElement, info: WidgetInfo) => [HTMLElement, WidgetInfo];
   /** The sorting shown written into the markdown */
   readonly applySort: (widget: HTMLElement, info: WidgetInfo) => void;
-  readonly showMarkdown: (info: WidgetInfo) => void;
+  readonly showSource: (info: WidgetInfo) => void;
   readonly openSettings: () => void;
   /** The table deleted from the page, asked first (Delete table) */
   readonly deleteTable: (info: WidgetInfo) => void;
@@ -238,15 +237,15 @@ export class Toolbar {
     return [
       // Pinned rows and columns are at the edges already: unpinned, they stay where they are.
       // Not for a table of a fixed shape (a pivot's): its pins are its feature's, as its rows and columns are
-      ...(hasPins(info.pins) && !host.fixedShape(parseTable(info.source))
+      ...(hasPins(info.pins) && !host.fixedShape(info.model)
         ? [
             {
               label: "Unpin all",
               title: "Unpin all rows and columns: they stay where they are, and scroll and sort with the others",
               icon: ICONS.unpin,
               run: () => {
-                const [w] = this.context.current(widget, info);
-                void host.write(w, (t) => t, { pins: NO_PINS });
+                const [, i] = this.context.current(widget, info);
+                void host.writeTable(i, (t) => t, { pins: NO_PINS });
               },
             },
           ]
@@ -257,15 +256,15 @@ export class Toolbar {
         title: "Align the table's markdown: its columns padded to one width, as the Long cells setting says",
         icon: ICONS.format,
         run: () => {
-          const [w] = this.context.current(widget, info);
-          void host.write(w, (t) => ({ ...t, padded: true }));
+          const [, i] = this.context.current(widget, info);
+          void host.writeTable(i, (t) => t, { tidy: true });
         },
       },
       {
         label: "Edit markdown",
         title: "Show this table as markdown",
         icon: ICONS.markdown,
-        run: () => this.context.showMarkdown(this.context.current(widget, info)[1]),
+        run: () => this.context.showSource(this.context.current(widget, info)[1]),
       },
       // Last before the destructive ones: not about this table
       {
@@ -380,7 +379,7 @@ export class Toolbar {
                     icon: ICONS.clear,
                     title: clear.label,
                     // (The menu closed: a refusal said as a notification, as its field would show it)
-                    run: () => void n.naming!.save("").then((why) => why && host.bridge.flash(`Silverware Table: ${why}`, "info")),
+                    run: () => void n.naming!.save("").then((why) => why && host.notify(`Silverware Table: ${why}`, "info")),
                     ...(n.naming.name && !n.naming.disabled ? {} : { disabled: n.naming.disabled ?? n.label }),
                   },
                 ]

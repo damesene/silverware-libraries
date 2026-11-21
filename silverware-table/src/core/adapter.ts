@@ -18,6 +18,12 @@ import type { TableKey } from "./tables.ts";
 export interface TableAdapter {
   /** The table of the page a rendered table is; why none is; undefined: rendered anew meanwhile */
   pair(widget: HTMLElement, table: HTMLTableElement): Promise<PairedTable | Unpaired | undefined>;
+  /**
+   * The table's source shown: the editor's cursor put into it, at its start
+   * or (`at`) in a cell, where a point of it is in its text (a plain cell's
+   * character there, else the cell's start); false: the table not found
+   */
+  showSource(info: WidgetInfo, at?: { readonly ref: CellRef; readonly cell: HTMLTableCellElement; readonly x: number; readonly y: number }): Promise<boolean>;
   /** The features' looks applied to a table's cells and headers (`only`: to those); `editing`: the cell edited (its field shows, not a display) */
   applyLooks(info: WidgetInfo, looks: MergedLooks, editing: CellRef | undefined, only?: readonly CellRef[]): void;
   /** A cell's text as its markdown renders, before any look; undefined: not rendered */
@@ -97,12 +103,15 @@ export type PairedTable = {
   readonly hint: number;
 };
 
+/** A table of the page whose empty headers keep it from being paired (by its key and revision): naming them makes it a table shown */
+export type EmptyHeaders = { readonly document: string; readonly key: TableKey; readonly revision: TableRevision };
+
 /**
  * Why a rendered table is paired with none of the page's: no place given to
  * find it by, or none is it (a table in a block quote; `emptyHeaders`: one
  * whose headers are empty, which naming them would make a table)
  */
-export type Unpaired = { readonly unpaired: "unplaced" | "unfound"; readonly emptyHeaders?: { readonly source: string; readonly hint: number } };
+export type Unpaired = { readonly unpaired: "unplaced" | "unfound"; readonly emptyHeaders?: EmptyHeaders };
 
 /** What pairing a rendered table asks of the core: the platform (the page's text read), a page's tables in a text keyed by the core's register */
 export type PairingContext = {

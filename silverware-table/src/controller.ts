@@ -15,7 +15,7 @@ import { oncePerFrame } from "./core/frame.ts";
 import { watchPress } from "./core/press.ts";
 import { heldBounds, innerBox, isShown, overScrollbar, type Rect, scrollParentOf, scrollsInside, shownPart, shownRect, viewBounds } from "./core/geometry.ts";
 import { TouchKeyboard } from "./core/touch-keyboard.ts";
-import type { TableAdapter } from "./core/adapter.ts";
+import type { EmptyHeaders, TableAdapter } from "./core/adapter.ts";
 import { mergeLooks } from "./core/looks.ts";
 import { Panels } from "./core/panel.ts";
 import { type DragContext, followDrag } from "./core/drag.ts";
@@ -28,14 +28,12 @@ import { type AttributeRules, cellWrittenOver, withAttributeRules, withoutNewAtt
 import { type TableData, tableData } from "./tabledata.ts";
 import { MarkdownStore, tablesIn } from "./store/markdown/store.ts";
 import { SourceStore } from "./store/sources.ts";
-import { tableAt } from "./store/markdown/tableparts.ts";
-import { decode, encode, encodeOver, plainMarkdown } from "./store/markdown/codec.ts";
+import { decode, encodeOver, plainMarkdown } from "./store/markdown/codec.ts";
 import { SettingsDialog } from "./settings.ts";
 import { Metadata } from "./core/metadata.ts";
 import { NO_SOURCES, type SourceProvider } from "./sources.ts";
 import { moduleHost } from "./core/modulehost.ts";
 import {
-  caretTextOffset,
   cellText,
   cellValue,
   sortKeyOf,
@@ -52,9 +50,6 @@ import {
 } from "./dom.ts";
 import { ICONS } from "./icons.ts";
 import {
-  cellSourceOffset,
-  locateBySource,
-  parseTable,
   serializeTable,
   type Table,
 } from "./markdown.ts";
@@ -132,7 +127,7 @@ export class Controller implements TableHost {
   pageText = "";
   currentPage = "";
   // The page's tables as last read (pageTables), made once per page and text
-  private shownPage: { readonly page: string; readonly text: string; readonly tables: readonly StoredTable[] } | undefined;
+  private shownPage: { readonly page: string; readonly tables: readonly StoredTable[] } | undefined;
 
   // Tables being enhanced: a scan meanwhile waits for it instead of starting again
   private readonly enhancing = new WeakMap<HTMLElement, Promise<void>>();
@@ -251,7 +246,7 @@ export class Controller implements TableHost {
     this.sourceStore = new SourceStore(sources, this.register);
     this.adapter = binding.adapter(doc, this.rows, {
       platform: () => this.platform,
-      tablesOfText: (document, text) => tablesIn(this.register, document, text),
+      tablesOfText: (document, text) => this.notePageTables(document, this.store.tablesOfText(document, text)),
       infoOf: (widget) => this.infos.get(widget),
       rowNeeded: (info, row) => this.rowNeeded(info, row),
       holdInDocument: (info, row) => this.holdInDocument(info, row),
@@ -573,8 +568,9 @@ export class Controller implements TableHost {
   }
 
   tableData(info: TableInfo): TableData {
-    const table = parseTable(info.source);
-    const place = locateBySource(this.pageText, info.hint, info.source) ?? { from: info.hint, to: info.hint + info.source.length };
+    // (Its markdown as the page has it, where the page's text read last has it)
+    const table = encodeOver(info.model, info.model);
+    const place = this.store.placeOf(this.currentPage, info.key) ?? { from: info.hint, to: info.hint + info.source.length };
     return tableData(table, place, this.tableName(info.model), (column) => this.columnName(info.model, column));
   }
 
@@ -605,9 +601,24 @@ export class Controller implements TableHost {
   }
 
   pageTables(): readonly StoredTable[] {
-    const { currentPage: page, pageText: text } = this;
-    if (this.shownPage?.page !== page || this.shownPage.text !== text) this.shownPage = { page, text, tables: tablesIn(this.register, page, text) };
-    return this.shownPage.tables;
+    return this.shownPage?.page === this.currentPage ? this.shownPage.tables : [];
+  }
+
+  /**
+   * The open page's tables as read last (by a rendered table's pairing, after a write): the list kept where its
+   * tables are the same (their keys and revisions), so a module's state kept for it stays
+   */
+  private notePageTables(page: string, tables: readonly StoredTable[]): readonly StoredTable[] {
+    const kept = this.shownPage;
+    const same = kept?.page === page && kept.tables.length === tables.length && kept.tables.every((table, i) => table.key === tables[i]!.key && table.revision === tables[i]!.revision);
+    if (!same) this.shownPage = { page, tables };
+    return tables;
+  }
+
+  /** After a write of the open page: its tables as the store has them now (and its text, which the sheet reads still) */
+  private async readPageAfterWrite(document: string): Promise<void> {
+    this.notePageTables(document, (await this.store.tables(document)) ?? []);
+    this.pageText = await this.platform.editor.text();
   }
 
   async pageTextNow(): Promise<string> {
@@ -903,9 +914,8 @@ export class Controller implements TableHost {
   async deleteTable(shown: TableInfo, options: { readonly unasked?: boolean } = {}): Promise<WriteResult> {
     await this.saveEditing();
     const info = this.tableFor(shown.key) ?? shown;
-    const table = parseTable(info.source);
-    const name = metaName(table);
-    const rows = table.rows.length - 1;
+    const name = metaName(info.model);
+    const rows = info.model.rows.length;
     const lost = this.features.flatMap((f) => f.tableDeleteWarning?.(info) ?? []);
     const what = `the table${name ? ` ${name}` : ""} (${rows} ${rows === 1 ? "row" : "rows"})`;
     const question = `Delete ${what} from the page?${lost.length ? ` ${lost.map((l) => l[0]!.toUpperCase() + l.slice(1)).join(". ")}.` : ""} Ctrl+Z brings it back.`;
@@ -934,7 +944,7 @@ export class Controller implements TableHost {
         this.notify(`Silverware Table: the table was not deleted (${report.skipped.reason})`, "error");
         return "failed";
       }
-      this.pageText = await this.platform.editor.text();
+      await this.readPageAfterWrite(document);
       for (const pending of held) pending.written();
       return "written";
     } catch (e) {
@@ -1124,7 +1134,7 @@ export class Controller implements TableHost {
       const paired = await this.adapter.pair(widget, table);
       if (this.stopped || !paired || renderedTable(widget) !== table) return;
       if ("unpaired" in paired) {
-        if (paired.emptyHeaders) this.offerHeaderFix(widget, paired.emptyHeaders.source, paired.emptyHeaders.hint);
+        if (paired.emptyHeaders) this.offerHeaderFix(widget, paired.emptyHeaders);
         // No place to find it by (it shows as rendered, never asked again); none of the page's (a table in a block quote):
         // it stays a plain SilverBullet table
         this.markUnsupported(widget, paired.unpaired === "unplaced");
@@ -1247,7 +1257,7 @@ export class Controller implements TableHost {
    * A table with unnamed columns renders with its header shifted against its
    * data, so Silverware Table leaves it alone and offers to name those columns
    */
-  private offerHeaderFix(widget: HTMLElement, source: string, hint: number): void {
+  private offerHeaderFix(widget: HTMLElement, found: EmptyHeaders): void {
     if (widget.querySelector(".swt-notice")) return;
     const notice = this.doc.createElement("div");
     notice.className = `${UI_CLASS} swt-notice`;
@@ -1261,25 +1271,22 @@ export class Controller implements TableHost {
       button.addEventListener(type, (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (type === "click") void this.fixHeaders(source, hint);
+        if (type === "click") void this.fixHeaders(found);
       });
     }
     notice.append(button);
     widget.prepend(notice);
   }
 
-  private async fixHeaders(source: string, hint: number): Promise<void> {
+  /** A table's empty headers named (NAMED_COLUMN…), where it is still as it was found */
+  private async fixHeaders(found: EmptyHeaders): Promise<void> {
     try {
-      const text = await this.platform.editor.text();
-      const document = await this.platform.editor.documentName();
-      const range = locateBySource(text, hint, source);
-      if (!range) {
-        this.notify(NOT_SAVED, "error");
-        return;
-      }
-      const table = parseTable(range.text);
-      const written = await this.store.write(document, (p) => p.tables.write([{ ...tableAt(text, range), markdown: serializeTable(encode(nameEmptyHeaders(decode(table)), table)) }]));
-      if (written.result === "failed") this.notify(`Silverware Table: could not name the columns (${written.reason})`, "error");
+      const tables = await this.store.tables(found.document);
+      const table = tables?.find((one) => one.key === found.key);
+      const report =
+        table &&
+        (await this.store.apply(await this.store.plan({ document: found.document, edits: [{ kind: "write", key: found.key, expects: found.revision, model: nameEmptyHeaders(table.model) }] })));
+      if (!report || report.skipped) this.notify(`Silverware Table: could not name the columns (${report?.skipped?.reason ?? "the table is not there"})`, "error");
     } catch (e) {
       console.error("Silverware Table: could not name the columns", e);
       this.notify(`Silverware Table: could not name the columns (${String(e)})`, "error");
@@ -2278,10 +2285,8 @@ export class Controller implements TableHost {
     }
     const ref = this.cellRef(info, cell);
     if (!ref) return;
-    // Within a plain-text cell, the clicked character; otherwise the cell start
-    const source = parseTable(info.source).rows[ref.row]?.cells[ref.column] ?? "";
-    const within = cellText(cell) === source ? caretTextOffset(cell, e.clientX, e.clientY) : undefined;
-    void this.showMarkdown(info, { ...ref, within: within ?? 0 });
+    // Where it was clicked (a plain cell's character)
+    void this.showMarkdown(info, { ref, cell, x: e.clientX, y: e.clientY });
   }
 
   // The end of a press that inserted with the +, or of a press taken: it reaches nothing
@@ -2703,7 +2708,7 @@ export class Controller implements TableHost {
         this.notify(`Silverware Table: the table was not written (${report.skipped.reason})`, "error");
         return "failed";
       }
-      this.pageText = await this.platform.editor.text();
+      await this.readPageAfterWrite(document);
       return "written";
     } catch (e) {
       console.error("Silverware Table: could not write the table", e);
@@ -2881,7 +2886,7 @@ export class Controller implements TableHost {
       const revision = report.revisions.get(key);
       const last = this.ownWrites.get(key);
       if (revision) this.ownWrites.set(key, { revision, pins: metaPins(changedModel), replaced: new Set(last?.revision === stored.revision ? last.replaced : []).add(stored.revision) });
-      this.pageText = await this.platform.editor.text();
+      await this.readPageAfterWrite(document);
       for (const pending of held) pending.written();
       this.sayTaken(taken);
       return "written";
@@ -2894,15 +2899,9 @@ export class Controller implements TableHost {
   }
 
   /** Shows the table's markdown by moving the cursor into it: to its start, or into a cell */
-  private async showMarkdown(info: WidgetInfo, at?: CellRef & { within: number }): Promise<void> {
-    const range = locateBySource(await this.platform.editor.text(), info.hint, info.source);
-    if (!range) {
-      this.notify(NOT_SAVED.replace(", nothing was saved", ""), "error");
-      return;
-    }
+  private async showMarkdown(info: WidgetInfo, at?: { readonly ref: CellRef; readonly cell: HTMLTableCellElement; readonly x: number; readonly y: number }): Promise<void> {
     this.hideFloating(true);
-    const offset = at ? cellSourceOffset(range.text, at.row, at.column, at.within) : 0;
-    await this.platform.editor.moveCursor?.(range.from + offset);
+    if (!(await this.adapter.showSource(info, at))) this.notify(NOT_SAVED.replace(", nothing was saved", ""), "error");
   }
 
   /** What holds the pointer, if anything (Feature.pointerBusy): a drag, a menu open */

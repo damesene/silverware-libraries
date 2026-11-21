@@ -14,7 +14,8 @@ import { FEATURE_NAMES, MODULE_LABELS } from "../bridge.ts";
 import { CELL_MENU_ORDER, type CellMenuGroup, type CellRef, type Feature, type TableHost, type ToolbarButton, type TableInfo } from "./feature.ts";
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "./feature.ts";
 import { ICONS } from "../icons.ts";
-import { findTables, parseTable, type Table, writesMetaRow, writtenMeta } from "../markdown.ts";
+import { type Table, writesMetaRow, writtenMeta } from "../markdown.ts";
+import { encodeOver } from "../store/markdown/codec.ts";
 import type { MenuEntry } from "../menu.ts";
 import { columnsAttributes } from "../meta.ts";
 import { CORE, splitAttributeName } from "../metanames.ts";
@@ -111,9 +112,9 @@ const KEPT = "Cells keep their text, a formula's cell its result.";
 export class Metadata implements Feature {
   constructor(private readonly host: TableHost) {}
 
-  /** A shown table's markdown, as rendered */
+  /** A shown table's markdown, as the page has it */
   private markdownOf(info: TableInfo): Table {
-    return parseTable(info.source);
+    return encodeOver(info.model, info.model);
   }
 
   toolbarButtons(info: TableInfo): ToolbarButton[] {
@@ -191,11 +192,8 @@ export class Metadata implements Feature {
   async removeFromPage(): Promise<void> {
     const { host } = this;
     const page = await host.pageNameNow();
-    const text = await host.pageTextNow();
-    const keys = host.tableKeys(page, text);
-    const tables = findTables(text)
-      .map((range) => ({ key: keys[range.ordinal]!, model: parseTable(range.text) }))
-      .filter((t) => hasMetadata(t.model));
+    // The page's tables as read now, each as its markdown (what metadata is written in)
+    const tables = ((await host.tables(page)) ?? []).map((t) => ({ key: t.key, model: encodeOver(t.model, t.model) })).filter((t) => hasMetadata(t.model));
     if (tables.length === 0) {
       host.notify("Silverware Table: no table on this page has metadata", "info");
       return;

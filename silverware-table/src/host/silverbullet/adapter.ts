@@ -1,7 +1,8 @@
 // The adapter to SilverBullet's rendered tables (core/adapter.ts): what the
 // core asks of the rendering, done on the DOM SilverBullet renders tables to.
 // Everything assumed about that DOM is in ../../dom.ts and in this folder.
-import { UI_CLASS, WIDGET_SELECTOR } from "../../dom.ts";
+import { caretTextOffset, cellText, UI_CLASS, WIDGET_SELECTOR } from "../../dom.ts";
+import { cellSourceOffset, locateBySource, parseTable } from "../../markdown.ts";
 import { EVERYWHERE, heldBounds, innerBox, intersect, isEmpty, scrollNearEdge, shownPart, shownRect, viewBounds } from "../../core/geometry.ts";
 import { dragLines } from "./linedrag.ts";
 import { Overlays } from "./overlays.ts";
@@ -73,6 +74,21 @@ export class SilverBulletAdapter implements TableAdapter {
 
   pair(widget: HTMLElement, table: HTMLTableElement): Promise<PairedTable | Unpaired | undefined> {
     return pairTable(widget, table, this.rows, this.context);
+  }
+
+  async showSource(info: WidgetInfo, at?: { readonly ref: CellRef; readonly cell: HTMLTableCellElement; readonly x: number; readonly y: number }): Promise<boolean> {
+    const { editor } = this.context.platform();
+    const range = locateBySource(await editor.text(), info.hint, info.source);
+    if (!range) return false;
+    let offset = 0;
+    if (at) {
+      // Within a plain-text cell, the character at the point; otherwise the cell's start
+      const source = parseTable(range.text).rows[at.ref.row]?.cells[at.ref.column] ?? "";
+      const within = cellText(at.cell) === source ? caretTextOffset(at.cell, at.x, at.y) : undefined;
+      offset = cellSourceOffset(range.text, at.ref.row, at.ref.column, within ?? 0);
+    }
+    await editor.moveCursor?.(range.from + offset);
+    return true;
   }
 
   applyLooks(info: WidgetInfo, looks: MergedLooks, editing: CellRef | undefined, only?: readonly CellRef[]): void {

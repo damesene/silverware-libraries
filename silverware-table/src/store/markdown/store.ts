@@ -59,9 +59,6 @@ const NO_SPACE: Space = {
   list: () => [],
 };
 
-/** What a write of a page did: written, nothing to write, or not written and why */
-export type PageWritten = { readonly result: "written" | "unchanged" } | { readonly result: "failed"; readonly reason: string };
-
 /**
  * Before a write of the open page, once it is planned: the text as read, the
  * span of its tables (the history marker goes outside it), the range the edit
@@ -111,6 +108,13 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
   // Each document's tables as last read, by revision: a write encodes a model over the very table it was decoded from
   // (the codec tells a column the model keeps from one gone by what it read), which a parse again need not be
   private readonly read = new Map<string, ReadonlyMap<TableRevision, Table>>();
+  // Where each table was in the page's text as last read
+  private readonly places = new Map<string, ReadonlyMap<TableKey, { readonly from: number; readonly to: number }>>();
+
+  /** Where a table is in its page's text as last read (a custom menu's table's `from`, `to`); undefined: not read */
+  placeOf(document: string, key: TableKey): { readonly from: number; readonly to: number } | undefined {
+    return this.places.get(document)?.get(key);
+  }
 
   constructor(
     private readonly platform: () => Pick<TablePlatform, "editor" | "space">,
@@ -129,34 +133,32 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
 
   async tables(document: string): Promise<readonly StoredTable[] | null> {
     const text = await textOf(this.platform(), document);
-    if (text === undefined) return null;
+    return text === undefined ? null : this.tablesOfText(document, text);
+  }
+
+  /**
+   * A page's tables in its text as read (by its binding: a rendered table
+   * paired with one), kept as the last read of the page: what a write encodes
+   * over, where each is (placeOf)
+   */
+  tablesOfText(document: string, text: string): readonly StoredTable[] {
     const keys = this.register.keysOf(document, text);
     const read = new Map<TableRevision, Table>();
+    const places = new Map<TableKey, { readonly from: number; readonly to: number }>();
     const tables = findTables(text).map((range): StoredTable => {
       const table = parseTable(range.text);
+      const key = keys[range.ordinal]!;
       read.set(revisionOf(range.text), table);
-      return { key: keys[range.ordinal]!, revision: revisionOf(range.text), model: decode(table) };
+      places.set(key, { from: range.from, to: range.to });
+      return { key, revision: revisionOf(range.text), model: decode(table) };
     });
     this.read.set(document, read);
+    this.places.set(document, places);
     return tables;
   }
 
   documentOf(key: TableKey): string | undefined {
     return this.register.pageOf(key);
-  }
-
-  /**
-   * A page's tables and the formulas in its text changed by the writer's
-   * changes `make` makes (the tables' parts: `p.tables`; others with them, a
-   * plugin's text edits: `p.editText`), as one write: one edit where the page
-   * is open, planned anew there where it changed since it was read; into the
-   * space where it is not, left where it changed
-   */
-  async write(document: string, make: (page: PageBuilder) => unknown): Promise<PageWritten> {
-    const report = await this.writer().write(pageChanges().page(document, make).build(), { replanOpenPage: true });
-    if (report.written.length) return { result: "written" };
-    const left = report.skipped[0];
-    return left ? { result: "failed", reason: left.reason } : { result: "unchanged" };
   }
 
   async plan(transaction: TableTransaction): Promise<TablePlan> {

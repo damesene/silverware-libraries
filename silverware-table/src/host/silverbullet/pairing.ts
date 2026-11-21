@@ -25,13 +25,16 @@ export async function pairTable(widget: HTMLElement, table: HTMLTableElement, ro
   const text = await editor.text();
   if (renderedTable(widget) !== table) return undefined;
   const range = locateByShape(text, hint, shape);
-  if (!range) {
-    const broken = locateWithEmptyHeaders(text, hint, shape);
-    return { unpaired: "unfound", ...(broken ? { emptyHeaders: { source: broken.text, hint: broken.from } } : {}) };
-  }
+  const broken = range ? undefined : locateWithEmptyHeaders(text, hint, shape);
+  if (!range && !broken) return { unpaired: "unfound" };
   const document = await editor.documentName();
   if (renderedTable(widget) !== table) return undefined;
-  const stored = context.tablesOfText(document, text)[range.ordinal]!;
+  const tables = context.tablesOfText(document, text);
+  if (!range) {
+    const named = tables[broken!.ordinal]!;
+    return { unpaired: "unfound", emptyHeaders: { document, key: named.key, revision: named.revision } };
+  }
+  const stored = tables[range.ordinal]!;
   const markdown = parseTable(range.text);
   return {
     key: stored.key,

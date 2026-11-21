@@ -5,7 +5,7 @@ import { followColumnMeta } from "../../testing/markdownops.ts";
 import { describe, expect, it } from "vitest";
 import { withColumnType } from "../../columntypes/registry.ts";
 import { findTables, parseTable, serializeTable, type Table } from "../../markdown.ts";
-import { metaValue, withColumnValues, withMetaValue } from "../../meta.ts";
+import { metaValue, withColumnValues, withMetaSort, withMetaValue } from "../../meta.ts";
 import { attributeIn, type ModelCell, type TableModel, withAttributeIn } from "../../model/model.ts";
 import { reorderRows, setCell } from "../../testing/markdownops.ts";
 import { cellTags } from "../../tags.ts";
@@ -169,6 +169,16 @@ describe("the markdown codec", () => {
       // A column renamed comes from the one read: its metadata by its name now, none kept by the old
       const renamed = { ...read, columns: read.columns.map((c, i) => (i === 1 ? { ...c, header: "Total" } : c)) };
       expect(Object.keys(encode(renamed, meta).meta ?? {})).not.toContain("core.-c-b.sort");
+    });
+
+    it("the metadata of a column renamed by hand kept, but where the model set that attribute on a column: written whole", () => {
+      const orphan = parseTable("| Cost | B |\n|---|---|\n| 1 | 2 |\n| <meta core.table core.-c-price.sort='asc' widths.-c-price.size='9'> |");
+      const read = decode(orphan);
+      expect(encode({ ...read, rows: [...read.rows] }, orphan).meta).toMatchObject({ "core.-c-price.sort": "asc", "widths.-c-price.size": "9" });
+      const sorted = encode(withMetaSort(read, { column: 0, direction: "desc" }), orphan).meta;
+      expect(sorted).toMatchObject({ "core.-c-cost.sort": "desc", "widths.-c-price.size": "9" });
+      expect(Object.keys(sorted ?? {})).not.toContain("core.-c-price.sort");
+      expect(Object.keys(encode(withMetaSort(read, undefined), orphan).meta ?? {})).not.toContain("core.-c-price.sort");
     });
   });
 

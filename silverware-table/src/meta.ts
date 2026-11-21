@@ -9,7 +9,7 @@
 import { type ColumnId, columnIdOf, findColumn, type ColumnHead, headsOf } from "./columns.ts";
 import type { Row, Table, TableMeta } from "./markdown.ts";
 import { attributeName, COLUMN_ATTRIBUTE_RE, COLUMN_MARK, CORE, type Owner, splitAttributeName } from "./metanames.ts";
-import { type Attributes, attributeIn, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt } from "./model/model.ts";
+import { type Attributes, attributeIn, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt, withAttributeSet } from "./model/model.ts";
 import { validateTableName } from "./namerules.ts";
 import type { SortDirection } from "../../shared/compare.ts";
 import { NO_PINS, type Pins } from "./view.ts";
@@ -171,14 +171,16 @@ export function metaSort(table: Table): MetaSort | undefined {
 
 /**
  * Stores (or, with undefined, removes) the sorting: the core's own write, the
- * metadata setting asked by the caller (a table that has a sorting may change it)
+ * metadata setting asked by the caller (a table that has a sorting may change
+ * it). Set on every column, so the table's sorting is written whole: none is
+ * left of a column renamed since (the codec's orphans)
  */
 export function withMetaSort<T extends Table | TableModel>(table: T, sort: MetaSort | undefined): T {
   if (!("columns" in table)) return withColumnValues(table, CORE, "sort", new Map(sort ? [[sort.column, sort.direction]] : [])) as T;
   let model: TableModel = table;
   for (let column = 0; column < table.columns.length; column++) {
     const value = sort?.column === column ? sort.direction : undefined;
-    model = withAttributesAt(model, { column }, (attributes) => withAttributeIn(attributes, CORE, "sort", value));
+    model = withAttributesAt(model, { column }, (attributes) => withAttributeSet(attributes, CORE, "sort", value));
   }
   return model as T;
 }

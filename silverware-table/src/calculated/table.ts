@@ -98,9 +98,9 @@ export function calculatedTable(table: TableModel, calculated: Calculated, renam
     const contents = cells.map(resultContent);
     const was = table.rows[r];
     const same =
-      was?.attributes === NO_ATTRIBUTES &&
+      was?.attributes.size === 0 &&
       was.cells.length === contents.length &&
-      was.cells.every((cell, c) => cell.attributes === NO_ATTRIBUTES && cell.content === contents[c]);
+      was.cells.every((cell, c) => cell.attributes.size === 0 && cell.content === contents[c]);
     return same ? was : { cells: contents.map((content) => ({ content, attributes: NO_ATTRIBUTES })), attributes: NO_ATTRIBUTES };
   });
   const totals = { bottom: calculated.totalRow ? 1 : 0, right: calculated.totalColumns };

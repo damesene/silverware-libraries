@@ -46,6 +46,9 @@ const bases = new WeakMap<TableModel, Table>();
 const rows = new WeakMap<ModelRow, Row>();
 // A row's cells past its header's (no column's: SilverBullet shows none of them), kept as written when the row changes
 const beyond = new WeakMap<Row, readonly string[]>();
+// The row a row's attributes were read with (one with cells past its header: a set of its own), so a row whose every
+// cell an edit made anew is still told as the row it was (its attributes go with it through the model's operations)
+const rowOfAttributes = new WeakMap<Attributes, Row>();
 const cells = new WeakMap<ModelCell, { readonly cell: string; readonly row: Row }>();
 const headers = new WeakMap<ModelColumn, string>();
 const tagsRead = new WeakMap<Attributes, { readonly cell: string; readonly inTags: ReadonlySet<string> }>();
@@ -116,7 +119,8 @@ export function decode(table: Table): TableModel {
       cells.set(cell, { cell: raw, row });
       return cell;
     });
-    const attributes: Attributes = named ? new Map([[CORE, new Map([[LINE_NAME_KEY, named.name]])]]) : NO_ATTRIBUTES;
+    const attributes: Attributes = named ? new Map([[CORE, new Map([[LINE_NAME_KEY, named.name]])]]) : beyond.has(row) ? new Map() : NO_ATTRIBUTES;
+    if (attributes !== NO_ATTRIBUTES) rowOfAttributes.set(attributes, row);
     const modelRow: ModelRow = { cells: rowCells, attributes };
     rows.set(modelRow, row);
     return modelRow;
@@ -269,6 +273,15 @@ function orphansKept(model: TableModel, base: Table): Record<string, string> {
   return set.size ? Object.fromEntries(Object.entries(orphans).filter(([name]) => !set.has(parseColumnAttribute(name)?.what ?? ""))) : orphans;
 }
 
+/** The row of `baseRows` a row's attributes were read with, through the changes made to them since */
+function readRowOf(attributes: Attributes, baseRows: ReadonlySet<Row>): Row | undefined {
+  for (let at: Attributes | undefined = attributes; at; at = attributeChangeOf(at)?.from) {
+    const row = rowOfAttributes.get(at);
+    if (row) return baseRows.has(row) ? row : undefined;
+  }
+  return undefined;
+}
+
 /**
  * A model written back as a markdown table, `base` the table it was read from
  * (its form: indent, padding, its rows as written); `deleted`: the columns of
@@ -316,8 +329,9 @@ export function encode(model: TableModel, base: Table, deleted: (column: number)
       const column = at?.column ?? 0;
       rowCells[column] = withName(rowCells[column]!, name);
     }
-    // As an edit of the row it was read from (its first cell read's): written as it was where its cells are (markdown.ts)
-    const from = row.cells.map((cell) => cells.get(cell)?.row).find((r) => r !== undefined && baseRows.has(r));
+    // As an edit of the row it was read from (its first cell read's, else its attributes'): written as it was where its
+    // cells are (markdown.ts), its cells past the header kept
+    const from = row.cells.map((cell) => cells.get(cell)?.row).find((r) => r !== undefined && baseRows.has(r)) ?? readRowOf(row.attributes, baseRows);
     return from ? { ...from, cells: [...rowCells, ...(beyond.get(from) ?? [])] } : { cells: rowCells };
   });
   const baseHeader = base.rows[0];

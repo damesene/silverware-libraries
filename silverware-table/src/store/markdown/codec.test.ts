@@ -92,6 +92,12 @@ describe("the markdown codec", () => {
     it("a cell's content, the row's cells past its header's kept", () => {
       const wide = parseTable("| A | B |\n|---|---|\n| 1 | 2 | extra |");
       expect(md(encode(withCell(decode(wide), 1, 0, (c) => ({ ...c, content: "x" })), wide))).toBe(md(setCell(wide, 1, 0, "x")));
+      // Every cell of the row made anew (cleared, pasted over), or a one-column table's: still the row's
+      const read = decode(wide);
+      const cleared = { ...read, rows: [{ ...read.rows[0]!, cells: read.rows[0]!.cells.map(() => ({ content: "", attributes: new Map() })) }] };
+      expect(md(encode(cleared, wide))).toBe(md(setCell(setCell(wide, 1, 0, ""), 1, 1, "")));
+      const single = parseTable("| A |\n|---|\n| 1 | x |");
+      expect(md(encode(withCell(decode(single), 1, 0, () => ({ content: "2", attributes: new Map() })), single))).toBe("| A |\n|---|\n| 2 | x |");
     });
 
     it("a row's name in the cell holding it as that cell's content changes", () => {

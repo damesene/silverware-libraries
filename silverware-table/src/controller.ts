@@ -2739,6 +2739,8 @@ export class Controller implements TableHost {
   }
 
   private async writeNow(given: TableTarget, widget: HTMLElement | undefined, change: TableWriteChange, asked: WriteOptions): Promise<WriteResult> {
+    // The row held as it was before this write set it: put back where the write is left
+    let heldBefore: typeof this.held | "unset" = "unset";
     try {
       // What the write needs read is read before the page's tables (other
       // pages, which take a while), so the tables the edit is made from are
@@ -2839,7 +2841,7 @@ export class Controller implements TableHost {
       }
       // What follows the table once it is rendered anew (the cell to edit, the row held), set before it is written: put
       // back where the write is left
-      const heldBefore = this.held;
+      heldBefore = this.held;
       if (focus) this.cellEditor.editAfterWrite(key, focus);
       this.holdAfterWrite(key, options);
       if (widget && !widget.classList.contains(DRAWN_CLASS)) {
@@ -2874,6 +2876,7 @@ export class Controller implements TableHost {
       return "written";
     } catch (e) {
       this.cellEditor.dropPending();
+      if (heldBefore !== "unset") this.held = heldBefore;
       console.error("Silverware Table: could not save the table", e);
       this.notify(`Silverware Table: could not save the table (${String(e)})`, "error");
       return "failed";

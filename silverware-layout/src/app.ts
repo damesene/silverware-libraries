@@ -82,6 +82,11 @@ export class LayoutApp {
   /** Tabs of other parts of Silverware Layout's for the settings dialog, made as it opens (the media's) */
   dialogTabs: (() => Promise<readonly DialogTabPart[]>) | undefined;
 
+  /** Told once the page's font shows at another size (a zoom, a size set): what read the page's look reads it again (the grids) */
+  fontSizeChanged: (() => void) | undefined;
+  // The page's font size shown last (fontSizeChanged told where it changes)
+  private fontSizeShownLast: number | undefined | null = null;
+
   /** Where the page's text is (x in the window, its padding left out); none before it is laid out */
   textEdges(): { readonly left: number; readonly right: number } | undefined {
     const widgets = this.widgetLayout?.widgets;
@@ -217,7 +222,12 @@ export class LayoutApp {
     this.page.showTextWidth(textWidthShown({ page: shown.pageWidth, fallback: shown.defaultWidth, paneWidth: pane, minPaneWidth: state.settings.minPaneWidth }));
     // (Font zoom off: this device's zoom not shown, still kept)
     const zoomed = shown.fontZoom ? shown.zoom : undefined;
-    showFontSize(this.doc, this.page, fontSizeShown(zoomed, shown.fontSize));
+    const size = fontSizeShown(zoomed, shown.fontSize);
+    showFontSize(this.doc, this.page, size);
+    if (size !== this.fontSizeShownLast) {
+      this.fontSizeShownLast = size;
+      this.fontSizeChanged?.();
+    }
     // The files grown or shrunk with this device's zoom, where asked: by its share of the size of all pages (the
     // theme's where none), so a page at its default shows them at theirs
     showContentScale(this.doc, shown.scaleFiles && zoomed !== undefined ? zoomed / (shown.fontSize ?? (this.themeSizeKept ??= this.themeSize())) : 1);

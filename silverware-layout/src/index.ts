@@ -45,6 +45,8 @@ const OWN_MARKER = "-- managed-by: silverware-layout";
 // observers and listeners live as long), started again with each load of Space Lua
 const registry = new Registry((message) => app.problem(message));
 const app = new LayoutApp(document, silverBulletPage(document), registry);
+// (The page's font shown at another size, a zoom: the grids read the page's look again, its headings' spacing)
+app.fontSizeChanged = () => grids?.pageLookChanged();
 
 /**
  * Silverware Layout's API, as its API page hands it to the widget plugins (`silverware.layout.api`): the widgets'

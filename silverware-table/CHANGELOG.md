@@ -1,5 +1,13 @@
 # Silverware Table: changelog
 
+## 1.4.0 (2026-11-21)
+
+- **Changed:** `silverware.table.tables(text)` (and the table custom menu entries get) gives each row's cells by the table's columns: a cell past the header, in a row longer than its header, is left out. A column's name with repeated spaces is given with one (`Unit  price` is `Unit price`); its key is the same as before.
+- Deleting a column no longer removes the rows' names: a row's name stays with its row whichever column is deleted. Cells' names in that column still go with it, as Silverware Table says before.
+- Faster saving in large tables: a table drawn anew after an edit keeps its look from the start instead of being restyled whole.
+- Large tables with Silverware Layout installed: the rows out of view are taken out before the table is laid out again, as without it, so saving no longer lays out every row.
+- Many small fixes to how cells, headers, names and metadata are written, found while rebuilding how tables are read and stored.
+
 ## 1.3.1 (2026-11-19)
 
 - Fixed: letting go of something dragged in a dialog (a column's options), or cancelling the drag with Esc, no longer counts as a click on what lies under the pointer.

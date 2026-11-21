@@ -909,6 +909,44 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    large as step 3. (B) `source` and `hint` kept as the adapter's pairing,
    only the encoding and formatting moved into the store: smaller, the core
    still carrying the markdown's identity. Recommended: (A).
+   **Decided (2026-11-21): (A).** In parts, each a commit (or a few), the
+   tests and the UI tests passing after each:
+   - **A1. A write by the key and its revision.** The core reads the
+     table to write from the store (`store.tables(document)`: its model and
+     revision by its key) and writes a transaction (`write` with `expects`,
+     the other tables the features change with it, new tables), no text of
+     its own. What a write is checked against, where the caller saw an older
+     revision, is the revisions the core's own writes made since (each
+     report gives the written tables' new revisions), not their markdown:
+     `writtenAs` goes, the pins moved as now. The store encodes and formats
+     (the serializer is its own already). The rest the write computes from
+     the page's text today is the binding's, done by the markdown store as
+     it writes, through hooks the binding registers on it: what other
+     plugins write with it (`onWrite`, the Lua listeners told the tables'
+     changes), the page's formulas the features change (the store's
+     `PageFormulaStore`, set in the same transaction), the history marker
+     (the span written, the edit's range: the binding's `Editor` places it),
+     and where a table is in the text after it (the anchors keep it by key
+     already). `TableReport` says what the core needs of it: the new
+     revisions, the keys inserted, the hidden values taken off.
+   - **A2. The adapter pairs a widget with a key.** The scan's pairing (a
+     rendered table found in the text by its shape and `data-pos`, its key
+     from the register, the empty headers offered a fix) moves into the
+     binding's adapter, which gives the core `{ key, model, revision }` for a
+     widget; `TableInfo` loses `source` and `hint` (the metadata row, rows
+     and pins read off the model). `tableData` (a custom menu's table:
+     `from`, `to` in the text, public) asks the store where a key's table is.
+     The adapter's modules that read a table's text (history, beside,
+     expressions) take it from the binding's pairing.
+   - **A3. The sheet's board** makes its targets from keys (`store.tables`)
+     and inserts after a key: no range, no text.
+   - **A4. `TableTarget` is the key** (`{ key }`, the revision where a
+     caller has it); `locateBySource` and the text read in the core gone;
+     `isolation.test.ts` checks that the core reads no page's text
+     (`editor.text`, `findTables`, `parseTable` of a page) and imports no
+     markdown of a table.
+   Users see no change; the Space Lua API and the stored markdown stay as
+   they are.
 7. **Docs.** CLAUDE.md (Layout, Architecture), docs/silverware-table-isolation.md
    extended by the store's boundary.
 8. **The whole API and its names, reviewed.** With every layer in its place,

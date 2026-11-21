@@ -320,7 +320,7 @@ export class Controller implements TableHost {
       buttons: (_widget, info) => this.features.flatMap((feature) => feature.toolbarButtons?.(info) ?? []),
       current: (widget, info) => this.current(widget, info),
       applySort: (widget, info) => void this.applySort(widget, info),
-      showMarkdown: (info) => void this.showMarkdown(info),
+      showSource: (info) => void this.showSource(info),
       openSettings: () => void this.openSettings(),
       deleteTable: (info) => void this.deleteTable(info),
       namesShown: () => this.namesShown === "always" || (this.namesShown === "shift" && this.shiftHeld),
@@ -2271,7 +2271,7 @@ export class Controller implements TableHost {
     const ref = this.cellRef(info, cell);
     if (!ref) return;
     // Where it was clicked (a plain cell's character)
-    void this.showMarkdown(info, { ref, cell, x: e.clientX, y: e.clientY });
+    void this.showSource(info, { ref, cell, x: e.clientX, y: e.clientY });
   }
 
   // The end of a press that inserted with the +, or of a press taken: it reaches nothing
@@ -2871,7 +2871,7 @@ export class Controller implements TableHost {
   }
 
   /** Shows the table's markdown by moving the cursor into it: to its start, or into a cell */
-  private async showMarkdown(info: WidgetInfo, at?: { readonly ref: CellRef; readonly cell: HTMLTableCellElement; readonly x: number; readonly y: number }): Promise<void> {
+  private async showSource(info: WidgetInfo, at?: { readonly ref: CellRef; readonly cell: HTMLTableCellElement; readonly x: number; readonly y: number }): Promise<void> {
     this.hideFloating(true);
     if (!(await this.adapter.showSource(info, at))) this.notify(NOT_SAVED.replace(", nothing was saved", ""), "error");
   }

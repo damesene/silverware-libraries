@@ -34,7 +34,7 @@ export type ToolbarContext = {
   readonly current: (widget: HTMLElement, info: WidgetInfo) => [HTMLElement, WidgetInfo];
   /** The sorting shown written into the markdown */
   readonly applySort: (widget: HTMLElement, info: WidgetInfo) => void;
-  readonly showMarkdown: (info: WidgetInfo) => void;
+  readonly showSource: (info: WidgetInfo) => void;
   readonly openSettings: () => void;
   /** The table deleted from the page, asked first (Delete table) */
   readonly deleteTable: (info: WidgetInfo) => void;
@@ -264,7 +264,7 @@ export class Toolbar {
         label: "Edit markdown",
         title: "Show this table as markdown",
         icon: ICONS.markdown,
-        run: () => this.context.showMarkdown(this.context.current(widget, info)[1]),
+        run: () => this.context.showSource(this.context.current(widget, info)[1]),
       },
       // Last before the destructive ones: not about this table
       {

@@ -80,15 +80,17 @@ export class SilverBulletAdapter implements TableAdapter {
   }
 
   async showSource(info: WidgetInfo, at?: { readonly ref: CellRef; readonly cell: HTMLTableCellElement; readonly x: number; readonly y: number }): Promise<boolean> {
+    // The cell as it shows and the character at the point, read before anything is awaited (it may be rendered anew)
+    const shown = at && { text: cellText(at.cell), caret: caretTextOffset(at.cell, at.x, at.y) };
     const { editor } = this.context.platform();
     const found = await this.store.rangeNow(await editor.documentName(), info.key);
     if (!found) return false;
     const { range } = found;
     let offset = 0;
-    if (at) {
+    if (at && shown) {
       // Within a plain-text cell, the character at the point; otherwise the cell's start
       const source = parseTable(range.text).rows[at.ref.row]?.cells[at.ref.column] ?? "";
-      const within = cellText(at.cell) === source ? caretTextOffset(at.cell, at.x, at.y) : undefined;
+      const within = shown.text === source ? shown.caret : undefined;
       offset = cellSourceOffset(range.text, at.ref.row, at.ref.column, within ?? 0);
     }
     await editor.moveCursor?.(range.from + offset);

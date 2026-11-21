@@ -468,15 +468,6 @@ export type WriteOptions = {
  */
 export type RowHold = { readonly after?: number; readonly before?: number };
 
-/**
- * A step every write goes through after the edit itself, such as formulas
- * following moved cells: the table before the edit, the table after it, and
- * how rows and columns moved; returns the table to write. `byModel`: the
- * change was the model's (TableHost.writeTable), its columns' attributes on
- * its columns already.
- */
-export type WriteStep = (before: Table, after: Table, options: WriteOptions, byModel: boolean) => Table;
-
 /** A column as shown: its width, and the width its header needs to show its name and icons whole (0: no header line, one being edited), in pixels */
 export type ColumnMeasure = { readonly width: number; readonly header: number };
 

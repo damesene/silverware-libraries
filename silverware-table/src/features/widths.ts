@@ -4,7 +4,7 @@
 // sideways, or narrower down to its box), a column fitted to its text by
 // double-clicking its edge or with "Fit to content" in its menu. With the metadata setting they are
 // stored in the table (widths.-c-price.size='180'), which follows the column
-// through renames and moves (metadataAfterEdit); without it, they hold for
+// through renames and moves (an attribute of its column in the model); without it, they hold for
 // the view only. "Reset column widths" in the table's menu makes every column
 // automatic again.
 //

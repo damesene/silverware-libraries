@@ -6,7 +6,7 @@
 // names it as columns.ts names columns (its key or fixed name, with its
 // occurrence where several share it), so it survives moves and renames, which
 // every edit follows here whatever the attribute is for.
-import { type ColumnId, columnIdOf, findColumn, matchColumns, type ColumnHead, headsOf } from "./columns.ts";
+import { type ColumnId, columnIdOf, findColumn, type ColumnHead, headsOf } from "./columns.ts";
 import type { Row, Table, TableMeta } from "./markdown.ts";
 import { attributeName, COLUMN_ATTRIBUTE_RE, COLUMN_MARK, CORE, type Owner, splitAttributeName } from "./metanames.ts";
 import { type Attributes, attributeIn, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt } from "./model/model.ts";
@@ -60,13 +60,13 @@ export function metaValuesOf(table: Table, owner: Owner): Map<string, string> {
 // ---- attributes of columns ------------------------------------------------------
 
 
-function parseColumnAttribute(name: string): { readonly what: string; readonly id: ColumnId } | undefined {
+export function parseColumnAttribute(name: string): { readonly what: string; readonly id: ColumnId } | undefined {
   const match = COLUMN_ATTRIBUTE_RE.exec(name);
   return match ? { what: `${match[1]!}.${match[4]!}`, id: { name: match[2]!, nth: Number(match[3] ?? 1) } } : undefined;
 }
 
 /** The name of the attribute `what` (its owner and key) of a column, as the headers name the column */
-function columnAttributeName(headers: readonly ColumnHead[], what: string, column: number): string | undefined {
+export function columnAttributeName(headers: readonly ColumnHead[], what: string, column: number): string | undefined {
   const id = columnIdOf(headers, column);
   const dot = what.indexOf(".");
   return id && `${what.slice(0, dot)}.${COLUMN_MARK}${id.name}${id.shared ? `:${id.nth}` : ""}.${what.slice(dot + 1)}`;
@@ -158,43 +158,6 @@ export function columnsAttributes(table: Table, columns: ReadonlySet<number>): s
   });
 }
 
-/**
- * Keeps the columns' attributes on their columns through an edit: each one
- * the table before had, unchanged by the edit, names its column as moved and
- * as the table after names it, so renamed, moved and duplicate-named columns
- * are followed, in the place it was written. Attributes the edit set are its
- * own. How the columns moved: `map`, the edit's (undefined: deleted, and the
- * attribute goes); without one, as `matchColumns` pairs the headers, an
- * attribute of a column it finds nowhere kept as written (a calculated table
- * without that column now: it comes back with it), never put on another
- */
-export function followColumnMeta(before: Table, after: Table, map?: (column: number) => number | undefined): Table {
-  const old = before.meta ?? {};
-  const current = after.meta ?? {};
-  const beforeHeaders = headsOf(before.rows[0]?.cells ?? []);
-  const afterHeaders = headsOf(after.rows[0]?.cells ?? []);
-  const moves = map ?? matchColumns(beforeHeaders, afterHeaders);
-  let changed = false;
-  const meta: Record<string, string> = {};
-  for (const [name, value] of Object.entries(current)) {
-    const attribute = old[name] === value ? parseColumnAttribute(name) : undefined;
-    const column = attribute && findColumn(beforeHeaders, attribute.id);
-    if (!attribute || column === undefined) {
-      meta[name] = value;
-      continue;
-    }
-    const moved = moves(column);
-    // (Found nowhere, the edit not saying it went: kept as written)
-    if (moved === undefined && !map) {
-      meta[name] = value;
-      continue;
-    }
-    const renamed = moved === undefined ? undefined : columnAttributeName(afterHeaders, attribute.what, moved);
-    if (renamed !== name) changed = true;
-    if (renamed !== undefined) meta[renamed] = value;
-  }
-  return changed ? { ...after, meta } : after;
-}
 
 // ---- sorting ------------------------------------------------------------------
 
@@ -267,35 +230,6 @@ export function metaName(table: Table | TableModel): string | undefined {
 /** The table's name as written, valid or not */
 export function writtenName(table: Table | TableModel): string | undefined {
   return metaValue(table, CORE, "name");
-}
-
-// ---- keeping the metadata through edits ------------------------------------------
-
-/**
- * The step every table edit goes through for the metadata row: the columns'
- * attributes follow their columns (`columnMap`), and edits that change the
- * pins store them, at the edges they may be stored at (`canPin`: the metadata
- * setting off, only where the table has pins already). (Pins are counts at
- * the edges: the edits that change them set them.)
- */
-export function metadataAfterEdit(
-  before: Table,
-  after: Table,
-  edit: { readonly columnMap?: (column: number) => number | undefined; readonly pins?: Pins },
-  canPin: (edge: keyof typeof PIN_KEYS) => boolean = () => true,
-  // Whether the columns' attributes are followed by their names (a markdown edit's); else they are on their columns already
-  follows = true,
-): Table {
-  const followed = follows ? followColumnMeta(before, after, edit.columnMap) : after;
-  if (!edit.pins) return followed;
-  const kept = metaPins(followed);
-  const pins = edit.pins;
-  return withMetaPins(followed, {
-    top: canPin("top") ? pins.top : kept.top,
-    bottom: canPin("bottom") ? pins.bottom : kept.bottom,
-    left: canPin("left") ? pins.left : kept.left,
-    right: canPin("right") ? pins.right : kept.right,
-  });
 }
 
 export { NO_PINS };

@@ -4,6 +4,8 @@
 // as the markdown wrote them before the model (docs/silverware-table-store-plan.md,
 // step 6). Each returns a new table.
 import type { Align, Row, Table } from "../markdown.ts";
+import { findColumn, headsOf, matchColumns } from "../columns.ts";
+import { columnAttributeName, parseColumnAttribute } from "../meta.ts";
 export { columnAfterMove, type IndexMap, lineAfterBlockMove } from "../model/ops.ts";
 
 function withRows(table: Table, rows: readonly Row[]): Table {
@@ -167,4 +169,42 @@ export function setAlign(table: Table, column: number, align: Align): Table {
     ...table,
     align: table.align.map((a, i) => (i === column ? align : a)),
   };
+}
+
+/**
+ * Keeps the columns' attributes on their columns through an edit: each one
+ * the table before had, unchanged by the edit, names its column as moved and
+ * as the table after names it, so renamed, moved and duplicate-named columns
+ * are followed, in the place it was written. Attributes the edit set are its
+ * own. How the columns moved: `map`, the edit's (undefined: deleted, and the
+ * attribute goes); without one, as `matchColumns` pairs the headers, an
+ * attribute of a column it finds nowhere kept as written (a calculated table
+ * without that column now: it comes back with it), never put on another
+ */
+export function followColumnMeta(before: Table, after: Table, map?: (column: number) => number | undefined): Table {
+  const old = before.meta ?? {};
+  const current = after.meta ?? {};
+  const beforeHeaders = headsOf(before.rows[0]?.cells ?? []);
+  const afterHeaders = headsOf(after.rows[0]?.cells ?? []);
+  const moves = map ?? matchColumns(beforeHeaders, afterHeaders);
+  let changed = false;
+  const meta: Record<string, string> = {};
+  for (const [name, value] of Object.entries(current)) {
+    const attribute = old[name] === value ? parseColumnAttribute(name) : undefined;
+    const column = attribute && findColumn(beforeHeaders, attribute.id);
+    if (!attribute || column === undefined) {
+      meta[name] = value;
+      continue;
+    }
+    const moved = moves(column);
+    // (Found nowhere, the edit not saying it went: kept as written)
+    if (moved === undefined && !map) {
+      meta[name] = value;
+      continue;
+    }
+    const renamed = moved === undefined ? undefined : columnAttributeName(afterHeaders, attribute.what, moved);
+    if (renamed !== name) changed = true;
+    if (renamed !== undefined) meta[renamed] = value;
+  }
+  return changed ? { ...after, meta } : after;
 }

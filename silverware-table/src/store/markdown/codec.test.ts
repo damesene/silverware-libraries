@@ -1,10 +1,11 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { followColumnMeta } from "../../testing/markdownops.ts";
 import { describe, expect, it } from "vitest";
 import { withColumnType } from "../../columntypes/registry.ts";
 import { findTables, parseTable, serializeTable, type Table } from "../../markdown.ts";
-import { followColumnMeta, metaValue, withColumnValues, withMetaValue } from "../../meta.ts";
+import { metaValue, withColumnValues, withMetaValue } from "../../meta.ts";
 import { attributeIn, type ModelCell, type TableModel, withAttributeIn } from "../../model/model.ts";
 import { reorderRows, setCell } from "../../testing/markdownops.ts";
 import { cellTags } from "../../tags.ts";

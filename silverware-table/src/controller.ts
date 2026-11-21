@@ -3,7 +3,7 @@
 // one write of the page writer's (the markdown store's, store/markdown/): one
 // edit of the open page, so undo works as for any other edit.
 import { type FeatureName, formatRule, moduleOnByDefault, SETTINGS, type SettingValue } from "./bridge.ts";
-import { type AdapterFeature, type AddressFrame, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, type ColumnsMeasure, type ColumnWidths, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type InsertPlace, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget, type KeyedTable, type OtherPages, type PendingEdits, type TableChange } from "./core/feature.ts";
+import { type AdapterFeature, type AddressFrame, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, type ColumnsMeasure, type ColumnWidths, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type InsertPlace, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type NamingTarget, type KeyedTable, type OtherPages, type PendingEdits, type TableChange } from "./core/feature.ts";
 import { type Dialog, type DialogOptions, Dialogs } from "./core/dialog.ts";
 import { ViewAnchor } from "./core/anchor.ts";
 import { mapPosition, type TextEdit, withWriteListeners } from "./core/writelisteners.ts";
@@ -71,7 +71,7 @@ import {
 } from "./markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "./menu.ts";
 import { floatingMenu, focusMenu } from "./core/menu.ts";
-import { CORE, metadataAfterEdit, metaName, metaPins, metaSort, withMetaPins, withMetaSort, writtenName } from "./meta.ts";
+import { CORE, metaName, metaPins, metaSort, withMetaPins, withMetaSort, writtenName } from "./meta.ts";
 import { CELL_NAME_KEY, type CellNameAt, LINE_NAME_KEY, modelCellName, modelCellNames, modelColumnName, modelRowName, modelRowNames, type RowName, withModelName } from "./names.ts";
 import { ownMeta } from "./core/metaaccess.ts";
 import { reorderRows } from "./model/ops.ts";
@@ -242,13 +242,6 @@ export class Controller implements TableHost {
   private readonly dragContext: DragContext;
   // The tables marked (TableHost.tableMark), by mark
   private readonly tableMarks = new Map<string, Set<string>>();
-  // Steps every write goes through after the edit, in this order
-  // The core's write steps: the columns' attributes follow their columns (a write of the model's has them on its
-  // columns already: followed by name again, where headers repeat, they would move twice), pins are stored (as far as
-  // they may be)
-  private readonly writeSteps: readonly WriteStep[] = [
-    (before, after, options, byModel) => metadataAfterEdit(before, after, options, (edge) => this.coreMeta.canStore(before, `pin-${edge}`), !byModel),
-  ];
 
   constructor(
     readonly doc: Document,
@@ -807,6 +800,19 @@ export class Controller implements TableHost {
     const was = metaPins(table);
     const edge = (side: keyof Pins) => (pins[side] === was[side] || this.canPin(table, side) ? pins[side] : was[side]);
     return withMetaPins(table, { top: edge("top"), bottom: edge("bottom"), left: edge("left"), right: edge("right") });
+  }
+
+  /**
+   * The core's step of a write: the pins it sets stored, at the edges they may
+   * be stored at (the metadata setting off: only where the table has pins
+   * there already); the columns' attributes are on their columns in the model
+   */
+  private withPinsStored(before: TableModel, after: TableModel, options: Pick<WriteOptions, "pins">): TableModel {
+    const { pins } = options;
+    if (!pins) return after;
+    const kept = metaPins(after);
+    const edge = (side: keyof Pins) => (this.coreMeta.canStore(before, `pin-${side}`) ? pins[side] : kept[side]);
+    return withMetaPins(after, { top: edge("top"), bottom: edge("bottom"), left: edge("left"), right: edge("right") });
   }
 
   /**
@@ -2671,19 +2677,19 @@ export class Controller implements TableHost {
   // ---- writing markdown --------------------------------------------------
 
   writeTable(target: TableTarget, change: (table: TableModel) => TableModel | undefined, options: WriteOptions = {}): Promise<WriteResult> {
-    return this.writeTo(target, this.modelChange(change, options), options, true);
+    return this.writeTo(target, this.modelChange(change, options), options);
   }
 
   writeMarkdown(target: TableTarget, change: (table: Table) => Table | undefined, options: WriteOptions = {}): Promise<WriteResult> {
-    return this.writeTo(target, change, options, false);
+    return this.writeTo(target, change, options);
   }
 
-  /** A write of a table by its target (`byModel`: a change of the model's, modelChange) */
-  private writeTo(target: TableTarget, change: (table: Table) => Table | undefined, options: WriteOptions, byModel: boolean): Promise<WriteResult> {
+  /** A write of a table by its target */
+  private writeTo(target: TableTarget, change: (table: Table) => Table | undefined, options: WriteOptions): Promise<WriteResult> {
     // Rendered: written as its widget's, so the view stays where it was
     const widget = this.widgetForKey(target.key);
     const info = widget && this.infos.get(widget);
-    return info && info.source === target.source ? this.writeAt(info, widget, change, options, byModel) : this.writeAt(target, undefined, change, options, byModel);
+    return info && info.source === target.source ? this.writeAt(info, widget, change, options) : this.writeAt(target, undefined, change, options);
   }
 
   /**
@@ -2790,7 +2796,7 @@ export class Controller implements TableHost {
    * saved first, as a press elsewhere would: kept open, a table drawn for its
    * key (the sheet's) would not be drawn anew under it
    */
-  private async writeAt(given: TableTarget, shown: HTMLElement | undefined, change: (table: Table) => Table | undefined, options: WriteOptions, byModel: boolean): Promise<WriteResult> {
+  private async writeAt(given: TableTarget, shown: HTMLElement | undefined, change: (table: Table) => Table | undefined, options: WriteOptions): Promise<WriteResult> {
     const key = given.key;
     if (options.focus && this.cellEditor.active?.key === key) await this.saveEditing();
     const before = this.writing.get(key);
@@ -2799,7 +2805,7 @@ export class Controller implements TableHost {
     this.writing.set(key, mine);
     if (before) await before;
     try {
-      return await this.writeNow(given, this.widgetForKey(key) ?? shown, change, options, byModel);
+      return await this.writeNow(given, this.widgetForKey(key) ?? shown, change, options);
     } finally {
       if (this.writing.get(key) === mine) this.writing.delete(key);
       release();
@@ -2828,7 +2834,7 @@ export class Controller implements TableHost {
     return { info: { key: given.key, source: now.source, hint: now.hint }, range: found, options };
   }
 
-  private async writeNow(given: TableTarget, widget: HTMLElement | undefined, change: (table: Table) => Table | undefined, asked: WriteOptions, byModel: boolean): Promise<WriteResult> {
+  private async writeNow(given: TableTarget, widget: HTMLElement | undefined, change: (table: Table) => Table | undefined, asked: WriteOptions): Promise<WriteResult> {
     try {
       // What the write needs read is read before the page's text (other pages,
       // which take a while), so the text the edit is computed from is not stale
@@ -2868,9 +2874,8 @@ export class Controller implements TableHost {
       const edit = { ...options, page };
       let stepped = editedModel;
       for (const feature of this.features) if (feature.writeStep) stepped = feature.writeStep(beforeModel, stepped, edit);
-      stepped = this.withoutNewAttributes(beforeModel, stepped, options, taken);
-      let changed = encode(stepped, edited);
-      changed = this.writeSteps.reduce((table, step) => step(before, table, options, byModel), changed);
+      stepped = this.withoutNewAttributes(beforeModel, this.withPinsStored(beforeModel, stepped, options), options, taken);
+      const changed = encode(stepped, edited);
       const changedModel = decode(changed);
       const serialize = await this.serializer();
       const markdown = serialize(changed);

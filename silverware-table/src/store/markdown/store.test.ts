@@ -93,7 +93,7 @@ describe("the markdown store", () => {
       expect(pages.get("Shop")).toBe(`Intro.\n\n| A |\n|---|\n| 2 |\n\nTotal: \${te("=SUM(b![A])")}\n`);
     });
 
-    it("lets other plugins write with it, told of the tables written; tidies and writes a table whole where asked", async () => {
+    it("lets other plugins write with it, told of the tables written; tidies a table where asked", async () => {
       const told: string[] = [];
       writeListenersAnew();
       addWriteListener((text, context) => {
@@ -101,11 +101,11 @@ describe("the markdown store", () => {
         return text.startsWith("Intro.") ? [{ from: 0, to: 6, text: "Begin." }] : [];
       });
       const { pages, platform } = pagesOf({ Shop: [table(["A"], ["1"])] }, "Shop");
-      pages.set("Shop", "Intro.\n\n| A |\n|---|\n|  1 |\n| <meta core.table core.-c-gone.sort='asc'> |\n");
+      pages.set("Shop", "Intro.\n\n| A |\n|---|\n|  1 |\n");
       const store = storeOf(platform);
       const [first] = (await store.tables("Shop"))!;
       const renamed = { ...first!.model, columns: first!.model.columns.map((c) => ({ ...c, header: "B" })) };
-      await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "write", key: first!.key, expects: first!.revision, model: renamed, tidy: true, whole: true }] }));
+      await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "write", key: first!.key, expects: first!.revision, model: renamed, tidy: true }] }));
       expect(told).toEqual(["true"]);
       expect(pages.get("Shop")).toBe("Begin.\n\n| B   |\n| --- |\n| 1   |\n");
     });

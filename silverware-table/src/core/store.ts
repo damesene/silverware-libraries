@@ -41,8 +41,7 @@ export interface PageFormulaStore {
  * (`expects`). `columnMap`: where its columns went (undefined: deleted), for
  * what follows a write (a markdown page's other plugins, told). `tidy`:
  * written anew in the store's tidiest form (a markdown table's cells padded
- * to line up). `whole`: the model is all the table keeps, what the store kept
- * beyond it going (a markdown table's metadata naming no column)
+ * to line up)
  */
 export type TableWriteEdit = {
   readonly kind: "write";
@@ -51,7 +50,6 @@ export type TableWriteEdit = {
   readonly model: TableModel;
   readonly columnMap?: IndexMap;
   readonly tidy?: true;
-  readonly whole?: true;
 };
 
 /**

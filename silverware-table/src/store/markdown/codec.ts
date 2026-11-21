@@ -201,13 +201,18 @@ export function decodeCell(raw: string): ModelCell {
   return { content: unescapeCell(withoutTags(raw)), attributes };
 }
 
+/** The table a model was read from (decode's), undefined: one made otherwise */
+export function decodedFrom(model: TableModel): Table | undefined {
+  return bases.get(model);
+}
+
 /**
- * Each column's attributes its header's tags hold, by column (the others are
- * the metadata row's): what a tag typed into a header becomes once read
+ * A model written as the markdown of the table another was read from
+ * (`read`, decoded: its form, indent and rows as written); none read: as a
+ * table of its own
  */
-export function headerTagAttributes(table: Table): readonly Attributes[] {
-  const header = table.rows[0];
-  return table.align.map((_, c) => attributesOf(tagAttributes(header?.cells[c] ?? "")));
+export function encodeOver(model: TableModel, read: TableModel): Table {
+  return encode(model, bases.get(read) ?? { indent: "", align: [], rows: [], padded: false });
 }
 
 /** A cell read alone (decodeCell) written back as a cell of encode's: as read where unchanged */

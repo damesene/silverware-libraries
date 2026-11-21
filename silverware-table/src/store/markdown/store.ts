@@ -5,7 +5,7 @@
 // of the same text free); written through the page writer (shared/pages/),
 // by the parts of tableparts.ts (step 4b).
 import { findTables, minimalEdit, parseTable, type Table } from "../../markdown.ts";
-import { decode, encode } from "./codec.ts";
+import { decode, decodedFrom, encode } from "./codec.ts";
 import type { TablePlatform } from "../../core/platform.ts";
 import {
   type InsertAt,
@@ -108,6 +108,9 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
   private writing: { readonly platform: Pick<TablePlatform, "editor" | "space">; readonly writer: PageWriter } | undefined;
   private readonly plans = new WeakMap<TablePlan, PlanOwn>();
   private readonly reports = new WeakMap<TableReport, ApplyReport>();
+  // Each document's tables as last read, by revision: a write encodes a model over the very table it was decoded from
+  // (the codec tells a column the model keeps from one gone by what it read), which a parse again need not be
+  private readonly read = new Map<string, ReadonlyMap<TableRevision, Table>>();
 
   constructor(
     private readonly platform: () => Pick<TablePlatform, "editor" | "space">,
@@ -126,7 +129,16 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
 
   async tables(document: string): Promise<readonly StoredTable[] | null> {
     const text = await textOf(this.platform(), document);
-    return text === undefined ? null : tablesIn(this.register, document, text);
+    if (text === undefined) return null;
+    const keys = this.register.keysOf(document, text);
+    const read = new Map<TableRevision, Table>();
+    const tables = findTables(text).map((range): StoredTable => {
+      const table = parseTable(range.text);
+      read.set(revisionOf(range.text), table);
+      return { key: keys[range.ordinal]!, revision: revisionOf(range.text), model: decode(table) };
+    });
+    this.read.set(document, read);
+    return tables;
   }
 
   documentOf(key: TableKey): string | undefined {
@@ -185,9 +197,11 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
         writes.push({ ...tableAt(text, range), markdown: undefined });
         continue;
       }
-      const read = parseTable(range.text);
-      // (Tidy: every row written anew, padded; whole: the metadata of no column left behind)
-      const base: Table = { ...read, ...(edit.tidy ? { padded: true } : {}), ...(edit.whole ? { meta: undefined, metaSource: undefined } : {}) };
+      const read = this.read.get(document)?.get(edit.expects) ?? parseTable(range.text);
+      // Over the very table its model was read from (the codec knows what it read of it): the page's, or one a change of
+      // the markdown made (written as it is); tidy: every row written anew, padded
+      const over = decodedFrom(edit.model) ?? read;
+      const base: Table = edit.tidy ? { ...over, padded: true } : over;
       const { columnMap } = edit;
       const after = encode(edit.model, base, columnMap && ((column) => columnMap(column) === undefined));
       const markdown = serialize(after);

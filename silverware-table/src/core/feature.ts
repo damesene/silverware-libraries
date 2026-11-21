@@ -49,8 +49,8 @@ export type TableInfo = {
 /** A table shown as the adapter has it: with its rendered element */
 export type WidgetInfo = TableInfo & { readonly table: HTMLTableElement };
 
-/** A table of the page as a write finds it, rendered or not: its key, its markdown as last read and where it was (`hint`) */
-export type TableTarget = Pick<WidgetInfo, "key" | "source" | "hint">;
+/** A table of the page as a write finds it, rendered or not: its key, its revision as the caller saw it, its markdown as last read and where it was (`hint`) */
+export type TableTarget = Pick<WidgetInfo, "key" | "revision" | "source" | "hint">;
 
 // A cell by its row in the markdown (header 0) and its column
 export type CellRef = { readonly row: number; readonly column: number };
@@ -459,6 +459,8 @@ export type WriteOptions = {
   // Other tables changed in the same edit (a table alone put on the sheet another table joins; a sheet's tables
   // renamed with it)
   readonly also?: readonly TableChange[];
+  // The table written anew in its store's tidiest form (Format table: a markdown table's cells padded to line up)
+  readonly tidy?: true;
 };
 
 /**
@@ -1259,18 +1261,18 @@ export interface Feature {
    */
   action?(name: string, info: TableInfo, column: number | undefined): boolean;
   /**
-   * Before a write replaces a table (from..to of the page's text), with the
-   * edit `change` (the part of the text it replaces); may return what to do
-   * after it, given where the change started, how much longer the text got,
-   * and where a place of the text before is in the text after (`moved`: the
-   * edit may change text apart from the table, other plugins' writes with it)
+   * Before a write of the open page replaces its tables (from..to of the
+   * page's text: the span of them all), with the edit `change` (the part of
+   * the text it replaces); may return what to do after it, given where a
+   * place of the text before is in the text after (`moved`: the edit may
+   * change text apart from the tables, other plugins' writes with it)
    */
   beforeWrite?(
     text: string,
     from: number,
     to: number,
     change: { readonly from: number; readonly to: number },
-  ): Promise<((editFrom: number, lengthChange: number, moved: (pos: number, after: boolean) => number) => void) | undefined>;
+  ): Promise<((moved: (pos: number, after: boolean) => number) => void) | undefined>;
   /** Another page whose tables formulas refer to was changed: results may be out of date */
   tablesChanged?(): void;
   /** The page or a table scrolled, or tables moved: floating elements follow */

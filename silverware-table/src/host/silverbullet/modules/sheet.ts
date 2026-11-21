@@ -48,6 +48,7 @@ import { type MenuEntry, namingThatCloses } from "../../../menu.ts";
 import { type CellRenderer, StaticCellRenderer } from "../cells.ts";
 import { drawTable } from "../drawn.ts";
 import type { TableKey } from "../../../core/tables.ts";
+import { revisionOf } from "../../../store/markdown/store.ts";
 
 // An empty column's width, a row's height when no table gives one
 const COLUMN_WIDTH = 100;
@@ -598,7 +599,7 @@ export class Sheet implements AdapterFeature {
   private tablesOfSheet(text: string, sheet: string): { target: TableTarget; table: TableModel }[] {
     const keys = this.host.tableKeys(this.host.currentPage, text);
     const tables = sheetsOf(this.sheetTablesIn(text)).find((s) => sameSheet(s.name, sheet))?.tables ?? [];
-    return tables.map((t) => ({ target: { key: keys[t.range.ordinal]!, source: t.range.text, hint: t.range.from }, table: t.table }));
+    return tables.map((t) => ({ target: { key: keys[t.range.ordinal]!, revision: revisionOf(t.range.text), source: t.range.text, hint: t.range.from }, table: t.table }));
   }
 
   /**
@@ -1247,7 +1248,7 @@ export class Sheet implements AdapterFeature {
     const { sheet, taken, also } = this.sheetFor(board, text);
     const name = this.host.tableName(model) ?? this.freeNameIn(text, taken);
     const result = await this.host.writeTable(
-      { key, source: range.text, hint: range.from },
+      { key, revision: revisionOf(range.text), source: range.text, hint: range.from },
       (t) => this.host.withAttribute(this.host.withAttribute(this.host.withTableName(t, name), SHEET_KEY, sheet), AT_KEY, formatAt(at)),
       also ? { also: [also] } : {},
     );
@@ -1437,7 +1438,7 @@ export class Sheet implements AdapterFeature {
         this.queuePlace();
         return;
       }
-      const target = range && { key: keys[range.ordinal]!, source: range.text, hint: range.from };
+      const target = range && { key: keys[range.ordinal]!, revision: revisionOf(range.text), source: range.text, hint: range.from };
       const result = target && (await this.host.writeTable(target, (t) => this.host.withAttribute(t, key, width === undefined ? undefined : String(width))));
       if (result === "written") return;
     } catch (e) {
@@ -1721,7 +1722,7 @@ export class Sheet implements AdapterFeature {
     if (!last) return "failed";
     const { sheet, taken, also } = this.sheetFor(board, text);
     const table = this.host.withAttribute(this.host.withAttribute(this.host.withTableName(made, this.freeNameIn(text, taken)), SHEET_KEY, sheet), AT_KEY, formatAt(at));
-    const result = await this.host.insertTable(table, { after: { key: keys[last.ordinal]!, source: last.text, hint: last.from } }, also, key);
+    const result = await this.host.insertTable(table, { after: { key: keys[last.ordinal]!, revision: revisionOf(last.text), source: last.text, hint: last.from } }, also, key);
     if (result === "written") this.becameSheet(board, sheet, also, "the new one");
     return result;
   }

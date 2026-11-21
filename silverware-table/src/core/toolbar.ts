@@ -257,7 +257,7 @@ export class Toolbar {
         icon: ICONS.format,
         run: () => {
           const [, i] = this.context.current(widget, info);
-          void host.writeMarkdown(i, (t) => ({ ...t, padded: true }));
+          void host.writeTable(i, (t) => t, { tidy: true });
         },
       },
       {

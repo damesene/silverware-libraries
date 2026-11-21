@@ -26,7 +26,7 @@ export class Expressions implements AdapterFeature {
   /** SilverBullet's `page:index` event for a page */
   async pageIndexed(name: string): Promise<void> {
     if (this.stopped || !this.host.platform.renderer.evaluate) return;
-    if (name !== (await this.host.pageNameNow())) return;
+    if (name !== (await this.host.documentNameNow())) return;
     // The time the indexers get to write the index
     const delay = await this.host.setting("expressionsDelay");
     clearTimeout(this.timer);

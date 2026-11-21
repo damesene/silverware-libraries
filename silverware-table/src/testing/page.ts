@@ -230,7 +230,7 @@ const insertControls = () => (controller as unknown as { insert: InsertControls 
 
 /** A + shown where the pointer would bring it up (undefined: none), the pointer in the band around the table or not */
 /** The key the core gives the page's table at `index` (as findTables counts them) */
-export const tableKey = (index = 0): TableKey => controller.pageTables()[index]!.key;
+export const tableKey = (index = 0): TableKey => controller.documentTables()[index]!.key;
 
 export function pointInsert(at: InsertTarget | undefined, inBand = false): void {
   const insert = insertControls();

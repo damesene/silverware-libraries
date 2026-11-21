@@ -38,7 +38,7 @@ export class Names implements Feature {
   private readonly told = new Set<string>();
 
   private sharedNames(): ReadonlyMap<string, number> {
-    const tables = this.host.pageTables();
+    const tables = this.host.documentTables();
     if (this.shared?.tables !== tables) {
       const counts = new Map<string, number>();
       for (const { model } of tables) {
@@ -64,7 +64,7 @@ export class Names implements Feature {
   /** A table whose name another has too: said, once for that name on the page */
   enhanced(info: TableInfo): void {
     // (The page's tables as last read without this table as rendered: read before it, nothing to tell by)
-    if (!this.host.pageTables().some((t) => t.key === info.key && t.revision === info.revision)) return;
+    if (!this.host.documentTables().some((t) => t.key === info.key && t.revision === info.revision)) return;
     const shared = this.sharedNames();
     const own = this.host.tableName(info.model)?.toLowerCase();
     // No longer shared (renamed): said again should it be shared again
@@ -184,7 +184,7 @@ export class Names implements Feature {
     if (problem) return problem;
     if (name !== "") {
       // The page's tables as they are now, this one by its key (it may have moved since it was rendered)
-      const tables = (await this.host.tables(await this.host.pageNameNow())) ?? [];
+      const tables = (await this.host.tables(await this.host.documentNameNow())) ?? [];
       const taken = tables.some(({ key, model }) => {
         if (key === info.key) return false;
         const other = this.host.tableName(model);

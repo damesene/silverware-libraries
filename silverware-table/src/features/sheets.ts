@@ -46,7 +46,7 @@ export class Sheets implements Feature {
   tableDeleteWarning(info: TableInfo): string | undefined {
     const sheet = sheetOfTable(this.host, info.model);
     if (!sheet) return undefined;
-    const others = sheetTablesOf(this.host, byKey(this.host.pageTables())).filter((t) => sameSheet(t.sheet, sheet) && t.key !== info.key);
+    const others = sheetTablesOf(this.host, byKey(this.host.documentTables())).filter((t) => sameSheet(t.sheet, sheet) && t.key !== info.key);
     if (!others.length) return `the sheet ${sheet} goes with it, as it is its only table`;
     // The sheet's own data it holds goes to the next table, where that can take it (the metadata setting off: no)
     const data = sheetData(this.host, info.model);
@@ -117,7 +117,7 @@ export class Sheets implements Feature {
     // (Taken off it above: that removes, which the setting off allows)
     if (!canPlace(this.host, info.model)) return "a table's sheet, place and name are kept in its metadata: turn on Store table metadata in the settings";
     // The page's tables as they are now, this one by its key (it may have moved since it was rendered)
-    const page = (await this.host.tables(await this.host.pageNameNow())) ?? [];
+    const page = (await this.host.tables(await this.host.documentNameNow())) ?? [];
     const tables = sheetTablesOf(this.host, byKey(page));
     const target = sheetsOf(tables).find((s) => sameSheet(s.name, name));
     const others = (target?.tables ?? []).filter((t) => t.key !== info.key);
@@ -147,15 +147,15 @@ export class Sheets implements Feature {
   writeStep(before: TableModel, after: TableModel, edit: WriteEdit): TableModel {
     let out = after;
     for (const move of handovers(this.host, before, after, edit)) {
-      if (move.from === edit.page.key) out = move.data.reduce((t, [name]) => this.host.withAttribute(t, name, undefined), out);
-      if (move.to === edit.page.key) out = move.data.reduce((t, [name, value]) => this.host.withAttribute(t, name, value), out);
+      if (move.from === edit.key) out = move.data.reduce((t, [name]) => this.host.withAttribute(t, name, undefined), out);
+      if (move.to === edit.key) out = move.data.reduce((t, [name, value]) => this.host.withAttribute(t, name, value), out);
     }
     return out;
   }
 
   /** A table of a sheet that would grow into another it overlaps already (sheet/layout.ts): not written */
   refusesWrite(before: TableModel, after: TableModel, edit: WriteEdit): string | undefined {
-    const room = roomOnSheet(this.host, before, after, edit, edit.page.key);
+    const room = roomOnSheet(this.host, before, after, edit, edit.key);
     return room && "refused" in room ? `the table cannot grow into ${room.refused}, which overlaps it on the sheet already: check their places (at)` : undefined;
   }
 
@@ -166,25 +166,25 @@ export class Sheets implements Feature {
    */
   otherTablesWritten(before: TableModel, after: TableModel | undefined, edit: WriteEdit): readonly KeyedTable[] {
     // By the layout's ids, which are the tables' keys given it
-    const page = new Map<LayoutId, KeyedTable>(edit.page.tables.map((t) => [t.key, t]));
+    const page = new Map<LayoutId, KeyedTable>(edit.tables.map((t) => [t.key, t]));
     const written = new Map<LayoutId, KeyedTable>();
     const change = (id: LayoutId | undefined, f: (table: TableModel) => TableModel) => {
-      const other = id === undefined || id === edit.page.key ? undefined : (written.get(id) ?? page.get(id));
+      const other = id === undefined || id === edit.key ? undefined : (written.get(id) ?? page.get(id));
       if (other) written.set(other.key, { key: other.key, model: f(other.model) });
     };
     for (const move of handovers(this.host, before, after, edit)) {
       change(move.from, (t) => move.data.reduce((out, [name]) => this.host.withAttribute(out, name, undefined), t));
       change(move.to, (t) => move.data.reduce((out, [name, value]) => this.host.withAttribute(out, name, value), t));
     }
-    const room = after && roomOnSheet(this.host, before, after, edit, edit.page.key);
+    const room = after && roomOnSheet(this.host, before, after, edit, edit.key);
     if (room && "moved" in room) for (const [id, at] of room.moved) change(id, (t) => this.host.withAttribute(t, AT_KEY, formatAt(at)));
     // Other tables of a sheet the write grows (another module's in the same edit: a pivot of the table edited) make room
     // too, one after the other, each on the sheet as the room made before it left it (the table edited grown, those moved)
-    const read = new Map(edit.page.read.map((t) => [t.key, t.model]));
-    for (const other of edit.page.tables) {
+    const read = new Map(edit.read.map((t) => [t.key, t.model]));
+    for (const other of edit.tables) {
       const was = read.get(other.key);
-      if (other.key === edit.page.key || !was || was === other.model) continue;
-      const laidOut = edit.page.tables.map((t) => (t.key === edit.page.key && after ? { key: t.key, model: after } : (written.get(t.key) ?? t)));
+      if (other.key === edit.key || !was || was === other.model) continue;
+      const laidOut = edit.tables.map((t) => (t.key === edit.key && after ? { key: t.key, model: after } : (written.get(t.key) ?? t)));
       // At its place as moved meanwhile, before and after its growth
       const place = this.host.attribute((written.get(other.key) ?? other).model, AT_KEY);
       const placed = (t: TableModel) => (place === undefined ? t : this.host.withAttribute(t, AT_KEY, place));
@@ -199,7 +199,7 @@ export class Sheets implements Feature {
  * The room a table of a sheet that grows in the write makes on it (it stays
  * on its sheet, at its place); undefined: it is on none, or does not grow there
  */
-function roomOnSheet(meta: SheetMeta, before: TableModel, after: TableModel, edit: WriteEdit, at: TableKey, page: readonly KeyedTable[] = edit.page.tables): Room | undefined {
+function roomOnSheet(meta: SheetMeta, before: TableModel, after: TableModel, edit: WriteEdit, at: TableKey, page: readonly KeyedTable[] = edit.tables): Room | undefined {
   const tables = sheetTablesOf(meta, page.map((t) => ({ key: t.key, table: t.key === at ? before : t.model })));
   const mine = tables.find((t) => t.key === at);
   // After the write still on its sheet, at its place
@@ -226,10 +226,10 @@ function roomOnSheet(meta: SheetMeta, before: TableModel, after: TableModel, edi
  * is gone.
  */
 function handovers(meta: SheetMeta, before: TableModel, after: TableModel | undefined, edit: WriteEdit): { data: [string, string][]; from: TableKey; to: TableKey | undefined }[] {
-  const at = edit.page.key;
+  const at = edit.key;
   // (No table: it is deleted)
   const withEdited = (table: TableModel | undefined) =>
-    edit.page.tables.flatMap((t) => (t.key !== at ? [{ key: t.key, table: t.model }] : table ? [{ key: t.key, table }] : []));
+    edit.tables.flatMap((t) => (t.key !== at ? [{ key: t.key, table: t.model }] : table ? [{ key: t.key, table }] : []));
   const sheetsBefore = sheetsOf(sheetTablesOf(meta, withEdited(before)));
   const sheetsAfter = sheetsOf(sheetTablesOf(meta, withEdited(after)));
   const moves: { data: [string, string][]; from: TableKey; to: TableKey | undefined }[] = [];

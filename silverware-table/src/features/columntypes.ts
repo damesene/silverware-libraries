@@ -151,7 +151,7 @@ export class ColumnTypes implements Feature {
    * (its leading "="), calculated by the formulas module on the page shown; undefined values where it gives none, with why
    */
   private listOf(table: TableModel, name: string, stored = this.host.attributes(table)): ListRead {
-    const page = this.host.pageTables();
+    const page = this.host.documentTables();
     if (this.lists?.page !== page) this.lists = { page, byTable: new WeakMap() };
     let read = this.lists.byTable.get(table);
     if (!read) this.lists.byTable.set(table, (read = new Map()));

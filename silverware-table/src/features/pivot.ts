@@ -70,7 +70,7 @@ export class Pivot implements Feature {
   /** The page of a source on another page (one naming the page shown is of this page) */
   private pageOf(definition: PivotDefinition): string | undefined {
     const { page } = sourceRef(definition.source);
-    return page !== undefined && page !== this.host.currentPage ? page : undefined;
+    return page !== undefined && page !== this.host.currentDocument ? page : undefined;
   }
 
   /** The name of a source of this page, lowercased; none for one on another page, or a source of the space */
@@ -384,7 +384,7 @@ export class Pivot implements Feature {
 
   /** The open page's tables as last read, as models */
   private pageModels(): readonly TableModel[] {
-    return this.modelsOf(this.host.pageTables());
+    return this.modelsOf(this.host.documentTables());
   }
 
   /** Tables the host gave (a page's) as models */
@@ -402,7 +402,7 @@ export class Pivot implements Feature {
 
   /** Another page's tables a pivot can summarize, by their names and their columns' (read through pageLinks), or why there are none */
   private async pageSources(page: string): Promise<readonly { name: string; columns: string[] }[] | string> {
-    if (page === this.host.currentPage) return this.sources();
+    if (page === this.host.currentDocument) return this.sources();
     const offer = this.host.offered<PageLinksOffer>("pageLinks");
     if (!offer || !this.host.readsOtherPages || !this.cells()) return "Other pages are read by the pageLinks module, which is off";
     await offer.readPages([page], false);
@@ -434,7 +434,7 @@ export class Pivot implements Feature {
       ...(off || blocked ? { blocked: off ?? blocked } : {}),
       preview: (definition) => this.calculate(definition, this.sourceFor(definition, sources)),
       readPage: (page) => this.pageSources(page),
-      ...(this.host.readsOtherPages ? { pages: async () => (await this.host.pageNames()).filter((page) => page !== this.host.currentPage) } : {}),
+      ...(this.host.readsOtherPages ? { pages: async () => (await this.host.pageNames()).filter((page) => page !== this.host.currentDocument) } : {}),
     });
   }
 

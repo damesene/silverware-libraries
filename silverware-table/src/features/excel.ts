@@ -342,7 +342,7 @@ export class Excel implements Feature {
         return { value, formula };
       });
     }
-    const page = await this.host.pageNameNow();
+    const page = await this.host.documentNameNow();
     const name = this.host.tableName(model) ?? page.split("/").pop() ?? "Table";
     const widths = columns.map((h, c) => columnWidth([h, ...exported.rows.map((r) => r.values[c] ?? "")]));
     // A calculated column: the same formula in every row but the totals row, in Excel's form too

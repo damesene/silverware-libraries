@@ -24,13 +24,13 @@ type TableAt = { readonly text: string; readonly occurrence: number; readonly of
 export type NewTablePlace = { readonly after: TableAt } | { readonly cursor: { readonly position: number; readonly line: string } };
 
 /** A table of a write: found as read, written as this markdown (none: taken out, with the empty line after it) */
-export type TableWrite = TableAt & { readonly markdown: string | undefined };
+export type TableReplacement = TableAt & { readonly markdown: string | undefined };
 
 /** A new table of a write: its markdown and where it goes (none: the page's end), an empty line around it */
-export type TableInsert = { readonly markdown: string; readonly place?: NewTablePlace };
+export type TableAddition = { readonly markdown: string; readonly place?: NewTablePlace };
 
 /** The changes the tables' part writes: tables of the page written in one change */
-type WriteTables = { readonly kind: "writeTables"; readonly tables: readonly TableWrite[]; readonly inserts: readonly TableInsert[] };
+type WriteTables = { readonly kind: "writeTables"; readonly tables: readonly TableReplacement[]; readonly inserts: readonly TableAddition[] };
 /** The change the page formulas' part writes: a formula written in the page's text */
 type SetPageFormula = { readonly kind: "setPageFormula"; readonly formula: PageFormula; readonly document: string };
 
@@ -102,7 +102,7 @@ export function newTablePlace(text: string, place: NewTablePlace | undefined): {
 const CHANGED = "a table changed since it was read";
 
 /** A write's tables in a page's text as it is: the edits they make, or why they cannot be made (the store's too: where places go) */
-export function tableEdits(text: string, change: { readonly tables: readonly TableWrite[]; readonly inserts: readonly TableInsert[] }): { readonly from: number; readonly to: number; readonly text: string }[] | { readonly problem: string } {
+export function tableEdits(text: string, change: { readonly tables: readonly TableReplacement[]; readonly inserts: readonly TableAddition[] }): { readonly from: number; readonly to: number; readonly text: string }[] | { readonly problem: string } {
   const edits: { from: number; to: number; text: string }[] = [];
   for (const one of change.tables) {
     const range = found(text, one);
@@ -123,7 +123,7 @@ export function tableEdits(text: string, change: { readonly tables: readonly Tab
  * after it with it; the page's last, the one before); `inserts`: new tables, each put where its place says (found in
  * the text as read too)
  */
-export const TABLES = definePluginPart<WriteTables, { write(tables: readonly TableWrite[], inserts?: readonly TableInsert[]): PageBuilder }>({
+export const TABLES = definePluginPart<WriteTables, { write(tables: readonly TableReplacement[], inserts?: readonly TableAddition[]): PageBuilder }>({
   name: "tables",
   kinds: ["writeTables"],
   section: (add) => ({ write: (tables, inserts = []) => add({ kind: "writeTables", tables, inserts }) }),

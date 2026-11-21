@@ -184,7 +184,7 @@ export class Views implements Feature {
   private validateName(name: string, own?: TableModel): string | undefined {
     const problem = validateTableName(name);
     if (problem) return problem;
-    const taken = this.host.pageTables().some(({ model }) => {
+    const taken = this.host.documentTables().some(({ model }) => {
       const other = this.host.tableName(model);
       return !!other && sameTableName(other, name) && !(own && sameTableName(this.host.tableName(own) ?? "", name));
     });
@@ -193,7 +193,7 @@ export class Views implements Feature {
 
   /** A name for a new table not taken on the page: view1, view2… (table1… for a source) */
   private freeName(prefix: string): string {
-    return freeTableName(prefix, this.host.pageTables().map((t) => this.host.tableName(t.model)));
+    return freeTableName(prefix, this.host.documentTables().map((t) => this.host.tableName(t.model)));
   }
 
   /** Why no view can be inserted or saved (its metadata not stored, the formulas off), if so */
@@ -244,7 +244,7 @@ export class Views implements Feature {
   /** Insert view at the cursor: the page's first named table's body to start from, else an empty formula */
   private insertAtCursor(): void {
     const first = this.host
-      .pageTables()
+      .documentTables()
       .map(({ model }) => this.host.tableName(model)?.trim())
       .find((name): name is string => !!name);
     const preview = (formula: string) => this.result(formula);

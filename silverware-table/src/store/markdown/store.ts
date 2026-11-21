@@ -26,7 +26,7 @@ import {
   validateTransaction,
 } from "../../core/store.ts";
 import { pageFormulasIn } from "./pageformulas.ts";
-import { cursorPlace, found, newTableMarkdown, newTablePlace, type NewTablePlace, PAGE_FORMULAS, TABLES, tableAt, tableEdits, type TableInsert, type TableWrite } from "./tableparts.ts";
+import { cursorPlace, found, newTableMarkdown, newTablePlace, type NewTablePlace, PAGE_FORMULAS, TABLES, tableAt, tableEdits, type TableAddition, type TableReplacement } from "./tableparts.ts";
 import { pageFormulaPlace } from "./pageformulas.ts";
 import { mapPosition, type TableWritten, type TextEdit, withWriteListeners } from "./writelisteners.ts";
 import { written as textWritten } from "../../../../shared/pages/parts.ts";
@@ -95,7 +95,7 @@ type PlanOwn = {
 type OpenWrite = { readonly text: string; readonly span: { readonly from: number; readonly to: number }; readonly made: string; readonly moved: (position: number, after: boolean) => number };
 
 /** A transaction as the writer's changes: its tables written and new, its page formulas, what other plugins are told */
-type WriteOf = { readonly tables: readonly TableWrite[]; readonly inserts: readonly TableInsert[]; readonly formulas: readonly PageFormula[]; readonly told: readonly TableWritten[] };
+type WriteOf = { readonly tables: readonly TableReplacement[]; readonly inserts: readonly TableAddition[]; readonly formulas: readonly PageFormula[]; readonly told: readonly TableWritten[] };
 
 /**
  * Other plugins' edits of a write (silverware.table.onWrite) as the page
@@ -233,8 +233,8 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
     const ranges = findTables(text);
     const keys = this.register.keysOf(document, text);
     const serialize = await this.serializer();
-    const writes: TableWrite[] = [];
-    const inserts: (TableInsert & { readonly key?: TableKey })[] = [];
+    const writes: TableReplacement[] = [];
+    const inserts: (TableAddition & { readonly key?: TableKey })[] = [];
     // What other plugins are told of the tables written, the tables' spans (what a history marker goes outside of), the keys written
     const told: TableWritten[] = [];
     const spans: { readonly from: number; readonly to: number }[] = [];
@@ -351,7 +351,7 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
   }
 
   /** A transaction's changes of the writer's: its page formulas first (found by their order, which a table written first could change), its tables */
-  private tablesChanges(p: PageBuilder, document: string, formulas: readonly PageFormula[], tables: { readonly tables: readonly TableWrite[]; readonly inserts: readonly TableInsert[] }): void {
+  private tablesChanges(p: PageBuilder, document: string, formulas: readonly PageFormula[], tables: { readonly tables: readonly TableReplacement[]; readonly inserts: readonly TableAddition[] }): void {
     for (const formula of formulas) p.part(PAGE_FORMULAS).set(document, formula);
     if (tables.tables.length || tables.inserts.length) p.part(TABLES).write(tables.tables, tables.inserts);
   }

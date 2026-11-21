@@ -101,7 +101,7 @@ class LazyTable {
 
   holdCellEdit(info: TableInfo, edit: HeldEdit): boolean {
     if (!this.on) return false;
-    const held = this.held ?? { page: this.host.currentPage, key: info.key, edits: new Map() };
+    const held = this.held ?? { page: this.host.currentDocument, key: info.key, edits: new Map() };
     const id = cellId(edit);
     // What a write checks is the cell as written: the original of the first edit held
     const original = held.edits.get(id)?.original ?? edit.original;
@@ -178,7 +178,7 @@ class LazyTable {
     const held = this.held;
     if (!held?.edits.size) return false;
     if (this.module.leaving()) return false;
-    if ((await this.host.pageNameNow()) !== held.page) {
+    if ((await this.host.documentNameNow()) !== held.page) {
       await this.flushToPage(held);
       return false;
     }

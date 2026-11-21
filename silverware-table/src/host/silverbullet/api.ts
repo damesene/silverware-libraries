@@ -98,7 +98,7 @@ const FORMULAS_OFF: EvaluatedError = { code: "#N/A", detail: "formulas are off" 
  * text it is given to the page's keys, and Lua's may be another page's for a
  * moment, the editor's text still the old page's as another opens)
  */
-function modelsOfText(controller: Controller, text: string, page = controller.currentPage): readonly KeyedModel[] {
+function modelsOfText(controller: Controller, text: string, page = controller.currentDocument): readonly KeyedModel[] {
   return tablesIn(new TableRegister(), page, text);
 }
 

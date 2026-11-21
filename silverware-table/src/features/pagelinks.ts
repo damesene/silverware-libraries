@@ -8,7 +8,7 @@
 // read again as they change too.
 // Turned off, no page is read, and formulas referring to one keep their
 // results (formula/page.ts: pages not read are `unread`).
-import type { Feature, ModelHost, OtherPages, StoredTable, TableTarget, TableInfo, WritePage } from "../core/feature.ts";
+import type { Feature, ModelHost, OtherPages, StoredTable, TableTarget, TableInfo, WriteDocument } from "../core/feature.ts";
 import { type FormulaCells, formulaPages, referredPages, tablesWritten } from "../../../shared/formulas/index.ts";
 import { type FormulasOffer, type PageLinksOffer } from "../formulas/offers.ts";
 import type { TableModel } from "../../../shared/table/model.ts";
@@ -55,13 +55,13 @@ export class PageLinks implements Feature {
   async prepareWrite(info: TableTarget): Promise<void> {
     const cells = this.cells();
     if (!cells) return;
-    const tables = this.host.pageTables().map((t) => ({ key: t.key, table: t.model, name: this.host.tableName(t.model) }));
+    const tables = this.host.documentTables().map((t) => ({ key: t.key, table: t.model, name: this.host.tableName(t.model) }));
     await this.load(tablesWritten(cells, tables, info.key), true);
   }
 
   /** After the edit: pages the page's tables and the edited one refer to, if not read yet */
-  async prepareEdit(edited: TableModel, page: WritePage): Promise<void> {
-    await this.load([...page.tables.map((t) => t.model), edited], false);
+  async prepareEdit(edited: TableModel, edit: WriteDocument): Promise<void> {
+    await this.load([...edit.tables.map((t) => t.model), edited], false);
   }
 
   /**
@@ -72,7 +72,7 @@ export class PageLinks implements Feature {
    */
   async pageIndexed(name: string): Promise<void> {
     if (!this.pages.has(name)) return;
-    if (name === this.host.currentPage) {
+    if (name === this.host.currentDocument) {
       this.pages.delete(name);
       return;
     }
@@ -101,7 +101,7 @@ export class PageLinks implements Feature {
     for (const page of queue) {
       if (done.size >= MAX_OTHER_PAGES) break;
       done.add(page);
-      if (page === this.host.currentPage) continue;
+      if (page === this.host.currentDocument) continue;
       visited?.add(page);
       if (fresh === true || (fresh && fresh.has(page)) || !this.pages.has(page)) {
         await this.read(page);

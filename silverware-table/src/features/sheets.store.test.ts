@@ -31,7 +31,7 @@ describe("the sheet module over the memory store", () => {
     // Three rows more: from A1 down to A5 now, over the table at A4
     const grown = [1, 2, 3].reduce((t, at) => insertRow(t, at), costs!.model);
     const tables = [costs!, cities!].map(({ key, model }) => ({ key, model }));
-    const edit = { page: { tables, read: tables, key: costs!.key, formulas: [] } } as unknown as WriteEdit;
+    const edit: WriteEdit = { tables, read: tables, key: costs!.key, formulas: [] };
     const module = new Sheets(host);
     expect(module.refusesWrite(costs!.model, grown, edit)).toBeUndefined();
     const others = module.otherTablesWritten(costs!.model, grown, edit);

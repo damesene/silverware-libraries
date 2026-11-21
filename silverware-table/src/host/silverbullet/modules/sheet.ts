@@ -730,12 +730,12 @@ export class Sheet implements AdapterFeature {
 
   /** The open page's text as last read (its tables shown, written) */
   private textRead(): string {
-    return this.store.lastText(this.host.currentPage) ?? "";
+    return this.store.lastText(this.host.currentDocument) ?? "";
   }
 
   /** The keys of the open page's tables in a text of it, in order */
   private keysOf(text: string): readonly TableKey[] {
-    return this.store.keysOf(this.host.currentPage, text);
+    return this.store.keysOf(this.host.currentDocument, text);
   }
 
   /** Every write: what it wrote is read again (a table far in the page has no rendering of SilverBullet's to follow) */

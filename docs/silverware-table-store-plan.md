@@ -947,6 +947,30 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
      markdown of a table.
    Users see no change; the Space Lua API and the stored markdown stay as
    they are.
+   **Done (2026-11-21), A1 to A4**: the markdown store writes a
+   transaction's page formulas and other plugins' edits, tells the binding
+   before a write of the open page (`BeforeWrite`) and reports revisions;
+   the core writes, deletes and inserts by key and revision (`ownWrites`, the
+   revisions its own writes made, in place of `writtenAs`), Format table a
+   write's `tidy`; the binding makes the store (`TableBinding.store`, the core
+   seeing a `BoundStore`) and gives it its adapter, which pairs a rendered
+   table with a key (`host/silverbullet/pairing.ts`), and its modules (the
+   sheet reads the page's text through it; Edit markdown and a press beside a
+   table find the table by its key); `TableInfo` and `TableTarget` are a
+   table's key and revision, no text; `isolation.test.ts` checks the core
+   reads no page's text. Two things learned: a write is encoded over the very
+   table its model was read from (the store keeps the tables as last read),
+   else the codec cannot tell a column gone from one kept; a change of a
+   table's markdown (Remove metadata) is written as that markdown is (the
+   store encodes a model over the table it was decoded from, `decodedFrom`).
+   **Left**: Remove metadata still changes a table's markdown (made by the
+   codec from its model, `encodeOver`), so the core imports the codec. In
+   model terms it is the attributes of the part, but a header cell's tags and
+   its column's attributes in the metadata row are one column's attributes in
+   the model: taking a header cell's alone needs the store (what it wrote
+   where), so it becomes the store's operation (proposed: a write edit's
+   `withoutAttributes` of the part, the store taking what its form keeps of
+   them), a decision for the user since a part's meaning is shown to users.
 7. **Docs.** CLAUDE.md (Layout, Architecture), docs/silverware-table-isolation.md
    extended by the store's boundary.
 8. **The whole API and its names, reviewed.** With every layer in its place,

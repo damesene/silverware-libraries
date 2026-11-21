@@ -113,8 +113,8 @@ function listenersEdit(made: string, listened: { readonly text: string }, told: 
 /** Whether two ranges of a text overlap */
 const overlaps = (a: { readonly from: number; readonly to: number }, b: { readonly from: number; readonly to: number }) => a.from < b.to && a.to > b.from;
 
-/** A skip of the writer's as the store's (its causes are the same) */
-const skipOf = (skipped: { readonly cause: TableSkip["cause"]; readonly reason: string }): TableSkip => ({ cause: skipped.cause, reason: skipped.reason });
+/** A page's skip as the transaction's: why, without its page */
+const skipOf = ({ cause, reason }: TableSkip): TableSkip => ({ cause, reason });
 
 /**
  * How tables are written, as the settings say: with autoFormat every edited table aligned (padded), a padded one as

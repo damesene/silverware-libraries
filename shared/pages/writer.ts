@@ -23,18 +23,17 @@ import { type WriterOptions, written } from "./parts.ts";
 import { type EditResult, type TagUse, tagUses } from "./tags/edit.ts";
 
 export type { Progress } from "./batch.ts";
+import type { Skip } from "../store.ts";
+
 export type { WriterOptions } from "./parts.ts";
 
 /**
- * Why a page is left alone, as a code to act on (the words are `reason`):
- * `changed` since it was read (an undo: since it was written), `missing` (it
- * could not be read), `refused` (the changes cannot be made there, or the
- * space cannot: a name taken, a form not read, a page open)
+ * A page left alone, why (shared/store.ts): `changed` since it was read (an
+ * undo: since it was written), `missing` (it could not be read), `refused`
+ * (the changes cannot be made there, or the space cannot: a name taken, a form
+ * not read, a page open)
  */
-export type SkipCause = "changed" | "missing" | "refused";
-
-/** A page left alone, why in words and as a code */
-export type Skipped = { readonly page: string; readonly cause: SkipCause; readonly reason: string };
+export type Skipped = Skip & { readonly page: string };
 
 /** A page as a plan would change it: what it shows of itself */
 export type PlannedPage = {

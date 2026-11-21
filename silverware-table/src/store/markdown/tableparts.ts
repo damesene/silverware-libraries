@@ -18,7 +18,7 @@ import { encode } from "./codec.ts";
 import { pageFormulaPlace } from "./pageformulas.ts";
 
 /** A table of a page as a change finds it: its text as read, its order among the page's tables of that text (from 0), and how many there were */
-export type TableAt = { readonly source: string; readonly occurrence: number; readonly of: number };
+type TableAt = { readonly text: string; readonly occurrence: number; readonly of: number };
 
 /** Where a new table goes: after a table, or where the cursor was (its offset, and its line as read: changed since, refused); none: the page's end */
 export type NewTablePlace = { readonly after: TableAt } | { readonly cursor: { readonly position: number; readonly line: string } };
@@ -65,12 +65,12 @@ export function newTableMarkdown(model: TableModel, indent: string, serialize: (
 /** A table range of a page as a change finds it again */
 export function tableAt(text: string, range: TableRange): TableAt {
   const alike = findTables(text).filter((one) => one.text === range.text);
-  return { source: range.text, occurrence: alike.findIndex((one) => one.from === range.from), of: alike.length };
+  return { text: range.text, occurrence: alike.findIndex((one) => one.from === range.from), of: alike.length };
 }
 
 /** The table a change names in the text as it is now; undefined: changed since it was read (another of its text made, or it gone) */
 export function found(text: string, at: TableAt): TableRange | undefined {
-  const alike = findTables(text).filter((one) => one.text === at.source);
+  const alike = findTables(text).filter((one) => one.text === at.text);
   return alike.length === at.of ? alike[at.occurrence] : undefined;
 }
 

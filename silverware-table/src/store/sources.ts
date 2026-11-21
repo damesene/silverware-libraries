@@ -22,7 +22,7 @@ export function sourceTable(data: SourceData): Table {
 }
 
 /** A source's document: its name after `@` */
-export const sourceDocument = (name: string): string => `@${name}`;
+const sourceDocument = (name: string): string => `@${name}`;
 
 const READ_ONLY = { cause: "refused", reason: "a source is read only" } as const;
 

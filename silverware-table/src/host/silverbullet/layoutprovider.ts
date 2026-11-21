@@ -11,7 +11,7 @@ import { ownMeta } from "../../core/metaaccess.ts";
 import { renderedModel } from "./adapter.ts";
 
 /** The owner of Silverware Layout's attributes in a table's metadata */
-export const LAYOUT_OWNER = "layout";
+const LAYOUT_OWNER = "layout";
 
 /** What the provider asks of the core */
 export function tablesLayoutProvider(tables: LayoutTables): LayoutProvider {

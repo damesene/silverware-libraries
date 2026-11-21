@@ -47,7 +47,7 @@ import { Widths } from "../../features/widths.ts";
  * The features in the order they get events; `metadata` is the controller's own (Remove metadata, also a page
  * command), `sources` what the host gives the sources module
  */
-export function featureEntries(metadata: Feature, sources: SourceTables, store: MarkdownStore): readonly FeatureEntry[] {
+function featureEntries(metadata: Feature, sources: SourceTables, store: MarkdownStore): readonly FeatureEntry[] {
   const optional = (name: FeatureName, create: (host: TableHost) => AdapterFeature): FeatureEntry => ({ name, create });
   const always = (create: (host: TableHost) => AdapterFeature): FeatureEntry => ({ name: undefined, create });
   return [

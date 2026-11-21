@@ -40,7 +40,7 @@ describe("the markdown store's parts of the page writer", () => {
   it("writes a table found by its text and its order among those alike, and refuses one changed since", async () => {
     const { map, writer } = pages({ Shop: TWO });
     const second = at(TWO, 1);
-    expect(second).toEqual({ source: "| A |\n|---|\n| 1 |", occurrence: 1, of: 2 });
+    expect(second).toEqual({ text: "| A |\n|---|\n| 1 |", occurrence: 1, of: 2 });
     await writer.write(pageChanges().page("Shop", (p) => p.tables.write([{ ...second, markdown: "| A |\n|---|\n| 2 |" }])).build());
     expect(map.get("Shop")).toBe("# Shop\n\n| A |\n|---|\n| 1 |\n\nText.\n\n| A |\n|---|\n| 2 |\n");
     // The first one alike no more: changed since it was read

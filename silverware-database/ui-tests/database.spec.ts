@@ -1630,7 +1630,11 @@ test("a table's row dragged by its grip to the top is written there, by its rank
   await expect(page.locator(".swd-table tbody tr")).toHaveCount(2);
   const last = page.locator(".swd-table tbody tr").last();
   await last.hover();
-  const grip = (await last.locator(".swd-row-grip").boundingBox())!;
+  // (Read off the row as it is now: drawn anew as the index tells of the items, its box holds)
+  const grip = await page.evaluate(() => {
+    const { x, y, width, height } = document.querySelector(".swd-table tbody tr:last-child .swd-row-grip")!.getBoundingClientRect();
+    return { x, y, width, height };
+  });
   // (By the name's first line, in its middle; left of its text)
   const line = await last.locator(".swd-table-name").evaluate((name) => {
     const range = document.createRange();
@@ -1640,8 +1644,15 @@ test("a table's row dragged by its grip to the top is written there, by its rank
   });
   expect(Math.abs(grip.y + grip.height / 2 - line.middle)).toBeLessThanOrEqual(1.5);
   expect(grip.x + grip.width).toBeLessThanOrEqual(line.left);
-  const first = (await page.locator(".swd-table tbody tr").first().boundingBox())!;
-  const name = (await page.locator(".swd-table tbody tr").first().locator(".swd-table-name").boundingBox())!;
+  // (Read at once off the rows as they are now: drawn anew as the index tells of the items, their boxes hold)
+  const { first, name } = await page.evaluate(() => {
+    const row = document.querySelector(".swd-table tbody tr")!;
+    const box = (element: Element) => {
+      const { x, y, width, height } = element.getBoundingClientRect();
+      return { x, y, width, height };
+    };
+    return { first: box(row), name: box(row.querySelector(".swd-table-name")!) };
+  });
   // (Taken by its right end and let go over the name's text, in the row's own cell where it lands: the click the browser
   // sends then is the cell's, which a click edits)
   await page.mouse.move(grip.x + grip.width - 2, grip.y + grip.height / 2);
@@ -1654,8 +1665,17 @@ test("a table's row dragged by its grip to the top is written there, by its rank
   // one cell, the browser's click is that cell's)
   const top = page.locator(".swd-table tbody tr").first();
   await top.hover();
-  const own = (await top.locator(".swd-row-grip").boundingBox())!;
-  const itsName = (await top.locator(".swd-table-name").boundingBox())!;
+  // (The top row's grip and name read at once, off the rows as they are now: the table's rows are drawn anew as its
+  // write comes back, and again as the index tells of it, at any moment; drawn the same, their boxes hold, which a box
+  // asked of a row then gone does not: none)
+  const { own, itsName } = await page.evaluate(() => {
+    const row = document.querySelector(".swd-table tbody tr")!;
+    const box = (element: Element) => {
+      const { x, y, width, height } = element.getBoundingClientRect();
+      return { x, y, width, height };
+    };
+    return { own: box(row.querySelector(".swd-row-grip")!), itsName: box(row.querySelector(".swd-table-name")!) };
+  });
   await page.mouse.move(own.x + own.width - 2, own.y + own.height / 2);
   await page.mouse.down();
   await page.mouse.move(itsName.x + 30, own.y + own.height / 2, { steps: 12 });

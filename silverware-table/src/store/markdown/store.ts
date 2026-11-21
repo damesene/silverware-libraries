@@ -7,7 +7,7 @@
 import { findTables, parseTable, type Table } from "../../markdown.ts";
 import { decode, encode } from "./codec.ts";
 import type { TablePlatform } from "../../core/platform.ts";
-import type { PageFormula, PageFormulaStore, StoredTable, TablePlan, TableReport, TableRevision, TableSkip, TableStore, TableTransaction } from "../../core/store.ts";
+import { type PageFormula, type PageFormulaStore, type StoredTable, type TablePlan, type TableReport, type TableRevision, type TableSkip, type TableStore, type TableTransaction, validateTransaction } from "../../core/store.ts";
 import { pageFormulasIn } from "./pageformulas.ts";
 import { newTableMarkdown, tableAt, type TableInsert, type TableWrite } from "./tableparts.ts";
 import { type PageBuilder, pageChanges } from "../../../../shared/pages/changes.ts";
@@ -96,6 +96,8 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
   async plan(transaction: TableTransaction): Promise<TablePlan> {
     const { document } = transaction;
     const left = (skipped: TableSkip): TablePlan => ({ document, changes: 0, skipped });
+    const invalid = validateTransaction(transaction);
+    if (invalid) return left({ cause: "refused", reason: invalid });
     const text = await textOf(this.platform(), document);
     if (text === undefined) return left({ cause: "missing", reason: "the document is not there" });
     const ranges = findTables(text);
@@ -128,7 +130,9 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
   async apply(plan: TablePlan): Promise<TableReport> {
     const { document } = plan;
     const own = this.plans.get(plan);
-    if (plan.skipped || !own) return { document, written: false, inserted: [], skipped: plan.skipped ?? { cause: "refused", reason: "not planned by this store" } };
+    if (plan.skipped || !own) return { document, written: false, inserted: [], skipped: plan.skipped ?? { cause: "refused", reason: "not planned by this store, or applied already" } };
+    // (Once: applied again on the open page, it would be planned anew on what it wrote, a new table made twice)
+    this.plans.delete(plan);
     // The new tables' keys, made before they are written (the register gives each the table of its text)
     const inserted = own.inserted.map((markdown) => {
       const key = this.register.reserve(document);

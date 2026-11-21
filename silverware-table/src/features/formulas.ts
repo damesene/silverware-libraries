@@ -815,7 +815,8 @@ export class Formulas implements Feature {
     if (editor.row === 0) return undefined;
     if (isFormulaInput(typed) && !this.allowed(editor)) {
       this.host.notify(`Silverware Table: ${FORMULAS_NEED_METADATA}; saved as text`, "info");
-      return { ...editor.original, content: typed };
+      // (A value written over the cell: a formula it had ends, wherever it is written, a write held for later too)
+      return this.host.cellWrittenOver({ content: typed, attributes: NO_ATTRIBUTES }, editor.original);
     }
     if (isFormulaInput(typed)) {
       const slips = autofixFormula(typed.trim());
@@ -837,7 +838,7 @@ export class Formulas implements Feature {
       // (Set on the cell as it was: its other attributes, its name, stay)
       return this.cells.formulaCell("", withColumnKeys(formula, headers), editor.original);
     }
-    return typed.startsWith("'=") ? { ...editor.original, content: typed.slice(1) } : undefined;
+    return typed.startsWith("'=") ? this.host.cellWrittenOver({ content: typed.slice(1), attributes: NO_ATTRIBUTES }, editor.original) : undefined;
   }
 
   editorClosed(): void {

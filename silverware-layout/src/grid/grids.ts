@@ -472,6 +472,14 @@ export class Grids {
   }
 
   /**
+   * The grids drawn given the host's editor's look as it is now (its font shown at another size: a zoom), what their
+   * cells' rendering takes of it read again
+   */
+  pageLookChanged(): void {
+    for (const element of this.doc.querySelectorAll<HTMLElement>(".swl-grid")) if (this.bodies.has(element) || element.classList.contains("swl-grid-shown")) this.showPageLook(element);
+  }
+
+  /**
    * A grid drawn given what its cells' rendering takes of the host's editor's look where no theme's variable tells it
    * (`PAGE_LOOK`), as variables of its own the style page reads; none where the host reads none (the style page's own)
    */

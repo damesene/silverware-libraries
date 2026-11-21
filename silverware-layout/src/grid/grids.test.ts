@@ -74,6 +74,18 @@ describe("the grids", () => {
     expect(state.settled).toEqual([grid]);
   });
 
+  it("takes the host's editor's look as it draws a grid, and again once the page's look changed (its font zoomed)", async () => {
+    const { gridHost } = host(`# A\n\n<grid>\n${body}\n</grid>\n`);
+    let above = "0.375em";
+    const grids = new Grids(document, { ...gridHost, pageEditorLook: () => ({ heading2: { "padding-top": above } }) });
+    const grid = await grids.render(body);
+    document.body.append(grid);
+    expect(grid.style.getPropertyValue("--swl-h2-above")).toBe("0.375em");
+    above = "0.2em";
+    grids.pageLookChanged();
+    expect(grid.style.getPropertyValue("--swl-h2-above")).toBe("0.2em");
+  });
+
   it("shows a cell the host could not render as its text, and draws a grid not in the page as one column per cell", async () => {
     const { gridHost } = host("no grid here", "Right");
     const grid = await new Grids(document, gridHost).render(body);

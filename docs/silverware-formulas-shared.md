@@ -91,4 +91,16 @@ Each a commit (or a few) that leaves `npm run verify` and the UI tests passing.
 
 ## Progress
 
-(Written as the steps are done.)
+- **Steps 1 to 4 done (2026-11-21)**: a column head's text is the model's
+  (`headsOf` and `markdownHeaderText` make one of a markdown header cell); the
+  model is `shared/table/` (`model.ts`, `ops.ts`, `rules.ts`, `columns.ts`,
+  `names.ts`, `namerules.ts`; `CORE` defined in `model.ts`, the table's
+  `metanames.ts` taking it), its tests against the markdown staying the
+  table's (`silverware-table/src/model/`); the formulas are `shared/formulas/`
+  (with `format.ts`, `formatLuaNumber`), their tests in tables staying the
+  table's (`silverware-table/src/formulas/`: `index`, `custom`, `grids`,
+  `sources`, `views`, and `builtin/index.test.ts`, each function documented
+  on the table's library page); `shared/imports.test.ts` checks decided 3;
+  the table's isolation test reads the model and the formulas where they are.
+- **Step 5 (docs)** is done with the store plan's step 7, at the end, of the
+  final names.

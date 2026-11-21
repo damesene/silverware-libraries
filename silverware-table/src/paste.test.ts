@@ -57,6 +57,12 @@ describe("pasting cells", () => {
     );
   });
 
+  it("keeps a header's name where nothing but spaces is pasted over it, and counts no blank value as one left", () => {
+    const result = paste([["  ", "Count"]], { row: 0, column: 0 });
+    expect("markdown" in result && result.markdown).toBe(["| Name | Count |", "|---|---|", "| Pear | 3 |", "| Apple | 10 |", `| Total | 13 <meta formulas.f='=SUM([qty])'> |`].join("\n"));
+    expect(paste([[" "]], { row: 3, column: 1 })).toMatchObject({ skipped: 0 });
+  });
+
   it("adds rows and columns where the table ends, before the rows pinned to the bottom", () => {
     const result = paste(
       [

@@ -976,9 +976,11 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    markdown store taking off its hidden tags and metadata row
    (`store/markdown/metadata.ts`); a header cell's own tags go, its column's
    attributes in the metadata row stay (a column's part takes them too).
-   `writeMarkdown` and `replaceMarkdown` are gone. **Left**: the core still
-   imports the codec for a custom menu's table data (`tableData`, from the
-   table's markdown), `asModel` and Copy as Markdown (`plainMarkdown`).
+   `writeMarkdown` and `replaceMarkdown` are gone. **Left, done 2026-11-21**:
+   the core imports no codec (`isolation.test.ts`): a table's data for custom
+   menus and `silverware.table.tables` is read off the model (`tableData`),
+   Copy as Markdown is the store's (`BoundStore.plainMarkdown`), and the sheet
+   decodes the tables it reads itself (`asModel` gone from the host).
    **Formulas apart from the table** (added 2026-11-21, done before step 8 so
    the names are reviewed once, where they end up): the model and the formulas
    move into `shared/` (docs/silverware-formulas-shared.md), so formulas work

@@ -9,25 +9,30 @@ import { ownMeta } from "./metaaccess.ts";
 describe("a module's own metadata", () => {
   const table = parseTable("| Name | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='fruit' filters.-c-name.condition='=Pear'> |");
 
+  // (As the markdown writes them: the metadata row of the model written over the table read)
+  const written = (model: ReturnType<typeof decode>) => writtenMeta(encode(model, table));
+
   it("is named by the core: the module's name, its key, and the column", () => {
     const filters = ownMeta("filters", () => true);
-    expect(filters.attribute(table, "condition", { column: 0 })).toBe("=Pear");
-    expect(writtenMeta(filters.withAttribute(table, "condition", ">1", { column: 1 }))).toEqual({
+    const model = decode(table);
+    expect(filters.attribute(model, "condition", { column: 0 })).toBe("=Pear");
+    expect(written(filters.withAttribute(model, "condition", ">1", { column: 1 }))).toEqual({
       "core.name": "fruit",
       "filters.-c-name.condition": "=Pear",
       "filters.-c-qty.condition": ">1",
     });
-    expect(writtenMeta(ownMeta("themes", () => true).withAttribute(table, "name", "slate"))["themes.name"]).toBe("slate");
+    expect(written(ownMeta("themes", () => true).withAttribute(model, "name", "slate"))["themes.name"]).toBe("slate");
   });
 
   it("with the metadata setting off: what the table has may change or go, nothing new is added", () => {
     const filters = ownMeta("filters", () => false);
-    expect(filters.withAttribute(table, "condition", "=Fig", { column: 0 }).meta?.["filters.-c-name.condition"]).toBe("=Fig");
-    expect(filters.withAttribute(table, "condition", ">1", { column: 1 })).toBe(table);
-    expect(writtenMeta(filters.withColumnAttributes(table, "condition", new Map([[0, "=Fig"], [1, ">1"]])))).toEqual({ "core.name": "fruit", "filters.-c-name.condition": "=Fig" });
-    expect(writtenMeta(filters.withAttribute(table, "condition", undefined, { column: 0 }))).toEqual({ "core.name": "fruit" });
-    expect(filters.canStore(table, "condition", { column: 0 })).toBe(true);
-    expect(filters.canStore(table, "condition", { column: 1 })).toBe(false);
+    const model = decode(table);
+    expect(written(filters.withAttribute(model, "condition", "=Fig", { column: 0 }))["filters.-c-name.condition"]).toBe("=Fig");
+    expect(filters.withAttribute(model, "condition", ">1", { column: 1 })).toBe(model);
+    expect(written(filters.withColumnAttributes(model, "condition", new Map([[0, "=Fig"], [1, ">1"]])))).toEqual({ "core.name": "fruit", "filters.-c-name.condition": "=Fig" });
+    expect(written(filters.withAttribute(model, "condition", undefined, { column: 0 }))).toEqual({ "core.name": "fruit" });
+    expect(filters.canStore(model, "condition", { column: 0 })).toBe(true);
+    expect(filters.canStore(model, "condition", { column: 1 })).toBe(false);
   });
 
   describe("on the model: the table's, a column's, a row's and a cell's, written where the markdown keeps them", () => {

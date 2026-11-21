@@ -19,9 +19,8 @@ import { isError, isRange, type Scalar, single, TimeValue, type Value } from "..
 import { customFunctionsAnew, defineCustomFunctions } from "../../formulas/registry.ts";
 import { addWriteListener, type WriteListener, writeListenersAnew } from "../../store/markdown/writelisteners.ts";
 import { cellSourceOffset, findTables, pageTablesOf } from "../../markdown.ts";
-import { decodeCell } from "../../store/markdown/codec.ts";
+import { decode, decodeCell } from "../../store/markdown/codec.ts";
 import { metaName } from "../../meta.ts";
-import { nameOf } from "../../names.ts";
 import { type TableData, tableData } from "../../tabledata.ts";
 import { customMenuEntries, customMenuEntriesAnew, defineCustomMenuEntries } from "../../menus/custom.ts";
 import { LuaSources } from "./sources.ts";
@@ -299,7 +298,10 @@ export type TableOfText = TableData;
  * cells: what another plugin reads tables by, without reading their metadata
  */
 export function tables(text: string): TableOfText[] {
-  return pageTablesOf(String(text)).map(({ range, table }) => tableData(table, range, metaName(table), (column) => nameOf(table.rows[0]?.cells[column] ?? "")));
+  return pageTablesOf(String(text)).map(({ range, table }) => {
+    const model = decode(table);
+    return tableData(model, range, metaName(model));
+  });
 }
 
 /**

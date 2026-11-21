@@ -38,6 +38,7 @@ import { markOverWindow } from "../../../../../shared/overwindow.ts";
 import { columnLetters, isFormulaInput } from "../../../formulas/index.ts";
 import { ICONS } from "../../../icons.ts";
 import { escapeCell, findTables, pageTablesOf, parseTable, type TableRange } from "../../../markdown.ts";
+import { decode } from "../../../store/markdown/codec.ts";
 import { sameTableName } from "../../../namerules.ts";
 import { AT_KEY, formatAt, freeNameOf, freeSheetName, SHEET_KEY, WIDTH_PREFIX, sameSheet, type SheetCell, canPlace, sheetDataTable, type SheetPlace, validateSheetName, sheetOfTable, sheetsOf, sheetTablesOf, sheetWidths } from "../../../sheet/page.ts";
 import { parseClipboardCells } from "../../../paste.ts";
@@ -166,12 +167,12 @@ export class Sheet implements AdapterFeature {
 
   /** The tables of a page's text that are on a sheet, in the page's order, with where each is in the text */
   private sheetTablesIn(text: string): SheetTable[] {
-    return sheetTablesOf(this.host, pageTablesOf(text).map((t) => ({ range: t.range, table: this.host.asModel(t.table) })));
+    return sheetTablesOf(this.host, pageTablesOf(text).map((t) => ({ range: t.range, table: decode(t.table) })));
   }
 
   /** A table of the page's text (a range's, or one made) read into the model */
   private modelOf(markdown: string): TableModel {
-    return this.host.asModel(parseTable(markdown));
+    return decode(parseTable(markdown));
   }
 
   /** A name no table of a page's text has (nor one of `taken`): table1, table2, … */

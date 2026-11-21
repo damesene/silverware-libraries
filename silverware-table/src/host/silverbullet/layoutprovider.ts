@@ -6,10 +6,9 @@
 // through the core's write (one edit). With the metadata setting off nothing new is stored: the write says so.
 import type { LayoutChanges, LayoutEntries, LayoutProvider } from "../../../../shared/layout.ts";
 import { renderedTable, WIDGET_SELECTOR } from "../../dom.ts";
-import { type Table, tableMetaOf } from "../../markdown.ts";
 import type { LayoutTables } from "../../core/binding.ts";
 import { ownMeta } from "../../core/metaaccess.ts";
-import { renderedMeta } from "./adapter.ts";
+import { renderedModel } from "./adapter.ts";
 
 /** The owner of Silverware Layout's attributes in a table's metadata */
 export const LAYOUT_OWNER = "layout";
@@ -23,8 +22,7 @@ export function tablesLayoutProvider(tables: LayoutTables): LayoutProvider {
     kinds: [{ id: "table", name: "Table", align: "center" }],
     read: (element): LayoutEntries => {
       const table = renderedTable(element);
-      const rendered = table && renderedMeta(tables.renderedRows(table));
-      return rendered ? Object.fromEntries(meta.attributes(tableMetaOf(rendered) as Table)) : {};
+      return table ? Object.fromEntries(meta.attributes(renderedModel(tables.renderedRows(table)))) : {};
     },
     // A table holding its header in view (the sticky module) hides the rows that scrolled under it: what is seen of it
     // starts at its header, where the header is held lower than the table's top

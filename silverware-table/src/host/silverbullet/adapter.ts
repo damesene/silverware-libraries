@@ -6,7 +6,9 @@ import { cellSourceOffset, parseTable } from "../../markdown.ts";
 import { EVERYWHERE, heldBounds, innerBox, intersect, isEmpty, scrollNearEdge, shownPart, shownRect, viewBounds } from "../../core/geometry.ts";
 import { dragLines } from "./linedrag.ts";
 import { Overlays } from "./overlays.ts";
-import type { TableMeta } from "../../markdown.ts";
+import { type TableMeta, tableMetaOf } from "../../markdown.ts";
+import type { TableModel } from "../../model/model.ts";
+import { decode } from "../../store/markdown/codec.ts";
 import { TABLE_MARKER } from "../../metanames.ts";
 import type { AdapterContext, PairedTable, TableAdapter, Unpaired } from "../../core/adapter.ts";
 import { pairTable } from "./pairing.ts";
@@ -46,6 +48,15 @@ export function renderedMeta(rows: readonly HTMLTableRowElement[]): TableMeta | 
   const read: Record<string, string> = {};
   for (const attribute of Array.from(meta.attributes)) if (attribute.name !== TABLE_MARKER) read[attribute.name] = attribute.value;
   return read;
+}
+
+/**
+ * A rendered table's metadata (its metadata row's `<meta>`) as the model has it, read before the table is: what is
+ * read of a table as a whole as it is rendered (its look, Silverware Layout's entries)
+ */
+export function renderedModel(rows: readonly HTMLTableRowElement[]): TableModel {
+  const meta = renderedMeta(rows);
+  return decode({ indent: "", align: [], rows: [], padded: false, ...(meta ? tableMetaOf(meta) : {}) });
 }
 
 export class SilverBulletAdapter implements TableAdapter {

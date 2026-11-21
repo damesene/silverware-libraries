@@ -70,7 +70,9 @@ describe("isolation", () => {
     // (The register, core/tables.ts, keys a text's tables: the stores ask it)
     const own = Object.fromEntries(Object.entries(core).filter(([path]) => path !== "./core/tables.ts"));
     expect(matches(own, /\beditor[!?]?\.text\(|\bspace[!?]?\.read\(|\b(findTables|parseTable|locateBy\w*|tablesIn|keysOf|textOf)\(/)).toEqual([]);
-    expect(matches(own, /from "[./]*store\/markdown\/(store|tableparts|pageformulas)\.ts"|new MarkdownStore\b/)).toEqual([]);
+    expect(matches(own, /from "[./]*store\/markdown\/(store|tableparts|pageformulas|codec)\.ts"|new MarkdownStore\b/)).toEqual([]);
+    // (Nor the markdown's form: the register alone reads a text's tables, to key them)
+    expect(matches(own, /from "[./]*markdown\.ts"/)).toEqual([]);
   });
 
   it("the modules work on the model: nothing of the markdown's form (its tables, cells, tags and operations)", () => {

@@ -2,7 +2,7 @@
 // inline cell editing and row/column editing. Every change to the markdown is
 // one write of the page writer's (the markdown store's, store/markdown/): one
 // edit of the open page, so undo works as for any other edit.
-import { type FeatureName, formatRule, moduleOnByDefault, SETTINGS, type SettingValue } from "./bridge.ts";
+import { type FeatureName, moduleOnByDefault, SETTINGS, type SettingValue } from "./bridge.ts";
 import { type AdapterFeature, type AddressFrame, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, type ColumnsMeasure, type ColumnWidths, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type InsertPlace, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type NamingTarget, type KeyedTable, type OtherPages, type PendingEdits, type TableChange } from "./core/feature.ts";
 import { type Dialog, type DialogOptions, Dialogs } from "./core/dialog.ts";
 import { ViewAnchor } from "./core/anchor.ts";
@@ -27,7 +27,6 @@ import { HASHTAGS_KEY, nameEmptyHeaders } from "./columns.ts";
 import { type AttributeRules, cellWrittenOver, withAttributeRules, withoutNewAttributes } from "./model/rules.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { SourceStore } from "./store/sources.ts";
-import { decode, encodeOver, plainMarkdown } from "./store/markdown/codec.ts";
 import { SettingsDialog } from "./settings.ts";
 import { Metadata } from "./core/metadata.ts";
 import { NO_SOURCES, type SourceProvider } from "./sources.ts";
@@ -48,10 +47,6 @@ import {
   WIDGET_SELECTOR,
 } from "./dom.ts";
 import { ICONS } from "./icons.ts";
-import {
-  serializeTable,
-  type Table,
-} from "./markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "./menu.ts";
 import { floatingMenu, focusMenu } from "./core/menu.ts";
 import { CORE, metaName, metaPins, metaSort, withMetaPins, withMetaSort, writtenName } from "./meta.ts";
@@ -239,7 +234,7 @@ export class Controller implements TableHost {
     this.store = binding.store({
       platform: () => this.platform,
       register: this.register,
-      serializer: () => this.serializer(),
+      setting: (name) => this.setting(name),
       beforeWrite: (text, span, edit) => this.beforeWrite(text, span, edit),
     });
     this.adapter = binding.adapter(
@@ -561,19 +556,13 @@ export class Controller implements TableHost {
     return this.store.tables(document);
   }
 
-  asModel(table: Table): TableModel {
-    return decode(table);
-  }
-
   plainMarkdown(table: TableModel, rows: readonly number[], read?: TableModel): string {
-    return plainMarkdown(table, rows, read);
+    return this.store.plainMarkdown(table, rows, read);
   }
 
   tableData(info: TableInfo): TableData {
-    // (Its markdown as the page has it, where the page's text read last has it)
-    const table = encodeOver(info.model, info.model);
     const place = this.store.placeOf(this.currentPage, info.key) ?? { from: 0, to: 0 };
-    return tableData(table, place, this.tableName(info.model), (column) => this.columnName(info.model, column));
+    return tableData(info.model, place, this.tableName(info.model));
   }
 
   /**
@@ -2584,13 +2573,6 @@ export class Controller implements TableHost {
   /** The header row and the shown body rows, in display order */
   shownRows(info: WidgetInfo): HTMLTableRowElement[] {
     return this.rows.shownRows(info);
-  }
-
-  /** How tables are written: with the autoFormat setting every edited table aligned; a padded one as Long cells says */
-  private async serializer(): Promise<(table: Table) => string> {
-    const format = await this.setting("autoFormat");
-    const rule = await formatRule((name) => this.setting(name));
-    return (table) => serializeTable(format ? { ...table, padded: true } : table, rule);
   }
 
   /** A setting's value, falling back to its default when unset or not valid */

@@ -18,7 +18,6 @@ import type { Rect } from "./geometry.ts";
 export type { Dialog, DialogOptions } from "./dialog.ts";
 export type { Rect } from "./geometry.ts";
 import type { IndexMap } from "../model/ops.ts";
-import type { Table } from "../markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "../menu.ts";
 import type { MenuBuilder, MenuGroup, MenuSection } from "../../../shared/menuslots.ts";
 import type { CellNameAt, RowName } from "../names.ts";
@@ -968,13 +967,6 @@ export interface ModelHost {
 
 /** What the core offers the adapter's modules (src/host/silverbullet/modules/): the model host and the rendering */
 export interface TableHost extends ModelHost {
-  /**
-   * A markdown table read into the model (its columns, rows and cells: a cell's
-   * content unescaped, its attributes apart): the adapter's, which reads the
-   * page's text for the sheet's board (until the binding pairs it with the
-   * markdown store: docs/silverware-table-store-plan.md, step 6)
-   */
-  asModel(table: Table): TableModel;
   /** What a table, or a part of it, stores beyond its content (Remove metadata: whose it is, whether any): its store's */
   storedMetadata(table: TableModel, part: MetadataPart | "all"): StoredMetadata;
   /** The table without what its store keeps of a part of it (or all) beyond its content, as its store reads it then (Remove metadata's change) */

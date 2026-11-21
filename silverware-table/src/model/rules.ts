@@ -124,17 +124,17 @@ const valuesOf = (attributes: Attributes): string[] => [...attributes].flatMap((
  * columns went, rows from 1), or a column, row or cell of the table had it
  * with that value (a calculated column's new row, a cell moved); else it is
  * taken off, the content staying. With how many were taken off. The table's
- * own are kept, and a column's but those its header's text holds
- * (`headerTags`, by column; none given: none checked): a module sets one
- * through `canStore`, which the setting answers; one in a header's text (a
- * tag typed there) is checked as a cell's.
+ * own are kept, and a column's the edit set (`asked`: the table as the edit
+ * made it, where `after` is it as its store reads it back): a module sets one
+ * through `canStore`, which the setting answers; one the store reads off the
+ * text (a tag typed into a header) is checked as a cell's.
  */
 export function withoutNewAttributes(
   before: TableModel,
   after: TableModel,
   rowMap?: IndexMap,
   columnMap?: IndexMap,
-  headerTags: readonly Attributes[] = [],
+  asked: TableModel = after,
 ): { readonly table: TableModel; readonly taken: number } {
   const rowWas = sources(rowMap, before.rows.length, after.rows.length, 1);
   const columnWas = sources(columnMap, before.columns.length, after.columns.length, 0);
@@ -144,11 +144,11 @@ export function withoutNewAttributes(
     ...before.rows.flatMap((row) => [...valuesOf(row.attributes), ...row.cells.flatMap((cell) => valuesOf(cell.attributes))]),
   ]);
   let taken = 0;
-  const kept = (attributes: Attributes, was: Attributes | undefined, checked?: Attributes): Attributes => {
+  const kept = (attributes: Attributes, was: Attributes | undefined, set?: Attributes): Attributes => {
     let result = attributes;
     for (const [owner, own] of attributes) {
       for (const [key, value] of own) {
-        if (checked && attributeIn(checked, owner, key) === undefined) continue;
+        if (set && attributeIn(set, owner, key) === value) continue;
         if (had.has(`${owner}\u0000${key}\u0000${value}`) || (was && attributeIn(was, owner, key) !== undefined)) continue;
         result = withAttributeIn(result, owner, key, undefined);
         taken++;
@@ -158,7 +158,7 @@ export function withoutNewAttributes(
   };
   const columns = after.columns.map((column, c) => {
     const from = columnWas[c];
-    const attributes = kept(column.attributes, from === undefined ? undefined : before.columns[from]?.attributes, headerTags[c] ?? NO_ATTRIBUTES);
+    const attributes = kept(column.attributes, from === undefined ? undefined : before.columns[from]?.attributes, asked.columns[c]?.attributes ?? NO_ATTRIBUTES);
     return attributes === column.attributes ? column : { ...column, attributes };
   });
   let changed = columns.some((column, c) => column !== after.columns[c]);

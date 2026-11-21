@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withContentAt } from "../model/ops.ts";
+import { withAttributeIn } from "../model/model.ts";
 import { cell, clickOn, controller, cursorMoves, editor, edits, flashes, flush, key, renderPage, setText, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 import { PREVIEW_DELAY_MS } from "./viewdialog.ts";
 
@@ -44,6 +45,14 @@ describe("Views", () => {
     expect(text).toContain("| 3 <meta formulas.f='=COUNTA(people![assignee])'> |");
     // (Its header, three rows, its metadata row)
     expect(table(1).rows.length).toBe(5);
+  });
+
+  it("refuses a row's name in a view, as any value of its own, saying why", async () => {
+    await setup(`${TASKS}\n\n${VIEW("| anna |\n| petr |")}\n`, { "silverware.table.metadata": true });
+    const view = controller.shownTables()[1]!;
+    const named = await controller.writeTable(view, (t) => ({ ...t, rows: t.rows.map((row, r) => (r === 0 ? { ...row, attributes: withAttributeIn(row.attributes, "core", "n", "first") } : row)) }));
+    expect(named).toBe("failed");
+    expect(flashes.some((f) => f.includes("this table is a view"))).toBe(true);
   });
 
   it("writes a view of stacked arrays: HSTACK's columns named by their parts, a link as markdown, VSTACK's padding as \\#N/A", async () => {

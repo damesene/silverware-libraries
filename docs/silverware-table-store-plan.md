@@ -241,7 +241,7 @@ What changes for the modules, so that nothing of a store's form is in it:
 | `takesTags`, `keepTags`, `uniqueTags` | gone (attributes kept on edit; `unique` and `boundToContent` declared, the core's write step applying them) |
 | `headerRenamed` | gone (a header's name holds nothing else) |
 | `hideHeaderTags` | gone (the binding hides what the codec writes into headers) |
-| `TableInfo.source`, `hint`, `metaRow` | gone (`revision`; the place is the store's; the metadata row the adapter's) |
+| `TableInfo.source`, `hint` | gone (`revision`; the place is the store's; `metaRow` set by the adapter's pairing) |
 | `pageText`, `otherPages()`, `PageTable` | `host.tables(document)`, `host.table(key)`, other documents through the store |
 | `WritePage`, `TextWritten`, `TextPosition` | `WriteEdit.document` (its tables by key), places by key, `InsertPlace` |
 | `bridge` | `notify`, `ask`, `navigate`; nothing else of the platform |
@@ -423,7 +423,8 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    custom menus' context is unchanged (the check below is for when the core
    no longer has offsets, step 4 or 6). Modules read no markdown, no page
    text and no table's place (`isolation.test.ts`); `pageText`,
-   `pageTextNow` and `tableKeys` are the adapter's (`TableHost`).
+   `pageTextNow` and `tableKeys` are the adapter's (`TableHost`; gone in
+   step 6: the sheet reads the page through the markdown store).
    Left to later steps, as planned: a cell's escapes, `sameTable` and Copy
    as Markdown's `serializeTable` (step 3: content unescaped, the codec);
    formulas written outside tables (`WritePage.text`, `TextWritten`) and an
@@ -909,6 +910,70 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    large as step 3. (B) `source` and `hint` kept as the adapter's pairing,
    only the encoding and formatting moved into the store: smaller, the core
    still carrying the markdown's identity. Recommended: (A).
+   **Decided (2026-11-21): (A).** In parts, each a commit (or a few), the
+   tests and the UI tests passing after each:
+   - **A1. A write by the key and its revision.** The core reads the
+     table to write from the store (`store.tables(document)`: its model and
+     revision by its key) and writes a transaction (`write` with `expects`,
+     the other tables the features change with it, new tables), no text of
+     its own. What a write is checked against, where the caller saw an older
+     revision, is the revisions the core's own writes made since (each
+     report gives the written tables' new revisions), not their markdown:
+     `writtenAs` goes, the pins moved as now. The store encodes and formats
+     (the serializer is its own already). The rest the write computes from
+     the page's text today is the binding's, done by the markdown store as
+     it writes, through hooks the binding registers on it: what other
+     plugins write with it (`onWrite`, the Lua listeners told the tables'
+     changes), the page's formulas the features change (the store's
+     `PageFormulaStore`, set in the same transaction), the history marker
+     (the span written, the edit's range: the binding's `Editor` places it),
+     and where a table is in the text after it (the anchors keep it by key
+     already). `TableReport` says what the core needs of it: the new
+     revisions, the keys inserted, the hidden values taken off.
+   - **A2. The adapter pairs a widget with a key.** The scan's pairing (a
+     rendered table found in the text by its shape and `data-pos`, its key
+     from the register, the empty headers offered a fix) moves into the
+     binding's adapter, which gives the core `{ key, model, revision }` for a
+     widget; `TableInfo` loses `source` and `hint` (the metadata row, rows
+     and pins read off the model). `tableData` (a custom menu's table:
+     `from`, `to` in the text, public) asks the store where a key's table is.
+     The adapter's modules that read a table's text (history, beside,
+     expressions) take it from the binding's pairing.
+   - **A3. The sheet's board** makes its targets from keys (`store.tables`)
+     and inserts after a key: no range, no text.
+   - **A4. `TableTarget` is the key** (`{ key }`, the revision where a
+     caller has it); `locateBySource` and the text read in the core gone;
+     `isolation.test.ts` checks that the core reads no page's text
+     (`editor.text`, `findTables`, `parseTable` of a page) and imports no
+     markdown of a table.
+   Users see no change; the Space Lua API and the stored markdown stay as
+   they are.
+   **Done (2026-11-21), A1 to A4**: the markdown store writes a
+   transaction's page formulas and other plugins' edits, tells the binding
+   before a write of the open page (`BeforeWrite`) and reports revisions;
+   the core writes, deletes and inserts by key and revision (`ownWrites`, the
+   revisions its own writes made, in place of `writtenAs`), Format table a
+   write's `tidy`; the binding makes the store (`TableBinding.store`, the core
+   seeing a `BoundStore`) and gives it its adapter, which pairs a rendered
+   table with a key (`host/silverbullet/pairing.ts`), and its modules (the
+   sheet reads the page's text through it; Edit markdown and a press beside a
+   table find the table by its key); `TableInfo` and `TableTarget` are a
+   table's key and revision, no text; `isolation.test.ts` checks the core
+   reads no page's text. Two things learned: a write is encoded over the very
+   table its model was read from (the store keeps the tables as last read),
+   else the codec cannot tell a column gone from one kept; a change of a
+   table's markdown (Remove metadata) is written as that markdown is (the
+   store encodes a model over the table it was decoded from, `decodedFrom`).
+   Remove metadata is the store's (decided 2026-11-21: it stays as it
+   was): the core asks what a table or a part of it stores beyond its content
+   (`BoundStore.metadataOf`: whose, whether any, whether settings go with
+   it) and writes the table with `withoutMetadata` of the part or all, the
+   markdown store taking off its hidden tags and metadata row
+   (`store/markdown/metadata.ts`); a header cell's own tags go, its column's
+   attributes in the metadata row stay (a column's part takes them too).
+   `writeMarkdown` and `replaceMarkdown` are gone. **Left**: the core still
+   imports the codec for a custom menu's table data (`tableData`, from the
+   table's markdown), `asModel` and Copy as Markdown (`plainMarkdown`).
 7. **Docs.** CLAUDE.md (Layout, Architecture), docs/silverware-table-isolation.md
    extended by the store's boundary.
 8. **The whole API and its names, reviewed.** With every layer in its place,
@@ -951,9 +1016,8 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    for every plugin (`PageSections.tables` type-checks in a bundle that has
    no such part) and `PARTS` a mutable array exported as readonly.
    Left by the review, smaller than a fix of their own: a write planned
-   anew on the open page leaves the controller's `pageText` and the history
-   marker as computed on the text read (the page itself right; the next
-   scan reads it again); the writer's `plannedAnew` reports a page written
+   anew on the open page leaves the history marker as computed on the text
+   read (the page itself right); the writer's `plannedAnew` reports a page written
    where the text came out the same, and skips `leaveAlone` (no plugin
    replanning uses it); a source's key keeps the name it was first defined
    with (`documentOf` answers `@Tasks` after it is redefined `tasks`).

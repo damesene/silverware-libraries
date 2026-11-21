@@ -1,5 +1,5 @@
 // Silverware Table's provider for Silverware Layout (shared/layout.ts, docs/silverware-layout.md): its tables are
-// widgets Silverware Layout lays out. The core's, as the public API for other plugins is (writelisteners.ts): it names
+// widgets Silverware Layout lays out. The core's, as the public API for other plugins is (store/markdown/writelisteners.ts): it names
 // no module. A table keeps Silverware Layout's entries in its metadata under the owner `layout` (`layout.width`), as it
 // keeps anyone's, without reading their meaning. Read from the table as rendered (its metadata row's <meta>, before
 // the browser lays it out: as a table's look is read), so Silverware Layout lays it out before it is painted; written

@@ -10,7 +10,7 @@
 import type { AdapterFeature, TableHost } from "../../../core/feature.ts";
 import { cellText, renderedTable, UI_CLASS, WIDGET_SELECTOR } from "../../../dom.ts";
 import { formatLuaNumber } from "../../../format.ts";
-import { parseTable } from "../../../markdown.ts";
+import { encodeOver } from "../../../store/markdown/codec.ts";
 
 export class Expressions implements AdapterFeature {
   private timer: ReturnType<typeof setTimeout> | undefined;
@@ -37,8 +37,10 @@ export class Expressions implements AdapterFeature {
     const { platform, doc } = this.host;
     for (const widget of Array.from(doc.querySelectorAll<HTMLElement>(`${WIDGET_SELECTOR}.swt-table`))) {
       const info = this.host.infoOf(widget);
-      if (this.stopped || !info || !info.source.includes("${")) continue;
-      const rows = parseTable(info.source).rows;
+      if (this.stopped || !info) continue;
+      // Its cells as the page has them (the markdown its model was read from)
+      const rows = encodeOver(info.model, info.model).rows;
+      if (!rows.some((row) => row.cells.some((cell) => cell.includes("${")))) continue;
       let changed = false;
       for (let row = 0; row < rows.length; row++) {
         const cells = rows[row]!.cells;

@@ -7,10 +7,15 @@
 // modifier (Shift extending the selection, Alt showing the markdown) SilverBullet's.
 import type { AdapterFeature, TableHost } from "../../../core/feature.ts";
 import { EDITOR_SELECTOR, SCROLLER_SELECTOR, WIDGET_SELECTOR, widgetOfLineBelow } from "../../../dom.ts";
-import { locateBySource } from "../../../markdown.ts";
+import type { TableKey } from "../../../core/tables.ts";
+import type { MarkdownStore } from "../../../store/markdown/store.ts";
 
 export class BesideTables implements AdapterFeature {
-  constructor(private readonly host: TableHost) {}
+  constructor(
+    private readonly host: TableHost,
+    // Where a table is in the page's text now (the cursor goes after it)
+    private readonly store: MarkdownStore,
+  ) {}
 
   mouseDown(e: MouseEvent): boolean {
     if (e.button !== 0 || e.altKey || e.shiftKey || e.ctrlKey || e.metaKey || !(e.target instanceof Element)) return false;
@@ -19,7 +24,7 @@ export class BesideTables implements AdapterFeature {
     if (!info) return false;
     e.preventDefault();
     e.stopPropagation();
-    void this.cursorAfter(info.hint, info.source);
+    void this.cursorAfter(info.key);
     return true;
   }
 
@@ -38,12 +43,11 @@ export class BesideTables implements AdapterFeature {
     return undefined;
   }
 
-  private async cursorAfter(hint: number, source: string): Promise<void> {
+  private async cursorAfter(key: TableKey): Promise<void> {
     const { editor } = this.host.platform;
-    const text = await editor.text();
-    const range = locateBySource(text, hint, source);
+    const found = await this.store.rangeNow(await editor.documentName(), key);
     // A table at the page's end has no line after it: the cursor stays where it was
-    if (!range || range.to >= text.length) return;
-    await editor.moveCursor?.(range.to + 1);
+    if (!found || found.range.to >= found.text.length) return;
+    await editor.moveCursor?.(found.range.to + 1);
   }
 }

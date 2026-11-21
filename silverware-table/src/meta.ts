@@ -162,8 +162,12 @@ export function columnsAttributes(table: Table, columns: ReadonlySet<number>): s
 // ---- sorting ------------------------------------------------------------------
 
 /** The sorting stored in the table, if its column still exists */
-export function metaSort(table: Table): MetaSort | undefined {
-  for (const [column, direction] of columnValues(table, CORE, "sort")) {
+export function metaSort(table: Table | TableModel): MetaSort | undefined {
+  const sorts: Iterable<[number, string]> = "columns" in table ? table.columns.flatMap((column, c): [number, string][] => {
+    const direction = attributeIn(column.attributes, CORE, "sort");
+    return direction === undefined ? [] : [[c, direction]];
+  }) : columnValues(table, CORE, "sort");
+  for (const [column, direction] of sorts) {
     if (direction === "asc" || direction === "desc") return { column, direction };
   }
   return undefined;

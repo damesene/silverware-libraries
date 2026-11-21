@@ -1,13 +1,16 @@
 // The adapter to SilverBullet's rendered tables (core/adapter.ts): what the
 // core asks of the rendering, done on the DOM SilverBullet renders tables to.
 // Everything assumed about that DOM is in ../../dom.ts and in this folder.
-import { UI_CLASS, WIDGET_SELECTOR } from "../../dom.ts";
+import { caretTextOffset, cellText, UI_CLASS, WIDGET_SELECTOR } from "../../dom.ts";
+import { cellSourceOffset, parseTable } from "../../markdown.ts";
 import { EVERYWHERE, heldBounds, innerBox, intersect, isEmpty, scrollNearEdge, shownPart, shownRect, viewBounds } from "../../core/geometry.ts";
 import { dragLines } from "./linedrag.ts";
 import { Overlays } from "./overlays.ts";
 import type { TableMeta } from "../../markdown.ts";
 import { TABLE_MARKER } from "../../metanames.ts";
-import type { AdapterContext, TableAdapter } from "../../core/adapter.ts";
+import type { AdapterContext, PairedTable, TableAdapter, Unpaired } from "../../core/adapter.ts";
+import { pairTable } from "./pairing.ts";
+import type { MarkdownStore } from "../../store/markdown/store.ts";
 import type { CellRef, ColumnsMeasure, ColumnWidths, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "../../core/feature.ts";
 import { type MergedLooks, refKey } from "../../core/looks.ts";
 import type { TableRows } from "../../core/rows.ts";
@@ -61,6 +64,8 @@ export class SilverBulletAdapter implements TableAdapter {
     // Each table's rows as SilverBullet rendered them, in the document or not
     private readonly rows: TableRows,
     private readonly context: AdapterContext,
+    // The store the page's tables are kept in (pairing reads the page's tables through it)
+    private readonly store: MarkdownStore,
   ) {
     this.overlays = new Overlays(doc, rows);
     this.columns = new ColumnLayouts(doc, (table) => {
@@ -68,6 +73,28 @@ export class SilverBulletAdapter implements TableAdapter {
       const info = widget && context.infoOf(widget);
       if (info && info.table === table) context.columnsResized(info);
     });
+  }
+
+  pair(widget: HTMLElement, table: HTMLTableElement): Promise<PairedTable | Unpaired | undefined> {
+    return pairTable(widget, table, this.rows, this.context, this.store);
+  }
+
+  async showSource(info: WidgetInfo, at?: { readonly ref: CellRef; readonly cell: HTMLTableCellElement; readonly x: number; readonly y: number }): Promise<boolean> {
+    // The cell as it shows and the character at the point, read before anything is awaited (it may be rendered anew)
+    const shown = at && { text: cellText(at.cell), caret: caretTextOffset(at.cell, at.x, at.y) };
+    const { editor } = this.context.platform();
+    const found = await this.store.rangeNow(await editor.documentName(), info.key);
+    if (!found) return false;
+    const { range } = found;
+    let offset = 0;
+    if (at && shown) {
+      // Within a plain-text cell, the character at the point; otherwise the cell's start
+      const source = parseTable(range.text).rows[at.ref.row]?.cells[at.ref.column] ?? "";
+      const within = shown.text === source ? shown.caret : undefined;
+      offset = cellSourceOffset(range.text, at.ref.row, at.ref.column, within ?? 0);
+    }
+    await editor.moveCursor?.(range.from + offset);
+    return true;
   }
 
   applyLooks(info: WidgetInfo, looks: MergedLooks, editing: CellRef | undefined, only?: readonly CellRef[]): void {

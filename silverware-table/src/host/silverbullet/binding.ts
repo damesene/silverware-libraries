@@ -10,6 +10,7 @@ import { markTable, renderedMeta, SilverBulletAdapter } from "./adapter.ts";
 import { tablesLayoutProvider } from "./layoutprovider.ts";
 import { type Table, tableMetaOf, type TableMeta } from "../../markdown.ts";
 import { decode } from "../../store/markdown/codec.ts";
+import { MarkdownStore } from "../../store/markdown/store.ts";
 import { AutoFill } from "../../features/autofill.ts";
 import { Autoscroll } from "./modules/autoscroll.ts";
 import { ColumnTypes } from "../../features/columntypes.ts";
@@ -48,7 +49,7 @@ import { Widths } from "../../features/widths.ts";
  * The features in the order they get events; `metadata` is the controller's own (Remove metadata, also a page
  * command), `sources` what the host gives the sources module
  */
-export function featureEntries(metadata: Feature, sources: SourceTables): readonly FeatureEntry[] {
+export function featureEntries(metadata: Feature, sources: SourceTables, store: MarkdownStore): readonly FeatureEntry[] {
   const optional = (name: FeatureName, create: (host: TableHost) => AdapterFeature): FeatureEntry => ({ name, create });
   const always = (create: (host: TableHost) => AdapterFeature): FeatureEntry => ({ name: undefined, create });
   return [
@@ -85,7 +86,7 @@ export function featureEntries(metadata: Feature, sources: SourceTables): readon
     optional("themes", (host) => new Themes(host)),
     optional("export", (host) => new Export(host)),
     optional("excel", (host) => new Excel(host)),
-    optional("sheet", (host) => new Sheet(host)),
+    optional("sheet", (host) => new Sheet(host, store)),
     // Its part in a table's menu: Add to sheet…, Remove from sheet
     optional("sheet", (host) => new Sheets(host)),
     // Its icon last in the toolbar, before the menu
@@ -94,7 +95,7 @@ export function featureEntries(metadata: Feature, sources: SourceTables): readon
     optional("tableLabels", (host) => new TableLabels(host)),
     always((host) => new Expressions(host)),
     always((host) => new History(host)),
-    always((host) => new BesideTables(host)),
+    always((host) => new BesideTables(host, store)),
     // Custom definitions' entries in a row's or a column's menu, after the modules'
     always((host) => new CustomMenus(host)),
     always((host) => new CellPopup(host)),
@@ -102,8 +103,10 @@ export function featureEntries(metadata: Feature, sources: SourceTables): readon
 }
 
 /** Silverware Table bound to SilverBullet: what the Space Lua API's `init` (api.ts) hands the controller */
-export const silverBulletBinding: TableBinding = {
-  adapter: (doc, rows, context) => new SilverBulletAdapter(doc, rows, context),
+export const silverBulletBinding: TableBinding<MarkdownStore> = {
+  // The tables kept as markdown in pages, read through the platform as it is now (a new one comes with Space Lua loaded again)
+  store: (context) => new MarkdownStore(context.platform, context.register, context.serializer, context.beforeWrite),
+  adapter: (doc, rows, context, store) => new SilverBulletAdapter(doc, rows, context, store),
   features: featureEntries,
   markRendered: (widget, rows, look) => markTable(widget, look(decode(metadataOnly(renderedMeta(rows))))),
   layoutProvider: tablesLayoutProvider,

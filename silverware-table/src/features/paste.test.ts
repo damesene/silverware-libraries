@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { withAttributeIn } from "../model/model.ts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buttonLabel, cell, clickOn, controller, editor, flashes, flush, key, menuButtons, setup, text, useTablePage } from "../testing/page.ts";
 
@@ -238,7 +239,7 @@ describe("Pasting from a spreadsheet", () => {
       controller.selectCells(info(), { row: 2, column: 0 }, { row: 2, column: 0 });
       cutKey();
       expect(edges()).toBe(1);
-      await controller.writeMarkdown(controller.infoOf(editor.querySelector<HTMLElement>(".sb-table-widget")!)!, (t) => ({ ...t, rows: t.rows.filter((_, i) => i !== 1) }));
+      await controller.writeTable(controller.infoOf(editor.querySelector<HTMLElement>(".sb-table-widget")!)!, (t) => ({ ...t, rows: t.rows.filter((_, i) => i !== 0) }));
       await controller.scan();
       expect(edges()).toBe(0);
     });
@@ -247,9 +248,9 @@ describe("Pasting from a spreadsheet", () => {
       await setup("| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | |\n", { "silverware.table.metadata": true });
       controller.selectCells(info(), { row: 1, column: 0 }, { row: 1, column: 1 });
       cutKey();
-      await controller.writeMarkdown(controller.infoOf(editor.querySelector<HTMLElement>(".sb-table-widget")!)!, (t) => ({
+      await controller.writeTable(controller.infoOf(editor.querySelector<HTMLElement>(".sb-table-widget")!)!, (t) => ({
         ...t,
-        rows: t.rows.map((r, i) => (i === 1 ? { cells: [r.cells[0]!, "2 <meta formulas.f='=1+1'>"] } : r)),
+        rows: t.rows.map((r, i) => (i === 0 ? { ...r, cells: [r.cells[0]!, { content: "2", attributes: withAttributeIn(r.cells[1]!.attributes, "formulas", "f", "=1+1") }] } : r)),
       }));
       await controller.scan();
       // The cut ended: what it held changed

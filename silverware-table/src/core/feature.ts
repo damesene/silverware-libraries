@@ -3,7 +3,7 @@
 // state and listeners and works through the host.
 import type { TableKey } from "./tables.ts";
 export type { TableKey } from "./tables.ts";
-export type { PageFormula, PageFormulaKey, StoredTable, TableRevision } from "./store.ts";
+export type { MetadataPart, PageFormula, PageFormulaKey, StoredMetadata, StoredTable, TableRevision } from "./store.ts";
 import type { TableParts } from "./parts.ts";
 export type { PartTable, TablePart, TableParts } from "./parts.ts";
 export { tablePartsOf } from "./parts.ts";
@@ -11,7 +11,7 @@ import type { FeatureName, SETTINGS, SettingValue } from "../bridge.ts";
 import type { TablePlatform } from "./platform.ts";
 import type { AttributePlace, KeyedModel, ModelCell, TableModel } from "../model/model.ts";
 import type { PageFormula } from "./store.ts";
-import type { StoredTable, TableRevision } from "./store.ts";
+import type { MetadataPart, StoredMetadata, StoredTable, TableRevision } from "./store.ts";
 import type { Dialog, DialogOptions } from "./dialog.ts";
 import type { Rect } from "./geometry.ts";
 
@@ -27,15 +27,10 @@ import type { TableData } from "../tabledata.ts";
 
 /** A table shown, in model terms (what modules get): where it is in the page, its shape, its pins */
 export type TableInfo = {
-  // The table's markdown when it was rendered: the editor only reuses a
-  // rendered table while its markdown stays exactly the same (the core's and
-  // the store's: modules read `model` and compare `revision`)
-  readonly source: string;
   /** The table as rendered */
   readonly model: TableModel;
   /** Its model's revision: equal, the same model (a module's state kept for it compares it) */
   readonly revision: TableRevision;
-  readonly hint: number;
   readonly key: TableKey;
   readonly columns: number;
   // The table ends with a metadata row (`<meta …>`), rendered as its last row
@@ -49,8 +44,8 @@ export type TableInfo = {
 /** A table shown as the adapter has it: with its rendered element */
 export type WidgetInfo = TableInfo & { readonly table: HTMLTableElement };
 
-/** A table of the page as a write finds it, rendered or not: its key, its markdown as last read and where it was (`hint`) */
-export type TableTarget = Pick<WidgetInfo, "key" | "source" | "hint">;
+/** A table of the page as a write finds it, rendered or not: its key, its revision as the caller saw it */
+export type TableTarget = Pick<WidgetInfo, "key" | "revision">;
 
 // A cell by its row in the markdown (header 0) and its column
 export type CellRef = { readonly row: number; readonly column: number };
@@ -459,6 +454,8 @@ export type WriteOptions = {
   // Other tables changed in the same edit (a table alone put on the sheet another table joins; a sheet's tables
   // renamed with it)
   readonly also?: readonly TableChange[];
+  // The table written anew in its store's tidiest form (Format table: a markdown table's cells padded to line up)
+  readonly tidy?: true;
 };
 
 /**
@@ -631,8 +628,9 @@ export interface ModelHost {
    */
   replaceTables(document: string, changes: readonly TableChange[]): Promise<WriteResult>;
   /**
-   * The open page's tables in order, as last read (pageText): the same list while that text is (a module's state kept
-   * for the page compares it), a table of the page found in it by its key
+   * The open page's tables in order, as last read (a rendered table paired, a write): the same list while its tables
+   * are (their keys and revisions; a module's state kept for the page compares it), a table of the page found in it
+   * by its key
    */
   pageTables(): readonly StoredTable[];
   /**
@@ -977,29 +975,12 @@ export interface TableHost extends ModelHost {
    * markdown store: docs/silverware-table-store-plan.md, step 6)
    */
   asModel(table: Table): TableModel;
-  /**
-   * A table written as markdown (the change on its markdown): what works on how
-   * markdown keeps a table, which no model expresses (Remove metadata: its
-   * metadata row and every hidden tag; Format table: a table padded), the
-   * core's alone until the markdown store does it (step 4b, through the page
-   * writer); every other write is writeTable's
-   */
-  writeMarkdown(target: TableTarget, change: (table: Table) => Table | undefined, options?: WriteOptions): Promise<WriteResult>;
-  /** As replaceTables, the changes on the tables' markdown (Remove metadata of a page) */
-  replaceMarkdown(document: string, changes: readonly { readonly key: TableKey; readonly change: (table: Table) => Table }[]): Promise<WriteResult>;
+  /** What a table, or a part of it, stores beyond its content (Remove metadata: whose it is, whether any): its store's */
+  storedMetadata(table: TableModel, part: MetadataPart | "all"): StoredMetadata;
+  /** The table without what its store keeps of a part of it (or all) beyond its content, as its store reads it then (Remove metadata's change) */
+  withoutStoredMetadata(table: TableModel, part: MetadataPart | "all"): TableModel;
   /** The platform (core/platform.ts): the adapter is the host's side, which the modules' host functions stand for */
   readonly platform: TablePlatform;
-  /** The page's text as last read */
-  readonly pageText: string;
-  /** The open page's text as the editor has it now */
-  pageTextNow(): Promise<string>;
-  /**
-   * The keys of a page's tables in its text (as read now: pageTextNow), in
-   * the order findTables gives them: a table found in the text by its key. How
-   * tables are told apart is the core's (core/tables.ts): a key is made by it
-   * only, never from a table's place
-   */
-  tableKeys(page: string, text: string): readonly TableKey[];
   infoOf(widget: HTMLElement): WidgetInfo | undefined;
   /** The rendered table a key belongs to, if it is enhanced and on screen */
   widgetForKey(key: TableKey): HTMLElement | undefined;
@@ -1259,18 +1240,18 @@ export interface Feature {
    */
   action?(name: string, info: TableInfo, column: number | undefined): boolean;
   /**
-   * Before a write replaces a table (from..to of the page's text), with the
-   * edit `change` (the part of the text it replaces); may return what to do
-   * after it, given where the change started, how much longer the text got,
-   * and where a place of the text before is in the text after (`moved`: the
-   * edit may change text apart from the table, other plugins' writes with it)
+   * Before a write of the open page replaces its tables (from..to of the
+   * page's text: the span of them all), with the edit `change` (the part of
+   * the text it replaces); may return what to do after it, given where a
+   * place of the text before is in the text after (`moved`: the edit may
+   * change text apart from the tables, other plugins' writes with it)
    */
   beforeWrite?(
     text: string,
     from: number,
     to: number,
     change: { readonly from: number; readonly to: number },
-  ): Promise<((editFrom: number, lengthChange: number, moved: (pos: number, after: boolean) => number) => void) | undefined>;
+  ): Promise<((moved: (pos: number, after: boolean) => number) => void) | undefined>;
   /** Another page whose tables formulas refer to was changed: results may be out of date */
   tablesChanged?(): void;
   /** The page or a table scrolled, or tables moved: floating elements follow */

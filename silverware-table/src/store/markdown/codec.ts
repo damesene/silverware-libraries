@@ -201,13 +201,18 @@ export function decodeCell(raw: string): ModelCell {
   return { content: unescapeCell(withoutTags(raw)), attributes };
 }
 
+/** The table a model was read from (decode's), undefined: one made otherwise */
+export function decodedFrom(model: TableModel): Table | undefined {
+  return bases.get(model);
+}
+
 /**
- * Each column's attributes its header's tags hold, by column (the others are
- * the metadata row's): what a tag typed into a header becomes once read
+ * A model written as the markdown of the table another was read from
+ * (`read`, decoded: its form, indent and rows as written); none read: as a
+ * table of its own
  */
-export function headerTagAttributes(table: Table): readonly Attributes[] {
-  const header = table.rows[0];
-  return table.align.map((_, c) => attributesOf(tagAttributes(header?.cells[c] ?? "")));
+export function encodeOver(model: TableModel, read: TableModel): Table {
+  return encode(model, bases.get(read) ?? { indent: "", align: [], rows: [], padded: false });
 }
 
 /** A cell read alone (decodeCell) written back as a cell of encode's: as read where unchanged */
@@ -298,9 +303,11 @@ export function encode(model: TableModel, base: Table, deleted: (column: number)
     }
     return rest;
   });
+  // A row as it was read only where it is the base's (a row of another table, read with its indent, is written anew)
+  const baseRows = new Set(base.rows);
   const bodyRows = model.rows.map((row): Row => {
     const read = rows.get(row);
-    if (read) return read;
+    if (read && baseRows.has(read)) return read;
     const rowCells = row.cells.map((cell) => cells.get(cell)?.cell ?? cellMarkdown(cell.content, cell.attributes, () => true));
     // Its name in the cell holding it, else its first
     const name = attributeIn(row.attributes, CORE, LINE_NAME_KEY);
@@ -310,7 +317,7 @@ export function encode(model: TableModel, base: Table, deleted: (column: number)
       rowCells[column] = withName(rowCells[column]!, name);
     }
     // As an edit of the row it was read from (its first cell read's): written as it was where its cells are (markdown.ts)
-    const from = row.cells.map((cell) => cells.get(cell)?.row).find((r) => r !== undefined);
+    const from = row.cells.map((cell) => cells.get(cell)?.row).find((r) => r !== undefined && baseRows.has(r));
     return from ? { ...from, cells: [...rowCells, ...(beyond.get(from) ?? [])] } : { cells: rowCells };
   });
   const baseHeader = base.rows[0];

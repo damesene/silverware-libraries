@@ -22,7 +22,7 @@ export class History implements AdapterFeature {
     from: number,
     to: number,
     change: { readonly from: number; readonly to: number },
-  ): Promise<((editFrom: number, lengthChange: number, moved: (pos: number, after: boolean) => number) => void) | undefined> {
+  ): Promise<((moved: (pos: number, after: boolean) => number) => void) | undefined> {
     const { editor } = this.host.platform;
     const select = editor.select?.bind(editor);
     if (!select) return undefined;
@@ -37,7 +37,7 @@ export class History implements AdapterFeature {
     if (!moveAfter) this.remember(marker);
     // Redo restores the cursor where the edit left it: the marker, moved by the edit (past what it inserted
     // where it reached it), by its own parts only: other plugins' edits with it are elsewhere in the page
-    return (_editFrom, _lengthChange, moved) => {
+    return (moved) => {
       const at = moved(marker, moveAfter);
       if (moveAfter) void select(at, at);
       this.remember(at);

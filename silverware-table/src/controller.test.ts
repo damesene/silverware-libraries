@@ -954,6 +954,115 @@ describe("Controller", () => {
       expect(widget.style.getPropertyValue("--swt-box-top")).toBe("70px");
     });
 
+    it("gives a table rendered anew after a write how its last rendering was held before it is laid out, not restyled whole after", async () => {
+      await setup(PAGE, { "silverware.table.editor.enterKey": "save" });
+      layOut(5000);
+      const widget = editor.querySelector<HTMLElement>(".sb-table-widget")!;
+      Object.defineProperty(widget, "clientHeight", { configurable: true, value: 100 });
+      Object.defineProperty(widget, "scrollHeight", { configurable: true, value: 300 });
+      Object.defineProperty(widget, "clientWidth", { configurable: true, value: 800 });
+      Object.defineProperty(document.querySelector("thead")!, "offsetHeight", { configurable: true, value: 30 });
+      scroller.scrollTop = 1150;
+      scroller.dispatchEvent(new Event("scroll"));
+      for (let i = 0; i < 3; i++) await new Promise((resolve) => requestAnimationFrame(resolve));
+      expect(widget.style.getPropertyValue("--swt-box-top")).toBe("70px");
+      // The frames held back: what the new rendering has once enhanced, before the sticky update of a frame
+      const queued: FrameRequestCallback[] = [];
+      const frames = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => queued.push(callback));
+      try {
+        clickOn(cell(1, 1));
+        editor.querySelector<HTMLInputElement>(".swt-cell-editor")!.value = "7";
+        key(editor.querySelector(".swt-cell-editor")!, "Enter");
+        await flush();
+        await controller.scan();
+        const anew = editor.querySelector<HTMLElement>(".sb-table-widget.swt-table")!;
+        expect(anew).not.toBe(widget);
+        expect(anew.classList.contains("swt-sticky-inside")).toBe(true);
+        expect(anew.style.getPropertyValue("--swt-box-top")).toBe("70px");
+      } finally {
+        frames.mockRestore();
+        for (const callback of queued) callback(performance.now());
+      }
+    });
+
+    it("gives a table that fitted its width, rendered anew after a write, its variables but not its box clipped: it scrolls to the cell to edit next though now wider", async () => {
+      await setup(PAGE, { "silverware.table.editor.enterKey": "save" });
+      layOut(5000);
+      scroller.scrollTop = 1100;
+      const widget = editor.querySelector<HTMLElement>(".sb-table-widget")!;
+      Object.defineProperty(widget, "clientWidth", { configurable: true, value: 800 });
+      Object.defineProperty(widget.querySelector("table")!, "offsetWidth", { configurable: true, value: 800 });
+      scroller.dispatchEvent(new Event("scroll"));
+      for (let i = 0; i < 3; i++) await new Promise((resolve) => requestAnimationFrame(resolve));
+      expect(widget.classList.contains("swt-sticky-native")).toBe(true);
+      const top = widget.style.getPropertyValue("--swt-sticky-top");
+      expect(top).not.toBe("");
+      const queued: FrameRequestCallback[] = [];
+      const frames = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => queued.push(callback));
+      try {
+        clickOn(cell(1, 1));
+        editor.querySelector<HTMLInputElement>(".swt-cell-editor")!.value = "7";
+        key(editor.querySelector(".swt-cell-editor")!, "Enter");
+        await flush();
+        await controller.scan();
+        const anew = editor.querySelector<HTMLElement>(".sb-table-widget.swt-table")!;
+        expect(anew).not.toBe(widget);
+        expect(anew.classList.contains("swt-sticky-native")).toBe(false);
+        expect(anew.style.getPropertyValue("--swt-sticky-top")).toBe(top);
+      } finally {
+        frames.mockRestore();
+        for (const callback of queued) callback(performance.now());
+      }
+    });
+
+    it("gives a table rendered anew how SilverBullet's last rendering of it was held, never a table Silverware Table drew (the sheet's)", async () => {
+      await setup(PAGE);
+      layOut(5000);
+      const widget = editor.querySelector<HTMLElement>(".sb-table-widget")!;
+      Object.defineProperty(widget, "clientHeight", { configurable: true, value: 100 });
+      Object.defineProperty(widget, "scrollHeight", { configurable: true, value: 300 });
+      Object.defineProperty(widget, "clientWidth", { configurable: true, value: 800 });
+      Object.defineProperty(document.querySelector("thead")!, "offsetHeight", { configurable: true, value: 30 });
+      scroller.scrollTop = 1150;
+      scroller.dispatchEvent(new Event("scroll"));
+      const settle = async () => {
+        for (let i = 0; i < 3; i++) await new Promise((resolve) => requestAnimationFrame(resolve));
+      };
+      await settle();
+      expect(widget.style.getPropertyValue("--swt-box-top")).toBe("70px");
+      // Drawn elsewhere (the sheet): given nothing of SilverBullet's, and held its own way, which is not kept
+      const elsewhere = document.createElement("div");
+      document.body.append(elsewhere);
+      renderPage(text, elsewhere, []);
+      const drawn = elsewhere.querySelector<HTMLElement>(".sb-table-widget")!;
+      drawn.classList.add("swt-drawn");
+      Object.defineProperty(drawn, "clientWidth", { configurable: true, value: 800 });
+      Object.defineProperty(drawn.querySelector("table")!, "offsetWidth", { configurable: true, value: 800 });
+      const queued: FrameRequestCallback[] = [];
+      let frames = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => queued.push(callback));
+      await controller.scan();
+      expect(drawn.classList.contains("swt-sticky-inside")).toBe(false);
+      expect(drawn.style.getPropertyValue("--swt-box-top")).toBe("");
+      frames.mockRestore();
+      for (const callback of queued.splice(0)) callback(performance.now());
+      await settle();
+      expect(drawn.classList.contains("swt-sticky-native")).toBe(true);
+      // The sheet gone, SilverBullet's table rendered anew: given its own last rendering's, not the drawn one's
+      elsewhere.remove();
+      frames = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => queued.push(callback));
+      try {
+        renderPage(text, editor, []);
+        await controller.scan();
+        const anew = editor.querySelector<HTMLElement>(".sb-table-widget.swt-table")!;
+        expect(anew).not.toBe(widget);
+        expect(anew.classList.contains("swt-sticky-inside")).toBe(true);
+        expect(anew.style.getPropertyValue("--swt-box-top")).toBe("70px");
+      } finally {
+        frames.mockRestore();
+        for (const callback of queued) callback(performance.now());
+      }
+    });
+
     it("keeps the toolbar above a header held at the top while the page scrolls, not over a column's name", async () => {
       await setup(PAGE);
       layOut(5000);

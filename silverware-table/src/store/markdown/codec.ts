@@ -18,10 +18,11 @@
 // row has of no column found (a header renamed by hand) is kept as written,
 // but of an attribute the model set on a column (orphansKept).
 import { HASHTAGS_KEY, headerHashtags, headerText, headsOf, typedHeader, withoutHashtags } from "../../columns.ts";
-import { escapeCell, type Row, serializeTable, type Table, unescapeCell } from "../../markdown.ts";
+import { escapeCell, type Row, serializeTable, type Table, type TableMeta, unescapeCell } from "../../markdown.ts";
 import { columnsAttributes, columnsMetaNamed, columnsMetaOf, parseColumnAttribute } from "../../meta.ts";
 import { attributeName, CORE, escapedForRegExp, splitAttributeName } from "../../metanames.ts";
 import {
+  type Align,
   attributeChangeOf,
   type Attributes,
   type AttributeChange,
@@ -280,6 +281,15 @@ function nameChanged(attributes: Attributes): boolean {
   return false;
 }
 
+/**
+ * A metadata row as the codec names it, read by these headers (what it means by them, its names' form aside: a
+ * column of a name others share named with its number)
+ */
+function namedBy(meta: TableMeta, headerCells: readonly string[]): Record<string, string> {
+  const { byColumn, orphans } = columnsMetaOf({ indent: "", padded: false, align: headerCells.map((): Align => ""), rows: [{ cells: headerCells }], meta });
+  return columnsMetaNamed(headsOf(headerCells), byColumn, orphans);
+}
+
 /** The row of `baseRows` a row's attributes were read with, through the changes made to them since */
 function readRowOf(attributes: Attributes, baseRows: ReadonlySet<Row>): Row | undefined {
   for (let at: Attributes | undefined = attributes; at; at = attributeChangeOf(at)?.from) {
@@ -363,7 +373,8 @@ export function encode(model: TableModel, base: Table, deleted: (column: number)
     align: model.columns.map((column) => column.align),
     rows: [headerRow, ...bodyRows],
     attributes: model.attributes === (base.attributes ?? NO_ATTRIBUTES) ? base.attributes : model.attributes,
-    // (No metadata row read and none to write: none)
-    meta: same(meta, base.meta) ? base.meta : Object.keys(meta).length || base.meta ? meta : undefined,
+    // (No metadata row read and none to write: none; one meaning by the headers written what the one read means,
+    // though named another way (a column of a name others share without its number): as read)
+    meta: same(meta, base.meta) || (base.meta && same(meta, namedBy(base.meta, headerCells))) ? base.meta : Object.keys(meta).length || base.meta ? meta : undefined,
   };
 }

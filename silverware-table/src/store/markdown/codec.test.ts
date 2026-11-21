@@ -5,9 +5,9 @@ import { followColumnMeta } from "../../testing/markdownops.ts";
 import { describe, expect, it } from "vitest";
 import { withColumnType } from "../../columntypes/registry.ts";
 import { findTables, parseTable, serializeTable, type Table } from "../../markdown.ts";
-import { metaValue, withColumnValues, withMetaSort, withMetaValue } from "../../meta.ts";
+import { columnValues, metaValue, withColumnValues, withMetaSort, withMetaValue } from "../../meta.ts";
 import { attributeIn, type ModelCell, type TableModel, withAttributeIn } from "../../model/model.ts";
-import { duplicateRow, withContentAt } from "../../model/ops.ts";
+import { duplicateRow, insertColumn, withContentAt, withHeader } from "../../model/ops.ts";
 import { reorderRows, setCell } from "../../testing/markdownops.ts";
 import { cellTags } from "../../tags.ts";
 import { withTagValue } from "../../tagvalues.ts";
@@ -180,6 +180,28 @@ describe("the markdown codec", () => {
       const sized = { ...read, columns: read.columns.map((c) => ({ ...c, attributes: withAttributeIn(c.attributes, "widths", "size", "10") })) };
       expect(md(encode(sized, plain)).split("\n")[0]).toBe("| #euro Price | Unit  price | #stars | Qty |");
       expect(read.columns.map(headerText)).toEqual(["Price #euro", "Unit price", "#stars", "Qty"]);
+    });
+
+    it("a metadata row naming a column of a name others share without its number: as read while it means the same, named anew once a header changed", () => {
+      const plain = parseTable("| Item | Item | Qty |\n|---|---|---|\n| a | b | c |\n| <meta core.table core.-c-item.sort='asc'> |");
+      const read = decode(plain);
+      const moved = { ...read, rows: [], columns: [read.columns[0]!, read.columns[2]!, read.columns[1]!] };
+      expect(md(encode({ ...read, rows: [] }, plain)).split("\n").at(-1)).toBe("| <meta core.table core.-c-item.sort='asc'> |");
+      expect(md(encode(moved, plain)).split("\n").at(-1)).toBe("| <meta core.table core.-c-item.sort='asc'> |");
+      const renamed = { ...read, columns: read.columns.map((c, i) => (i === 1 ? { ...c, header: "Cost" } : c)) };
+      expect(md(encode(renamed, plain)).split("\n").at(-1)).toBe("| <meta core.table core.-c-item.sort='asc'> |");
+      const first = { ...read, columns: read.columns.map((c, i) => (i === 0 ? { ...c, header: "Cost" } : c)) };
+      expect(md(encode(first, plain)).split("\n").at(-1)).toBe("| <meta core.table core.-c-cost.sort='asc'> |");
+    });
+
+    it("a metadata row read that would mean another column by the headers written: named anew (a fixed name's column renamed, a column of its key added)", () => {
+      const fixed = parseTable("| Cost <meta core.n='price'> | Qty |\n|---|---|\n| 1 | 2 |\n| <meta core.table core.-c-cost.sort='asc'> |");
+      const read = decode(fixed);
+      const renamed = { ...read, columns: read.columns.map((c, i) => (i === 0 ? { ...c, header: "Amount" } : c)) };
+      expect(columnValues(encode(renamed, fixed), "core", "sort")).toEqual(new Map([[0, "asc"]]));
+      const keyed = parseTable("| Draft | Qty |\n|---|---|\n| 1 | 2 |\n| <meta core.table core.-c-_draft_.sort='asc'> |");
+      const added = withHeader(insertColumn(decode(keyed), 2), 2, "(draft)");
+      expect(columnValues(encode(added, keyed), "core", "sort")).toEqual(new Map([[0, "asc"]]));
     });
 
     it("rows moved, each as it was written; a header renamed, its column's attributes with it", () => {

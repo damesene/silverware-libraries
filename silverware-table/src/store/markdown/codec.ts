@@ -17,7 +17,7 @@
 // names.ts writes it), so a changed table reads as before. What the metadata
 // row has of no column found (a header renamed by hand) is kept as written,
 // but of an attribute the model set on a column (orphansKept).
-import { HASHTAGS_KEY, headerHashtags, headerText, headsOf, withoutHashtags } from "../../columns.ts";
+import { HASHTAGS_KEY, headerHashtags, headerText, headsOf, typedHeader, withoutHashtags } from "../../columns.ts";
 import { escapeCell, type Row, serializeTable, type Table, unescapeCell } from "../../markdown.ts";
 import { columnsAttributes, columnsMetaNamed, columnsMetaOf, parseColumnAttribute } from "../../meta.ts";
 import { attributeName, CORE, escapedForRegExp, splitAttributeName } from "../../metanames.ts";
@@ -304,9 +304,13 @@ export function encode(model: TableModel, base: Table, deleted: (column: number)
     const edited = (cell: string) => withHashtags(cell, hashtags ? hashtags.split(" ") : []);
     // Its text as read where its header's text is the same (its hashtags where they are written, its spaces): only an
     // attribute of it changed, or its hashtags (put at its end)
+    // Its text as typed where it was made of one (its hashtags where they were typed), else as read where its text is the
+    // same (its hashtags where they are written, its spaces): only an attribute of it changed, or its hashtags (put at
+    // its end)
+    const typed = typedHeader(column);
     const asRead = changesSinceRead(column.attributes).read?.cell;
     const sameText = asRead !== undefined && unescapeCell(withoutHashtags(withoutTags(asRead))) === column.header;
-    return cellMarkdown(sameText ? unescapeCell(withoutTags(edited(asRead))) : headerText(column), column.attributes, inHeader, edited);
+    return cellMarkdown(typed ?? (sameText ? unescapeCell(withoutTags(edited(asRead))) : headerText(column)), column.attributes, inHeader, edited);
   });
   // The rest of a column's attributes: the metadata row's (its own name and its hashtags are its header's)
   const byColumn = model.columns.map((column): Attributes => {

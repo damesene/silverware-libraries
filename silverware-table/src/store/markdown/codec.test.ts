@@ -10,7 +10,7 @@ import { attributeIn, type ModelCell, type TableModel, withAttributeIn } from ".
 import { reorderRows, setCell } from "../../testing/markdownops.ts";
 import { cellTags } from "../../tags.ts";
 import { withTagValue } from "../../tagvalues.ts";
-import { HASHTAGS_KEY, headerText } from "../../columns.ts";
+import { HASHTAGS_KEY, headerText, withHeaderText } from "../../columns.ts";
 import { decode, decodeCell, encode, encodeCell } from "./codec.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -135,6 +135,18 @@ describe("the markdown codec", () => {
       const written = md(encode(renamed, tagged));
       expect(written).toContain("| Cost #currency-usd <meta note='x'> |");
       expect(written).toContain("widths.-c-cost.size='90'");
+    });
+
+    it("a header typed written as typed: its hashtags where they were typed, in their order", () => {
+      const plain = parseTable("| Price | B |\n|---|---|\n| 1 | 2 |");
+      expect(md(encode(withHeaderText(decode(plain), 0, "Unit #usd price"), plain))).toBe(md(setCell(plain, 0, 0, "Unit #usd price")));
+      const tagged = parseTable("| X #a #b | B |\n|---|---|\n| 1 | 2 |");
+      expect(md(encode(withHeaderText(decode(tagged), 0, "X #b #a"), tagged))).toBe(md(setCell(tagged, 0, 0, "X #b #a")));
+      // A type set from the menu: the hashtags kept where they are, the type's put at the end
+      const middle = parseTable("| Price #euro total | B |\n|---|---|\n| 1 | 2 |");
+      const read = decode(middle);
+      const typedType = { ...read, columns: read.columns.map((c, i) => (i === 0 ? { ...c, attributes: withAttributeIn(c.attributes, "core", HASHTAGS_KEY, "#euro #number") } : c)) };
+      expect(md(encode(typedType, middle))).toContain("| Price #euro total #number |");
     });
 
     it("a column's and the table's attributes, in the metadata row", () => {

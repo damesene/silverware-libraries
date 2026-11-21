@@ -2,15 +2,15 @@
 // core asks of the rendering, done on the DOM SilverBullet renders tables to.
 // Everything assumed about that DOM is in ../../dom.ts and in this folder.
 import { UI_CLASS, WIDGET_SELECTOR } from "../../dom.ts";
-import { EVERYWHERE, heldBounds, innerBox, intersect, isEmpty, scrollNearEdge, shownPart, shownRect, viewBounds } from "../geometry.ts";
+import { EVERYWHERE, heldBounds, innerBox, intersect, isEmpty, scrollNearEdge, shownPart, shownRect, viewBounds } from "../../core/geometry.ts";
 import { dragLines } from "./linedrag.ts";
 import { Overlays } from "./overlays.ts";
 import type { TableMeta } from "../../markdown.ts";
 import { TABLE_MARKER } from "../../metanames.ts";
-import type { TableAdapter } from "../adapter.ts";
-import type { CellRef, ColumnsMeasure, ColumnWidths, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "../feature.ts";
-import { type MergedLooks, refKey } from "../looks.ts";
-import type { TableRows } from "../rows.ts";
+import type { AdapterContext, TableAdapter } from "../../core/adapter.ts";
+import type { CellRef, ColumnsMeasure, ColumnWidths, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "../../core/feature.ts";
+import { type MergedLooks, refKey } from "../../core/looks.ts";
+import type { TableRows } from "../../core/rows.ts";
 import { applyCellLook, applyHeaderLook, renderedText } from "./looks.ts";
 import { ColumnLayouts, headerNeed, horizontalPadding } from "./columns.ts";
 
@@ -44,17 +44,6 @@ export function renderedMeta(rows: readonly HTMLTableRowElement[]): TableMeta | 
   for (const attribute of Array.from(meta.attributes)) if (attribute.name !== TABLE_MARKER) read[attribute.name] = attribute.value;
   return read;
 }
-
-/** What the adapter needs to know of the core: which tables it enhanced, and a row taken out of the document put back (largeTables) */
-export type AdapterContext = {
-  infoOf(widget: HTMLElement): WidgetInfo | undefined;
-  rowNeeded(info: WidgetInfo, row: HTMLTableRowElement): void;
-  holdInDocument(info: WidgetInfo, row: HTMLTableRowElement | undefined): void;
-  floating(className: string): HTMLElement;
-  place(element: HTMLElement, left: number, top: number): void;
-  // A table's columns took other widths after layout (ColumnLayouts): what is placed by them follows
-  columnsResized(info: WidgetInfo): void;
-};
 
 export class SilverBulletAdapter implements TableAdapter {
   private readonly overlays: Overlays;

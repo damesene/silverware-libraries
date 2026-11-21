@@ -5,7 +5,7 @@
 // ends it. Where a feature scrolls its tables and cells in a box of its own
 // (the sheet's board: host.scrollBoxAt), that box moves both ways, also from
 // a cell no table has.
-import type { AdapterFeature, TableHost } from "../../feature.ts";
+import type { AdapterFeature, TableHost } from "../../../core/feature.ts";
 
 // No movement within this distance of the start point
 const DEAD_ZONE = 12;

@@ -80,7 +80,7 @@ What the design below follows, and what decides a case it does not name:
    (through their index) and the core's interfaces (`core/feature.ts`:
    `ModelHost`, the hooks); **the core imports no module** (the controller's
    own Remove metadata, `core/metadata.ts` since step 3), the modules being
-   put together by `modules.ts`; stores implement the core's `TableStore`
+   put together by the binding (`host/silverbullet/binding.ts`); stores implement the core's `TableStore`
    and import the model and the platform; host bindings import all of it and
    put it together. Nothing imports a binding. `isolation.test.ts` checks it
    by folder.
@@ -344,14 +344,14 @@ registry the built-in parts go through takes a plugin's own since
 Everything that is SilverBullet's and not markdown's, in one place:
 
 - the platform, made of what the init page hands over;
-- the adapter (`core/silverbullet/` now) and its pairing with the markdown
+- the adapter (`host/silverbullet/` now) and its pairing with the markdown
   store: which key a rendered table is (`data-pos`, shape, source; moved out
   of the controller), the type hashtags hidden in headers (the codec tells
   which part of a header it wrote);
 - the history markers (the cursor put outside a table around each write, for
   SilverBullet's undo): the binding's `Editor` places them, as it knows
   the edit's range;
-- the places in Lua calls (host/lua.ts; found by store/markdown/pageformulas.ts);
+- the places in Lua calls (host/silverbullet/lua.ts; found by store/markdown/pageformulas.ts);
 - the Lua API: `silverware.table.tables(text)`, `onWrite(fn(text))`,
   `evaluate(formula, text, page)`, `evaluateText`, `errors(page)`,
   `errorsText`, the aliases and the `define…` functions, implemented over the
@@ -867,13 +867,48 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
 6. **The SilverBullet binding.** The adapter, its pairing with the markdown
    store, history markers, Lua places and the Lua API into
    `host/silverbullet/`; the dependency rule checked by folder.
-   **Silverware Layout's provider** (core/layoutprovider.ts, after the plan
+   **Silverware Layout's provider** (host/silverbullet/layoutprovider.ts, after the plan
    was first written) is the binding's: it registers tables with
    `silverware.layout.api` and reads their `layout.width` from the table as
    rendered (`renderedMeta`, synchronously, for the widget's size before the
    model is at hand). The attribute is the model's (owner `layout`, written
    by a transaction as any); reading it off SilverBullet's DOM is the
    adapter's, as the rendered table is. The core keeps no provider.
+   **Done (2026-11-21), as far as no API changes**: the binding is
+   `host/silverbullet/` (the adapter and its modules, the platform, the
+   space's Lua sources, the formulas in Lua calls, Silverware Layout's
+   provider, the Space Lua API `api.ts`, the entry `index.ts` exporting it),
+   handed to the core as a `TableBinding` (core/binding.ts: the adapter, the
+   features in their order, a table rendered anew marked with its look, the
+   provider): the core imports nothing of `host/` (`isolation.test.ts`, the
+   adapter's modules checked there too). The core's write steps are on the
+   model (the pins set; the metadata setting's rule, `withoutNewAttributes`,
+   a cell's, a row's and a header's attributes, checked on the table as
+   written and read again: a tag typed into a cell is an attribute once the
+   page is read; the columns' attributes follow their
+   columns in the model itself, so the markdown's following,
+   `metadataAfterEdit`, is gone, and `WriteStep` and `byModel` with it); the
+   markdown's operations (ops.ts) are the tests' alone
+   (`testing/markdownops.ts`, with `followColumnMeta`: what the model's are
+   compared with).
+   **Open (needs the user, it changes the hosts' API): the tables'
+   identity.** The core still tells a table by its markdown: `TableInfo`
+   and `TableTarget` carry `source` (its text) and `hint` (its place in the
+   page's text), the write finds the table again by them (`writeTarget`,
+   `writtenAs`), computes the text a write makes (for the register's keys,
+   the history markers, the anchors), and encodes and formats the tables
+   itself before handing them to the store. Taking that out of the core is
+   the adapter's pairing with the markdown store this step names, and it
+   changes `TableInfo` / `TableTarget` (the adapter's modules, the sheet's
+   board above all, read them). Proposed: (A) a table told by its key (and
+   its revision) alone in the core; the markdown store finds it by the
+   register, encodes and formats it, and its report says what the binding
+   needs after a write (where the table is now, the span written: the
+   history markers, the anchors), the adapter pairing a widget with a key
+   (`data-pos` and the register); in parts, the sheet's board last; about as
+   large as step 3. (B) `source` and `hint` kept as the adapter's pairing,
+   only the encoding and formatting moved into the store: smaller, the core
+   still carrying the markdown's identity. Recommended: (A).
 7. **Docs.** CLAUDE.md (Layout, Architecture), docs/silverware-table-isolation.md
    extended by the store's boundary.
 8. **The whole API and its names, reviewed.** With every layer in its place,
@@ -897,6 +932,31 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
    drawn out into `shared/` where the table's and the database's are alike
    (revisions, plans and reports by parts, the causes a part is left for, the
    contract tests' harness), decided 2026-11-21 (step 4b).
+   Found by the review of steps 4 to 6 (2026-11-21), for this step: one
+   outcome of a write said three ways (the markdown store's `PageWritten`,
+   `TableReport`, the core's `WriteResult`; `skipOf` copying the writer's
+   skip into a `TableSkip` of the same shape); the table store's plan and
+   report shaped unlike the database's (`TablePlan`/`TableReport`/`TableSkip`
+   with one `skipped` and `written` a boolean, against
+   `TransactionPlan`/`TransactionReport`/`Skipped[]`); `TableWrite` and
+   `TableInsert` of the markdown store's parts against `TableEdit`'s kinds
+   `write` and `insert`; `TableAt` naming the text `source` where the
+   writer's other parts say `text` and `occurrence`/`of`; `setPageFormula`
+   in the `tables` section; the controller's private `withoutNewAttributes`
+   named as the model's rule it calls; `LayoutTables.write` taking a widget
+   where every other write takes a `TableTarget`; `SourceStore.plan` taking
+   `{ document }`; exports used by their file alone (`featureEntries`,
+   `sourceDocument`, `PageWritten`, `TableAt`, `NewTablePlace`,
+   `newTablePlace`, `LAYOUT_OWNER`); the shared writer's part registry typed
+   for every plugin (`PageSections.tables` type-checks in a bundle that has
+   no such part) and `PARTS` a mutable array exported as readonly.
+   Left by the review, smaller than a fix of their own: a write planned
+   anew on the open page leaves the controller's `pageText` and the history
+   marker as computed on the text read (the page itself right; the next
+   scan reads it again); the writer's `plannedAnew` reports a page written
+   where the text came out the same, and skips `leaveAlone` (no plugin
+   replanning uses it); a source's key keeps the name it was first defined
+   with (`documentOf` answers `@Tasks` after it is redefined `tasks`).
 
 Rough size, not measured, **as estimated on 2026-11-06**: step 1 a day or
 two; step 2 the largest by files (about 25), a week or more; step 3 the
@@ -916,7 +976,7 @@ is done, by what it took.
   large tables; after our own writes none is built (*A model made once, kept
   from our own writes*). The playground's benchmark before and after steps 2
   and 3.
-- **The sheet** (core/silverbullet/modules/sheet.ts, about 1800 lines) reads
+- **The sheet** (host/silverbullet/modules/sheet.ts, about 1800 lines) reads
   the page's text in many places: it moves in step 2 on its own, with its
   UI tests (`ui-tests/sheet/`).
 - **One undo step**: a transaction is one edit of the text in the markdown
@@ -1041,7 +1101,7 @@ is done, by what it took.
      as read; a write refused where it changed since, as a table's), and is
      written by a writer of its own, not a cell's: a text the string literal
      cannot hold (a quote, a line break) is refused with why. The finder of
-     their places (`host/lua.ts`, `defineFormulaPlaces`, its registry now in
+     their places (`host/silverbullet/lua.ts`, `defineFormulaPlaces`, its registry now in
      `formulas/places.ts`) is the binding's; `FormulaPlace` (offsets) the
      markdown store's alone. The formulas module follows a table's edit in
      them through that store in the same write, replacing

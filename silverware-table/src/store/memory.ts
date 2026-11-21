@@ -3,7 +3,7 @@
 // revision of its own; for tests (modules over a store, no text) and the
 // playground's benchmark. Keys are made by the register (core/tables.ts, the
 // one maker of keys), revisions by a count: a table changed gets a new one.
-import type { StoredTable, TablePlan, TableReport, TableRevision, TableSkip, TableStore, TableTransaction } from "../core/store.ts";
+import { type StoredTable, type TablePlan, type TableReport, type TableRevision, type TableSkip, type TableStore, type TableTransaction, validateTransaction } from "../core/store.ts";
 import type { TableKey, TableRegister } from "../core/tables.ts";
 import type { TableModel } from "../model/model.ts";
 
@@ -54,6 +54,8 @@ export class MemoryStore implements TableStore {
   async plan(transaction: TableTransaction): Promise<TablePlan> {
     const { document } = transaction;
     const left = (skipped: TableSkip): TablePlan => ({ document, changes: 0, skipped });
+    const invalid = validateTransaction(transaction);
+    if (invalid) return left({ cause: "refused", reason: invalid });
     const before = this.documents.get(document);
     if (!before) return left({ cause: "missing", reason: "the document is not there" });
     let after: StoredTable[] = [...before];
@@ -81,7 +83,8 @@ export class MemoryStore implements TableStore {
   async apply(plan: TablePlan): Promise<TableReport> {
     const { document } = plan;
     const own = this.plans.get(plan);
-    if (plan.skipped || !own) return { document, written: false, inserted: [], skipped: plan.skipped ?? { cause: "refused", reason: "not planned by this store" } };
+    if (plan.skipped || !own) return { document, written: false, inserted: [], skipped: plan.skipped ?? { cause: "refused", reason: "not planned by this store, or applied already" } };
+    this.plans.delete(plan);
     if (this.documents.get(document) !== own.before) return { document, written: false, inserted: [], skipped: { cause: "changed", reason: "the document changed since it was planned" } };
     this.documents.set(document, own.after);
     for (const key of own.inserted) this.owners.set(key, document);
@@ -95,7 +98,7 @@ export class MemoryStore implements TableStore {
     const own = this.reports.get(report);
     if (!own) return { document, changes: 0, skipped: { cause: "refused", reason: "not written by this store" } };
     if (this.documents.get(document) !== own.after) return { document, changes: 0, skipped: { cause: "changed", reason: "the document changed since it was written" } };
-    const plan: TablePlan = { document, changes: 1 };
+    const plan: TablePlan = { document, changes: report.written ? 1 : 0 };
     this.plans.set(plan, { before: own.after, after: own.before, inserted: [] });
     return plan;
   }

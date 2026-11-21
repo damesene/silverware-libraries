@@ -40,7 +40,7 @@ function memory(pages: Record<string, string>, open?: string, writerOf: typeof p
       return {};
     },
   };
-  return { map, edits, writer: writerOf({ editor, space }) };
+  return { map, edits, writer: writerOf({ editor, space }), openPage: (name: string) => void (open = name) };
 }
 
 describe("the page writer", () => {
@@ -79,6 +79,13 @@ describe("the page writer", () => {
     const planned = await other.writer.plan(pageChanges().page("B", (p) => p.tags.rename("a", "c")).build(), { replanOpenPage: true });
     other.map.set("B", "x #a");
     expect((await other.writer.apply(planned)).skipped.map((one) => one.cause)).toEqual(["changed"]);
+    // A page read from the space as it was planned, opened since: the check kept
+    const opened = memory({ B: "#a" });
+    const read = await opened.writer.plan(pageChanges().page("B", (p) => p.tags.rename("a", "c")).build(), { replanOpenPage: true });
+    opened.map.set("B", "x #a");
+    opened.openPage("B");
+    expect((await opened.writer.apply(read)).skipped.map((one) => one.cause)).toEqual(["changed"]);
+    expect(opened.map.get("B")).toBe("x #a");
   });
 
   it("writes the page open through the editor, in one edit", async () => {

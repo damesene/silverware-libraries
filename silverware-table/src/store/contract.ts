@@ -144,6 +144,44 @@ export function storeContract(
       const report = await store.apply(await store.plan({ document: "Shop", edits: [{ kind: "write", key: shop!.key, expects: shop!.revision, model: table(["Fruit", "Price"], ["Kiwi", "2"]) }] }));
       expect(report.written).toBe(true);
       expect((await store.apply(await store.planUndo(report))).written).toBe(true);
+      const after = (await store.tables("Shop"))!;
+      expect(after.map((t) => texts(t.model))).toEqual([texts(prices), texts(counts)]);
+      // (The tables keep their keys)
+      expect(after[0]!.key).toBe(shop!.key);
+    });
+
+    it("applies a plan once: applied again, it is left and nothing is written twice", async () => {
+      const { store } = make({ Shop: [prices] });
+      const plan = await store.plan({ document: "Shop", edits: [{ kind: "insert", model: counts }] });
+      expect((await store.apply(plan)).written).toBe(true);
+      const again = await store.apply(plan);
+      expect(again.written).toBe(false);
+      expect(again.inserted).toEqual([]);
+      expect((await store.tables("Shop"))!.map((t) => texts(t.model))).toEqual([texts(prices), texts(counts)]);
+    });
+
+    it("leaves a plan whose table changed after it was planned", async () => {
+      const fixture = make({ Shop: [prices, counts] });
+      const { store } = fixture;
+      const [shop] = (await store.tables("Shop"))!;
+      const plan = await store.plan({ document: "Shop", edits: [{ kind: "write", key: shop!.key, expects: shop!.revision, model: table(["Fruit", "Price"], ["Kiwi", "2"]) }] });
+      expect(plan.skipped).toBeUndefined();
+      const typed = table(["Fruit", "Price"], ["Plum", "7"]);
+      fixture.replace("Shop", [typed, counts]);
+      const report = await store.apply(plan);
+      expect(report.written).toBe(false);
+      expect(report.skipped?.cause).toBe("changed");
+      expect((await store.tables("Shop"))!.map((t) => texts(t.model))).toEqual([texts(typed), texts(counts)]);
+    });
+
+    it("refuses a transaction that edits a table twice, or puts a new one after a table it takes out", async () => {
+      const { store } = make({ Shop: [prices, counts] });
+      const [shop] = (await store.tables("Shop"))!;
+      const write = { kind: "write", key: shop!.key, expects: shop!.revision, model: table(["Fruit", "Price"], ["Kiwi", "2"]) } as const;
+      const remove = { kind: "remove", key: shop!.key, expects: shop!.revision } as const;
+      expect((await store.plan({ document: "Shop", edits: [write, remove] })).skipped?.cause).toBe("refused");
+      expect((await store.plan({ document: "Shop", edits: [write, { ...write, model: counts }] })).skipped?.cause).toBe("refused");
+      expect((await store.plan({ document: "Shop", edits: [remove, { kind: "insert", model: counts, after: shop!.key }] })).skipped?.cause).toBe("refused");
       expect((await store.tables("Shop"))!.map((t) => texts(t.model))).toEqual([texts(prices), texts(counts)]);
     });
   });

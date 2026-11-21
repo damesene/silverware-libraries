@@ -468,15 +468,6 @@ export type WriteOptions = {
  */
 export type RowHold = { readonly after?: number; readonly before?: number };
 
-/**
- * A step every write goes through after the edit itself, such as formulas
- * following moved cells: the table before the edit, the table after it, and
- * how rows and columns moved; returns the table to write. `byModel`: the
- * change was the model's (TableHost.writeTable), its columns' attributes on
- * its columns already.
- */
-export type WriteStep = (before: Table, after: Table, options: WriteOptions, byModel: boolean) => Table;
-
 /** A column as shown: its width, and the width its header needs to show its name and icons whole (0: no header line, one being edited), in pixels */
 export type ColumnMeasure = { readonly width: number; readonly header: number };
 
@@ -977,7 +968,7 @@ export interface ModelHost {
   setSort(info: TableInfo, view: ViewState): void;
 }
 
-/** What the core offers the adapter's modules (src/core/silverbullet/modules/): the model host and the rendering */
+/** What the core offers the adapter's modules (src/host/silverbullet/modules/): the model host and the rendering */
 export interface TableHost extends ModelHost {
   /**
    * A markdown table read into the model (its columns, rows and cells: a cell's
@@ -1373,7 +1364,7 @@ export interface Feature {
   editorClosed?(editor: CellEditor): void;
 }
 
-/** A module of the adapter (src/core/silverbullet/modules/): a module, and the hooks of the rendering */
+/** A module of the adapter (src/host/silverbullet/modules/): a module, and the hooks of the rendering */
 export interface AdapterFeature extends Feature {
   /**
    * A menu of the feature's own at a point in no table's cell (the sheet's

@@ -130,6 +130,19 @@ describe("Table metadata", () => {
     expect(controller.canPin(pinned, "bottom")).toBe(false);
   });
 
+  it("with the setting off, takes a tag typed into a cell's or a header's text off a write, as one written new", async () => {
+    await setup(`| Name | Qty |\n|---|---|\n| Pear | 3 |\n`);
+    const [info] = controller.shownTables();
+    // (Typed or pasted: the model's content, which the page reads as an attribute)
+    await controller.writeTable(info!, (t) => ({
+      ...t,
+      columns: t.columns.map((column, c) => (c === 1 ? { ...column, header: "Qty <meta x.unit='kg'>" } : column)),
+      rows: t.rows.map((row) => ({ ...row, cells: row.cells.map((cell, c) => (c === 0 ? { ...cell, content: "Pears <meta x.note='a'>" } : cell)) })),
+    }));
+    expect(text).toBe(`| Name | Qty |\n|---|---|\n| Pears | 3 |\n`);
+    expect(flashes.some((f) => f.includes("2 new hidden values") && f.includes("not stored"))).toBe(true);
+  });
+
   it("stores the sorting with the setting on, only where the clicks end", async () => {
     vi.useFakeTimers();
     await setup(PAGE, { "silverware.table.metadata": true });

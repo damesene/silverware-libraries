@@ -2,8 +2,8 @@
 // *The store*): a document's tables in order, each by its key with its model
 // and a revision, whichever store keeps them (markdown in a page:
 // store/markdown/). Modules never see a store: they get tables through the
-// host (TableInfo.model and .revision; host.tables). Step 2 of the plan has
-// the read side; transactions and the rest come with steps 2 to 4. Formulas
+// host (TableInfo.model and .revision; host.tables). Step 2 of the plan gave
+// the read side, step 5 transactions. Formulas
 // written in a document's text, not as its tables' formula cells, are a store
 // of their own beside it (PageFormulaStore), which a store keeping none does
 // not have.
@@ -49,6 +49,23 @@ export type TableEdit =
 /** A document's tables changed as one step (one edit of a page: one undo step where it is open) */
 export type TableTransaction = { readonly document: string; readonly edits: readonly TableEdit[] };
 
+/**
+ * Why a transaction cannot be made as one step, whatever its document holds
+ * (a store refuses it): a table edited twice (which edit is the table's?), a
+ * new one after a table it takes out; undefined where it can
+ */
+export function validateTransaction(transaction: TableTransaction): string | undefined {
+  const edited = new Set<TableKey>();
+  for (const edit of transaction.edits) {
+    if (edit.kind === "insert") continue;
+    if (edited.has(edit.key)) return "a table is edited twice in one transaction";
+    edited.add(edit.key);
+  }
+  const removed = new Set(transaction.edits.flatMap((edit) => (edit.kind === "remove" ? [edit.key] : [])));
+  if (transaction.edits.some((edit) => edit.kind === "insert" && edit.after !== undefined && removed.has(edit.after))) return "a new table goes after a table the transaction takes out";
+  return undefined;
+}
+
 /** Why a transaction was left: a table changed since it was read, the document not there, or the store refusing it (read only, a change it cannot make) */
 export type TableSkip = { readonly cause: "changed" | "missing" | "refused"; readonly reason: string };
 
@@ -72,7 +89,7 @@ export interface TableStore {
   documentOf(key: TableKey): string | undefined;
   /** What a transaction would do; nothing written (the database store's shape: plan, apply, planUndo) */
   plan(transaction: TableTransaction): Promise<TablePlan>;
-  /** A plan written as one step where the document is still as planned (a page open: planned anew where it changed); else left, said why */
+  /** A plan written as one step where the document is still as planned (a page open: planned anew where it changed), once; else left, said why */
   apply(plan: TablePlan): Promise<TableReport>;
   /** What `report` wrote put back, where the document is still as it left it */
   planUndo(report: TableReport): Promise<TablePlan>;

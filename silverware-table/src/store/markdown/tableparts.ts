@@ -153,9 +153,11 @@ registerPart(
       }
       const edits = tableEdits(text, change);
       if ("problem" in edits) return { text, changes: 0, problem: edits.problem };
-      // From the last up, so each edit's place is as found (a new table after one written: after it, as it is written)
+      // From the last up, so each edit's place is as found (a new table after one written: after it, as it is written);
+      // new tables at one place the last given first, so each goes before the one after it, in the order given
       let written = text;
-      for (const edit of [...edits].sort((a, b) => b.from - a.from || b.to - a.to)) written = written.slice(0, edit.from) + edit.text + written.slice(edit.to);
+      const order = edits.map((edit, index) => ({ edit, index })).sort((a, b) => b.edit.from - a.edit.from || b.edit.to - a.edit.to || b.index - a.index);
+      for (const { edit } of order) written = written.slice(0, edit.from) + edit.text + written.slice(edit.to);
       return { text: written, changes: written === text ? 0 : edits.length };
     },
   }),

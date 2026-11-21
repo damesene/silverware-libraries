@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTable, serializeTable } from "./markdown.ts";
+import { parseTable, serializeTable } from "../markdown.ts";
 import {
   columnAfterMove,
   deleteColumn,
@@ -13,7 +13,7 @@ import {
   moveRow,
   moveRows,
   setAlign,
-} from "./ops.ts";
+} from "./markdownops.ts";
 
 const base = parseTable("| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |");
 const md = (t: ReturnType<typeof parseTable>) => serializeTable(t);

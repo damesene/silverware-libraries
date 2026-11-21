@@ -6,7 +6,7 @@
 // (store/markdown/pageformulas.ts). A literal with an escape or a line break in it
 // is left out: its text in the page is not the formula, so it could not be
 // written back; a text the literal cannot hold so is not written into it.
-import type { FormulaPlace, FormulaPlaces } from "../store/markdown/pageformulas.ts";
+import type { FormulaPlace, FormulaPlaces } from "../../store/markdown/pageformulas.ts";
 
 /** A text to find as it is in a regular expression */
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

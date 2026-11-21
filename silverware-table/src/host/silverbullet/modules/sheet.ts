@@ -29,9 +29,9 @@
 // table changes the address shown, not the value.
 import { nameEmptyHeaders } from "../../../columns.ts";
 import type { TableModel } from "../../../model/model.ts";
-import { CELL_MENU_ORDER, type AdapterFeature, type AddressFrame, type TableChange, type CellArea, type CellEditor, type CellMenuGroup, type CellRef, type RenderedEditor, type TableHost, type TableInfo, type TableTarget, type ToolbarButton, type WidgetInfo, type WriteResult } from "../../feature.ts";
-import { oncePerFrame } from "../../frame.ts";
-import { claimWindow, releaseWindow } from "../../overwindow.ts";
+import { CELL_MENU_ORDER, type AdapterFeature, type AddressFrame, type TableChange, type CellArea, type CellEditor, type CellMenuGroup, type CellRef, type RenderedEditor, type TableHost, type TableInfo, type TableTarget, type ToolbarButton, type WidgetInfo, type WriteResult } from "../../../core/feature.ts";
+import { oncePerFrame } from "../../../core/frame.ts";
+import { claimWindow, releaseWindow } from "../../../core/overwindow.ts";
 import { DRAWN_CLASS, STAND_IN_CLASS, UI_CLASS } from "../../../dom.ts";
 import { el } from "../../../../../shared/elements.ts";
 import { markOverWindow } from "../../../../../shared/overwindow.ts";
@@ -42,12 +42,12 @@ import { sameTableName } from "../../../namerules.ts";
 import { AT_KEY, formatAt, freeNameOf, freeSheetName, SHEET_KEY, WIDTH_PREFIX, sameSheet, type SheetCell, canPlace, sheetDataTable, type SheetPlace, validateSheetName, sheetOfTable, sheetsOf, sheetTablesOf, sheetWidths } from "../../../sheet/page.ts";
 import { parseClipboardCells } from "../../../paste.ts";
 import { validatePlace, roomFor } from "../../../sheet/layout.ts";
-import { watchPress } from "../../press.ts";
-import { growTo } from "../../structure.ts";
+import { watchPress } from "../../../core/press.ts";
+import { growTo } from "../../../core/structure.ts";
 import { type MenuEntry, namingThatCloses } from "../../../menu.ts";
 import { type CellRenderer, StaticCellRenderer } from "../cells.ts";
 import { drawTable } from "../drawn.ts";
-import type { TableKey } from "../../tables.ts";
+import type { TableKey } from "../../../core/tables.ts";
 
 // An empty column's width, a row's height when no table gives one
 const COLUMN_WIDTH = 100;

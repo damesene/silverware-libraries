@@ -3,9 +3,9 @@
 // they go, and the page (a wide table's box) scrolls near its edges. What the
 // copy looks like and where the lines were is measured here, from the cells.
 import { WIDGET_SELECTOR } from "../../dom.ts";
-import type { LineDrag, WidgetInfo } from "../feature.ts";
-import { scrollNearEdge } from "../geometry.ts";
-import type { TableRows } from "../rows.ts";
+import type { LineDrag, WidgetInfo } from "../../core/feature.ts";
+import { scrollNearEdge } from "../../core/geometry.ts";
+import type { TableRows } from "../../core/rows.ts";
 
 export type LineDragContext = {
   readonly doc: Document;

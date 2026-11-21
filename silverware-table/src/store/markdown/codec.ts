@@ -15,10 +15,11 @@
 // byte for byte; an attribute changed is written into the tags it was read
 // from, as the writers before the model wrote it (withTagValue; a name as
 // names.ts writes it), so a changed table reads as before. What the metadata
-// row has of no column found (a header renamed by hand) is kept as written.
+// row has of no column found (a header renamed by hand) is kept as written,
+// but of an attribute the model set on a column (orphansKept).
 import { HASHTAGS_KEY, headerHashtags, headerText, headsOf, withoutHashtags } from "../../columns.ts";
 import { escapeCell, type Row, serializeTable, type Table, unescapeCell } from "../../markdown.ts";
-import { columnsAttributes, columnsMetaNamed, columnsMetaOf } from "../../meta.ts";
+import { columnsAttributes, columnsMetaNamed, columnsMetaOf, parseColumnAttribute } from "../../meta.ts";
 import { attributeName, CORE, escapedForRegExp, splitAttributeName } from "../../metanames.ts";
 import {
   attributeChangeOf,
@@ -200,6 +201,15 @@ export function decodeCell(raw: string): ModelCell {
   return { content: unescapeCell(withoutTags(raw)), attributes };
 }
 
+/**
+ * Each column's attributes its header's tags hold, by column (the others are
+ * the metadata row's): what a tag typed into a header becomes once read
+ */
+export function headerTagAttributes(table: Table): readonly Attributes[] {
+  const header = table.rows[0];
+  return table.align.map((_, c) => attributesOf(tagAttributes(header?.cells[c] ?? "")));
+}
+
 /** A cell read alone (decodeCell) written back as a cell of encode's: as read where unchanged */
 export function encodeCell(cell: ModelCell): string {
   return cellMarkdown(cell.content, cell.attributes, () => true);
@@ -236,6 +246,22 @@ function metaOfColumnsGone(model: TableModel, base: Table, deleted: (column: num
   }
   const gone = new Set(read.columns.flatMap((column, c) => (column.attributes.size === 0 || reached.has(column.attributes) || deleted(c) ? [] : [c])));
   return Object.fromEntries(columnsAttributes(base, gone).map((name) => [name, base.meta![name]!]));
+}
+
+/**
+ * The metadata row's attributes of `base` naming no column (a column renamed
+ * by hand) that a write keeps: all but those of an attribute the model set on
+ * a column since it was read, which it writes whole (as a writer of the
+ * markdown setting every column's values of one did: a sorting stored leaves
+ * none of a column renamed since)
+ */
+function orphansKept(model: TableModel, base: Table): Record<string, string> {
+  const { orphans } = columnsMetaOf(base);
+  const set = new Set<string>();
+  for (const column of model.columns) {
+    for (let change = attributeChangeOf(column.attributes); change; change = attributeChangeOf(change.from)) set.add(attributeName(change.owner, change.key));
+  }
+  return set.size ? Object.fromEntries(Object.entries(orphans).filter(([name]) => !set.has(parseColumnAttribute(name)?.what ?? ""))) : orphans;
 }
 
 /**
@@ -289,7 +315,7 @@ export function encode(model: TableModel, base: Table, deleted: (column: number)
   });
   const baseHeader = base.rows[0];
   const headerRow: Row = !baseHeader ? { cells: headerCells } : headerCells.length === baseHeader.cells.length && headerCells.every((cell, c) => cell === baseHeader.cells[c]) ? baseHeader : { ...baseHeader, cells: headerCells };
-  const meta = columnsMetaNamed(headsOf(headerCells), byColumn, { ...columnsMetaOf(base).orphans, ...metaOfColumnsGone(model, base, deleted) });
+  const meta = columnsMetaNamed(headsOf(headerCells), byColumn, { ...orphansKept(model, base), ...metaOfColumnsGone(model, base, deleted) });
   const same = (a: Readonly<Record<string, string>>, b: Readonly<Record<string, string>> | undefined) =>
     !!b && Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([k, v]) => b[k] === v);
   return {

@@ -4,7 +4,7 @@
 // sideways, or narrower down to its box), a column fitted to its text by
 // double-clicking its edge or with "Fit to content" in its menu. With the metadata setting they are
 // stored in the table (widths.-c-price.size='180'), which follows the column
-// through renames and moves (metadataAfterEdit); without it, they hold for
+// through renames and moves (an attribute of its column in the model); without it, they hold for
 // the view only. "Reset column widths" in the table's menu makes every column
 // automatic again.
 //
@@ -14,7 +14,7 @@
 // of the box the table had then (widths.box): the table is shown as that
 // share of whatever box it has, so it widens and narrows with it (full
 // screen, another window; narrower, the rendering holds columns at their
-// headers' need, core/silverbullet/columns.ts). A column added
+// headers' need, host/silverbullet/columns.ts). A column added
 // or deleted keeps the table so (widthsAfterEdit, in the write). A table of
 // its own width (narrower or wider than its box) is a sum other than the box:
 // the same data (docs/silverware-table-column-resize.md).

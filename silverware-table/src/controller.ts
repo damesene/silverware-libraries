@@ -3,7 +3,7 @@
 // one write of the page writer's (the markdown store's, store/markdown/): one
 // edit of the open page, so undo works as for any other edit.
 import { type FeatureName, formatRule, moduleOnByDefault, SETTINGS, type SettingValue } from "./bridge.ts";
-import { type AdapterFeature, type AddressFrame, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, type ColumnsMeasure, type ColumnWidths, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type InsertPlace, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget, type KeyedTable, type OtherPages, type PendingEdits, type TableChange } from "./core/feature.ts";
+import { type AdapterFeature, type AddressFrame, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, type ColumnsMeasure, type ColumnWidths, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type InsertPlace, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type NamingTarget, type KeyedTable, type OtherPages, type PendingEdits, type TableChange } from "./core/feature.ts";
 import { type Dialog, type DialogOptions, Dialogs } from "./core/dialog.ts";
 import { ViewAnchor } from "./core/anchor.ts";
 import { mapPosition, type TextEdit, withWriteListeners } from "./core/writelisteners.ts";
@@ -21,22 +21,20 @@ import { mergeLooks } from "./core/looks.ts";
 import { Panels } from "./core/panel.ts";
 import { type DragContext, followDrag } from "./core/drag.ts";
 import { writingClipboard } from "../../shared/clipboard.ts";
-import { markTable, renderedMeta, SilverBulletAdapter } from "./core/silverbullet/adapter.ts";
 import type { TablePlatform } from "./core/platform.ts";
 import type { PageFormula, StoredTable, TableEdit } from "./core/store.ts";
 import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, type TableModel, withAttributeIn, withAttributesAt } from "./model/model.ts";
 import { HASHTAGS_KEY, nameEmptyHeaders } from "./columns.ts";
-import { type AttributeRules, cellWrittenOver, withAttributeRules } from "./model/rules.ts";
+import { type AttributeRules, cellWrittenOver, withAttributeRules, withoutNewAttributes } from "./model/rules.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { MarkdownStore, revisionOf, tablesIn } from "./store/markdown/store.ts";
 import { SourceStore } from "./store/sources.ts";
 import { pageFormulaPlace, pageFormulasIn } from "./store/markdown/pageformulas.ts";
 import { cursorPlace, newTableMarkdown, removedSpan, tableAt, type TableWrite } from "./store/markdown/tableparts.ts";
 import type { EditResult } from "../../shared/pages/tags/edit.ts";
-import { decode, encode, plainMarkdown } from "./store/markdown/codec.ts";
+import { decode, encode, headerTagAttributes, plainMarkdown } from "./store/markdown/codec.ts";
 import { SettingsDialog } from "./settings.ts";
 import { Metadata } from "./core/metadata.ts";
-import { featureEntries } from "./modules.ts";
 import { NO_SOURCES, type SourceProvider } from "./sources.ts";
 import { moduleHost } from "./core/modulehost.ts";
 import {
@@ -68,17 +66,14 @@ import {
   parseTable,
   serializeTable,
   type Table,
-  type TableMeta,
-  tableMetaOf,
   writesMetaRow,
   type TableRange,
 } from "./markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "./menu.ts";
 import { floatingMenu, focusMenu } from "./core/menu.ts";
-import { CORE, metadataAfterEdit, metaName, metaPins, metaSort, withMetaPins, withMetaSort, writtenName } from "./meta.ts";
+import { CORE, metaName, metaPins, metaSort, withMetaPins, withMetaSort, writtenName } from "./meta.ts";
 import { CELL_NAME_KEY, type CellNameAt, LINE_NAME_KEY, modelCellName, modelCellNames, modelColumnName, modelRowName, modelRowNames, type RowName, withModelName } from "./names.ts";
 import { ownMeta } from "./core/metaaccess.ts";
-import { withoutNewTagValues } from "./tagvalues.ts";
 import { reorderRows } from "./model/ops.ts";
 import {
   cycleSort,
@@ -96,7 +91,7 @@ import { Parts } from "./core/parts.ts";
 import { underWindow } from "./core/overwindow.ts";
 import { layoutOf } from "../../shared/layout.ts";
 import { overWindowOf } from "../../shared/overwindow.ts";
-import { tablesLayoutProvider } from "./core/layoutprovider.ts";
+import type { TableBinding } from "./core/binding.ts";
 
 // The cell editor as features see it, and what it takes to put the cell back
 
@@ -127,10 +122,6 @@ const NOT_SAVED = "Silverware Table: the table changed in the meantime, nothing 
 // The element under the pointer while Ctrl is held in a cell editor (the move cursor, CSS)
 const NAVIGATING_CLASS = "swt-navigating-here";
 
-/** A table of its metadata only (read from a rendering, before the table is): what features read of it as a whole */
-function metadataOnly(meta: TableMeta | undefined): Table {
-  return { indent: "", align: [], rows: [], padded: false, ...(meta ? tableMetaOf(meta) : {}) };
-}
 
 /** What sorting compares of body rows' cells, by row and column: a look's key of its own (data-swt-sort), else the value */
 function sortKeys(rows: readonly HTMLTableRowElement[], values: readonly (readonly string[])[]): (row: number, column: number) => string {
@@ -251,22 +242,17 @@ export class Controller implements TableHost {
   private readonly dragContext: DragContext;
   // The tables marked (TableHost.tableMark), by mark
   private readonly tableMarks = new Map<string, Set<string>>();
-  // Steps every write goes through after the edit, in this order
-  // The core's write steps: the columns' attributes follow their columns (a write of the model's has them on its
-  // columns already: followed by name again, where headers repeat, they would move twice), pins are stored (as far as
-  // they may be)
-  private readonly writeSteps: readonly WriteStep[] = [
-    (before, after, options, byModel) => metadataAfterEdit(before, after, options, (edge) => this.coreMeta.canStore(before, `pin-${edge}`), !byModel),
-  ];
 
   constructor(
     readonly doc: Document,
     public platform: TablePlatform,
+    // What the host binds the core to: its rendering's adapter, the features in their order (core/binding.ts)
+    private readonly binding: TableBinding,
     // The sources of the space the host gives (the sources module offers them to formulas)
     sources: SourceProvider = NO_SOURCES,
   ) {
     this.sourceStore = new SourceStore(sources, this.register);
-    this.adapter = new SilverBulletAdapter(doc, this.rows, {
+    this.adapter = binding.adapter(doc, this.rows, {
       infoOf: (widget) => this.infos.get(widget),
       rowNeeded: (info, row) => this.rowNeeded(info, row),
       holdInDocument: (info, row) => this.holdInDocument(info, row),
@@ -386,7 +372,7 @@ export class Controller implements TableHost {
    */
   private registerLayout(): void {
     layoutOf(this.platform.layout).register(
-      tablesLayoutProvider({
+      this.binding.layoutProvider({
         renderedRows: (table) => this.rows.renderedRows(table),
         enhanced: (widget) => this.infos.has(widget),
         write: (widget, change) => {
@@ -438,7 +424,7 @@ export class Controller implements TableHost {
    * page is loaded again.
    */
   private async startFeatures(): Promise<void> {
-    const all = featureEntries(this.metadata, this.sourceStore);
+    const all = this.binding.features(this.metadata, this.sourceStore);
     const enabled = await Promise.all(all.map(({ name }) => (name ? this.featureEnabled(name) : true)));
     if (this.stopped) return;
     all.forEach(({ name }, i) => {
@@ -817,16 +803,31 @@ export class Controller implements TableHost {
   }
 
   /**
-   * The last step of a write with the metadata setting off: the hidden values
-   * it would add to a table's cells (withoutNewTagValues) are taken off,
-   * counted in `taken` (the write's own: writes may run at once), said once
-   * the write is made
+   * The core's step of a write: the pins it sets stored, at the edges they may
+   * be stored at (the metadata setting off: only where the table has pins
+   * there already); the columns' attributes are on their columns in the model
    */
-  private withoutNewTags(before: Table, after: Table, options: Pick<WriteOptions, "rowMap" | "columnMap">, taken: { n: number }): Table {
-    if (this.metadataOn) return after;
-    const result = withoutNewTagValues(before, after, options.rowMap, options.columnMap);
+  private withPinsStored(before: TableModel, after: TableModel, options: Pick<WriteOptions, "pins">): TableModel {
+    const { pins } = options;
+    if (!pins) return after;
+    const kept = metaPins(after);
+    const edge = (side: keyof Pins) => (this.coreMeta.canStore(before, `pin-${side}`) ? pins[side] : kept[side]);
+    return withMetaPins(after, { top: edge("top"), bottom: edge("bottom"), left: edge("left"), right: edge("right") });
+  }
+
+  /**
+   * The last step of a write with the metadata setting off: the attributes it
+   * would add to a table's columns, rows and cells (model/rules.ts,
+   * withoutNewAttributes) are taken off, counted in `taken` (the write's own:
+   * writes may run at once), said once the write is made. Checked on the
+   * table as written, read again: a tag typed or pasted into a cell is its
+   * content in the model, and an attribute once the page is read
+   */
+  private withoutNewAttributes(before: TableModel, written: Table, options: Pick<WriteOptions, "rowMap" | "columnMap">, taken: { n: number }): Table {
+    if (this.metadataOn) return written;
+    const result = withoutNewAttributes(before, decode(written), options.rowMap, options.columnMap, headerTagAttributes(written));
     taken.n += result.taken;
-    return result.table;
+    return result.taken ? encode(result.table, written) : written;
   }
 
   /** Says how many hidden values a write left out (the metadata setting off) */
@@ -1116,7 +1117,7 @@ export class Controller implements TableHost {
           if (!widget || this.rows.knows(table) || this.ownTable(widget)) continue;
           const rows = this.rows.renderedRows(table);
           // How it looks as a whole, from its metadata as rendered, before the browser lays it out
-          markTable(widget, this.tableLook(decode(metadataOnly(renderedMeta(rows)))));
+          this.binding.markRendered(widget, rows, (table) => this.tableLook(table));
           for (const feature of this.features) feature.tableAdded?.(widget, table, rows);
         }
       }
@@ -2678,19 +2679,19 @@ export class Controller implements TableHost {
   // ---- writing markdown --------------------------------------------------
 
   writeTable(target: TableTarget, change: (table: TableModel) => TableModel | undefined, options: WriteOptions = {}): Promise<WriteResult> {
-    return this.writeTo(target, this.modelChange(change, options), options, true);
+    return this.writeTo(target, this.modelChange(change, options), options);
   }
 
   writeMarkdown(target: TableTarget, change: (table: Table) => Table | undefined, options: WriteOptions = {}): Promise<WriteResult> {
-    return this.writeTo(target, change, options, false);
+    return this.writeTo(target, change, options);
   }
 
-  /** A write of a table by its target (`byModel`: a change of the model's, modelChange) */
-  private writeTo(target: TableTarget, change: (table: Table) => Table | undefined, options: WriteOptions, byModel: boolean): Promise<WriteResult> {
+  /** A write of a table by its target */
+  private writeTo(target: TableTarget, change: (table: Table) => Table | undefined, options: WriteOptions): Promise<WriteResult> {
     // Rendered: written as its widget's, so the view stays where it was
     const widget = this.widgetForKey(target.key);
     const info = widget && this.infos.get(widget);
-    return info && info.source === target.source ? this.writeAt(info, widget, change, options, byModel) : this.writeAt(target, undefined, change, options, byModel);
+    return info && info.source === target.source ? this.writeAt(info, widget, change, options) : this.writeAt(target, undefined, change, options);
   }
 
   /**
@@ -2797,7 +2798,7 @@ export class Controller implements TableHost {
    * saved first, as a press elsewhere would: kept open, a table drawn for its
    * key (the sheet's) would not be drawn anew under it
    */
-  private async writeAt(given: TableTarget, shown: HTMLElement | undefined, change: (table: Table) => Table | undefined, options: WriteOptions, byModel: boolean): Promise<WriteResult> {
+  private async writeAt(given: TableTarget, shown: HTMLElement | undefined, change: (table: Table) => Table | undefined, options: WriteOptions): Promise<WriteResult> {
     const key = given.key;
     if (options.focus && this.cellEditor.active?.key === key) await this.saveEditing();
     const before = this.writing.get(key);
@@ -2806,7 +2807,7 @@ export class Controller implements TableHost {
     this.writing.set(key, mine);
     if (before) await before;
     try {
-      return await this.writeNow(given, this.widgetForKey(key) ?? shown, change, options, byModel);
+      return await this.writeNow(given, this.widgetForKey(key) ?? shown, change, options);
     } finally {
       if (this.writing.get(key) === mine) this.writing.delete(key);
       release();
@@ -2835,7 +2836,7 @@ export class Controller implements TableHost {
     return { info: { key: given.key, source: now.source, hint: now.hint }, range: found, options };
   }
 
-  private async writeNow(given: TableTarget, widget: HTMLElement | undefined, change: (table: Table) => Table | undefined, asked: WriteOptions, byModel: boolean): Promise<WriteResult> {
+  private async writeNow(given: TableTarget, widget: HTMLElement | undefined, change: (table: Table) => Table | undefined, asked: WriteOptions): Promise<WriteResult> {
     try {
       // What the write needs read is read before the page's text (other pages,
       // which take a while), so the text the edit is computed from is not stale
@@ -2875,9 +2876,8 @@ export class Controller implements TableHost {
       const edit = { ...options, page };
       let stepped = editedModel;
       for (const feature of this.features) if (feature.writeStep) stepped = feature.writeStep(beforeModel, stepped, edit);
-      let changed = encode(stepped, edited);
-      changed = this.writeSteps.reduce((table, step) => step(before, table, options, byModel), changed);
-      changed = this.withoutNewTags(before, changed, options, taken);
+      stepped = this.withPinsStored(beforeModel, stepped, options);
+      const changed = this.withoutNewAttributes(beforeModel, encode(stepped, edited), options, taken);
       const changedModel = decode(changed);
       const serialize = await this.serializer();
       const markdown = serialize(changed);
@@ -2915,7 +2915,7 @@ export class Controller implements TableHost {
       for (const [key, model] of others.written) {
         const at = rangeOf.get(key)!;
         const read = parseTable(at.text);
-        const other = serialize(this.withoutNewTags(read, encode(model, read), {}, taken));
+        const other = serialize(this.withoutNewAttributes(decode(read), encode(model, read), {}, taken));
         updates.push({ range: at, markdown: other });
         tables.push({ ...tableAt(text, at), markdown: other });
       }

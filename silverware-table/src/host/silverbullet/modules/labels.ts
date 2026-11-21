@@ -10,9 +10,9 @@
 // header), or, where the view leaves no room there (a table at the page's
 // top), in the header's corner. It takes no presses.
 import { el } from "../../../../../shared/elements.ts";
-import type { AdapterFeature, TableBadge, TableHost, WidgetInfo } from "../../feature.ts";
-import type { Rect } from "../../geometry.ts";
-import { underWindow } from "../../overwindow.ts";
+import type { AdapterFeature, TableBadge, TableHost, WidgetInfo } from "../../../core/feature.ts";
+import type { Rect } from "../../../core/geometry.ts";
+import { underWindow } from "../../../core/overwindow.ts";
 
 // A tab's height, kept in step with the CSS (.swt-table-label): measured, a tab not shown yet has none
 const TAB_HEIGHT = 18;

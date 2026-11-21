@@ -25,8 +25,8 @@
 // top, the box's top above it, under SilverBullet's top bar) is marked `swt-held-by-page`: its box's scrollbar runs up
 // past the header there, and the CSS makes it clear until the box's top is in view again (its width kept: the table
 // does not move).
-import type { AdapterFeature, TableHost } from "../../feature.ts";
-import { STICKY_GAP } from "../../layout.ts";
+import type { AdapterFeature, TableHost } from "../../../core/feature.ts";
+import { STICKY_GAP } from "../../../core/layout.ts";
 import { renderedTable, WIDGET_SELECTOR } from "../../../dom.ts";
 
 // A box's table whose header the page holds, above the box's top: its scrollbar hidden (the CSS)

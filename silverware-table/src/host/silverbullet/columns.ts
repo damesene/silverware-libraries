@@ -12,7 +12,7 @@
 // is kept and shown at once when it is rendered anew (every write): the pass
 // then finds nothing to change, and the table is laid out once.
 import { WIDGET_SELECTOR } from "../../dom.ts";
-import { oncePerFrame } from "../frame.ts";
+import { oncePerFrame } from "../../core/frame.ts";
 
 // A table laid out by its columns' widths: its colgroup and the table both have the class
 const FIXED_COLUMNS_CLASS = "swt-fixed-columns";

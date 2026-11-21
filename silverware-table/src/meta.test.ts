@@ -1,8 +1,9 @@
+import { followColumnMeta } from "./testing/markdownops.ts";
 import { describe, expect, it } from "vitest";
 import { findTables, locateByShape, parseMetaRow, parseTable, serializeTable, type Table, writtenMeta } from "./markdown.ts";
-import { columnValues, followColumnMeta, metaName, metaSort, withColumnValues, withMeta, withMetaSort, withMetaValue } from "./meta.ts";
+import { columnValues, metaName, metaSort, withColumnValues, withMeta, withMetaSort, withMetaValue } from "./meta.ts";
 import { sameTableName, validateTableName } from "./namerules.ts";
-import { columnAfterMove, deleteColumn, insertRow, moveColumn, setCell } from "./ops.ts";
+import { columnAfterMove, deleteColumn, insertRow, moveColumn, setCell } from "./testing/markdownops.ts";
 
 const md = (t: ReturnType<typeof parseTable>) => serializeTable(t);
 

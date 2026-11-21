@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseTable, serializeTable, writtenMeta } from "../markdown.ts";
-import { setCell } from "../ops.ts";
+import { setCell } from "../testing/markdownops.ts";
 import { attributeChangeOf } from "../model/model.ts";
 import { decode, encode } from "../store/markdown/codec.ts";
 import { withTagValue } from "../tagvalues.ts";

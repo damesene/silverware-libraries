@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { pageChanges } from "../../../../shared/pages/changes.ts";
 import { pageWriter } from "../../../../shared/pages/writer.ts";
 import type { Editor, Space } from "../../../../shared/platform.ts";
-import { luaCallPlaces } from "../../host/lua.ts";
+import { luaCallPlaces } from "../../host/silverbullet/lua.ts";
 import { findTables } from "../../markdown.ts";
 import { defineFormulaPlaces, pageFormulasIn } from "./pageformulas.ts";
 import { cursorPlace, removedSpan, tableAt } from "./tableparts.ts";
@@ -76,6 +76,14 @@ describe("the markdown store's parts of the page writer", () => {
     const end = pages({ Shop: "Text." });
     await end.writer.write(pageChanges().page("Shop", (p) => p.tables.write([], [{ markdown: NEW }])).build());
     expect(end.map.get("Shop")).toBe(`Text.\n\n${NEW}`);
+    // Several at one place: in the order given
+    const LAST = "| C |\n|---|\n| y |";
+    const two = pages({ Shop: TWO });
+    await two.writer.write(pageChanges().page("Shop", (p) => p.tables.write([], [{ markdown: NEW, place: { after: at(TWO, 0) } }, { markdown: LAST, place: { after: at(TWO, 0) } }])).build());
+    expect(two.map.get("Shop")).toBe(`# Shop\n\n| A |\n|---|\n| 1 |\n\n${NEW}\n\n${LAST}\n\nText.\n\n| A |\n|---|\n| 1 |\n`);
+    const ends = pages({ Shop: "Text." });
+    await ends.writer.write(pageChanges().page("Shop", (p) => p.tables.write([], [{ markdown: NEW }, { markdown: LAST }])).build());
+    expect(ends.map.get("Shop")).toBe(`Text.\n\n${NEW}\n\n${LAST}`);
   });
 
   it("takes a table out with the empty line after it, the page's last with the one before", async () => {

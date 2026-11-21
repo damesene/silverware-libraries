@@ -21,6 +21,7 @@ import {
   type TableSkip,
   type TableStore,
   type TableTransaction,
+  type TableWriteEdit,
   validateTransaction,
 } from "../../core/store.ts";
 import { pageFormulasIn } from "./pageformulas.ts";
@@ -222,14 +223,9 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
         writes.push({ ...tableAt(text, range), markdown: undefined });
         continue;
       }
-      const read = this.read.get(document)?.get(edit.expects) ?? parseTable(range.text);
-      // Over the very table its model was read from (the codec knows what it read of it): the page's, or one a change of
-      // the markdown made (written as it is); tidy: every row written anew, padded
-      const over = decodedFrom(edit.model) ?? read;
-      const base: Table = edit.tidy ? { ...over, padded: true } : over;
+      const read = this.tableRead(document, edit.expects, range.text);
       const { columnMap } = edit;
-      const encoded = encode(edit.model, base, columnMap && ((column) => columnMap(column) === undefined));
-      const after = edit.withoutMetadata ? withoutMetadata(encoded, edit.withoutMetadata) : encoded;
+      const after = this.encoded(document, edit.model, read, edit);
       const markdown = serialize(after);
       writes.push({ ...tableAt(text, range), markdown });
       told.push({ before: read, after, markdown, ...(columnMap ? { columnMap } : {}) });
@@ -332,7 +328,39 @@ export class MarkdownStore implements TableStore, PageFormulaStore {
 
   metadataOf(table: TableModel, part: MetadataPart | "all"): StoredMetadata {
     // (Its markdown as read: what it stores is written there, the metadata of no column too)
-    return metadataOf(decodedFrom(table) ?? encodeOver(table, table), part);
+    return metadataOf(encodeOver(table, table), part);
+  }
+
+  withoutMetadata(table: TableModel, part: MetadataPart | "all"): TableModel {
+    // (Read back from its markdown without it: written as that markdown is, the metadata of no column gone too)
+    return decode(withoutMetadata(encodeOver(table, table), part));
+  }
+
+  async writesSame(document: string, read: StoredTable, model: TableModel, options: Pick<TableWriteEdit, "tidy" | "columnMap"> = {}): Promise<boolean> {
+    const serialize = await this.serializer();
+    return serialize(this.encoded(document, model, this.tableRead(document, read.revision, read.revision), options)) === read.revision;
+  }
+
+  /** A table of a page as last read by its revision (its text: parsed again where not kept) */
+  private tableRead(document: string, revision: TableRevision, text: string): Table {
+    return this.read.get(document)?.get(revision) ?? parseTable(text);
+  }
+
+  /**
+   * A model written as a table of a page over `read`, the table it replaces:
+   * over the very table its model was read from (the codec knows what it
+   * read of it), the table read or one the store made of it (a table without
+   * its metadata, written as it is), never another of the page's tables; tidy:
+   * every row written anew, padded; the columns the column map deletes taking
+   * their metadata with them
+   */
+  private encoded(document: string, model: TableModel, read: Table, options: Pick<TableWriteEdit, "tidy" | "columnMap">): Table {
+    const from = decodedFrom(model);
+    const another = from !== undefined && from !== read && [...(this.read.get(document)?.values() ?? [])].includes(from);
+    const over = from && !another ? from : read;
+    const base: Table = options.tidy ? { ...over, padded: true } : over;
+    const { columnMap } = options;
+    return encode(model, base, columnMap && ((column) => columnMap(column) === undefined));
   }
 
   asRead(model: TableModel): TableModel {

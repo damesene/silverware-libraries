@@ -456,8 +456,6 @@ export type WriteOptions = {
   readonly also?: readonly TableChange[];
   // The table written anew in its store's tidiest form (Format table: a markdown table's cells padded to line up)
   readonly tidy?: true;
-  // What its store keeps of a part of it (or all of it) beyond its content taken off (Remove metadata)
-  readonly withoutMetadata?: MetadataPart | "all";
 };
 
 /**
@@ -628,7 +626,7 @@ export interface ModelHost {
    * write step taking part (a page command over every table, edits held for a page left). "failed" where one of the
    * tables is not in the document (or it is not there)
    */
-  replaceTables(document: string, changes: readonly TableChange[], options?: Pick<WriteOptions, "withoutMetadata">): Promise<WriteResult>;
+  replaceTables(document: string, changes: readonly TableChange[]): Promise<WriteResult>;
   /**
    * The open page's tables in order, as last read (pageText): the same list while that text is (a module's state kept
    * for the page compares it), a table of the page found in it by its key
@@ -978,6 +976,8 @@ export interface TableHost extends ModelHost {
   asModel(table: Table): TableModel;
   /** What a table, or a part of it, stores beyond its content (Remove metadata: whose it is, whether any): its store's */
   storedMetadata(table: TableModel, part: MetadataPart | "all"): StoredMetadata;
+  /** The table without what its store keeps of a part of it (or all) beyond its content, as its store reads it then (Remove metadata's change) */
+  withoutStoredMetadata(table: TableModel, part: MetadataPart | "all"): TableModel;
   /** The platform (core/platform.ts): the adapter is the host's side, which the modules' host functions stand for */
   readonly platform: TablePlatform;
   infoOf(widget: HTMLElement): WidgetInfo | undefined;

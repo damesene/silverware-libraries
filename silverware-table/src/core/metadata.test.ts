@@ -373,6 +373,18 @@ describe("Table metadata", () => {
     expect(text).toBe("| A |\n|---|\n| 1 |\n| 2 |\n");
   });
 
+  it("written as any change: a formula of another table referring to the name it took is followed in the same edit", async () => {
+    await setup(`| Item | Price |\n|---|---|\n| Pear | 12 |\n| <meta core.table core.name='prices'> |\n\n| Total |\n|---|\n| 24 <meta formulas.f='=prices!B1*2'> |\n`, {
+      "silverware.table.metadata": true,
+    });
+    bridge.confirm = () => true;
+    tableMenuItem(/^Remove metadata$/)!.click();
+    await flush();
+    expect(text).toContain("| Item | Price |\n|---|---|\n| Pear | 12 |\n\n");
+    // (Its name gone: the formula referring to it is an error now, as a rename's would be)
+    expect(text).toContain("| \\#REF! <meta formulas.f='=prices!B1*2'> |");
+  });
+
   it("keeps the metadata row last and follows a renamed column", async () => {
     // Enter only saves the header: the cell below would open
     await setup(META_PAGE, { "silverware.table.editor.enterKey": "save" });

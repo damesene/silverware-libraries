@@ -112,23 +112,6 @@ export function sameCell(a: ModelCell, b: ModelCell): boolean {
   return a === b || (a.content === b.content && sameAttributes(a.attributes, b.attributes));
 }
 
-/** Whether two tables are the same: their columns (header, alignment, attributes), rows and cells, and attributes */
-export function sameTable(a: TableModel, b: TableModel): boolean {
-  if (a === b) return true;
-  if (a.columns.length !== b.columns.length || a.rows.length !== b.rows.length || !sameAttributes(a.attributes, b.attributes)) return false;
-  const sameColumns = a.columns.every((column, c) => {
-    const other = b.columns[c]!;
-    return column === other || (column.header === other.header && column.align === other.align && sameAttributes(column.attributes, other.attributes));
-  });
-  return (
-    sameColumns &&
-    a.rows.every((row, r) => {
-      const other = b.rows[r]!;
-      return row === other || (row.cells.length === other.cells.length && sameAttributes(row.attributes, other.attributes) && row.cells.every((cell, c) => sameCell(cell, other.cells[c]!)));
-    })
-  );
-}
-
 /** Where an attribute is: a column's (`column`), a body row's (`row`, the first 1), a cell's (both); none: the table's */
 export type AttributePlace = { readonly column: number; readonly row?: undefined } | { readonly row: number; readonly column?: number };
 

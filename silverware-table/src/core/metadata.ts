@@ -6,10 +6,11 @@
 // For one table from its toolbar, for all tables of the page with the
 // "Silverware Table: Remove table metadata" command, for cells, rows or
 // columns from their menu (a column's attributes in the metadata row too).
-// The core's; what a table stores beyond its content, and taking it off, are
-// its store's (BoundStore.metadataOf, a write's `withoutMetadata`: the markdown
+// The core's; what a table stores beyond its content, and the table without
+// it, are its store's (BoundStore.metadataOf, withoutMetadata: the markdown
 // store's metadata row and hidden tags, those of no column too, which no
-// model holds).
+// model holds), written as any change: the features follow it (formulas
+// referring to a name gone, a sheet's data handed on).
 import { FEATURE_NAMES, MODULE_LABELS } from "../bridge.ts";
 import { CELL_MENU_ORDER, type CellMenuGroup, type CellRef, type Feature, type MetadataPart, type StoredMetadata, type TableHost, type ToolbarButton, type TableInfo } from "./feature.ts";
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "./feature.ts";
@@ -103,7 +104,7 @@ export class Metadata implements Feature {
     // The table as rendered now: the dialog may have outlived the rendering it was asked from
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
     if (this.host.storedMetadata(info.model, part).settings) this.host.forgetStoredView(info.key);
-    await this.host.writeTable(info, (table) => table, { withoutMetadata: part });
+    await this.host.writeTable(info, (table) => this.host.withoutStoredMetadata(table, part));
     // The dialog took the focus: back to the editor, so Ctrl+Z works right away
     this.host.focusPage();
   }
@@ -119,7 +120,7 @@ export class Metadata implements Feature {
     // The table as rendered now: the dialog may have outlived the rendering it was asked from
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
     if (this.host.storedMetadata(info.model, "all").settings) this.host.forgetStoredView(info.key);
-    await this.host.writeTable(info, (table) => table, { withoutMetadata: "all" });
+    await this.host.writeTable(info, (table) => this.host.withoutStoredMetadata(table, "all"));
     // The dialog took the focus: back to the editor, so Ctrl+Z works right away
     this.host.focusPage();
   }
@@ -141,7 +142,7 @@ export class Metadata implements Feature {
     if (!(await this.host.ask(question))) return;
     for (const t of tables) if (t.stored.settings) host.forgetStoredView(t.key);
     // One edit of all those tables, so one Ctrl+Z undoes it
-    await host.replaceTables(page, tables.map((t) => ({ key: t.key, change: (table) => table })), { withoutMetadata: "all" });
+    await host.replaceTables(page, tables.map((t) => ({ key: t.key, change: (table) => host.withoutStoredMetadata(table, "all") })));
     // The dialog took the focus: back to the editor, so Ctrl+Z works right away
     this.host.focusPage();
     host.notify(`Silverware Table: removed the metadata of ${tables.length} table(s)`, "info");

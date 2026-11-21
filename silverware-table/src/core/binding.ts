@@ -13,7 +13,7 @@ import type { AdapterContext, TableAdapter } from "./adapter.ts";
 import type { AdapterFeature, Feature, TableHost, TableLook, WriteResult } from "./feature.ts";
 import type { TableRows } from "./rows.ts";
 import type { TablePlatform } from "./platform.ts";
-import type { MetadataPart, PageFormulaStore, StoredMetadata, TableStore } from "./store.ts";
+import type { MetadataPart, PageFormulaStore, StoredMetadata, StoredTable, TableStore, TableWriteEdit } from "./store.ts";
 import type { TableKey, TableRegister } from "./tables.ts";
 import type { Table } from "../markdown.ts";
 
@@ -39,13 +39,17 @@ export type StoreContext = {
  * The store a host keeps the open page's tables in, as the core uses it: its
  * tables, transactions and page formulas, where a table is in its document
  * as the host counts (a markdown page's offsets: a custom menu's table's
- * `from`, `to`; undefined: not read), and what a table it read stores beyond
- * its content (Remove metadata; a write's `withoutMetadata` takes it off)
+ * `from`, `to`; undefined: not read), what a table it read stores beyond
+ * its content and the table without it (Remove metadata: written as any
+ * change, the other tables following it), and whether a model written over
+ * a table read would write it as it is (a write that changes nothing)
  */
 export type BoundStore = TableStore &
   PageFormulaStore & {
     placeOf(document: string, key: TableKey): { readonly from: number; readonly to: number } | undefined;
     metadataOf(table: TableModel, part: MetadataPart | "all"): StoredMetadata;
+    withoutMetadata(table: TableModel, part: MetadataPart | "all"): TableModel;
+    writesSame(document: string, read: StoredTable, model: TableModel, options?: Pick<TableWriteEdit, "tidy" | "columnMap">): Promise<boolean>;
   };
 
 /**

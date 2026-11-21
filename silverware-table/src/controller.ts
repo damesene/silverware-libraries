@@ -22,7 +22,7 @@ import { type DragContext, followDrag } from "./core/drag.ts";
 import { writingClipboard } from "../../shared/clipboard.ts";
 import type { TablePlatform } from "./core/platform.ts";
 import type { MetadataPart, StoredMetadata, StoredTable, TableEdit, TableRevision } from "./core/store.ts";
-import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, sameAttributes, sameCell, sameTable, type TableModel, withAttributeIn, withAttributesAt } from "./model/model.ts";
+import { type AttributePlace, attributeIn, type ModelCell, NO_ATTRIBUTES, sameAttributes, sameCell, type TableModel, withAttributeIn, withAttributesAt } from "./model/model.ts";
 import { HASHTAGS_KEY, nameEmptyHeaders } from "./columns.ts";
 import { type AttributeRules, cellWrittenOver, withAttributeRules, withoutNewAttributes } from "./model/rules.ts";
 import { type TableData, tableData } from "./tabledata.ts";
@@ -617,14 +617,14 @@ export class Controller implements TableHost {
     return this.platform.editor.documentName();
   }
 
-  async replaceTables(document: string, changes: readonly TableChange[], options: Pick<WriteOptions, "withoutMetadata"> = {}): Promise<WriteResult> {
+  async replaceTables(document: string, changes: readonly TableChange[]): Promise<WriteResult> {
     // One transaction of the store's: each table written where it is still as read now
     const tables = await this.store.tables(document);
     const edits: TableEdit[] = [];
     for (const { key, change } of changes) {
       const table = tables?.find((one) => one.key === key);
       if (!table) return "failed";
-      edits.push({ kind: "write", key, expects: table.revision, model: change(table.model), ...(options.withoutMetadata ? { withoutMetadata: options.withoutMetadata } : {}) });
+      edits.push({ kind: "write", key, expects: table.revision, model: change(table.model) });
     }
     const report = await this.store.apply(await this.store.plan({ document, edits }));
     return report.written ? "written" : report.skipped ? "failed" : "unchanged";
@@ -632,6 +632,10 @@ export class Controller implements TableHost {
 
   storedMetadata(table: TableModel, part: MetadataPart | "all"): StoredMetadata {
     return this.store.metadataOf(table, part);
+  }
+
+  withoutStoredMetadata(table: TableModel, part: MetadataPart | "all"): TableModel {
+    return this.store.withoutMetadata(table, part);
   }
 
   get undoEdit(): (() => Promise<void>) | undefined {
@@ -2769,8 +2773,8 @@ export class Controller implements TableHost {
       for (const feature of this.features) if (feature.writeStep) stepped = feature.writeStep(beforeModel, stepped, edit);
       stepped = this.withPinsStored(beforeModel, stepped, options);
       const changedModel = this.withoutNewAttributes(beforeModel, stepped, options, taken);
-      // (Unchanged: as the page has it; written anew where its form is asked to change)
-      if (!options.tidy && !options.withoutMetadata && sameTable(stored.model, changedModel)) {
+      // (Unchanged: written as the page has it, its store says, formatted as asked)
+      if (await this.store.writesSame(document, stored, changedModel, options)) {
         for (const pending of held) pending.written();
         // (What was left out may be all the write had: said all the same)
         this.sayTaken(taken);
@@ -2805,7 +2809,6 @@ export class Controller implements TableHost {
           model: changedModel,
           ...(columnMap ? { columnMap } : {}),
           ...(options.tidy ? { tidy: true } : {}),
-          ...(options.withoutMetadata ? { withoutMetadata: options.withoutMetadata } : {}),
         },
       ];
       for (const [other, model] of others.written) {

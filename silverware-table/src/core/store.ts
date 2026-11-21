@@ -60,8 +60,7 @@ export type StoredMetadata = {
  * (`expects`). `columnMap`: where its columns went (undefined: deleted), for
  * what follows a write (a markdown page's other plugins, told). `tidy`:
  * written anew in the store's tidiest form (a markdown table's cells padded
- * to line up). `withoutMetadata`: what the store keeps of the part (or all)
- * beyond its content taken off as it is written (metadataOf)
+ * to line up)
  */
 export type TableWriteEdit = {
   readonly kind: "write";
@@ -70,7 +69,6 @@ export type TableWriteEdit = {
   readonly model: TableModel;
   readonly columnMap?: IndexMap;
   readonly tidy?: true;
-  readonly withoutMetadata?: MetadataPart | "all";
 };
 
 /**

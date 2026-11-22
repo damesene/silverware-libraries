@@ -325,7 +325,7 @@ describe("Formulas", () => {
       expect(down.defaultPrevented).toBe(true);
       fx.click();
       Array.from(dialog()!.querySelectorAll<HTMLElement>(".swt-functions-group")).find((b) => b.textContent === "Logic")!.click();
-      expect(listed()).toEqual(["AND", "IF", "IFERROR", "ISNUMBER", "NOT", "OR"]);
+      expect(listed()).toEqual(["AND", "IF", "IFERROR", "IFS", "ISNUMBER", "NOT", "OR", "SWITCH"]);
       key(search(), "ArrowDown");
       expect(picked()).toBe("IF");
       key(search(), "Escape");

@@ -481,6 +481,8 @@ The *Functions* dialog shows them all: **Functions…** (fx) under a formula bei
 | `MOD(number, divisor)` | The remainder after dividing the number by the divisor, with the divisor's sign. Of a time, a time: MOD([\@end] - [\@start], 1) is the length of a shift past midnight. |
 | `ABS(number)` | The number without its sign. |
 | `IF(condition, value_if_true, [value_if_false])` | One value if the condition is true, another if it is false (default FALSE). |
+| `IFS(condition1, value1, [condition2, value2], …)` | The value of the first condition that is true; `#N/A` where none is (TRUE as the last condition gives a default). |
+| `SWITCH(value, case1, result1, [case2, result2], …, [default])` | The result of the first case equal to the value (compared as = compares), else the default; `#N/A` without one. |
 | `IFERROR(value, value_if_error)` | The value, or the second value if the first is an error. |
 | `AND(logical1, [logical2], …)` | TRUE if all of the values are true. |
 | `OR(logical1, [logical2], …)` | TRUE if any of the values is true. |

@@ -15,6 +15,8 @@ import round from "./round.ts";
 import abs from "./abs.ts";
 import if_ from "./if.ts";
 import iferror from "./iferror.ts";
+import ifs from "./ifs.ts";
+import switch_ from "./switch.ts";
 import and_ from "./and.ts";
 import or_ from "./or.ts";
 import not_ from "./not.ts";
@@ -91,6 +93,8 @@ const ALL: readonly AnyFunction[] = [
   round,
   abs,
   if_,
+  ifs,
+  switch_,
   iferror,
   and_,
   or_,

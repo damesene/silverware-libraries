@@ -37,7 +37,7 @@ export function withFutureNames(text: string): string {
 // Functions Excel has with the same meaning and arguments (cells written as Excel's values: numbers, dates)
 export const SAME_IN_EXCEL: ReadonlySet<string> = new Set([
   "SUM", "AVERAGE", "MIN", "MAX", "PRODUCT", "COUNT", "COUNTA", "SUMIFS", "COUNTIFS", "AVERAGEIFS", "MAXIFS", "MINIFS",
-  "SUMPRODUCT", "MEDIAN", "LARGE", "SMALL", "RANK", "STDEV", "INT", "MROUND", "MOD", "ABS", "IF", "IFERROR", "AND", "OR",
+  "SUMPRODUCT", "MEDIAN", "LARGE", "SMALL", "RANK", "STDEV", "INT", "MROUND", "MOD", "ABS", "IF", "SWITCH", "IFERROR", "AND", "OR",
   "NOT", "ISNUMBER", "CONCAT", "TEXTJOIN", "LEN", "MID", "SEARCH", "SUBSTITUTE", "UPPER", "LOWER", "PROPER", "TRIM",
   "XLOOKUP", "TODAY", "NOW", "DATE", "YEAR", "MONTH", "DAY", "HOUR", "MINUTE", "SECOND", "WEEKDAY", "ISOWEEKNUM",
   "EOMONTH", "NETWORKDAYS", "WORKDAY",
@@ -64,6 +64,8 @@ const UNIT_REASON = { reason: "its unit is not written in the formula (it comes 
 export const EXCEL_FUNCTIONS: Readonly<Record<string, ExcelCall>> = {
   // Ours count from the first row under the header, Excel's from the sheet's first row (the header)
   ROW: () => "(ROW()-1)",
+  // Excel refuses IFS of a condition without its value (ours: #N/A): its cell written as its value
+  IFS: (args) => (args.length % 2 === 0 ? call("IFS", texts(args)) : { reason: "IFS takes its conditions and values in pairs" }),
   // Ours: digits optional; Excel's: required
   ROUND: (args) => call("ROUND", padded(args, ["", "0"])),
   ROUNDUP: (args) => call("ROUNDUP", padded(args, ["", "0"])),

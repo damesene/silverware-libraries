@@ -67,6 +67,10 @@ describe("Excel's formulas", () => {
     expect(write('=DATEDIF(A1, B1, "d")')).toBe("TRUNC(((B2)-(A2)))");
     expect(write('=DATEDIF(A1, B1, "ym")')).toBe('DATEDIF(A2,B2,"YM")');
     expect(write('=MAXIFS([qty], [fruit], "p*")')).toBe('_xlfn.MAXIFS(B2:B3,A2:A3,"p*")');
+    expect(write('=IFS(C1 > 1, "a", TRUE, "b")')).toBe('_xlfn.IFS(C2>1,"a",TRUE,"b")');
+    expect(write('=SWITCH(A1, "Pear", 1, 0)')).toBe('_xlfn.SWITCH(A2,"Pear",1,0)');
+    // (A condition without its value: Excel refuses it, the cell written as its value)
+    expect(write('=IFS(C1 > 1, "a", TRUE)')).toEqual({ reason: "IFS takes its conditions and values in pairs" });
   });
 
   it("writes a named row as its cells' run", () => {

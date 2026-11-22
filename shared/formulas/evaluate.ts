@@ -5,7 +5,8 @@ import { type ModelCell, NO_ATTRIBUTES, type TableModel } from "../table/model.t
 import { withCellAt } from "../table/ops.ts";
 import { asNumber } from "../filter.ts";
 import { type CalculatedBy, cellsByName, errorCodeIn, type FormulaCells, hasFormulas, PLAIN_CELLS, resultContent, rowsByName, withEquals } from "./cell.ts";
-import { dateArithmetic, parseDate } from "./dates.ts";
+import { dateArithmetic } from "./dates.ts";
+import { compareValues } from "./compare.ts";
 import { type Node, parse, refersToOwnData, wholeColumnNames } from "./parser.ts";
 import { type Area, areaText, cellName, formulaOutside, referencedColumn, type SourceRef, tablePrefix, type TableRef } from "./references.ts";
 import { takesGrids } from "./function.ts";
@@ -750,7 +751,7 @@ class Sheet {
     if (isError(right)) return right;
     if (op === "&") return (toText(left) as string) + (toText(right) as string);
     const comparison = COMPARISONS[op];
-    if (comparison) return comparison(compare(left, right));
+    if (comparison) return comparison(compareValues(left, right));
     // A date and days (or two dates) add and subtract as dates
     const dated = op === "+" || op === "-" ? dateArithmetic(op, left, right) : undefined;
     if (dated !== undefined) return dated;
@@ -811,20 +812,6 @@ const COMPARISONS: Readonly<Record<string, (order: number) => boolean>> = {
   "<=": (o) => o <= 0,
   ">=": (o) => o >= 0,
 };
-
-/** Compares two values: as dates if both are dates, as numbers if both read as numbers, else as text ignoring case */
-function compare(a: Scalar, b: Scalar): number {
-  // 2025-11-06 is 2025-11-06 00:00, and 2025-11-06T08:00 is before 2025-11-06 09:00
-  const da = typeof a === "string" ? parseDate(a) : undefined;
-  const db = da && typeof b === "string" ? parseDate(b) : undefined;
-  if (da && db) return da.ms - db.ms;
-  const na = a === null ? 0 : toNumber(a);
-  const nb = b === null ? 0 : toNumber(b);
-  if (!isError(na) && !isError(nb) && typeof a !== "boolean" && typeof b !== "boolean") return na - nb;
-  const ta = (toText(a) as string).toLowerCase();
-  const tb = (toText(b) as string).toLowerCase();
-  return ta < tb ? -1 : ta > tb ? 1 : 0;
-}
 
 /**
  * The table with every formula cell showing its current result. Returns the

@@ -91,7 +91,10 @@ export type ModuleHost = DocumentsHost & MentionsHost & MediaHost & {
   readonly core: DatabaseCore;
   readonly types: TypeRegistry;
   readonly ui: Pick<UserInterface, "notify" | "ask">;
+  /** A database as its views show it (a property's options by a formula listed: core/calculating.ts) */
   database(id: string): Promise<Revised<Database> | undefined>;
+  /** A database's schema as kept, what an edit of it is made of (Properties): never the one shown, whose options by a formula are no one's to write */
+  schema(id: string): Promise<Revised<Database> | undefined>;
   items(id: string): Promise<readonly Item[]>;
   /** Whether the store keeps an item's body (its content), which `body` reads */
   readonly itemBodies: boolean;

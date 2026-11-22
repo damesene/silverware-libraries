@@ -77,7 +77,8 @@ export function withFormulaValues(items: readonly Item[], database: Database, ta
  */
 export function changesByItself(database: Database): boolean {
   return database.properties.some((property) => {
-    const formula = isFormula(property) ? formulaOf(property.params) : undefined;
-    return formula !== undefined && !callsPureFunctionsOnly(formula);
+    // (A property's own formula, or its options' (options.ts), whose list follows the time as its values would)
+    const formula = isFormula(property) ? formulaOf(property.params) : typeof property.params.optionsFormula === "string" ? property.params.optionsFormula : undefined;
+    return formula !== undefined && formula.trim() !== "" && !callsPureFunctionsOnly(formula);
   });
 }

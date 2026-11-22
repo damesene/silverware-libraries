@@ -37,7 +37,7 @@ async function setup(answer = false, configured: Record<string, unknown> = {}, a
   let refreshed = 0;
   // (The modules' items calculated, as the entry gives them: a formula's values; the core on the store itself)
   const calculated = calculatingStore(store);
-  const modules = new Modules(all, { document, icons: iconsOf(undefined), editors: editorsOf(undefined), core, types, ui, database: (id) => store.database(id), items: async (id) => (await calculated.items(id)).value, itemBodies: true, body: (id, item) => store.body(id, item.key), openDocument: async () => {}, documents: async () => [], validateDocumentName: () => undefined, openByName: async () => {}, noun: { one: "page", many: "pages" }, editorArea: () => undefined, onChanged: (listener) => store.onChanged((one) => listener(one.database)), onDocumentOpened: () => () => {}, refreshPlaces: () => void refreshed++, ...(showConflict ? { showConflict } : {}) }, { get: (path, fallback) => (path in configured ? configured[path] : fallback) });
+  const modules = new Modules(all, { document, icons: iconsOf(undefined), editors: editorsOf(undefined), core, types, ui, database: (id) => calculated.database(id), schema: (id) => store.database(id), items: async (id) => (await calculated.items(id)).value, itemBodies: true, body: (id, item) => store.body(id, item.key), openDocument: async () => {}, documents: async () => [], validateDocumentName: () => undefined, openByName: async () => {}, noun: { one: "page", many: "pages" }, editorArea: () => undefined, onChanged: (listener) => store.onChanged((one) => listener(one.database)), onDocumentOpened: () => () => {}, refreshPlaces: () => void refreshed++, ...(showConflict ? { showConflict } : {}) }, { get: (path, fallback) => (path in configured ? configured[path] : fallback) });
   await modules.start();
   const schema = async () => (await store.database("tasks"))!.value.properties;
   const named = async (name: string) => (await store.items("tasks")).value.find((one) => one.name === name)!;
@@ -448,6 +448,67 @@ describe("the properties' dialog", () => {
     expect((await schema()).at(-1)).toMatchObject({ key: "ratio", label: "Ratio" });
     await settle();
     expect(told.filter((one) => one.startsWith("Ratio:"))).toEqual([]);
+  });
+
+  it("gives a select its options by a formula: the options it gives shown, kept as its formula alone, a list again from what it gave", async () => {
+    const { open, q, schema, told } = await setup();
+    await open();
+    expand("status");
+    const by = (label: string) => [...document.querySelectorAll<HTMLButtonElement>('[data-property="status"] .swd-segment')].find((one) => one.textContent === label)!;
+    by("From a formula").click();
+    const field = () => q<HTMLInputElement>('[data-property="status"] [data-focus="options-formula"]');
+    // (The items' estimates, each once: "3" and "a lot")
+    field().value = "=UNIQUE([estimate])";
+    field().dispatchEvent(new Event("input"));
+    await vi.waitFor(() => expect(q(".swd-options-given").textContent).toBe("2 options:3a lot"), { timeout: 5_000 });
+    // A list again: the options it had (a list kept in the draft), else those the formula gave
+    by("Fixed list").click();
+    expect([...document.querySelectorAll<HTMLInputElement>('[data-property="status"] .swd-option-name')].map((one) => one.value)).toEqual(["Todo", "Done"]);
+    // From a formula again: the formula left, back
+    by("From a formula").click();
+    expect(field().value).toBe("=UNIQUE([estimate])");
+    await save();
+    // (No value converted: the schema alone, written at once)
+    expect(document.querySelector(".swd-properties")).toBeNull();
+    const status = (await schema()).find((one) => one.key === "status")!;
+    expect(status.params).toEqual({ optionsFormula: "=UNIQUE([estimate])" });
+    expect(told).toEqual([]);
+  });
+
+  it("renames no option of a list left for a formula, and saves no empty options' formula", async () => {
+    const { open, q, schema, told, named } = await setup();
+    await open();
+    expand("status");
+    const names = () => [...document.querySelectorAll<HTMLInputElement>('[data-property="status"] .swd-option-name')];
+    names()[0]!.value = "To do";
+    names()[0]!.dispatchEvent(new Event("input"));
+    [...document.querySelectorAll<HTMLButtonElement>('[data-property="status"] .swd-segment')].find((one) => one.textContent === "From a formula")!.click();
+    // (Nothing typed: not saved, why said)
+    await save();
+    expect(told.at(-1)).toMatch(/^Status: its options' formula is empty/);
+    const field = q<HTMLInputElement>('[data-property="status"] [data-focus="options-formula"]');
+    expect(document.activeElement).toBe(field);
+    field.value = "=[name]";
+    field.dispatchEvent(new Event("input"));
+    await save();
+    expect(document.querySelector(".swd-properties")).toBeNull();
+    expect((await schema()).find((one) => one.key === "status")!.params).toEqual({ optionsFormula: "=[name]" });
+    // (Fix login's "Todo" as it was: the list renamed was left)
+    expect((await named("Fix login")).values.status).toBe("Todo");
+  });
+
+  it("saves no options' formula that does not read, said why", async () => {
+    const { open, q, schema, told } = await setup();
+    await open();
+    expand("status");
+    [...document.querySelectorAll<HTMLButtonElement>('[data-property="status"] .swd-segment')].find((one) => one.textContent === "From a formula")!.click();
+    const field = q<HTMLInputElement>('[data-property="status"] [data-focus="options-formula"]');
+    field.value = "=UNIQUE(";
+    field.dispatchEvent(new Event("input"));
+    await save();
+    expect(document.querySelector(".swd-properties")).not.toBeNull();
+    expect(told.at(-1)).toMatch(/^Status: /);
+    expect((await schema()).find((one) => one.key === "status")!.params.optionsFormula).toBeUndefined();
   });
 
   it("saves no formula that does not read, its field shown and why said", async () => {

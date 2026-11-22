@@ -161,3 +161,58 @@ describe("the calculating store", () => {
     expect(calculated.keepableName("Pear", ["Pear"])).toBe(store.keepableName("Pear", ["Pear"]));
   });
 });
+
+describe("a property's options by a formula", () => {
+  // (A select whose options are the names of the items: =[name], each once)
+  const PICK: Property = { key: "pick", label: "Pick", type: "select", params: { optionsFormula: "=[name]" }, readonly: false };
+
+  it("are its formula's list in the schema the views read, never in the schema kept", async () => {
+    const { store, calculated } = setup([...ORDERS.properties, PICK]);
+    const shown = (await calculated.database("orders"))!;
+    expect(shown.value.properties.find((one) => one.key === "pick")!.params.options).toEqual(["Pear", "Fig"]);
+    expect((await property(store, "pick")).params.options).toBeUndefined();
+    // (The same revision: an edit made of it is against the schema kept)
+    expect(shown.revision).toBe((await store.database("orders"))!.revision);
+    expect((await calculated.optionsProblems("orders")).size).toBe(0);
+  });
+
+  it("take any value as the core writes one (the list is the views'), a view marking one none of them", async () => {
+    const { core, store, calculated } = setup([...ORDERS.properties, PICK]);
+    const pear = (await store.items("orders")).value[0]!;
+    expect(await core.update("orders", pear, "pick", "Kiwi")).not.toHaveProperty("problem");
+    const types = new TypeRegistry();
+    const shown = (await calculated.database("orders"))!.value.properties.find((one) => one.key === "pick")!;
+    expect(types.of("select", shown.params)!.validate("Kiwi", shown.params)).toMatch(/none of its options/);
+    expect(types.of("select", shown.params)!.validate("Fig", shown.params)).toBeUndefined();
+  });
+
+  it("say why where the formula gives none, the property then of no options", async () => {
+    const { calculated } = setup([...ORDERS.properties, { ...PICK, params: { optionsFormula: "=SUM([qty])/0" } }]);
+    const shown = (await calculated.database("orders"))!.value.properties.find((one) => one.key === "pick")!;
+    expect(shown.params.options).toEqual([]);
+    expect((await calculated.optionsProblems("orders")).get("pick")?.code).toBe("#DIV/0!");
+  });
+
+  it("are calculated anew as time goes where their formula reads it, a multi-select's none with a comma", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-11-22T10:00:00Z"));
+      const { calculated } = setup([...ORDERS.properties, { ...PICK, params: { optionsFormula: "=TEXT(TODAY(), \"yyyy-mm-dd\")" } }]);
+      const optionsOf = async () => (await calculated.database("orders"))!.value.properties.find((one) => one.key === "pick")!.params.options;
+      expect(await optionsOf()).toEqual(["2026-11-22"]);
+      vi.setSystemTime(new Date("2026-11-23T10:00:00Z"));
+      expect(await optionsOf()).toEqual(["2026-11-23"]);
+    } finally {
+      vi.useRealTimers();
+    }
+    const several = setup([...ORDERS.properties, { ...PICK, params: { multiple: true, optionsFormula: '=VSTACK("Prague, CZ", "Brno")' } }]);
+    expect((await several.calculated.database("orders"))!.value.properties.find((one) => one.key === "pick")!.params.options).toEqual(["Brno"]);
+  });
+
+  it("are refused where their formula does not read, or reads outside the database", async () => {
+    const select = new TypeRegistry().named("select")!;
+    expect(select.validateParams!({ optionsFormula: "=[name" })).toMatch(/^its options' formula/);
+    expect(select.validateParams!({ optionsFormula: "=prices![name]" })).toMatch(/only its own items/);
+    expect(select.validateParams!({ optionsFormula: "=UNIQUE([qty])" })).toBeUndefined();
+  });
+});

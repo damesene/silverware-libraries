@@ -3805,6 +3805,41 @@ button.swd-editor-document-folder:hover,
   color: var(--swd-quiet);
   font-size: 0.8em;
 }
+/* Where a property's options come from (Fixed list, From a formula), over them; the options a formula gives, as pills */
+.swd-prop-options-by {
+  margin-bottom: 4px;
+}
+.swd-prop-options-by .swd-segment {
+  white-space: nowrap;
+}
+.swd-prop-options-by > .swd-segments {
+  width: fit-content;
+  max-width: 100%;
+}
+.swd-prop-options-by .swd-segment {
+  font-size: 0.85em;
+}
+.swd-prop-field.swd-prop-options-formula {
+  align-items: start;
+}
+.swd-options-given {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9em;
+}
+.swd-options-given-count,
+.swd-options-given-more {
+  color: var(--swd-quiet);
+}
+.swd-options-given-error {
+  color: var(--danger-color, #c62828);
+}
+.swd-options-given-note {
+  padding: 0;
+  border: 0;
+}
 /* A setting turned by a switch (Required, Name in views, Locked in views): its name and hint across the width, the switch
    at the right, on a phone too (in the names' narrow column the hint broke every few words) */
 .swd-prop-field.swd-prop-switch-row {

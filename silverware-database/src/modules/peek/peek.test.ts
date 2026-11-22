@@ -53,6 +53,7 @@ async function setup(answer = true, withProperties = false, configured: Record<s
       types,
       ui,
       database: (id) => store.database(id),
+      schema: (id) => store.database(id),
       items: async (id) => {
         if (failItems) throw new Error("index unavailable");
         return (await store.items(id)).value;

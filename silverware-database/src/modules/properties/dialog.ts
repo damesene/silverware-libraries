@@ -12,10 +12,12 @@
 import { typeOf } from "../../domain/listing.ts";
 import { systemKind, systemProperties } from "../../domain/system.ts";
 import { calculated, paramsKept } from "../../domain/calculated.ts";
-import { formulaTypedProblem } from "../../domain/formulas/help.ts";
+import { formulaCompletion, formulaFunctionHelp, formulaTypedProblem } from "../../domain/formulas/help.ts";
+import { formulaOptions } from "../../domain/formulas/options.ts";
+import { formulaField } from "../../../../shared/formulafield.ts";
 import { formulaErrorsSaid } from "../../domain/formulas/calculate.ts";
 import { formulaDetails } from "./formula.ts";
-import { switchControl } from "../../../../shared/controls.ts";
+import { segmentedControl, switchControl } from "../../../../shared/controls.ts";
 import { Dialogs } from "../../../../shared/dialog.ts";
 import { reorder } from "../../../../shared/drag.ts";
 import { el } from "../../../../shared/elements.ts";
@@ -148,6 +150,10 @@ export class PropertiesDialog {
   // The items, read once a formula's result is shown while the dialog is open; the item it is shown for
   private items: Promise<readonly Item[]> | undefined;
   private readonly shownFor: { item: string | undefined } = { item: undefined };
+  // The options each property's formula gave last (by its id), a list to edit from as it is turned back to a fixed list
+  private readonly lastOptions = new Map<string, readonly string[]>();
+  // An options' formula left for a fixed list (by the property's id), back as From a formula is pressed again
+  private readonly formulasLeft = new Map<string, string>();
 
   constructor(
     private readonly host: ModuleHost,
@@ -175,7 +181,7 @@ export class PropertiesDialog {
       this.focusAt(at);
       return this.whenClosed;
     }
-    const read = await this.host.database(this.id);
+    const read = await this.host.schema(this.id);
     if (!read || this.dialogs.isOpen) return this.whenClosed;
     this.whenClosed = new Promise((resolve) => (this.closedNow = resolve));
     this.database = read.value;
@@ -189,6 +195,8 @@ export class PropertiesDialog {
     this.adding = { label: "", type: "" };
     this.opened = at?.property;
     this.items = undefined;
+    this.lastOptions.clear();
+    this.formulasLeft.clear();
     const doc = this.host.document;
     this.body = el(doc, "div", "swd-properties");
     this.note = el(doc, "span", { class: `${BASE}-note swd-properties-note`, attrs: { "aria-live": "polite" } });
@@ -247,7 +255,7 @@ export class PropertiesDialog {
    */
   async follow(): Promise<void> {
     if (!this.dialogs.isOpen || this.busy) return;
-    const read = await this.host.database(this.id);
+    const read = await this.host.schema(this.id);
     // (Drawn anew only where it changed: the focus and what is typed stay)
     if (!read || read.revision === this.revision) return;
     if (this.dirty()) {
@@ -271,6 +279,11 @@ export class PropertiesDialog {
   private built(entry: Entry): Property {
     const { property, options } = entry;
     if (!options || !this.hasOptions(property.type)) return property;
+    // (Its options a formula's: no list kept, its colors by value kept)
+    if (typeof property.params.optionsFormula === "string") {
+      const { options: _listed, ...rest } = property.params;
+      return { ...property, params: rest };
+    }
     const colors: Record<string, OptionColor> = Object.create(null);
     for (const one of options) if (one.color && one.text.trim()) colors[one.text.trim()] ??= one.color;
     const { colors: _gone, options: _was, ...rest } = property.params;
@@ -281,7 +294,7 @@ export class PropertiesDialog {
   private changedEntry(entry: Entry): boolean {
     if (!entry.saved || entry.removed) return true;
     const built = this.built(entry);
-    return JSON.stringify(sortedKeys(built)) !== JSON.stringify(sortedKeys(entry.saved)) || (!!entry.options && Object.keys(optionsRenamed(entry.options)).length > 0);
+    return JSON.stringify(sortedKeys(built)) !== JSON.stringify(sortedKeys(entry.saved)) || (!!entry.options && typeof built.params.optionsFormula !== "string" && Object.keys(optionsRenamed(entry.options)).length > 0);
   }
 
   /** Whether the draft holds any change: a property changed, added, removed, or the order */
@@ -296,7 +309,8 @@ export class PropertiesDialog {
       .filter((entry) => !entry.removed)
       .map((entry): PropertyEdit => {
         const p = this.built(entry);
-        const renames = entry.saved && entry.options && p.type === entry.saved.type ? optionsRenamed(entry.options) : {};
+        // (Options renamed in a list kept: a list left for a formula renames nothing)
+        const renames = entry.saved && entry.options && p.type === entry.saved.type && typeof p.params.optionsFormula !== "string" ? optionsRenamed(entry.options) : {};
         return {
           ...(entry.saved ? { from: entry.saved.key } : {}),
           label: p.label,
@@ -340,15 +354,17 @@ export class PropertiesDialog {
       for (const input of this.body?.querySelectorAll<HTMLInputElement>(`[data-property="${CSS.escape(entry.id)}"] .swd-option-name`) ?? []) input.classList.toggle("swd-invalid", input.value.trim() === twice);
       return this.host.ui.notify(`${entry.property.label}: "${twice}" is two options: give each a name of its own`, { type: "error" });
     }
-    // A formula that does not read (or reads outside the database): not saved, its field shown, why said
+    // A formula that does not read (or reads outside the database), a property's or its options': not saved, its field
+    // shown, why said
     for (const entry of this.entries) {
-      if (entry.removed || entry.property.system !== undefined || !calculated({ type: entry.property.type })) continue;
-      const formula = entry.property.params.formula;
-      const problem = typeof formula === "string" ? formulaTypedProblem(formula) : undefined;
+      if (entry.removed || entry.property.system !== undefined) continue;
+      const options = !calculated({ type: entry.property.type }) && this.hasOptions(entry.property.type);
+      const formula = options ? entry.property.params.optionsFormula : calculated({ type: entry.property.type }) ? entry.property.params.formula : undefined;
+      const problem = typeof formula === "string" ? (options && !formula.trim() ? "its options' formula is empty: write one, or pick Fixed list" : formulaTypedProblem(formula)) : undefined;
       if (!problem) continue;
       this.opened = entry.id;
       this.draw();
-      this.body?.querySelector<HTMLElement>(`[data-property="${CSS.escape(entry.id)}"] [data-focus="formula"]`)?.focus();
+      this.body?.querySelector<HTMLElement>(`[data-property="${CSS.escape(entry.id)}"] :is([data-focus="formula"], [data-focus="options-formula"])`)?.focus();
       return this.host.ui.notify(`${entry.property.label}: ${problem}`, { type: "error" });
     }
     this.busy = true;
@@ -402,7 +418,7 @@ export class PropertiesDialog {
     }
     // (Values outside the database taken off, or the draft not written: the database read again, the draft kept, made of what
     // it was made of)
-    const read = await this.host.database(this.id);
+    const read = await this.host.schema(this.id);
     if (read && read.revision !== this.revision) {
       if (this.dirty()) this.stale = true;
       else this.adopt(read.value, read.revision);
@@ -416,7 +432,7 @@ export class PropertiesDialog {
    * an error for (`#DIV/0!`): said, from the items as the views calculate them; the save stands (decided 3)
    */
   private async sayFormulaErrors(before: ReadonlyMap<string, Property>): Promise<void> {
-    const read = await this.host.database(this.id);
+    const read = await this.host.schema(this.id);
     if (!read) return;
     const params = (property: Property | undefined) => JSON.stringify(sortedKeys(property?.params));
     const changed = read.value.properties.filter((one) => one.system === undefined && calculated(one) && params(before.get(one.key)) !== params(one));
@@ -729,7 +745,7 @@ export class PropertiesDialog {
       field("Type", type),
       ...(formula ? this.formula(entry) : []),
       // (Options where its values are picked from them: a select's, a type of the user's so)
-      ...(this.hasOptions(property.type) ? [this.options(entry)] : []),
+      ...(this.hasOptions(property.type) ? [this.optionsBy(entry)] : []),
       // (Its type's switches: a select's Multiple)
       ...(formula ? [] : this.switches(entry)),
       // (A value turned by a press has no empty one to require)
@@ -825,6 +841,79 @@ export class PropertiesDialog {
     if (this.advancedOpen.has(entry.id) || (entry.property.readonly && entry.property.system === undefined)) box.open = true;
     box.addEventListener("toggle", () => void (box.open ? this.advancedOpen.add(entry.id) : this.advancedOpen.delete(entry.id)));
     return box;
+  }
+
+  /**
+   * Where a property's options come from: a list (Fixed list, `options`) or a formula (From a formula, `optionsFormula`:
+   * its field, the options it gives the items as they are). From a formula back to a list: the list it gave, to edit
+   */
+  private optionsBy(entry: Entry): HTMLElement {
+    const doc = this.host.document;
+    const property = this.built(entry);
+    const byFormula = typeof entry.property.params.optionsFormula === "string";
+    const source = segmentedControl(doc, "swd", `Where the options of ${property.label} come from`, [{ value: "list", label: "Fixed list" }, { value: "formula", label: "From a formula" }], byFormula ? "formula" : "list", (to) =>
+      this.edited(() => {
+        const { optionsFormula: was, ...rest } = entry.property.params;
+        if (to === "formula") entry.property = { ...entry.property, params: { ...rest, optionsFormula: this.formulasLeft.get(entry.id) ?? "" } };
+        else {
+          if (typeof was === "string" && was.trim()) this.formulasLeft.set(entry.id, was);
+          entry.property = { ...entry.property, params: rest };
+          // (The list the formula gave, where none was listed, to edit from)
+          if (!entry.options?.length && this.lastOptions.get(entry.id)?.length) entry.options = this.lastOptions.get(entry.id)!.map((text) => ({ was: undefined, text, color: undefined }));
+        }
+      }),
+    );
+    const head = el(doc, "div", "swd-prop-options-by", source.element);
+    if (!byFormula) {
+      const list = this.options(entry);
+      list.querySelector(".swd-options-box")?.prepend(head);
+      return list;
+    }
+    // The formula's options, calculated over the items (read once) after a pause in typing, the database as kept
+    const given = el(doc, "div", { class: "swd-options-given", attrs: { "aria-live": "polite" } });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const show = async () => {
+      const formula = entry.property.params.optionsFormula;
+      if (typeof formula !== "string" || !formula.trim() || formulaTypedProblem(formula)) {
+        this.lastOptions.delete(entry.id);
+        return void given.replaceChildren();
+      }
+      const items = await (this.items ??= this.host.items(this.id));
+      const made = formulaOptions(this.database!, items, formula);
+      if ("code" in made) {
+        this.lastOptions.delete(entry.id);
+        return void given.replaceChildren(el(doc, "span", { class: "swd-options-given-error", text: `${made.code}: ${made.detail}` }));
+      }
+      // (A multi-select's as the views have them: none with a comma)
+      const options = entry.property.params.multiple === true ? made.filter((one) => !one.includes(",")) : made;
+      this.lastOptions.set(entry.id, options);
+      const shown = options.slice(0, 20);
+      given.replaceChildren(
+        el(doc, "span", { class: "swd-options-given-count", text: options.length ? `${options.length} option${options.length === 1 ? "" : "s"}:` : "No options: the formula gives none for the items as they are" }),
+        ...shown.map((one) => optionPill(doc, { ...property, params: { ...property.params, options: [...options] } }, one, typeOf(this.host.types, property))),
+        ...(options.length > shown.length ? [el(doc, "span", { class: "swd-options-given-more", text: `and ${options.length - shown.length} more` })] : []),
+      );
+    };
+    const field = formulaField(
+      doc,
+      { complete: (text, caret) => formulaCompletion(this.database!, text, caret, entry.saved?.key), help: formulaFunctionHelp, validate: formulaTypedProblem },
+      typeof entry.property.params.optionsFormula === "string" ? entry.property.params.optionsFormula : "",
+      (text) => {
+        entry.property = { ...entry.property, params: { ...entry.property.params, optionsFormula: text } };
+        this.typed(entry);
+        clearTimeout(timer);
+        timer = setTimeout(() => void show(), 300);
+      },
+      { base: "swd", label: `Formula of the options of ${property.label}`, focus: "options-formula", placeholder: "=UNIQUE([category])" },
+    );
+    void show();
+    return el(
+      doc,
+      "div",
+      "swd-prop-field swd-prop-options swd-prop-options-formula",
+      el(doc, "span", "swd-prop-field-name", "Options"),
+      el(doc, "div", "swd-formula-box", head, field, given, el(doc, "p", { class: "swd-formula-panel-foot swd-options-given-note", text: "A value none of them is kept, shown as none; the options follow the items as they change" })),
+    );
   }
 
   /** A select's options as a list: each its grip (dragged to its place, Alt+↑ ↓), its color, its name, ×; one added under them */

@@ -101,3 +101,17 @@ test("silverware.database.items in a ${…}: the items in their order, a formula
   await expect(line("Pages:")).toContainText(`Pages: ${space.folder}/Page/db-tasks/Fix login, ${space.folder}/Page/db-tasks/Write docs`);
   await expect(line("Missing:")).toContainText("Missing: nil");
 });
+
+test("a select whose options are a formula's: its list picked from in a cell, the value written, its formula alone in the root page", async ({ page, space }) => {
+  const rootPage = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n    next: { type: select, label: Next, optionsFormula: \"=[name]\" }\n---\n";
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS, "Page/db-tasks": rootPage }, "Page");
+  const cell = page.locator(".swd-table tbody tr", { hasText: "Fix login" }).locator('td[data-key="next"]');
+  await cell.click();
+  const select = cell.locator("select");
+  await expect(select.locator("option")).toContainText(["Fix login", "Write docs"]);
+  await select.selectOption("Write docs");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("next: Write docs\n");
+  await expect(cell).toHaveText("Write docs");
+  expect(await space.saved("Page/db-tasks")).not.toMatch(/next: \{[^}]*options:/);
+});
+

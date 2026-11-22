@@ -1,5 +1,9 @@
 # Silverware Assets PDF: changelog
 
+## 1.0.1 (2026-11-22)
+
+- Shares updated code with Silverware Assets; nothing changes in use.
+
 ## 1.0.0 (2026-11-14)
 
 First release.

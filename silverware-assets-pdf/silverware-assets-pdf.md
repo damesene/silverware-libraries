@@ -1,7 +1,7 @@
 ---
 name: Library/damesene/silverware-assets-pdf
 tags: meta/library
-version: 1.0.0
+version: 1.0.1
 description: "Silverware Assets PDF: with Silverware Assets, a PDF's preview in your pages is its first page as an image, drawn by pdf.js (in place of a small browser viewer). Works offline, on a phone too."
 files:
 - silverware-assets-pdf.js

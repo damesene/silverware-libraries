@@ -1,4 +1,4 @@
-import { expect, item, root, test } from "./helpers.ts";
+import { expect, item, root, test, waitForIndex } from "./helpers.ts";
 
 // A database's formula properties (docs/silverware-database-formulas.md): made in Properties, kept in the root page
 // alone, their values calculated in the views
@@ -95,6 +95,12 @@ test("silverware.database.items in a ${…}: the items in their order, a formula
     "",
   ].join("\n");
   await space.open({ Page: lines, ...TASKS, "Page/db-tasks": rootPage }, "Page");
+  // (Evaluated once the index has the database and its items: a ${…} evaluated before is nil, and is not evaluated again
+  // as the index catches up, which takes long under load)
+  await waitForIndex(page, "db-root", `${space.folder}/Page/db-tasks`);
+  for (const name of ["Fix login", "Write docs"]) await waitForIndex(page, "db", `${space.folder}/Page/db-tasks/${name}`);
+  await page.reload();
+  await page.waitForFunction(() => !!(window as unknown as { client?: { editorView?: unknown } }).client?.editorView);
   const line = (start: string) => page.locator(".cm-line", { hasText: start });
   await expect(line("Items:")).toContainText("Items: Fix login/Todo/FIX LOGIN, Write docs/Done/WRITE DOCS");
   // (The test's pages are in a folder of its own)

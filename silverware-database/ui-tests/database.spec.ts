@@ -283,6 +283,16 @@ test("a press beside the block, on its lines, does not show its markdown", async
       return [w.x + 40, (w.y + p.y) / 2];
     }],
     ["the closing fence", async () => {
+      // (The place drawn and the block laid out as it stays: SilverBullet after 2.12.1 draws its widgets anew a moment
+      // after its first index, a place empty meanwhile, the fence's line where the press lands then)
+      let last = "";
+      await expect.poll(async () => {
+        if ((await page.locator(".swd-place:empty").count()) || !(await page.locator(".test-item").count())) return (last = "", false);
+        const now = JSON.stringify([await closing(), await widget()]);
+        const same = now === last;
+        last = now;
+        return same;
+      }).toBe(true);
       const c = await closing();
       return [c.x + 40, c.y + c.height / 2];
     }],

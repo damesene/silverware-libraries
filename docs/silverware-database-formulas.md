@@ -17,8 +17,11 @@ items with their calculated values readable from Space Lua.
 
 ## Decided (2026-11-22, with the user)
 
-1. **The formula is the schema's, the value is no one's.** Kept in the root page beside the property's other
-   settings, `_database.properties.total: { type: number, label: Total, formula: "=[@qty]*[@price]" }`. An item's page
+1. **A formula property is a type of its own, `formula`; its formula and result's type are its params.** Kept in the
+   root page as any type's settings are (a select's `options`), every field the schema does not know being a param:
+   `total: { type: formula, label: Total, formula: "=[@qty]*[@price]" }`, with `resultType: number` where the result's
+   type is chosen (decided 3); no field of the model's own, as `system` is. Chosen 2026-11-22 over a `formula` field
+   beside a type that was the result's: a formula is picked as a type in Properties, as Number or Select are. An item's page
    keeps no value under the key: none is read from a page (one typed there by hand is left, unseen, as a system
    property's is) and the calculation sets or takes off every calculated key of an item read, so no stored value is
    ever shown or written back. `query[[from index.tag "db"]]` does not see calculated values; Space Lua reads them
@@ -27,20 +30,23 @@ items with their calculated values readable from Space Lua.
    `SUM([hours])`, a share of the whole, `COUNTIFS`). Another database, a Silverware Table table or a source of the
    space come after the release (*Later*); until then such a reference is the formula's error (`#REF!`, saying they
    come later), never another meaning.
-3. **The result's type is the property's, chosen, Auto by default.** A formula property has a type as any property
-   (number, date, date and time, text, checkbox: how its values are shown, sorted, filtered and grouped), or **Auto**:
-   each value as what it is (a number as a number, a date as a date, a logical value as a checkbox). A value that does
+3. **The result's type is chosen, Auto by default.** `resultType` names a type (number, date, date and time, text,
+   checkbox): the formula type then shows, sorts, filters and groups its values as that type does (the registry's
+   `forParams`, as a select is a multi-select by its params), read only. Without it, **Auto**: each value as what it is
+   (a number as a number, a date as a date, a logical value as a checkbox); no type of its own. A value that does
    not read as the chosen type is kept as calculated and shown as one that does not read (as a value typed into a page
    is). An error (`#DIV/0!`, `#REF!`) is shown with its message, as a table's cell shows it.
 4. **A calculated property's values are one rule; its settings are its kind's.** A system property (domain/system.ts)
    and a formula property are both *calculated* as to their values: never read from an item's page, set or taken off
    by the calculation, read only (`readonly` forced, as `versions.ts` and `newProperty` force it for a system property
-   today), none taken off an item when the property is removed. The model says it once (`calculated(property)`), and
-   the places that ask `system` about values ask that (`versions.ts`' read, `itempart.ts`' own keys, the core's
-   removal and its forced `readonly`). The rules about settings stay each kind's: a system property's type, key,
-   params and required are not changed (the core's `system` refusals, unchanged); a formula property's type (its
-   result's), key, label and formula are changed as any property's. Properties tells a formula's read-only from
-   *Locked in views* (both `readonly`): a formula property shows its formula, not the lock.
+   today), none taken off an item when the property is removed. The domain says it once (`calculated(property)`: a
+   system property, or one of the formula type, by the built-in type's name, which the stores may read as they read
+   `system`), and the places that ask `system` about values ask that (`versions.ts`' read, `itempart.ts`' own keys,
+   the core's removal and its forced `readonly`). The rules about settings stay each kind's: a system property's
+   type, key, params and required are not changed (the core's `system` refusals, unchanged); a formula property's
+   key, label and params (its formula, its result's type) are changed as any property's, and so is its type (to
+   formula and back, decided 8). Properties tells a formula's read-only from *Locked in views* (both `readonly`): a
+   formula property shows its formula, not the lock.
 5. **Where values are calculated**: in the domain, pure (`domain/formulas/`, `withFormulaValues(items, database,
    tables)` as `withSystemValues(items, database, …)`). It is applied by a store over the store (`core/` file, a
    `DatabaseStore` whose `items(id)` reads `database(id)` itself and gives the items calculated, the rest passed
@@ -58,6 +64,10 @@ items with their calculated values readable from Space Lua.
    `was`, a board adding an option), and no view offers to add an option to such a property. Its order is the
    formula's, colors by value as now; a value no option holds shown as none of them (Anyone keeps a person's name
    valid), nothing taken off; renaming an option is then its source's.
+8. **A property turned into a formula and back.** Its type changed to `formula` leaves the values items keep under its
+   key where they are, unseen while it is a formula; changed back to another type, they show again, read as that type.
+   The core's change of a type converts the values items keep (`editSchema`); to or from the formula type it converts
+   and writes none.
 
 ## How it fits
 
@@ -84,11 +94,10 @@ items with their calculated values readable from Space Lua.
 - **Isolation** (`isolation.test.ts`): a rule of its own: `shared/formulas/` and `shared/table/` in the domain, the
   core and the entry only (pure, as `shared/filter.ts`); refused in views, modules, converters and stores, which today
   may import any other `shared/` path. No layer below the domain's users calculates.
-- **Writes**: a formula is set, changed and removed as any setting of the schema (the core validates it: it parses,
-  and references outside the database are refused with why). `formula` joins `PROPERTY_FIELDS` (versions.ts),
-  `NewProperty`, `propertyEdit` and `withFlags` (core.ts), and the converters' property check (`converter.ts`).
-  Converting a property to a formula leaves the values items keep under its key where they are (unseen while it is a
-  formula); converting it back shows them again. A converter (`converters/builtin/tasks.ts` skips system properties)
+- **Writes**: a formula is set, changed and removed as any param of the schema (the formula type's `validateParams`:
+  the formula parses, references outside the database refused with why, `resultType` a type the formula type can
+  show by); nothing of the model, `PROPERTY_FIELDS`, `NewProperty` or `withFlags` changes, params being read and
+  written whole already. A property turned into a formula and back: decided 8. A converter (`converters/builtin/tasks.ts` skips system properties)
   treats a calculated property as it treats a system one: it writes none of its values.
 - **Editing the formula**: where and how is *How it is used*'s, decided before any UI is built.
 
@@ -99,8 +108,8 @@ first idea of where a field could go. Before step 4 a short design, weighed agai
 it and against Silverware Table's own formula editing (so the two feel alike), mockups where it helps, agreed with the
 user:
 
-- **Making one**: from where a property is added (a table's +, Properties), a formula offered as a kind of property
-  or as a type; what a new one starts with (an empty field, an example of this database's own properties).
+- **Making one**: from where a property is added (a table's +, Properties), Formula picked as its type (decided 1);
+  what a new one starts with (an empty field, an example of this database's own properties).
 - **Writing it**: a field big enough for a long formula; the database's properties offered as they are typed and by
   a click on them (no key to remember, a label with spaces written for you); functions offered with their syntax
   (Silverware Table's completions); the result shown live for an item while typing (which item: the one it was
@@ -120,22 +129,24 @@ first idea.
 
 Ordered by the code (each step's tests passing before the next; UI tests where a step changes what a user does).
 
-1. **The model and the stores.** `Property.formula`, `calculated(property)` (values only, decided 4); `formula` in
-   `PROPERTY_FIELDS`, read and written with the schema; `versions.ts`' read and `itempart.ts` through `calculated`;
-   `readonly` forced for a formula property as for a system one. The stores' contract tests: a formula kept and read
-   back; no value of it read from a page (one typed by hand left unseen).
-2. **The calculation, in the domain, with the Auto type.** The Auto type (domain/types/builtin, `offered: false`:
-   the calculation reads back by it, and the core refuses an unknown type); `domain/formulas/`: the database as a
+1. **The formula type and the stores.** The formula type (domain/types/builtin: its params `formula` and
+   `resultType`, `validateParams` but for the formula's parsing, which step 2 adds, `forParams` giving the result's
+   type read only, Auto without one); `calculated(property)` (values only, decided 4); `versions.ts`' read and
+   `itempart.ts` through `calculated`; `readonly` forced for a formula property as for a system one. The stores'
+   contract tests: a formula property kept with its params and read back; no value of it read from a page (one typed
+   by hand left unseen).
+2. **The calculation, in the domain.** `domain/formulas/`: the database as a
    table of the model, values in and out (*How it fits*), `withFormulaValues` setting or taking off every calculated
    key. In `shared/formulas/`: the call giving each formula cell's value, no total rows, the number form given, each
    with its tests there. The isolation test's rule. Unit tests: a row's own values, a whole column, a label renamed
    (`[@key]` still read), a formula reading another formula property, a cycle, errors with their messages, Auto and a
    chosen type, a value of each type in and back, `[#Data]`, a reference outside the database refused with why.
 3. **The core and the entry.** A property's formula set, changed and removed through the schema's changes
-   (validated; `NewProperty`, `propertyEdit`, `withFlags`); the calculating store (`core/`, its key of revisions,
+   (its params validated with the formula's parsing); a type changed to or from formula converting and writing no
+   value (decided 8); the calculating store (`core/`, its key of revisions,
    `TODAY()`) made by the entry and handed to the places, the modules, the media host; the core on the raw store for
    every read a write is made from, a test that a schema edit of a formula property's key or type writes nothing of
-   its values.
+   its values, nor a type changed to or from formula.
 4. **The design, then the views.** First *How it is used* designed and agreed with the user. Then what it decided:
    making and editing a formula; values read only in tables, lists, boards, calendars, timelines and the item's panel;
    errors shown as decided. UI tests for making, editing and reading one, a phone's too.

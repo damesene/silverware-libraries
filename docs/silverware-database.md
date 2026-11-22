@@ -471,7 +471,8 @@ says is two properties compared (`[@spent] > [@budget]`), conditions joined in o
 twice: a rule is stored as its condition and parameters, never as a formula, and formulas add the domain's condition
 `formula` beside the others, as the table has both.
 
-**Formulas in a database**, when they come (talked over, not decided in detail):
+**Formulas in a database**, when they come (talked over, not decided in detail; planned since 2026-11-22 in
+docs/silverware-database-formulas.md, which decides what of this it does first):
 
 * A database as a source of Silverware Table's formulas (`@tasks`, `defineSource`'s shape): small, and much at once (pivots,
   views, `SUMIFS`/`COUNTIFS` over a database: what rollups would give, matched by text).

@@ -339,7 +339,7 @@ export class PagesStore implements DatabaseStore {
     }
   }
 
-  async plan(changes: Changes): Promise<TransactionPlan> {
+  async plan(changes: Changes, progress?: WriteProgress): Promise<TransactionPlan> {
     const id = changes.database;
     const read = await this.read(id);
     // The bodies a transaction writes, read now (the index has none): one changed since it was read is left
@@ -395,13 +395,21 @@ export class PagesStore implements DatabaseStore {
       });
     }
     const planned: Planned[] = [];
-    for (const of of toPlan) {
-      const batch = pageChanges();
-      of.write(batch);
-      const pagePlan = await this.writer.plan(batch.build());
+    // (A few pages read at once, each read for its plan: a database deleted reads tens of thousands; kept in their order)
+    const pagePlans = await inBatches(
+      toPlan,
+      (of) => {
+        const batch = pageChanges();
+        of.write(batch);
+        return this.writer.plan(batch.build());
+      },
+      progress && ((done, of) => told(progress, done, of)),
+    );
+    toPlan.forEach((of, at) => {
+      const pagePlan = pagePlans[at]!;
       for (const one of pagePlan.skipped) skipped.push({ target: of.target, cause: one.cause, reason: one.reason });
       for (const one of pagePlan.pages) planned.push(this.part({ target: of.target, changes: of.count, preview: () => one.preview() }, { ...of.part, pagePlan: { pages: [one], skipped: [] } }));
-    }
+    });
     return { database: id, planned, skipped };
   }
 

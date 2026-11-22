@@ -410,6 +410,16 @@ describe("the pages store", () => {
     expect(plan.planned).toEqual([]);
   });
 
+  it("tells its progress page by page as it plans them (each page read), the plan in the order of its changes", async () => {
+    const seed: ContractSeed[] = [{ database: TASKS, items: ["A", "B", "C"].map((name, at) => ({ name, values: { status: "Todo" }, rank: `a${at}` })) }];
+    const { store } = harness(seed);
+    const items = (await store.items("tasks")).value;
+    const told: [number, number][] = [];
+    const plan = await store.plan(changes("tasks", ...items.map((item) => ({ kind: "removeItem" as const, item: item.key })), { kind: "removeDatabase" }), (done, of) => void told.push([done, of]));
+    expect(told).toEqual([[1, 4], [2, 4], [3, 4], [4, 4]]);
+    expect(plan.planned.map((one) => one.target)).toEqual([{ database: "tasks" }, ...items.map((item) => ({ item: item.key }))]);
+  });
+
   it("tells the changes of its own pages the index gives while it writes once it is done, a database once (not once a page); another database's at once", async () => {
     const IDEAS: Database = { ...TASKS, id: "ideas", name: "Ideas" };
     const seed: ContractSeed[] = [

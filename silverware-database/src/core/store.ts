@@ -99,9 +99,11 @@ export interface DatabaseStore {
    * What a transaction would do, part by part; nothing written. A part is
    * left where it cannot be made (with why), where an item's revision is not
    * the one `expects` names, and all of it where the database is kept in
-   * another version than the store writes (*Decided* 26)
+   * another version than the store writes (*Decided* 26). `progress` told as
+   * its parts are planned where that takes a while (a store of pages reads
+   * each page)
    */
-  plan(changes: Changes): Promise<TransactionPlan>;
+  plan(changes: Changes, progress?: WriteProgress): Promise<TransactionPlan>;
   /** A plan written part by part, each where still as read, the rest left and reported; `progress` told as parts are done, last with all of them */
   apply(plan: TransactionPlan, progress?: WriteProgress): Promise<TransactionReport>;
   /** What `report` wrote put back, where each part is still as it left it */

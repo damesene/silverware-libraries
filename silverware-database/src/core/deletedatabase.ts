@@ -39,7 +39,7 @@ export function openDeleteDatabase(host: DeleteDatabaseHost, id: string, name: s
   const { noun } = host;
   const dialogs = new Dialogs(doc, { base: BASE, closeIcon: ICONS.close });
   const many = (n: number, one: string, more: string) => `${number(n)} ${n === 1 ? one : more}`;
-  const status = el(doc, "p", { class: "swd-delete-status", text: `Looking for its views: reading the ${noun.many}…`, attrs: { role: "status" } });
+  const status = el(doc, "p", { class: "swd-delete-status", text: `Reading its ${noun.many}…`, attrs: { role: "status" } });
   const said = el(doc, "ul", { class: "swd-delete-lines", attrs: { hidden: "" } });
   const field = el(doc, "input", { class: "swd-delete-name", attrs: { "aria-label": `The database's name, ${name}`, autocomplete: "off", spellcheck: "false", disabled: "" } });
   const ask = el(doc, "label", { class: "swd-delete-ask", attrs: { hidden: "" } }, el(doc, "span", { text: `Type ${name} to delete it` }), field);
@@ -77,8 +77,13 @@ export function openDeleteDatabase(host: DeleteDatabaseHost, id: string, name: s
 
   // What goes, found (every document read: told as it goes)
   void (async () => {
-    const made = await host.core.planDeleteDatabase(id, (done, of) => {
-      if (state === "finding") status.textContent = `Looking for its views: ${number(done)} of ${number(of)} ${noun.many} read…`;
+    // Two steps told: its own documents read (each kept for Undo), then every other one looked through for its views
+    const told = (text: string) => {
+      if (state === "finding") status.textContent = text;
+    };
+    const made = await host.core.planDeleteDatabase(id, {
+      reading: (done, of) => told(`Reading its ${noun.many}: ${number(done)} of ${number(of)}…`),
+      finding: (done, of) => told(`Looking for its views on other ${noun.many}: ${number(done)} of ${number(of)} read…`),
     });
     if (state !== "finding") return;
     if ("problem" in made) {

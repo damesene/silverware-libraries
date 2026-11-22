@@ -2,16 +2,13 @@
 // asset shown in a panel at the window's right (`open-panel`: the page beside it still used) or enlarged over the page
 // (`open-enlarged`), each rendered as the core renders it (`render`: the type's own view, else the host's drawing, else its
 // card). One of each at a time: another shown takes its place. Esc, ×, or (the enlarged view) a click beside it closes it.
-// Over the window, so marked `data-silverware-over-window` (the other plugins stand back: shared/overwindow.ts, its
-// attribute named here as the contract leaves this part to know no more than the contract and the elements).
+// Over the window, so marked as shown over it (the other plugins stand back: shared/overwindow.ts); the side panel marked
+// a side panel too (Silverware Layout may move the page's text to the left while one is open: shared/sidepanel.ts).
 import { type ActionContext, type Asset, type AssetAction, assetName, type Capabilities } from "../../../shared/assets.ts";
 import { el } from "../../../shared/elements.ts";
 import { sheetRect } from "../../../shared/sheetarea.ts";
-
-const OVER_WINDOW = "data-silverware-over-window";
-// A panel at the window's right, over the page: Silverware Layout may move the page's text to the left while one is open
-// (shared/sidepanel.ts' attribute, named here as the over-window one is: this part imports the contract alone)
-const SIDE_PANEL = "data-silverware-side-panel";
+import { markSidePanel } from "../../../shared/sidepanel.ts";
+import { markOverWindow } from "../../../shared/overwindow.ts";
 
 // What a panel shows: an asset drawn larger than its card (a card alone is no more than the card in the page)
 const shows = (_asset: Asset, can: Capabilities) => can.views.includes("full") || can.views.includes("preview");
@@ -42,7 +39,7 @@ function show(kind: "side-panel" | "enlarged", context: ActionContext, build: (c
     close();
   };
   const { root, body, stop } = build(close);
-  root.setAttribute(OVER_WINDOW, "");
+  markOverWindow(root, true);
   doc.body.append(root);
   doc.addEventListener("keydown", key, true);
   open.set(kind, close);
@@ -155,7 +152,7 @@ export const sidePanel: AssetAction = {
       const body = el(document, "div", { class: "swa-panel-body" });
       const root = el(document, "aside", { class: "swa-side-panel", attrs: { role: "dialog", "aria-label": assetName(context.asset) } }, head(context, close, true), body);
       root.prepend(resizer(root));
-      root.setAttribute(SIDE_PANEL, "");
+      markSidePanel(root, true);
       // (Over the area the host gives, its editor's: under its top bar and a toolbar docked at the editor's edge)
       const place = () => placeIn(root, context);
       place();

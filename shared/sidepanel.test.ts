@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readFileSync } from "node:fs";
-import { markSidePanel, SIDE_PANEL_ATTRIBUTE, sidePanelOpen, watchSidePanel } from "./sidepanel.ts";
+import { markSidePanel, sidePanelOpen, watchSidePanel } from "./sidepanel.ts";
 import { ENDED_MS } from "./watchmark.ts";
 
 // Fake timers: the watcher's moment (ENDED_MS) passes as the test moves it, not as a loaded machine lets a real wait end
@@ -50,9 +49,5 @@ describe("A side panel", () => {
     await vi.advanceTimersByTimeAsync(ENDED_MS);
     expect(told).toEqual([true]);
     stop();
-  });
-
-  it("is named alike where a plugin's part names it itself (Silverware Assets' panels, which import the contract alone)", () => {
-    expect(readFileSync("silverware-assets/src/builtin/panels.ts", "utf8")).toContain(`"${SIDE_PANEL_ATTRIBUTE}"`);
   });
 });

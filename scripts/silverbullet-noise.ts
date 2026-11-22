@@ -15,6 +15,12 @@ const NOISE: readonly { readonly pattern: RegExp; readonly why: string }[] = [
     pattern: /commandsUpdated[\s\S]*reading 'dispatch'|reading 'dispatch'[\s\S]*commandsUpdated/,
     why: "SilverBullet's commands told before its editor is made, as it starts",
   },
+  {
+    // SilverBullet after 2.12.1, as it starts (2026-11-22): its page list told (`file:listed`) to a listener of its own
+    // not made yet, its stack in its client alone (no plugin of ours listens to the event)
+    pattern: /dispatching event file:listed : TypeError: \S+ is not a function/,
+    why: "SilverBullet's page list told to a listener of its own not made yet, as it starts",
+  },
 ];
 
 /** Whether an error of the page's console is SilverBullet's own, none of a plugin's (`NOISE`) */

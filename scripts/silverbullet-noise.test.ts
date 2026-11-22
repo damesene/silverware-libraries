@@ -10,6 +10,7 @@ describe("SilverBullet's own errors in the console", () => {
         "[Client] Error during : TypeError: Cannot read properties of undefined (reading 'dispatch')\n    at commandsUpdated (http://127.0.0.1:3010/.client/client.js:228:14900)\n    at Bc.emit (http://127.0.0.1:3010/.client/client.js:92:11944)",
       ),
     ).toBe(true);
+    expect(silverBulletsOwnError("[Client] Error while dispatching event file:listed : TypeError: s is not a function\n    at a (http://127.0.0.1:3013/.client/client.js:184:6796)")).toBe(true);
   });
 
   it("are not a plugin's errors, nor the same message from elsewhere", () => {

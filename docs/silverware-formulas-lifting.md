@@ -18,7 +18,8 @@ for its **operators** only (`evaluate.ts`' `cellByCell`): `[status] & "-aa"` is 
    arguments are lifted, their ranges must be of one size, else `#VALUE!` saying their sizes, as `cellByCell` says. A
    reference to one cell (`A1`, `[@x]`, a list of one value) is that value, as now.
 2. **Each argument's kind is declared by the function**, one declaration (agreed with the user, 2026-11-22):
-   `argument(at, count) → "value" | "range" | "branch"`, from 0 of `count` given, none (or "value") an argument of one value, lifted; "range"
+   `argument: "value" | "range" | "branch"` for every argument, or `(at, count) → kind` by place, from 0 of `count`
+   given; none (or "value") an argument of one value, lifted; "range"
    one read whole (the table below); "branch" one a choosing function chooses among (decided 3). Never guessed. The 10
    functions taking grids (`grids: true`: FILTER, SORT, UNIQUE…) are as they are.
 3. **Choosing functions lift over what decides, not over what they choose among** (as Excel 365): IF over its
@@ -35,14 +36,14 @@ for its **operators** only (`evaluate.ts`' `cellByCell`): `[status] & "-aa"` is 
    breaking change is fine): it declares its arguments the same way (`argument` in its definition), its arguments of
    one value lifted, those it declares "range" given a range as a list, as today. **Breaking**: a function of the
    user's reading a range (a list it sums, joins, looks up in) and not declaring it is called for each value of the
-   range instead: it declares `argument: () => "range"` (every argument) or by its place
+   range instead: it declares `argument: "range"` (every argument) or by its place
    (`argument: (at) => at === 1 ? "range" : "value"`). Said in Silverware Table's changelog (`**Breaking:**`, what to
-   add) and on its library page; Silverware Table's release a MAJOR one. A definition whose `argument` is no function,
-   or whose `argument(0, 1)` throws or gives another kind, is refused as any mistake of a definition is (a notification,
-   the others defined); another argument's wrong answer, met in a formula, is taken as one value. Its answers are kept
-   by place and count (asked for every call). One kind for every argument is written as it is (`argument: "range"`,
-   2026-11-22 after the release: a helper `ALL_RANGES` handed over as a function was weighed against it and dropped, a
-   function giving a constant being harder to read than the constant). Silverware Database has no functions of the
+   add) and on its library page; Silverware Table's release a MAJOR one. A definition whose `argument` is neither a kind nor a
+   function, or whose function throws or gives another kind for `(0, 1)`, is refused as any mistake of a definition is
+   (a notification, the others defined); another argument's wrong answer, met in a formula, is taken as one value. A
+   function's answers are kept by place and count (asked for every call). One kind for every argument is written as it
+   is (2026-11-22 after the release: a helper `ALL_RANGES` handed over as a function was weighed against it and
+   dropped, a function giving a constant being harder to read than the constant). Silverware Database has no functions of the
    user's yet (docs/silverware-database-formulas.md, *Later*): nothing changes there.
 6. **As an operator takes it** (decided with the user, 2026-11-22): a grid of several rows and columns (a table's
    `[#Data]`, FILTER's result) given where one value is expected is `#VALUE!` whole, "pick a column first

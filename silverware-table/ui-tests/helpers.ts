@@ -24,6 +24,7 @@ import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { LONG_PRESS_MS } from "../src/core/press.ts";
 
 import { boxOf } from "../../scripts/ui-test-helpers.ts";
+import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
 
 export { boxOf };
 
@@ -45,12 +46,6 @@ const TEST_FOLDER = "UiTests";
 // Under Library/: SilverBullet after 2.12.1 runs space-lua only there
 const SETTINGS_PAGE = `Library/${TEST_FOLDER}/Settings`;
 
-/**
- * Errors SilverBullet itself logs in the browser's console that are not
- * Silverware Table's: the `page` fixture fails a test on any other. Each with
- * why it is not a failure.
- */
-const SILVERBULLET_CONSOLE_NOISE: readonly RegExp[] = [];
 
 /** The settings a test gave, by its page: a later `setSettings` adds to them */
 const settingsOf = new WeakMap<Page, Record<string, Setting>>();
@@ -121,7 +116,8 @@ export const test = base.extend({
       // (Where from: a failed load's message names no file)
       log.push(`[${m.type()}] ${m.text()}${m.location().url ? ` (${m.location().url})` : ""}`);
       if (m.type() !== "error") return;
-      if (target === "silverbullet" && SILVERBULLET_CONSOLE_NOISE.some((noise) => noise.test(m.text()))) return;
+      // (SilverBullet's own errors, none of Silverware Table's: scripts/silverbullet-noise.ts)
+      if (target === "silverbullet" && silverBulletsOwnError(m.text())) return;
       errors.push(m.text());
     });
     const name = `${TEST_FOLDER}/${testInfo.testId}`;

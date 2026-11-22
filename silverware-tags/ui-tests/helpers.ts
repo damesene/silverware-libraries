@@ -17,6 +17,7 @@ import { test as base, expect, type Locator, type Page } from "@playwright/test"
 import { SAMPLE_PAGES } from "../../playground/tags-sample.ts";
 import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
+import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
 
 export { expect };
 
@@ -42,7 +43,7 @@ export const test = base.extend({
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => {
-      if (m.type() === "error") errors.push(m.text());
+      if (m.type() === "error" && !silverBulletsOwnError(m.text())) errors.push(m.text());
     });
     try {
       if (onSilverBullet) {

@@ -9,6 +9,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
+import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
 
 export { expect };
 
@@ -27,7 +28,7 @@ export const test = base.extend<{ open: (text: string) => Promise<void> }>({
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => {
       // (SilverBullet answers what it looks for and does not find with a 404, which the page logs)
-      if (m.type() === "error" && !/404/.test(m.text())) errors.push(m.text());
+      if (m.type() === "error" && !/404/.test(m.text()) && !silverBulletsOwnError(m.text())) errors.push(m.text());
     });
     try {
       if (!onSilverBullet) {

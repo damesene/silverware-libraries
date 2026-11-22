@@ -11,6 +11,7 @@ import { test as base, expect, type Page } from "@playwright/test";
 import { commandDefined } from "../../scripts/ui-test-helpers.ts";
 import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
+import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
 
 export { expect };
 
@@ -48,7 +49,7 @@ export const test = base.extend<{ space: Space }>({
       // (SilverBullet answers what it looks for and does not find with a 404, which the page logs. Its edge, 2026-11,
       // indexes a file deleted or renamed after it is gone, its index plug's `indexDocument` failing to read it: its
       // own, not ours)
-      if (m.type() === "error" && !/404|indexDocument|document:index/.test(m.text())) errors.push(m.text());
+      if (m.type() === "error" && !/404/.test(m.text()) && !silverBulletsOwnError(m.text())) errors.push(m.text());
     });
     try {
       await use(page);

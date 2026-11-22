@@ -15,6 +15,7 @@ import { boxOf, commandDefined } from "../../scripts/ui-test-helpers.ts";
 export { boxOf };
 import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
+import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
 
 export { expect };
 
@@ -102,7 +103,7 @@ export const test = base.extend<{ space: Space }>({
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => {
       // (SilverBullet answers what it looks for and does not find with a 404, which the page logs)
-      if (m.type() === "error" && !/404/.test(m.text())) errors.push(m.text());
+      if (m.type() === "error" && !/404/.test(m.text()) && !silverBulletsOwnError(m.text())) errors.push(m.text());
     });
     try {
       await use(page);

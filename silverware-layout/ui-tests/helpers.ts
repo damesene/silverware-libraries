@@ -11,6 +11,7 @@ import { configFile, silverbulletServer } from "../../scripts/silverbullet-serve
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 
 import { boxOf, commandDefined } from "../../scripts/ui-test-helpers.ts";
+import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
 
 export { boxOf };
 
@@ -52,7 +53,7 @@ export const test = base.extend<{ space: Space }>({
     page.on("console", (m) => {
       // (SilverBullet answers what it looks for and does not find with a 404, which the page logs; its own gesture of two
       // fingers prevents the default in a passive listener of the window, which Chrome logs: client/editor_ui.tsx)
-      if (m.type() === "error" && !/404|Unable to preventDefault inside passive event listener/.test(m.text())) errors.push(m.text());
+      if (m.type() === "error" && !/404|Unable to preventDefault inside passive event listener/.test(m.text()) && !silverBulletsOwnError(m.text())) errors.push(m.text());
     });
     try {
       await use(page);

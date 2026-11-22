@@ -2,6 +2,7 @@
 // SilverBullet itself: where a new version changes one, the test names it (the other tests would fail somewhere further
 // on, or not at all where the playground stands in for SilverBullet). docs/silverware-layout.md, probes 1 to 3.
 import type { Page } from "@playwright/test";
+import { embedOf, expectWidgetMenuKept, onSilverBulletEdge } from "../../scripts/silverbullet-widgetmenu.ts";
 import { boxOf, expect, gridsDrawn, test } from "./helpers.ts";
 
 const PAGE = `# Table\n\nSome text.\n\n| Name | Amount |\n| --- | --- |\n| a | 1 |\n| b | 2 |\n\nSome text.\n`;
@@ -162,4 +163,12 @@ test("what SilverBullet places by the text, moved with it at the left (src/host/
     const at = await edges();
     return Math.abs(at.notifications - (at.textRight - 20));
   }).toBeLessThan(20);
+});
+
+test("SilverBullet's ⋮ beside a widget (its edge): kept from a grid, shown beside a widget not ours (shared/silverbullet/widgetmenu.ts)", async ({ page, space }) => {
+  test.skip(!onSilverBulletEdge, "the ⋮ beside a widget is SilverBullet's edge's (after 2.12.1)");
+  const grid = "<grid>\n<cell>\n\nLeft text\n\n</cell>\n<cell>\n\nRight text\n\n</cell>\n</grid>\n";
+  await space.open({ Page: `# Page\n\n${embedOf(`${space.folder}/Other`)}\n\nBetween\n\n${grid}\nBelow\n`, Other: "# Other\n\nEmbedded.\n" }, "Page");
+  await gridsDrawn(page);
+  await expectWidgetMenuKept(page, page.locator("#sb-main .sb-markdown-widget, #sb-main [data-sb-widget-menu]").first(), "Embed", page.locator("#sb-main .swl-grid"));
 });

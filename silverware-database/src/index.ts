@@ -4,6 +4,7 @@
 // the commands; the API page defines the user's own views, types and
 // converters (`defineViews`, `defineTypes`, `defineConverters`), before
 // `init`, as Space Lua loads.
+import { keepFromWidgetMenu } from "../../shared/silverbullet/widgetmenu.ts";
 import { applyLayers } from "../../shared/layers.ts";
 import { iconsOf } from "../../shared/icons.ts";
 import { editorsOf } from "../../shared/editor.ts";
@@ -312,6 +313,8 @@ function registerLayout(bridge: Bridge): void {
 export function render(body: string, page: string): HTMLElement {
   const element = document.createElement("div");
   element.className = "swd-place";
+  // (SilverBullet's ⋮ beside a widget offers nothing that fits a place: shared/silverbullet/widgetmenu.ts)
+  keepFromWidgetMenu(element);
   if (!app) {
     element.append(note("Silverware Database is not started (its init page did not run)"));
     return element;

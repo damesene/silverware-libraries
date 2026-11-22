@@ -3,6 +3,7 @@
 // configuration (saved into CONFIG), a page's own width in its frontmatter (through the page writer), this device's
 // zoom in the browser. Its init page hands over SilverBullet's API (bridge.ts) and calls `pageLoaded`, `pageOpened`
 // and `pageEdited`.
+import { keepFromWidgetMenu } from "../../shared/silverbullet/widgetmenu.ts";
 import { applyLayers } from "../../shared/layers.ts";
 import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { type PageWriter, pageWriter } from "../../shared/pages/writer.ts";
@@ -147,7 +148,13 @@ export async function init(bridge: Bridge): Promise<void> {
  * Layout is started (no API handed over yet), its cells' markdown shown as text
  */
 export function renderGrid(body: unknown): Promise<HTMLElement> | HTMLElement {
-  if (grids) return grids.render(String(body));
+  // (SilverBullet's ⋮ beside a widget offers nothing that fits a grid: shared/silverbullet/widgetmenu.ts)
+  if (grids) {
+    const drawn = grids.render(String(body));
+    if (drawn instanceof Promise) return drawn.then((element) => (keepFromWidgetMenu(element), element));
+    keepFromWidgetMenu(drawn);
+    return drawn;
+  }
   const plain = document.createElement("pre");
   plain.className = "swl-grid-plain";
   plain.textContent = String(body);

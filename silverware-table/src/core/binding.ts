@@ -85,6 +85,8 @@ export type TableBinding<S extends BoundStore = BoundStore> = {
   features(metadata: Feature, sources: SourceTables, store: S): readonly FeatureEntry[];
   /** A table rendered anew marked with its look (`look` of the table its rendered metadata makes), before the browser lays it out */
   markRendered(widget: HTMLElement, rows: readonly HTMLTableRowElement[], look: (table: TableModel) => TableLook): void;
+  /** A table the host rendered, found as it is put in the page: what the host does with its widget of its own (none: nothing) */
+  tableFound?(widget: HTMLElement): void;
   /** The provider of the tables for Silverware Layout */
   layoutProvider(tables: LayoutTables): LayoutProvider;
 };

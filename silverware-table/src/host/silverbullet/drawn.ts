@@ -6,6 +6,7 @@
 // is shown (DRAWN_CLASS). Its cells are rendered by a cell renderer
 // (cells.ts); the table is handed over whole, once every cell is rendered, so
 // nothing is filled in later under what the core and the modules put into it.
+import { keepFromWidgetMenu } from "../../../../shared/silverbullet/widgetmenu.ts";
 import { alignClass, DRAWN_CLASS, WIDGET_CLASS } from "../../dom.ts";
 import { TABLE_MARKER } from "../../metanames.ts";
 import { parseTable, writesMetaRow, writtenMeta } from "../../markdown.ts";
@@ -31,6 +32,7 @@ export async function drawTable(doc: Document, source: string, hint: number, ren
 
   const widget = doc.createElement("span");
   widget.className = `${WIDGET_CLASS} ${DRAWN_CLASS}`;
+  keepFromWidgetMenu(widget);
   const table = doc.createElement("table");
   table.dataset.pos = String(hint);
   const cell = (node: Node, column: number) => {

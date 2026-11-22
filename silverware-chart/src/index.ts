@@ -3,6 +3,7 @@
 // then a code widget defined for each of `languages()`, rendering `render(…)`,
 // and the page's edits told to `pageModified(…)`.
 import { applyLayers } from "../../shared/layers.ts";
+import { keepFromWidgetMenu } from "../../shared/silverbullet/widgetmenu.ts";
 import { layoutOf } from "../../shared/layout.ts";
 import { type Bridge, listOf, missingBridgeFunctions, readSettings, type Settings } from "./bridge.ts";
 import { Controller } from "./core/controller.ts";
@@ -81,7 +82,11 @@ export function languages(): string[] {
 
 /** A code block's element: its chart (or why it cannot be drawn); undefined where it is no chart (handed on) */
 export function render(language: string, text: string, page: string): Promise<HTMLElement | undefined> {
-  return slot[GLOBAL_KEY]?.render(String(language), String(text), String(page)) ?? Promise.resolve(undefined);
+  // (SilverBullet's ⋮ beside a widget offers nothing that fits a chart: shared/silverbullet/widgetmenu.ts)
+  return (slot[GLOBAL_KEY]?.render(String(language), String(text), String(page)) ?? Promise.resolve(undefined)).then((element) => {
+    if (element) keepFromWidgetMenu(element);
+    return element;
+  });
 }
 
 /** The commands' names, for the init page to define them (the modules' on) */

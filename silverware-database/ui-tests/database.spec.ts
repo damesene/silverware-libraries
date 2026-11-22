@@ -1,3 +1,4 @@
+import { embedOf, expectWidgetMenuKept, onSilverBulletEdge } from "../../scripts/silverbullet-widgetmenu.ts";
 import { boxOf, caretAtEnd, editorText, expect, fieldReady, fieldText, item, root, runCommand, test, waitForIndex } from "./helpers.ts";
 
 // (The test's own view named: the built-in ones come first in the switcher)
@@ -1854,4 +1855,10 @@ test("a person pressed opens SilverBullet's Mention Inbox on that name, editing 
   const boxes = page.locator(".swd-editor-choices.swd-floated");
   await expect(boxes).toHaveCSS("position", "fixed");
   expect(await boxes.evaluate((one) => one.parentElement === document.body)).toBe(true);
+});
+
+test("SilverBullet's ⋮ beside a widget (its edge): kept from a database's place, shown beside a widget not ours (shared/silverbullet/widgetmenu.ts)", async ({ page, space }) => {
+  test.skip(!onSilverBulletEdge, "the ⋮ beside a widget is SilverBullet's edge's (after 2.12.1)");
+  await space.open({ Page: `# Page\n\n${embedOf(`${space.folder}/Other`)}\n\nBetween\n\n${BLOCK}`, Other: "# Other\n\nEmbedded.\n", ...TASKS }, "Page");
+  await expectWidgetMenuKept(page, page.locator("#sb-main [data-sb-widget-menu]").first(), "Embed", page.locator(".swd-place").first());
 });

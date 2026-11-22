@@ -822,10 +822,12 @@ test("a time, a date and time and a link: edited in their own fields, written an
   await web.locator(".swd-peek-edit").click();
   await expect(web.locator(".swd-link-text")).toHaveValue("Docs");
   await expect(web.locator(".swd-link-address")).toHaveValue("https://example.com/docs/");
-  // A value changed, then a press in the content: the value shown at once, the content's field keeping the focus
+  // A value typed, then a press in the content: written as its field is left, shown at once, the content's field keeping
+  // the focus (typed by its keys: a time set whole, as the picker sets one, is written at once, before the press)
   const at = page.locator('.swd-peek .swd-peek-value[data-key="at"]');
   await at.click();
-  await at.locator("input").fill("09:15");
+  await at.locator("input").pressSequentially("0915AM");
+  await expect(at.locator("input")).toHaveValue("09:15");
   const body = page.locator(".swd-peek .swd-peek-body");
   await body.click();
   await expect(at).toHaveText("09:15");

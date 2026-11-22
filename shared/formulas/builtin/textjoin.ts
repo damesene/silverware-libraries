@@ -1,5 +1,5 @@
 import { firstError, flatten, isError, toBoolean, toText } from "../values.ts";
-import { ALL_RANGES, type FormulaFunction } from "../function.ts";
+import type { FormulaFunction } from "../function.ts";
 
 export default {
   name: "TEXTJOIN",
@@ -8,7 +8,7 @@ export default {
   category: "text",
   example: '=TEXTJOIN(", ", TRUE, [tag])',
   minArgs: 3,
-  argument: ALL_RANGES,
+  argument: "range",
   call: ([delimiter, ignoreEmpty, ...texts]) => {
     const error = firstError(texts);
     if (error) return error;

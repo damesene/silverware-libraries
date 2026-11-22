@@ -7,7 +7,7 @@
 // Excel has no form of) makes the formula its cell's value, with the reason.
 import { modelHeads } from "../../../shared/table/columns.ts";
 import type { TableModel } from "../../../shared/table/model.ts";
-import { columnLetters, type FormulaNode, FormulaError, functionNamed, isCustomFunction, parseFormula, referencedColumn, totalRows, cellsByName, type FormulaCells, rowsByName, takesGrids } from "../../../shared/formulas/index.ts";
+import { argumentKind, columnLetters, type FormulaNode, FormulaError, functionNamed, isCustomFunction, parseFormula, referencedColumn, totalRows, cellsByName, type FormulaCells, rowsByName, takesGrids } from "../../../shared/formulas/index.ts";
 import { type ExcelTemplates, excelCall, hasTemplate } from "./functions.ts";
 
 // The error values Excel has (ours #CYCLE! and #ERROR! are not among them)
@@ -184,9 +184,9 @@ export function excelFormula(formula: string, { table, name, cells, structured, 
         if (typeof written !== "string") throw new NotInExcel(written.reason);
         // A range at a place of one value: the function called for each of its values (lifted), its result a range, so
         // an array formula for an Excel before 365, as an operator on a range is
-        const lifts = !!f && !takesGrids(f) && parts.some((part, at) => part.range && (f.argument?.(at, count) ?? "value") === "value");
+        const lifts = !!f && !takesGrids(f) && parts.some((part, at) => part.range && argumentKind(f, at, count) === "value");
         // (A table's data given where one value is expected: a grid, which Silverware Table refuses: the cell's value)
-        if (lifts && node.args.some((arg, at) => arg.kind === "data" && (f.argument?.(at, count) ?? "value") !== "range")) throw new NotInExcel(`${node.name} is given a table's data where one value is expected`);
+        if (lifts && node.args.some((arg, at) => arg.kind === "data" && argumentKind(f!, at, count) !== "range")) throw new NotInExcel(`${node.name} is given a table's data where one value is expected`);
         if (lifts) array = true;
         return { text: written, range: lifts };
       }

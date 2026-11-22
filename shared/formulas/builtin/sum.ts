@@ -1,5 +1,5 @@
 import { withNumbers } from "../arguments.ts";
-import { ALL_RANGES, type FormulaFunction } from "../function.ts";
+import type { FormulaFunction } from "../function.ts";
 
 export default {
   name: "SUM",
@@ -8,6 +8,6 @@ export default {
   category: "math",
   example: "=SUM([qty])",
   minArgs: 1,
-  argument: ALL_RANGES,
+  argument: "range",
   call: (args) => withNumbers(args, (ns) => ns.reduce((a, b) => a + b, 0), true),
 } satisfies FormulaFunction;

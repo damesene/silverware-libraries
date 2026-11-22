@@ -1,6 +1,6 @@
 import { FormulaError } from "../values.ts";
 import { withNumbers } from "../arguments.ts";
-import { ALL_RANGES, type FormulaFunction } from "../function.ts";
+import type { FormulaFunction } from "../function.ts";
 
 export default {
   name: "MEDIAN",
@@ -9,7 +9,7 @@ export default {
   category: "math",
   example: "=MEDIAN([price])",
   minArgs: 1,
-  argument: ALL_RANGES,
+  argument: "range",
   call: (args) =>
     withNumbers(
       args,

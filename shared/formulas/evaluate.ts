@@ -9,7 +9,7 @@ import { dateArithmetic } from "./dates.ts";
 import { compareValues } from "./compare.ts";
 import { type Node, parse, refersToOwnData, wholeColumnNames } from "./parser.ts";
 import { type Area, areaText, cellName, formulaOutside, referencedColumn, type SourceRef, tablePrefix, type TableRef } from "./references.ts";
-import { type ArgumentKind, takesGrids } from "./function.ts";
+import { argumentKind, type ArgumentKind, takesGrids } from "./function.ts";
 import { functionNamed, isCustomFunction } from "./registry.ts";
 import {
   asGrid,
@@ -723,7 +723,7 @@ class Sheet {
         // rows; the built-in ones change none)
         const custom = isCustomFunction(node.name);
         const count = node.args.length;
-        const kindAt = (at: number): ArgumentKind => f.argument?.(at, count) ?? "value";
+        const kindAt = (at: number): ArgumentKind => argumentKind(f, at, count);
         const args: Value[] = [];
         for (const [at, arg] of node.args.entries()) {
           const result = this.evaluate(arg, row, column);
@@ -929,7 +929,7 @@ function listNode(node: Node): boolean {
       // A function taking grids gives one (FILTER, SORT…), one of one value given a list there gives a list (lifted)
       const f = functionNamed(node.name);
       if (!f) return false;
-      return takesGrids(f) || node.args.some((arg, at) => (f.argument?.(at, node.args.length) ?? "value") === "value" && listNode(arg));
+      return takesGrids(f) || node.args.some((arg, at) => argumentKind(f, at, node.args.length) === "value" && listNode(arg));
     }
     case "unary":
       return listNode(node.arg);

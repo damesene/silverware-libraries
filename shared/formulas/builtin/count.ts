@@ -1,5 +1,5 @@
 import { isError, isRange, toNumber } from "../values.ts";
-import { ALL_RANGES, type FormulaFunction } from "../function.ts";
+import type { FormulaFunction } from "../function.ts";
 
 export default {
   name: "COUNT",
@@ -8,7 +8,7 @@ export default {
   category: "math",
   example: "=COUNT([qty])",
   minArgs: 1,
-  argument: ALL_RANGES,
+  argument: "range",
   call: (args) => {
     let count = 0;
     for (const arg of args) {

@@ -8,9 +8,6 @@ import type { Result, Scalar, Value } from "./values.ts";
  */
 export type ArgumentKind = "value" | "range" | "branch";
 
-/** Every argument a range (SUM, COUNT, CONCAT…) */
-export const ALL_RANGES = (): ArgumentKind => "range";
-
 /**
  * A function formulas can call: a built-in one (builtin/, where a test
  * requires its syntax and description in the Functions table of
@@ -34,10 +31,11 @@ export type FormulaFunction = {
   // part of a formula calling it is calculated in every row, never once for all (evaluate.ts, rowFree)
   readonly readsPlace?: true;
   /**
-   * What its argument at `at` (from 0) takes, of `count` given (none: one value each, `value`); a function of the
-   * user's declares it as a built-in one does
+   * What its arguments take: one kind for every argument (`"range"`: SUM's), or the kind of the argument at `at` (from
+   * 0) of `count` given where they differ (`(at) => (at === 0 ? "range" : "value")`); none: one value each. A function
+   * of the user's declares it as a built-in one does. Read through `argumentKind`
    */
-  readonly argument?: (at: number, count: number) => ArgumentKind;
+  readonly argument?: ArgumentKind | ((at: number, count: number) => ArgumentKind);
   /**
    * Gets the evaluated arguments: a range or a cell reference (A1:B3, [Qty], A1)
    * is the list of its cells' values, an empty cell is null, an error is a
@@ -66,6 +64,12 @@ export type GridFunction = Omit<FormulaFunction, "call"> & {
 
 /** Any function formulas can call */
 export type AnyFunction = FormulaFunction | GridFunction;
+
+/** What a function's argument at `at`, of `count` given, takes (one value where it says nothing) */
+export function argumentKind(f: AnyFunction, at: number, count: number): ArgumentKind {
+  const { argument } = f;
+  return argument === undefined ? "value" : typeof argument === "string" ? argument : argument(at, count);
+}
 
 export function takesGrids(f: AnyFunction): f is GridFunction {
   return "grids" in f && f.grids === true;

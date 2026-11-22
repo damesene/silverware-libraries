@@ -40,7 +40,9 @@ for its **operators** only (`evaluate.ts`' `cellByCell`): `[status] & "-aa"` is 
    add) and on its library page; Silverware Table's release a MAJOR one. A definition whose `argument` is no function,
    or whose `argument(0, 1)` throws or gives another kind, is refused as any mistake of a definition is (a notification,
    the others defined); another argument's wrong answer, met in a formula, is taken as one value. Its answers are kept
-   by place and count (asked for every call). `ALL_RANGES` is in HELPERS. Silverware Database has no functions of the
+   by place and count (asked for every call). One kind for every argument is written as it is (`argument: "range"`,
+   2026-11-22 after the release: a helper `ALL_RANGES` handed over as a function was weighed against it and dropped, a
+   function giving a constant being harder to read than the constant). Silverware Database has no functions of the
    user's yet (docs/silverware-database-formulas.md, *Later*): nothing changes there.
 6. **As an operator takes it** (decided with the user, 2026-11-22): a grid of several rows and columns (a table's
    `[#Data]`, FILTER's result) given where one value is expected is `#VALUE!` whole, "pick a column first
@@ -78,9 +80,9 @@ one value only (a test lists them, so a function added later must say).
 
 ## How it fits
 
-- **`FormulaFunction.argument?(at: number): ArgumentKind`** (`function.ts`, `ArgumentKind = "value" | "range" |
-  "branch"`): its argument at `at`'s kind, none "value". Helpers for the common ones (`ALL_RANGES`, every argument a
-  range) in `function.ts` and in the HELPERS given to a module of functions of the user's. Kept in each function's
+- **`FormulaFunction.argument?: ArgumentKind | ((at, count) => ArgumentKind)`** (`function.ts`, `ArgumentKind =
+  "value" | "range" | "branch"`): one kind for every argument, or its argument at `at`'s kind; none "value"; read
+  through `argumentKind(f, at, count)` alone. Kept in each function's
   file, as the rest of its definition is; a custom one's in its definition, checked and guarded by `custom.ts` as its
   `call` is (a throw or another kind: told once, "value").
 - **The evaluator** (`evaluate.ts`, the `call` case, a function not taking grids, built-in or the user's): the arguments

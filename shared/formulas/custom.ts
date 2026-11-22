@@ -20,14 +20,12 @@ import {
   toText,
 } from "./values.ts";
 import { CELL_RE } from "../table/namerules.ts";
-import { ALL_RANGES, type ArgumentKind, FUNCTION_CATEGORIES, type FormulaFunction, type FunctionCategory } from "./function.ts";
+import { type ArgumentKind, FUNCTION_CATEGORIES, type FormulaFunction, type FunctionCategory } from "./function.ts";
 
 const ARGUMENT_KINDS: readonly ArgumentKind[] = ["value", "range", "branch"];
 
 /** The conversions the built-in functions use, for custom functions (a definitions function gets them) */
 export const HELPERS = {
-  // (What a function says of its arguments: every one a range)
-  ALL_RANGES,
   FormulaError,
   TimeValue,
   isError,
@@ -90,9 +88,12 @@ function customFunction(definition: unknown): FormulaFunction | string {
   if (example !== undefined && typeof example !== "string") return `${upper}: its example is not text`;
   if (!isCount(minArgs)) return `${upper}: minArgs is not a whole number of 0 or more`;
   if (maxArgs !== undefined && (!isCount(maxArgs) || maxArgs < minArgs)) return `${upper}: maxArgs is not a whole number of minArgs or more`;
-  if (argument !== undefined && typeof argument !== "function") return `${upper}: its argument is not a function ((at, count) => "value", "range" or "branch")`;
-  // (Asked as defined of its first argument: a throw or another answer said now, not met in a formula)
-  const said = argument === undefined ? undefined : argumentSaid(argument as (at: number, count: number) => unknown, 0, 1);
+  // Its argument: one kind for every argument, or a function giving the kind by place
+  if (typeof argument === "string" || (argument !== undefined && typeof argument !== "function")) {
+    if (!ARGUMENT_KINDS.includes(argument as ArgumentKind)) return `${upper}: its argument is not "value", "range", "branch" or a function giving one of them by place ((at, count) => …)`;
+  }
+  // (A function asked as defined of its first argument: a throw or another answer said now, not met in a formula)
+  const said = typeof argument === "function" ? argumentSaid(argument as (at: number, count: number) => unknown, 0, 1) : undefined;
   if (said && "problem" in said) return `${upper}: its argument(0, 1) ${said.problem}`;
   return {
     name: upper,
@@ -104,7 +105,7 @@ function customFunction(definition: unknown): FormulaFunction | string {
     ...(maxArgs === undefined ? {} : { maxArgs }),
     // (What it says of an argument, each answer kept (asked for every call), guarded: a throw or another answer for
     // another argument taken as one value, the kind of none declared)
-    ...(argument === undefined ? {} : { argument: keptArgument(argument as (at: number, count: number) => unknown) }),
+    ...(argument === undefined ? {} : { argument: typeof argument === "function" ? keptArgument(argument as (at: number, count: number) => unknown) : (argument as ArgumentKind) }),
     call: (args, context) => {
       let result: unknown;
       try {

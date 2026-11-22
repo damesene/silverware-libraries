@@ -3,7 +3,7 @@
 // say which of its arguments read a range, and a declaration says what its `call` does
 import { describe, expect, it } from "vitest";
 import { BUILT_IN_FUNCTIONS } from "./builtin/index.ts";
-import { type FormulaFunction, takesGrids } from "./function.ts";
+import { argumentKind, type FormulaFunction, takesGrids } from "./function.ts";
 import { asValue, FormulaError, type Value } from "./values.ts";
 
 // (What `single` says of a range of other than one value: what an argument of one value gives for a range)
@@ -77,7 +77,7 @@ describe("the built-in functions' arguments", () => {
   it.each(NOT_GRIDS.map((f) => [f.name, f] as const))("of %s read a range where declared one, refuse one where of one value", (_name, f) => {
     const args = sample(f);
     args.forEach((_, at) => {
-      const kind = f.argument?.(at, args.length) ?? "value";
+      const kind = argumentKind(f, at, args.length);
       if (kind === "branch") return;
       const given = args.map((one, i) => (i === at ? (Array.isArray(one) ? one : [one, one]) : one));
       const result = asValue(f.call(given, { row: 1, column: 1 }));
@@ -92,7 +92,7 @@ describe("the built-in functions' arguments", () => {
   });
 
   it("of the choosing functions: what decides one value, what they choose among branches", () => {
-    const kinds = (name: string, count: number) => Array.from({ length: count }, (_, at) => BUILT_IN_FUNCTIONS[name]!.argument?.(at, count));
+    const kinds = (name: string, count: number) => Array.from({ length: count }, (_, at) => argumentKind(BUILT_IN_FUNCTIONS[name]!, at, count));
     expect(kinds("IF", 3)).toEqual(["value", "branch", "branch"]);
     expect(kinds("IFS", 4)).toEqual(["value", "branch", "value", "branch"]);
     expect(kinds("IFERROR", 2)).toEqual(["value", "branch"]);

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { clearCustomFunctions, defineCustomFunctions, functionNamed, functionNames, customFunctionsAnew } from "../../../shared/formulas/registry.ts";
 import { BUILT_IN_FUNCTIONS } from "../../../shared/formulas/builtin/index.ts";
 import { HELPERS, customFunctions } from "../../../shared/formulas/custom.ts";
+import { argumentKind } from "../../../shared/formulas/function.ts";
 import { findFunctions, formulaChoices, formulaHelp } from "../../../shared/formulas/index.ts";
 import { recalculate } from "../testing/formulas.ts";
 import { parseTable } from "../markdown.ts";
@@ -69,24 +70,24 @@ describe("custom functions", () => {
     ).toEqual(["the definitions failed: oops"]);
   });
 
-  it("takes what a function says of its arguments (value, range, branch), one saying otherwise or failing taken as of one value", () => {
-    const sum = only([{ name: "MYSUM", argument: () => "range", call: () => 1 }]);
-    expect([sum.argument!(0, 1), sum.argument!(3, 4)]).toEqual(["range", "range"]);
-    // (Another answer for another argument, as a formula asks: taken as one value)
+  it("takes what a function says of its arguments (value, range, branch), for all or by place, one saying otherwise or failing taken as of one value", () => {
+    const kinds = (f: ReturnType<typeof only>, count: number) => Array.from({ length: count }, (_, at) => argumentKind(f, at, count));
+    // (One kind for every argument)
+    expect(kinds(only([{ name: "MYSUM", argument: "range", call: () => 1 }]), 3)).toEqual(["range", "range", "range"]);
+    // (By place; another answer for another argument, as a formula asks: taken as one value)
     const odd = only([{ name: "ODD", argument: (at: number) => (at === 1 ? "range" : at === 0 ? "value" : "nonsense"), call: () => 1 }]);
-    expect([odd.argument!(0, 3), odd.argument!(1, 3), odd.argument!(2, 3)]).toEqual(["value", "range", "value"]);
+    expect(kinds(odd, 3)).toEqual(["value", "range", "value"]);
     // (Asked once for each place and count)
     let asked = 0;
     const counted = only([{ name: "COUNTED", argument: () => (asked++, "range"), call: () => 1 }]);
-    counted.argument!(1, 2);
-    counted.argument!(1, 2);
+    argumentKind(counted, 1, 2);
+    argumentKind(counted, 1, 2);
     expect(asked).toBe(2);
     // (None said: every argument one value)
-    expect(only([{ name: "PLAIN", argument: undefined, call: () => 1 }]).argument).toBeUndefined();
-    expect(HELPERS.ALL_RANGES()).toBe("range");
+    expect(kinds(only([{ name: "PLAIN", argument: undefined, call: () => 1 }]), 2)).toEqual(["value", "value"]);
     // A wrong declaration said as the function is defined, the others defined
     const { functions, problems } = customFunctions([
-      { name: "BAD", argument: "range", call: () => 1 },
+      { name: "BAD", argument: "Range", call: () => 1 },
       {
         name: "FAILING",
         argument: () => {
@@ -95,11 +96,11 @@ describe("custom functions", () => {
         call: () => 1,
       },
       { name: "WRONG", argument: () => "Range", call: () => 1 },
-      { name: "GOOD", argument: HELPERS.ALL_RANGES, call: () => 1 },
+      { name: "GOOD", argument: "branch", call: () => 1 },
     ]);
     expect(functions.map((one) => one.name)).toEqual(["GOOD"]);
     expect(problems).toEqual([
-      'function 1: BAD: its argument is not a function ((at, count) => "value", "range" or "branch")',
+      'function 1: BAD: its argument is not "value", "range", "branch" or a function giving one of them by place ((at, count) => …)',
       "function 2: FAILING: its argument(0, 1) failed: oops",
       'function 3: WRONG: its argument(0, 1) gave "Range", which is none of "value", "range", "branch"',
     ]);

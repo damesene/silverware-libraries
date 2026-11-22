@@ -1,5 +1,5 @@
 import { extremeDate, withNumbers } from "../arguments.ts";
-import { ALL_RANGES, type FormulaFunction } from "../function.ts";
+import type { FormulaFunction } from "../function.ts";
 
 export default {
   name: "MIN",
@@ -8,6 +8,6 @@ export default {
   category: "math",
   example: "=MIN([price])",
   minArgs: 1,
-  argument: ALL_RANGES,
+  argument: "range",
   call: (args) => extremeDate(args, false) ?? withNumbers(args, (ns) => (ns.length ? Math.min(...ns) : 0), true),
 } satisfies FormulaFunction;

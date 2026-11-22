@@ -2,7 +2,7 @@
 
 ## 2.0.0 (2026-11-22)
 
-- **Breaking:** a custom function that reads a range (a sum or a lookup of your own) has to say so: `argument: ALL_RANGES`, or by the argument's place, `argument: (at) => (at === 1 ? "range" : "value")`. Without it, a function given a range is now called once for each of its values, as a built-in one is. Add `argument` to such functions in the files you load with `silverware.table.defineFunctions`.
+- **Breaking:** a custom function that reads a range (a sum or a lookup of your own) has to say so: `argument: "range"`, or by the argument's place, `argument: (at) => (at === 0 ? "range" : "value")`. Without it, a function given a range is now called once for each of its values, as a built-in one is. Add `argument` to such functions in the files you load with `silverware.table.defineFunctions`.
 - Functions of one value given a range are calculated for each of its values, as in Excel 365: `TEXTJOIN(", ", TRUE, UPPER([name]))` joins the names in capitals, `IF([qty] > 10, "bulk", "single")` decides for each row. Left alone in a cell, such a result is `#SPILL!` (Show result shows its values); a table's data where one value is expected is `#VALUE!`. In an Excel file such formulas are written as array formulas.
 - New functions: `IFS` and `SWITCH`, as in Excel.
 - Faster formulas: a part that reads nothing of its row (`SUM([hours])` in `=[@hours]/SUM([hours])`) is calculated once, not once per row.

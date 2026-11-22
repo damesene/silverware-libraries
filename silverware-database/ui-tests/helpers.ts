@@ -146,6 +146,9 @@ export const test = base.extend<{ space: Space }>({
         await page.waitForFunction(() => !!(window as unknown as { client?: { editorView?: unknown } }).client?.editorView);
         // (The page loaded whole: what SilverBullet draws again once its index is complete drawn by then)
         await loaded(page);
+        // Each database's place drawn: SilverBullet after 2.12.1 renders its widgets anew as they are ready, each place's
+        // element empty until its data is read (a test measuring it meanwhile found a block of no height, its lines bare)
+        await expect(page.locator(".swd-place:empty")).toHaveCount(0);
       },
       saved: async (name) => (existsSync(path(name)) ? (await readFile(path(name), "utf8")).replace(/\r\n/g, "\n") : undefined),
       config: async () => (existsSync(configPath) ? (await readFile(configPath, "utf8")).replace(/\r\n/g, "\n") : undefined),

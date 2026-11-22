@@ -15,6 +15,7 @@ import { type Block, dedentedLines, readBlocks } from "../../../../shared/markdo
 import { indentWidth } from "../../../../shared/markdown/lines.ts";
 import { readAttributeValue, writeAttribute, writeTaskLine } from "../../../../shared/markdown/task.ts";
 import type { Converted, ConvertedItem, ConvertedProperty, ConverterDefinition } from "../../core/converter.ts";
+import { calculated } from "../../domain/calculated.ts";
 import { keyFromLabel } from "../../domain/keys.ts";
 import { labelOfKey } from "../../domain/loose.ts";
 import type { Item, Property, Value } from "../../model/database.ts";
@@ -208,7 +209,8 @@ function write(items: readonly Item[], properties: readonly Property[]): string 
       // (A key read as the status, `state` or `status` of another type, would take its place: written with `_2`)
       const key = /^(state|status)$/i.test(property.key) ? `${property.key}_2` : property.key;
       if (property.system === "tags") parts.push(...texts(value).filter((tag) => !/[>\n]/.test(tag)).map(hashtagOf));
-      else if (property.system !== undefined) continue;
+      // (A calculated value, the system's or a formula's, is none the item keeps)
+      else if (calculated(property)) continue;
       else if (property.key === LINKS && property.type === "reference") parts.push(...linksOf(value));
       else if (property.type === "reference") parts.push(`[${key}: ${linksOf(value).join(", ")}]`);
       else if (property.type === "person") {

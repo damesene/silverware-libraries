@@ -92,10 +92,19 @@ test("the calendar: items on their days, one dragged to another day keeping its 
   // One without a date dragged onto a day: given it
   await page.locator(".swd-cal-undated .swd-cal-item").dragTo(cell(13));
   await expect.poll(() => space.saved("Page/db-tasks/Someday")).toContain(day(13));
-  // A day's +: an item added on it
+  // A day's +: an item added on it, opened in the peek with its name selected, typed over there; Esc closes it
   await cell(20).hover({ position: { x: 10, y: 10 } });
   await cell(20).locator(".swd-cal-add").click();
-  await expect.poll(() => space.saved("Page/db-tasks/Untitled")).toContain(day(20));
+  await expect(page.locator(".swd-peek-name")).toBeFocused();
+  await page.keyboard.type("Review");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => space.saved("Page/db-tasks/Review")).toContain(day(20));
+  // (The panel still on it, renamed: its key kept through the rename as the index tells the new page)
+  await expect(page.locator(".swd-peek-name")).toHaveValue("Review");
+  await page.locator(".swd-peek-name").press("Escape");
+  await expect(page.locator(".swd-peek")).toHaveCount(0);
+  // (The focus back on the item added, drawn anew by its rename)
+  await expect(bar("Review")).toBeFocused();
   // A phone: the days show marks, a day pressed lists its items whole under the month
   await page.setViewportSize({ width: 390, height: 844 });
   await cell(12).click({ position: { x: 4, y: 12 } });
@@ -681,6 +690,7 @@ test("the settings turn a view off: saved in CONFIG, the picker without it at on
   await expect(page.locator(".swd-menu .swd-menu-item")).toHaveCount(7);
   await page.keyboard.press("Escape");
   await runCommand(page, "Silverware Database: Settings");
+  await page.locator('.swd-settings [data-swd-tab="views"]').click();
   await page.locator('.swd-settings [data-swd-view="count"]').click();
   await page.locator(".swd-settings-save").click();
   await expect(page.locator(".swd-settings")).toHaveCount(0);
@@ -689,6 +699,25 @@ test("the settings turn a view off: saved in CONFIG, the picker without it at on
   expect(await space.config()).toContain('config.set("silverware.database.views.count.enabled", false)');
   await page.locator(".swd-view-picker").click();
   await expect(page.locator(".swd-menu .swd-menu-item")).toHaveCount(6);
+});
+
+test("a sort written into the block draws the place anew with no frame of it empty (no blink)", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS }, "Page");
+  await expect(page.locator(".swd-table tbody tr[data-item]")).toHaveCount(2);
+  // (Each frame looked at, from the press until the sort is shown: SilverBullet's element for the block's new text comes
+  // before its place has drawn anything)
+  await page.evaluate(() => {
+    (window as unknown as { emptyFrames: number }).emptyFrames = 0;
+    const look = () => {
+      if (!document.querySelector(".swd-table tbody tr[data-item]")) (window as unknown as { emptyFrames: number }).emptyFrames++;
+      if (!document.querySelector(".swd-table-sort-end")?.textContent?.includes("↑")) requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
+  await page.locator(".swd-table-sort").first().click();
+  await expect.poll(() => space.saved("Page")).toContain("table.sort");
+  await expect(page.locator(".swd-table-sort-end").first()).toContainText("↑");
+  expect(await page.evaluate(() => (window as unknown as { emptyFrames: number }).emptyFrames)).toBe(0);
 });
 
 test("the table edits a value in place, written into the item's page", async ({ page, space }) => {

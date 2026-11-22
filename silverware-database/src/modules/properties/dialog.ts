@@ -11,7 +11,13 @@
 // changes. The values outside the database have a screen of their own.
 import { typeOf } from "../../domain/listing.ts";
 import { systemKind, systemProperties } from "../../domain/system.ts";
-import { switchControl } from "../../../../shared/controls.ts";
+import { calculated, paramsKept } from "../../domain/calculated.ts";
+import { formulaCompletion, formulaFunctionHelp, formulaTypedProblem } from "../../domain/formulas/help.ts";
+import { formulaOptions } from "../../domain/formulas/options.ts";
+import { formulaField } from "../../../../shared/formulafield.ts";
+import { formulaErrorsSaid } from "../../domain/formulas/calculate.ts";
+import { formulaDetails } from "./formula.ts";
+import { segmentedControl, switchControl } from "../../../../shared/controls.ts";
 import { Dialogs } from "../../../../shared/dialog.ts";
 import { reorder } from "../../../../shared/drag.ts";
 import { el } from "../../../../shared/elements.ts";
@@ -20,7 +26,7 @@ import { labelOfKey } from "../../domain/loose.ts";
 import type { ModuleHost } from "../../core/module.ts";
 import { colorsOf, OPTION_COLORS, type OptionColor } from "../../domain/types/options.ts";
 import type { PropertyType } from "../../domain/types/type.ts";
-import type { Database, Property } from "../../model/database.ts";
+import type { Database, Item, Property } from "../../model/database.ts";
 import { ownIcon, propertyIcon } from "../../views/icons.ts";
 import { iconChoice, type Popovers, popovers } from "../../views/popover.ts";
 import { optionPill, pill } from "../../views/values.ts";
@@ -31,6 +37,14 @@ const SYSTEM_PREFIX = "system:";
 
 /** The types offered for a property of the user's (not those only the system's properties have) */
 const offered = (all: readonly PropertyType[]) => all.filter((one) => one.offered !== false);
+
+/** A list of types to pick from: those of typed values, then apart under Calculated those whose values are calculated (a formula) */
+function typeChoices(doc: Document, all: readonly PropertyType[], selected: string): (HTMLOptionElement | HTMLOptGroupElement)[] {
+  const option = (one: PropertyType) => new Option(one.label, one.name, false, one.name === selected);
+  const typed = offered(all).filter((one) => !calculated({ type: one.name }));
+  const calculatedOnes = offered(all).filter((one) => calculated({ type: one.name }));
+  return [...typed.map(option), ...(calculatedOnes.length ? [el(doc, "optgroup", { attrs: { label: "Calculated" } }, ...calculatedOnes.map(option))] : [])];
+}
 
 // The settings dialog's look: the same rows, cards and switches
 const BASE = "swd-settings";
@@ -133,6 +147,13 @@ export class PropertiesDialog {
   private readonly advancedOpen = new Set<string>();
   // A change being planned or written: nothing else offered meanwhile (Apply twice wrote nothing the second time and said so)
   private busy = false;
+  // The items, read once a formula's result is shown while the dialog is open; the item it is shown for
+  private items: Promise<readonly Item[]> | undefined;
+  private readonly shownFor: { item: string | undefined } = { item: undefined };
+  // The options each property's formula gave last (by its id), a list to edit from as it is turned back to a fixed list
+  private readonly lastOptions = new Map<string, readonly string[]>();
+  // An options' formula left for a fixed list (by the property's id), back as From a formula is pressed again
+  private readonly formulasLeft = new Map<string, string>();
 
   constructor(
     private readonly host: ModuleHost,
@@ -146,8 +167,12 @@ export class PropertiesDialog {
     return this.dialogs.isOpen;
   }
 
-  /** Opened (at a property, its details shown; or at the field adding one); open already: shown there. Resolved as it closes */
-  async open(at?: { readonly property?: string; readonly add?: boolean }): Promise<void> {
+  /**
+   * Opened (at a property, its details shown; or at the field adding one; `item`, the item it was opened from: a formula's
+   * result shown for it); open already: shown there. Resolved as it closes
+   */
+  async open(at?: { readonly property?: string; readonly add?: boolean; readonly item?: string }): Promise<void> {
+    if (at?.item !== undefined) this.shownFor.item = at.item;
     if (this.dialogs.isOpen) {
       // (A change being written: its review and progress stay as they are)
       if (this.busy) return this.whenClosed;
@@ -156,7 +181,7 @@ export class PropertiesDialog {
       this.focusAt(at);
       return this.whenClosed;
     }
-    const read = await this.host.database(this.id);
+    const read = await this.host.schema(this.id);
     if (!read || this.dialogs.isOpen) return this.whenClosed;
     this.whenClosed = new Promise((resolve) => (this.closedNow = resolve));
     this.database = read.value;
@@ -169,6 +194,9 @@ export class PropertiesDialog {
     this.loose = undefined;
     this.adding = { label: "", type: "" };
     this.opened = at?.property;
+    this.items = undefined;
+    this.lastOptions.clear();
+    this.formulasLeft.clear();
     const doc = this.host.document;
     this.body = el(doc, "div", "swd-properties");
     this.note = el(doc, "span", { class: `${BASE}-note swd-properties-note`, attrs: { "aria-live": "polite" } });
@@ -227,7 +255,7 @@ export class PropertiesDialog {
    */
   async follow(): Promise<void> {
     if (!this.dialogs.isOpen || this.busy) return;
-    const read = await this.host.database(this.id);
+    const read = await this.host.schema(this.id);
     // (Drawn anew only where it changed: the focus and what is typed stay)
     if (!read || read.revision === this.revision) return;
     if (this.dirty()) {
@@ -251,6 +279,11 @@ export class PropertiesDialog {
   private built(entry: Entry): Property {
     const { property, options } = entry;
     if (!options || !this.hasOptions(property.type)) return property;
+    // (Its options a formula's: no list kept, its colors by value kept)
+    if (typeof property.params.optionsFormula === "string") {
+      const { options: _listed, ...rest } = property.params;
+      return { ...property, params: rest };
+    }
     const colors: Record<string, OptionColor> = Object.create(null);
     for (const one of options) if (one.color && one.text.trim()) colors[one.text.trim()] ??= one.color;
     const { colors: _gone, options: _was, ...rest } = property.params;
@@ -261,7 +294,7 @@ export class PropertiesDialog {
   private changedEntry(entry: Entry): boolean {
     if (!entry.saved || entry.removed) return true;
     const built = this.built(entry);
-    return JSON.stringify(sortedKeys(built)) !== JSON.stringify(sortedKeys(entry.saved)) || (!!entry.options && Object.keys(optionsRenamed(entry.options)).length > 0);
+    return JSON.stringify(sortedKeys(built)) !== JSON.stringify(sortedKeys(entry.saved)) || (!!entry.options && typeof built.params.optionsFormula !== "string" && Object.keys(optionsRenamed(entry.options)).length > 0);
   }
 
   /** Whether the draft holds any change: a property changed, added, removed, or the order */
@@ -276,7 +309,8 @@ export class PropertiesDialog {
       .filter((entry) => !entry.removed)
       .map((entry): PropertyEdit => {
         const p = this.built(entry);
-        const renames = entry.saved && entry.options && p.type === entry.saved.type ? optionsRenamed(entry.options) : {};
+        // (Options renamed in a list kept: a list left for a formula renames nothing)
+        const renames = entry.saved && entry.options && p.type === entry.saved.type && typeof p.params.optionsFormula !== "string" ? optionsRenamed(entry.options) : {};
         return {
           ...(entry.saved ? { from: entry.saved.key } : {}),
           label: p.label,
@@ -319,6 +353,19 @@ export class PropertiesDialog {
       this.draw();
       for (const input of this.body?.querySelectorAll<HTMLInputElement>(`[data-property="${CSS.escape(entry.id)}"] .swd-option-name`) ?? []) input.classList.toggle("swd-invalid", input.value.trim() === twice);
       return this.host.ui.notify(`${entry.property.label}: "${twice}" is two options: give each a name of its own`, { type: "error" });
+    }
+    // A formula that does not read (or reads outside the database), a property's or its options': not saved, its field
+    // shown, why said
+    for (const entry of this.entries) {
+      if (entry.removed || entry.property.system !== undefined) continue;
+      const options = !calculated({ type: entry.property.type }) && this.hasOptions(entry.property.type);
+      const formula = options ? entry.property.params.optionsFormula : calculated({ type: entry.property.type }) ? entry.property.params.formula : undefined;
+      const problem = typeof formula === "string" ? (options && !formula.trim() ? "its options' formula is empty: write one, or pick Fixed list" : formulaTypedProblem(formula)) : undefined;
+      if (!problem) continue;
+      this.opened = entry.id;
+      this.draw();
+      this.body?.querySelector<HTMLElement>(`[data-property="${CSS.escape(entry.id)}"] :is([data-focus="formula"], [data-focus="options-formula"])`)?.focus();
+      return this.host.ui.notify(`${entry.property.label}: ${problem}`, { type: "error" });
     }
     this.busy = true;
     this.drawFoot();
@@ -363,16 +410,38 @@ export class PropertiesDialog {
       this.proposal = undefined;
     }
     this.changed();
-    if (saving && !isRefused(result)) return this.close();
+    if (saving && !isRefused(result)) {
+      // (Each property as it was saved before, by the key the draft gave it: one renamed is still the one it was)
+      const before = new Map(this.entries.filter((one) => one.saved && !one.removed).map((one) => [one.property.key || one.saved!.key, one.saved!]));
+      this.close();
+      return this.sayFormulaErrors(before);
+    }
     // (Values outside the database taken off, or the draft not written: the database read again, the draft kept, made of what
     // it was made of)
-    const read = await this.host.database(this.id);
+    const read = await this.host.schema(this.id);
     if (read && read.revision !== this.revision) {
       if (this.dirty()) this.stale = true;
       else this.adopt(read.value, read.revision);
     }
     if (this.loose) await this.readLoose();
     this.draw();
+  }
+
+  /**
+   * A formula saved (added, or its params changed since it was as `before` has it, by its key now) that some items give
+   * an error for (`#DIV/0!`): said, from the items as the views calculate them; the save stands (decided 3)
+   */
+  private async sayFormulaErrors(before: ReadonlyMap<string, Property>): Promise<void> {
+    const read = await this.host.schema(this.id);
+    if (!read) return;
+    const params = (property: Property | undefined) => JSON.stringify(sortedKeys(property?.params));
+    const changed = read.value.properties.filter((one) => one.system === undefined && calculated(one) && params(before.get(one.key)) !== params(one));
+    if (!changed.length) return;
+    const items = await this.host.items(this.id);
+    for (const property of changed) {
+      const said = formulaErrorsSaid(items, property.key);
+      if (said) this.host.ui.notify(`${property.label}: ${said}`, { type: "info" });
+    }
   }
 
   private say(text: string): void {
@@ -462,12 +531,14 @@ export class PropertiesDialog {
     const type = typeOf(types, property);
     const kind = systemKind(property.system, this.host.noun);
     const mark = entry.removed ? "Removed" : !entry.saved ? "New" : this.changedEntry(entry) ? "Changed" : undefined;
-    head.setAttribute("aria-label", `${property.label}, ${type?.label ?? property.type}${property.required ? ", required" : ""}${property.system ? ", given by the system" : property.readonly ? ", locked in views" : ""}${mark ? `, ${mark.toLowerCase()} (on Save)` : ""}`);
+    // (A formula's values are read only as calculated, not locked by the user: no lock, its type says it)
+    const locked = property.readonly && (property.system !== undefined || !calculated(property));
+    head.setAttribute("aria-label", `${property.label}, ${type?.label ?? property.type}${property.required ? ", required" : ""}${property.system ? ", given by the system" : locked ? ", locked in views" : ""}${mark ? `, ${mark.toLowerCase()} (on Save)` : ""}`);
     head.replaceChildren(
       propertyIcon(doc, this.host.look, property, type, "swd-prop-icon"),
       el(doc, "span", { class: "swd-prop-name", text: property.label || "(no name)" }, ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", title: "Required", attrs: { "aria-hidden": "true" } })] : [])),
       ...(mark ? [el(doc, "span", { class: `swd-prop-mark swd-prop-mark-${mark.toLowerCase()}`, text: mark, title: `${mark}: written on Save` })] : []),
-      ...(property.readonly ? [el(doc, "span", { class: "swd-prop-lock", html: LOCK, title: property.system ? "Given by the system" : "Locked in views" })] : []),
+      ...(locked ? [el(doc, "span", { class: "swd-prop-lock", html: LOCK, title: property.system ? "Given by the system" : "Locked in views" })] : []),
       el(doc, "span", { class: "swd-prop-type", text: kind?.label ? `System: ${kind.label}` : (type?.label ?? property.type) }),
     );
   }
@@ -639,15 +710,17 @@ export class PropertiesDialog {
         el(doc, "div", "swd-prop-actions", remove),
       );
     }
-    const type = el(doc, "select", { class: "swd-property-type", attrs: { "aria-label": `Type of ${property.label}` } }, ...offered(types.all()).map((one) => new Option(one.label, one.name, false, one.name === property.type)));
+    const type = el(doc, "select", { class: "swd-property-type", attrs: { "aria-label": `Type of ${property.label}` } }, ...typeChoices(doc, types.all(), property.type));
     // (A type not defined now, or not offered, kept as it is)
     if (!offered(types.all()).some((one) => one.name === property.type)) type.append(new Option(types.named(property.type)?.label ?? property.type, property.type, false, true));
     type.addEventListener("change", () =>
       this.edited(() => {
-        // (Its params kept where the new type takes them, else none, as the core keeps them; its options as edited, where it has some)
-        const to = types.named(type.value);
-        const params = to?.validateParams?.(property.params) === undefined ? property.params : {};
-        entry.property = { ...entry.property, type: type.value, params };
+        // (Its params kept as the core keeps them; its options as edited, where it has some. A formula read only and never
+        // required; one turned from a formula not read only, its read only the formula's: as the core saves them)
+        const { required: _required, ...rest } = entry.property;
+        const toFormula = calculated({ type: type.value });
+        const readonly = toFormula ? true : calculated({ type: entry.saved?.type ?? "" }) ? false : entry.property.readonly;
+        entry.property = { ...(toFormula ? rest : entry.property), type: type.value, params: paramsKept(property, types.named(type.value)), readonly };
         if (this.hasOptions(type.value)) entry.options ??= optionDrafts(entry.property);
       }),
     );
@@ -661,6 +734,8 @@ export class PropertiesDialog {
       entry.property = { ...entry.property, key: key.value.trim() || (entry.saved?.key ?? "") };
       this.typed(entry);
     });
+    // (A formula's values are calculated: read only always, none missing to require)
+    const formula = calculated({ type: property.type });
     return el(
       doc,
       "div",
@@ -668,12 +743,13 @@ export class PropertiesDialog {
       field("Name", label),
       iconField,
       field("Type", type),
+      ...(formula ? this.formula(entry) : []),
       // (Options where its values are picked from them: a select's, a type of the user's so)
-      ...(this.hasOptions(property.type) ? [this.options(entry)] : []),
+      ...(this.hasOptions(property.type) ? [this.optionsBy(entry)] : []),
       // (Its type's switches: a select's Multiple)
-      ...this.switches(entry),
+      ...(formula ? [] : this.switches(entry)),
       // (A value turned by a press has no empty one to require)
-      ...(typeOf(types, property).editor === "toggle"
+      ...(formula || typeOf(types, property).editor === "toggle"
         ? []
         : [
             el(
@@ -688,17 +764,49 @@ export class PropertiesDialog {
       ...(typeOf(types, property).look === "check" ? [] : [nameShown]),
       // What is seldom set, folded away: open while a property is (kept so as it is drawn anew)
       this.advanced(entry, [
-        el(
-          doc,
-          "label",
-          { class: "swd-prop-field swd-prop-switch-row swd-property-locked", title: `Locked: no view offers to change it (its ${this.host.noun.one} can still be edited by hand, a script can still write it)` },
-          el(doc, "span", "swd-prop-field-name", "Locked in views", el(doc, "span", { class: `${BASE}-hint`, text: "For values a script or another tool keeps" })),
-          locked,
-        ),
+        ...(formula
+          ? []
+          : [
+              el(
+                doc,
+                "label",
+                { class: "swd-prop-field swd-prop-switch-row swd-property-locked", title: `Locked: no view offers to change it (its ${this.host.noun.one} can still be edited by hand, a script can still write it)` },
+                el(doc, "span", "swd-prop-field-name", "Locked in views", el(doc, "span", { class: `${BASE}-hint`, text: "For values a script or another tool keeps" })),
+                locked,
+              ),
+            ]),
         field("Key", key, `How ${this.host.noun.many} and queries name it`),
       ]),
       el(doc, "div", "swd-prop-actions", remove),
     );
+  }
+
+  /** A formula property's formula, its result for an item, the type it is shown as (formula.ts) */
+  private formula(entry: Entry): HTMLElement[] {
+    const property = this.built(entry);
+    const key = entry.saved?.key ?? entry.id;
+    // (The properties a formula offers and reads: those saved, by their keys as saved, as the items hold their values; one
+    // added now has its key made on Save, so a reference to it could not be written yet; the formula's own as edited)
+    const properties = this.entries.filter((one) => !one.removed && (one.saved || one === entry)).map((one) => ({ ...this.built(one), key: one.saved?.key ?? key }));
+    return formulaDetails({
+      doc: this.host.document,
+      types: this.host.types,
+      iconOf: (one) => {
+        const icon = propertyIcon(this.host.document, this.host.look, one, typeOf(this.host.types, one), "swd-formula-property-icon");
+        icon.setAttribute("aria-hidden", "true");
+        return icon;
+      },
+      property,
+      key,
+      database: { ...this.database!, properties },
+      items: () => (this.items ??= this.host.items(this.id)),
+      shownFor: this.shownFor,
+      typed: (params) => {
+        entry.property = { ...entry.property, params };
+        this.typed(entry);
+      },
+      picked: (params) => this.edited(() => (entry.property = { ...entry.property, params })),
+    });
   }
 
   /** A property's type's switches (a select's Multiple), each a logical param: on, true; off, left out */
@@ -733,6 +841,83 @@ export class PropertiesDialog {
     if (this.advancedOpen.has(entry.id) || (entry.property.readonly && entry.property.system === undefined)) box.open = true;
     box.addEventListener("toggle", () => void (box.open ? this.advancedOpen.add(entry.id) : this.advancedOpen.delete(entry.id)));
     return box;
+  }
+
+  /**
+   * Where a property's options come from: a list (Fixed list, `options`) or a formula (From a formula, `optionsFormula`:
+   * its field, the options it gives the items as they are). From a formula back to a list: the list it gave, to edit
+   */
+  private optionsBy(entry: Entry): HTMLElement {
+    const doc = this.host.document;
+    const property = this.built(entry);
+    const byFormula = typeof entry.property.params.optionsFormula === "string";
+    const source = segmentedControl(doc, "swd", `Where the options of ${property.label} come from`, [{ value: "list", label: "Fixed list" }, { value: "formula", label: "From a formula" }], byFormula ? "formula" : "list", (to) =>
+      this.edited(() => {
+        const { optionsFormula: was, ...rest } = entry.property.params;
+        if (to === "formula") entry.property = { ...entry.property, params: { ...rest, optionsFormula: this.formulasLeft.get(entry.id) ?? "" } };
+        else {
+          if (typeof was === "string" && was.trim()) this.formulasLeft.set(entry.id, was);
+          entry.property = { ...entry.property, params: rest };
+          // (The list the formula gave, where none was listed, to edit from)
+          if (!entry.options?.length && this.lastOptions.get(entry.id)?.length) entry.options = this.lastOptions.get(entry.id)!.map((text) => ({ was: undefined, text, color: undefined }));
+        }
+      }),
+    );
+    const head = el(doc, "div", "swd-prop-options-by", source.element);
+    if (!byFormula) {
+      const list = this.options(entry);
+      list.querySelector(".swd-options-box")?.prepend(head);
+      return list;
+    }
+    // The formula's options, calculated over the items (read once) after a pause in typing, the database as kept
+    const given = el(doc, "div", { class: "swd-options-given", attrs: { "aria-live": "polite" } });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const show = async () => {
+      const formula = entry.property.params.optionsFormula;
+      if (typeof formula !== "string" || !formula.trim() || formulaTypedProblem(formula)) {
+        this.lastOptions.delete(entry.id);
+        return void given.replaceChildren();
+      }
+      const items = await (this.items ??= this.host.items(this.id));
+      const made = formulaOptions(this.database!, items, formula);
+      if ("code" in made) {
+        this.lastOptions.delete(entry.id);
+        return void given.replaceChildren(el(doc, "span", { class: "swd-options-given-error", text: `${made.code}: ${made.detail}` }));
+      }
+      // (A multi-select's as the views have them: none with a comma)
+      // (As the views have them: each read as its type reads one typed, a person's @ada as ada; a multiple select's none
+      // with a comma)
+      const type = this.host.types.of(entry.property.type, entry.property.params);
+      const read = [...new Set(type?.optionRead ? made.map((one) => type.optionRead!(one)).filter(Boolean) : made)];
+      const options = entry.property.params.multiple === true ? read.filter((one) => !one.includes(",")) : read;
+      this.lastOptions.set(entry.id, options);
+      const shown = options.slice(0, 20);
+      given.replaceChildren(
+        el(doc, "span", { class: "swd-options-given-count", text: options.length ? `${options.length} option${options.length === 1 ? "" : "s"}:` : "No options: the formula gives none for the items as they are" }),
+        ...shown.map((one) => optionPill(doc, { ...property, params: { ...property.params, options: [...options] } }, one, typeOf(this.host.types, property))),
+        ...(options.length > shown.length ? [el(doc, "span", { class: "swd-options-given-more", text: `and ${options.length - shown.length} more` })] : []),
+      );
+    };
+    const field = formulaField(
+      doc,
+      { complete: (text, caret) => formulaCompletion(this.database!, text, caret, entry.saved?.key), help: formulaFunctionHelp, validate: formulaTypedProblem },
+      typeof entry.property.params.optionsFormula === "string" ? entry.property.params.optionsFormula : "",
+      (text) => {
+        entry.property = { ...entry.property, params: { ...entry.property.params, optionsFormula: text } };
+        this.typed(entry);
+        clearTimeout(timer);
+        timer = setTimeout(() => void show(), 300);
+      },
+      { base: "swd", label: `Formula of the options of ${property.label}`, focus: "options-formula", placeholder: "=UNIQUE([category])" },
+    );
+    void show();
+    return el(
+      doc,
+      "div",
+      "swd-prop-field swd-prop-options swd-prop-options-formula",
+      el(doc, "span", "swd-prop-field-name", "Options"),
+      el(doc, "div", "swd-formula-box", head, field, given, el(doc, "p", { class: "swd-formula-panel-foot swd-options-given-note", text: "A value none of them is kept, shown as none; the options follow the items as they change" })),
+    );
   }
 
   /** A select's options as a list: each its grip (dragged to its place, Alt+↑ ↓), its color, its name, ×; one added under them */
@@ -882,7 +1067,7 @@ export class PropertiesDialog {
         return option;
       }),
     );
-    const type = el(doc, "select", { class: "swd-property-new-type", attrs: { "aria-label": "New property's type" } }, ...offered(types.all()).map((one) => new Option(one.label, one.name, false, one.name === this.adding.type)), system);
+    const type = el(doc, "select", { class: "swd-property-new-type", attrs: { "aria-label": "New property's type" } }, ...typeChoices(doc, types.all(), this.adding.type), system);
     // A system property picked: its own name offered, which may be changed
     type.addEventListener("change", () => {
       this.adding.type = type.value;
@@ -897,10 +1082,19 @@ export class PropertiesDialog {
         if (!label.value.trim() && !kind) return label.focus();
         const property: Property = kind
           ? { key: "", label: label.value.trim() || kind.label, type: kind.type, params: {}, readonly: true, system: kind.kind }
-          : { key: "", label: label.value.trim(), type: type.value, params: {}, readonly: false };
+          : { key: "", label: label.value.trim(), type: type.value, params: {}, readonly: calculated({ type: type.value }) };
         this.adding = { label: "", type: "" };
-        this.edited(() => this.entries.push({ id: `new:${++this.added}`, saved: undefined, property, options: this.hasOptions(property.type) ? [] : undefined }));
-        this.body?.querySelector<HTMLElement>(".swd-property-new-label")?.focus();
+        const id = `new:${++this.added}`;
+        // (A formula opened, its field focused: what it is for is written there)
+        const formula = !kind && calculated({ type: property.type });
+        this.edited(() => {
+          this.entries.push({ id, saved: undefined, property, options: this.hasOptions(property.type) ? [] : undefined });
+          if (formula) this.opened = id;
+        });
+        if (!formula) return this.body?.querySelector<HTMLElement>(".swd-property-new-label")?.focus();
+        // (Its formula and its panel at the top of the dialog's body, as much of them in sight as it holds)
+        this.body?.querySelector(`[data-property="${CSS.escape(id)}"] .swd-prop-formula`)?.scrollIntoView?.({ block: "start" });
+        this.body?.querySelector<HTMLElement>(`[data-property="${CSS.escape(id)}"] [data-focus="formula"]`)?.focus({ preventScroll: true });
       },
     });
     label.addEventListener("keydown", (event) => {

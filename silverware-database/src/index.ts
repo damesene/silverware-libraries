@@ -43,6 +43,8 @@ import { silverBulletMedia } from "./host/silverbullet/media.ts";
 import { layoutEntries, withLayout } from "./host/silverbullet/layout.ts";
 import { type Bridge, editorArea, editorLook, fieldLook, listOf as luaList, silverBulletPlatform, watchEditorArea } from "./host/silverbullet/platform.ts";
 import { LOOK_SAMPLE } from "../../shared/editorlook.ts";
+import { calculatingStore, type CalculatingStore } from "./core/calculating.ts";
+import { inRankOrder } from "./domain/rank.ts";
 import { PagesStore } from "./store/pages/store.ts";
 import { BUILT_IN_MODULES } from "./modules/builtin.ts";
 import { BUILT_IN_VIEWS } from "./views/builtin/index.ts";
@@ -80,6 +82,8 @@ const HANDOVER_MS = 10_000;
 type App = {
   readonly platform: Platform;
   readonly store: PagesStore;
+  // The store's items with their formulas' values: what the places and the modules read (the core writes from the store)
+  readonly calculated: CalculatingStore;
   readonly core: DatabaseCore;
   readonly writer: PageWriter;
   readonly modules: Modules;
@@ -157,7 +161,7 @@ export function init(bridge: Bridge): void {
   // cannot be: the editor's own)
   let sampled: Promise<string | undefined> | undefined;
   kept ??= keptParts();
-  const { platform, store, writer, core, ui, own } = kept;
+  const { platform, store, calculated, writer, core, ui, own } = kept;
   // The files a value of files names: Silverware Assets' where it is installed, else SilverBullet's own
   const media = silverBulletMedia(
     {
@@ -178,8 +182,9 @@ export function init(bridge: Bridge): void {
       core,
       types,
       ui,
-      database: (id) => store.database(id),
-      items: async (id) => (await store.items(id)).value,
+      database: (id) => calculated.database(id),
+      schema: (id) => store.database(id),
+      items: async (id) => (await calculated.items(id)).value,
       itemBodies: store.capabilities.itemBody,
       body: (id, item) => store.body(id, item.key),
       openDocument: async (item) => {
@@ -241,7 +246,7 @@ export function init(bridge: Bridge): void {
     },
     platform.settings,
   );
-  app = Object.assign(own, { platform, store, core, writer, modules, media, shown: before });
+  app = Object.assign(own, { platform, store, calculated, core, writer, modules, media, shown: before });
   for (const [element, shown] of before) if (element.isConnected) start(element, shown);
   // The modules on started (their settings read), the places drawn with what they add
   void modules.start().then(redrawAll);
@@ -251,7 +256,7 @@ export function init(bridge: Bridge): void {
 // What is kept as Space Lua loads again (a setting saved, a space-lua block edited): the platform, the store, the writer and
 // the core, so a change stays undoable while the window is open, and what a deletion removed, which only the writer's
 // reports hold, is not lost with them. The platform calls the bridge handed over last.
-type Kept = Pick<App, "platform" | "store" | "writer" | "core"> & { readonly ui: Ui; readonly own: { home: string } };
+type Kept = Pick<App, "platform" | "store" | "calculated" | "writer" | "core"> & { readonly ui: Ui; readonly own: { home: string } };
 type Ui = { readonly notify: Platform["ui"]["notify"]; readonly ask: (message: string) => Promise<boolean> };
 let kept: Kept | undefined;
 
@@ -276,7 +281,7 @@ function keptParts(): Kept {
       actions: [{ name: "Show conflict", run: () => openConflict(conflictHost(platform, redrawAll), one) }],
     });
   const core = new DatabaseCore(store, types, { ...ui, conflict }, platform.space.noun, { store: blockPlaces(platform.space, writer), propertyMeta: (view) => views.named(view)?.propertyMeta ?? [] });
-  return { platform, store, writer, core, ui, own };
+  return { platform, store, calculated: calculatingStore(store, types), writer, core, ui, own };
 }
 
 /**
@@ -343,6 +348,21 @@ export function slashCommands(): { name: string; description: string; command: s
 
 export async function runCommand(name: string): Promise<void> {
   await COMMANDS[name]?.();
+}
+
+/**
+ * A database's items for Space Lua (`silverware.database.items`), in their order by hand: each its values by key, a
+ * formula's calculated (an error's its code) and the system's (Created, Modified) among them, its `name` and its page
+ * (`ref`); none where there is no such database, Silverware Database has not started, or the index has it not yet
+ */
+export async function items(id: unknown): Promise<readonly Record<string, unknown>[] | undefined> {
+  if (!app || typeof id !== "string") return undefined;
+  const { calculated } = app;
+  if (!(await calculated.database(id))) return undefined;
+  return inRankOrder((await calculated.items(id)).value).map((item) => {
+    const ref = calculated.documentOf(item.key);
+    return { ...item.values, name: item.name, ...(ref === undefined ? {} : { ref }) };
+  });
 }
 
 /** Space Lua loads (again): the definitions of its scripts replace those of before */
@@ -436,7 +456,8 @@ function listOf(definitions: unknown, helpers: unknown): readonly unknown[] | st
 
 /** A block's place made and drawn (none where the block names no database) */
 function start(element: HTMLElement, shown: Shown): void {
-  const { store, core, platform } = app!;
+  // (The place reads the items with their formulas' values; it writes through the core)
+  const { calculated: store, core, platform } = app!;
   const id = readBlock(shown.current).get("id");
   if (typeof id !== "string" || !id) {
     element.replaceChildren(note("Name the database this block shows: id: <its id> (the command Silverware Database: New database makes one)"));
@@ -451,10 +472,13 @@ function start(element: HTMLElement, shown: Shown): void {
     handovers.delete(key);
     return handover.until > Date.now() && handover.from !== shown.place ? handover.from.handOver() : undefined;
   };
-  // (The place before it for this block over the window: this one so from its first drawing, no frame in the page between)
+  // (The place before it for this block over the window: this one so from its first drawing, no frame in the page between;
+  // in the page, what it drew shown until this one draws, the block never empty meanwhile: no blink as a sort is written)
   const before = handovers.get(JSON.stringify([shown.page, shown.current]));
-  const overWindow = !!before && before.until > Date.now() && before.from !== shown.place && before.from.isOverWindow;
-  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, converters: () => converters.all(), overWindow, settings: platform.settings, ui: platform.ui, editor: platform.editor, documents: platformDocuments(app!.platform), media: app!.media, moduleMenu: (place, menu) => app!.modules.placeMenu(place, menu), moduleTools: (place) => app!.modules.placeTools(place), placeDrawn: (place) => app!.modules.placeDrawn(place), openItem: (item, database, from) => app!.modules.openItem(item, database, from), editSource: () => void editSource(element, shown), deleteDatabase: (one, name) => deleteDatabase(core, one, name), takeOver });
+  const after = !!before && before.until > Date.now() && before.from !== shown.place;
+  const overWindow = after && before.from.isOverWindow;
+  if (after && !overWindow && !element.hasChildNodes()) element.replaceChildren(...before.from.stillCopy());
+  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, converters: () => converters.all(), overWindow, settings: platform.settings, ui: platform.ui, editor: platform.editor, documents: platformDocuments(app!.platform), media: app!.media, moduleMenu: (place, menu) => app!.modules.placeMenu(place, menu), moduleTools: (place) => app!.modules.placeTools(place), placeDrawn: (place) => app!.modules.placeDrawn(place), openItem: (item, database, from, how) => app!.modules.openItem(item, database, from, how), editSource: () => void editSource(element, shown), deleteDatabase: (one, name) => deleteDatabase(core, one, name), takeOver });
   void shown.place.render();
 }
 

@@ -10,6 +10,7 @@ export default {
   example: "=SMALL([time], 1)",
   minArgs: 2,
   maxArgs: 2,
+  argument: (at) => (at === 0 ? "range" : "value"),
   call: ([array, k]) => {
     const at = toWhole(k!);
     if (isError(at)) return at;

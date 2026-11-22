@@ -33,6 +33,7 @@ async function setup(on = true) {
       types,
       ui,
       database: (id) => store.database(id),
+      schema: (id) => store.database(id),
       items: async (id) => (await store.items(id)).value,
       itemBodies: false,
       body: async () => undefined,

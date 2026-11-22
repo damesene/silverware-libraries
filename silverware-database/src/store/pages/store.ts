@@ -145,6 +145,14 @@ export class PagesStore implements DatabaseStore {
   private readonly makings = new Map<string, string>();
   // Pages the store wrote, as the index will have them, until it has them so (or a while after it told of them)
   private readonly wrote = new Map<string, Held>();
+  // A database's reading kept while what it is read from stays as it was (no change told by the index, no write of the
+  // store's since): the places, the calculating store and a write's plan, asking at once or one after another, share it
+  // (every item of the index read and hashed: seconds a reading with tens of thousands of items, read several times a write)
+  private generation = 0;
+  // Transactions being written: a reading meanwhile is made anew each time (the store's own pages change as they go)
+  private applying = 0;
+  private readonly reads = new Map<string, { readonly generation: number; readonly read: Promise<Read | undefined> }>();
+  private readonly itemsRead = new WeakMap<Read, Promise<Revised<readonly Item[]>>>();
   private readonly parts = new WeakMap<Planned, Part>();
   private readonly written = new WeakMap<Planned, Wrote>();
   private readonly applied = new WeakSet<Planned>();
@@ -182,6 +190,7 @@ export class PagesStore implements DatabaseStore {
       nameKey: (name) => name.toLowerCase(),
     };
     platform.index.onChanged((change) => {
+      this.generation++;
       const held = this.wrote.get(change.document);
       // A page the store wrote, deleted since (by hand, renamed): gone at once; a page it removed, indexed since: made
       // again (by hand, renamed into its name); otherwise held until a query has it as the store left it
@@ -267,6 +276,14 @@ export class PagesStore implements DatabaseStore {
   async items(id: string): Promise<Revised<readonly Item[]>> {
     const read = await this.read(id);
     if (!read) return { value: [], revision: "0" };
+    // (Made once a reading: its items with their system values and their revision)
+    let items = this.itemsRead.get(read);
+    if (!items) this.itemsRead.set(read, (items = this.itemsOf(id, read)));
+    return items;
+  }
+
+  /** A reading's items, their system values given (the pages' facts, their tasks counted) */
+  private async itemsOf(id: string, read: Read): Promise<Revised<readonly Item[]>> {
     const pages = new Map([...read.items.values()].map(({ item, page }) => [item.key, page]));
     // (What it keeps apart is none of an item's: `looseValues` gives it)
     const plain = [...read.items.values()].map(({ item: { loose: _loose, ...item }, revision }) => ({ ...item, revision }));
@@ -383,9 +400,16 @@ export class PagesStore implements DatabaseStore {
   }
 
   async apply(plan: TransactionPlan, progress?: WriteProgress): Promise<TransactionReport> {
-    const report = await this.applyParts(plan, (done, of) => told(progress, done, of));
-    told(progress, plan.planned.length, plan.planned.length);
-    return report;
+    // (Read anew while it writes, the store's own pages changing as it goes, and after it)
+    this.applying++;
+    try {
+      const report = await this.applyParts(plan, (done, of) => told(progress, done, of));
+      told(progress, plan.planned.length, plan.planned.length);
+      return report;
+    } finally {
+      this.applying--;
+      this.generation++;
+    }
   }
 
   private async applyParts(plan: TransactionPlan, progress?: WriteProgress): Promise<TransactionReport> {
@@ -449,13 +473,24 @@ export class PagesStore implements DatabaseStore {
     for (const { one, own } of ordered) {
       try {
         const before = own.key === undefined ? undefined : read!.items.get(own.key)?.item;
-        // A page made gets its key before it is written: whoever reads meanwhile (a listener told by the index) sees the key it keeps
+        // A page made gets its key before it is written, and a page renamed its key under its new name: whoever reads
+        // meanwhile (a listener told by the index, which has the new name before the write ends) sees the key it keeps
         if (own.key === undefined && own.after) {
           this.keys.delete(own.page);
           this.keyOf(own.page);
         }
-        const result = await this.applyPage(own, before);
+        const renamed = own.key !== undefined && own.after ? `${read!.folder}/${(own.after as ItemState).name}` : undefined;
+        const early = renamed !== undefined && renamed !== own.page && !this.keys.has(renamed) ? renamed : undefined;
+        if (early) this.keys.set(early, own.key!);
+        let result: Awaited<ReturnType<typeof this.applyPage>>;
+        try {
+          result = await this.applyPage(own, before);
+        } catch (error) {
+          if (early) this.keys.delete(early);
+          throw error;
+        }
         if ("cause" in result) {
+          if (early) this.keys.delete(early);
           skip(one, result.cause, result.reason);
           continue;
         }
@@ -705,8 +740,22 @@ export class PagesStore implements DatabaseStore {
     return { name: page, tags: [ITEM_TAG, ...(this.facts.get(from)?.tags ?? item.tags ?? [])], ...item.loose, ...item.values, ...(Object.keys(system).length ? { _database: system } : {}) };
   }
 
+  /** A database as read from the index, the reading shared while nothing it is read from changed (`generation`) */
+  private read(id: string): Promise<Read | undefined> {
+    if (this.applying) return this.readNow(id);
+    const kept = this.reads.get(id);
+    if (kept && kept.generation === this.generation) return kept.read;
+    const read = this.readNow(id);
+    this.reads.set(id, { generation: this.generation, read });
+    // (A reading that failed is not kept: the next asks the index again)
+    read.catch(() => {
+      if (this.reads.get(id)?.read === read) this.reads.delete(id);
+    });
+    return read;
+  }
+
   /** A database as read now: the index's objects, the pages the store wrote as it wrote them */
-  private async read(id: string): Promise<Read | undefined> {
+  private async readNow(id: string): Promise<Read | undefined> {
     for (const object of await this.objects(ROOT_TAG)) {
       const version = versionOf(object);
       const reader = this.versionNamed(version);

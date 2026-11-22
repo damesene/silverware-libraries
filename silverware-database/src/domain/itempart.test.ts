@@ -4,7 +4,15 @@ import { samePart, stableText } from "./itempart.ts";
 
 const item = (values: Item["values"], more: Partial<Item> = {}): Item => ({ key: "a" as ItemKey, name: "Fix login", values, revision: "1", ...more }) as Item;
 // A database with a value the system gives (Modified): no part a write rests on
-const DATABASE = { id: "tasks", name: "Tasks", properties: [{ key: "modified_at", label: "Modified", type: "datetime", params: {}, readonly: true, system: "modifiedAt" }] } as unknown as Database;
+// and one a formula gives (Total), calculated as the items are read
+const DATABASE = {
+  id: "tasks",
+  name: "Tasks",
+  properties: [
+    { key: "modified_at", label: "Modified", type: "datetime", params: {}, readonly: true, system: "modifiedAt" },
+    { key: "total", label: "Total", type: "formula", params: { formula: "=[@estimate]*2" }, readonly: true },
+  ],
+} as unknown as Database;
 
 describe("an item's parts", () => {
   it("writes a value's text the same whatever the order of its maps' keys", () => {
@@ -20,6 +28,8 @@ describe("an item's parts", () => {
     expect(samePart(one, item({ status: "Todo" }), { allValues: true }, DATABASE)).toBe(false);
     // Every own value alike, the system's changed with the write (Modified): alike
     expect(samePart(one, item({ status: "Todo", estimate: 3, modified_at: "2026-11-09 10:05" }), { allValues: true }, DATABASE)).toBe(true);
+    // A formula's value is calculated, no own value: alike whatever it is
+    expect(samePart(item({ status: "Todo", total: 6 }), item({ status: "Todo", total: 8 }), { allValues: true }, DATABASE)).toBe(true);
     // Nothing of it: alike whatever changed (the body's own check)
     expect(samePart(one, item({}, { name: "Plan" }), {}, DATABASE)).toBe(true);
   });

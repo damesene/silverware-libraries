@@ -14,20 +14,26 @@ import { el } from "../../../shared/elements.ts";
 import { arrangeGroups, groupItems, type ItemGroup } from "../domain/grouping.ts";
 import type { Property } from "../model/database.ts";
 import { createInGroup, foldedOf, groupHead, setFolded } from "../views/groups.ts";
+import { NO_LIMIT } from "./limit.ts";
 import type { ViewDefinition, ViewHost, ViewInstance } from "./view.ts";
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-/** A host for one group: its items those of the group as grouped now, an item added in it with the group's value */
+/**
+ * A host for one group: its items those of the group as grouped now, as many as the place draws of it (its limit), an
+ * item added in it with the group's value
+ */
 function groupHost(host: ViewHost, property: Property, key: string, groups: () => readonly ItemGroup[]): ViewHost {
   const group = () => groups().find((one) => one.key === key);
   const grouped: ViewHost = Object.create(host);
-  Object.defineProperty(grouped, "items", { get: () => group()?.items ?? [] });
+  Object.defineProperty(grouped, "items", { get: () => host.limit.shown(group()?.items ?? [], key) });
+  // (Cut here already: the view draws them all)
+  Object.defineProperty(grouped, "limit", { get: () => NO_LIMIT });
   // (Its own count: a view saying how many of all it shows, as filtered, says it of its group)
   Object.defineProperty(grouped, "total", { get: () => group()?.items.length ?? 0 });
   // (Its items are one group's: grouped no further)
   Object.defineProperty(grouped, "grouping", { get: () => undefined });
-  grouped.create = (draft = {}, place) => createInGroup(host, property, group(), draft, place);
+  grouped.create = (draft = {}, place, how) => createInGroup(host, property, group(), draft, place, how);
   return grouped;
 }
 
@@ -51,6 +57,12 @@ export function drawGrouped(view: ViewDefinition, host: ViewHost, element: HTMLE
     }
     children = [];
   };
+  // A group's row under its view: Load more and how many it shows, none where it shows all
+  const drawMore = (more: HTMLElement, group: ItemGroup) => {
+    const parts = host.limit.more(group.items, group.key);
+    more.replaceChildren(...(parts ?? []));
+    more.hidden = !parts;
+  };
   const draw = () => {
     destroy();
     const folded = foldedOf(host);
@@ -61,13 +73,16 @@ export function drawGrouped(view: ViewDefinition, host: ViewHost, element: HTMLE
         const open = !folded.has(group.key);
         const head = groupHead(doc, group, open, () => void setFolded(host, group.key, open));
         const body = el(doc, "div", "swd-group-body");
-        const section = el(doc, "section", { class: "swd-group", attrs: { "aria-label": `${property.label}: ${group.label}` } }, head, ...(open ? [body] : []));
+        // (Under its view: Load more where the group has more items than it draws)
+        const more = el(doc, "div", { class: "swd-load-more swd-group-more", attrs: { "data-group": group.key } });
+        const section = el(doc, "section", { class: "swd-group", attrs: { "aria-label": `${property.label}: ${group.label}`, "data-group": group.key } }, head, ...(open ? [body, more] : []));
         if (open) {
           try {
             children.push(view.render(groupHost(host, property, group.key, () => groups), body));
           } catch (error) {
             body.replaceChildren(el(doc, "p", { class: "swd-place-note", text: `The view "${view.label}" failed: ${message(error)}` }));
           }
+          drawMore(more, group);
         }
         return section;
       }),
@@ -104,6 +119,10 @@ export function drawGrouped(view: ViewDefinition, host: ViewHost, element: HTMLE
           // (A view failing to update takes no other group down: drawn anew with the next change)
           shapeOf = "";
         }
+      }
+      for (const more of element.querySelectorAll<HTMLElement>(":scope > .swd-group > .swd-group-more")) {
+        const group = groups.find((one) => one.key === more.dataset.group);
+        if (group) drawMore(more, group);
       }
       for (const count of element.querySelectorAll<HTMLElement>(":scope > .swd-group > .swd-group-head .swd-group-count")) {
         const key = count.closest<HTMLElement>(".swd-group-head")?.dataset.group;

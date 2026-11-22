@@ -308,6 +308,30 @@ describe("evaluation", () => {
     expect(evaluate(FRUIT, "=IFERROR(1/0, 7)")).toBe("7");
   });
 
+  it("picks among conditions (IFS) and among a value's cases (SWITCH), #N/A where none holds", () => {
+    expect(evaluate(FRUIT, '=IFS(1 > 2, "a", 2 > 1, "b", TRUE, "c")')).toBe("b");
+    expect(evaluate(FRUIT, '=IFS(FALSE, "a", TRUE, "c")')).toBe("c");
+    expect(evaluate(FRUIT, '=IFS(1 > 2, "a")')).toBe("#N/A");
+    // (A condition missing its value, or one that is no logical value: said)
+    expect(evaluate(FRUIT, '=IFS(TRUE, "a", FALSE)')).toBe("#N/A");
+    expect(evaluate(FRUIT, '=IFS("x", "a")')).toBe("#VALUE!");
+    // (The first true one wins; an error in a value not picked is not read)
+    expect(evaluate(FRUIT, '=IFS(TRUE, "first", TRUE, 1/0)')).toBe("first");
+    expect(evaluate(FRUIT, '=SWITCH("done", "Todo", 1, "Done", 2, 3)')).toBe("2");
+    expect(evaluate(FRUIT, '=SWITCH(5, 1, "one", 2, "two", "other")')).toBe("other");
+    expect(evaluate(FRUIT, '=SWITCH(5, 1, "one", 2, "two")')).toBe("#N/A");
+    expect(evaluate(FRUIT, '=SWITCH("2025-11-06", "2025-11-06 00:00", "same day")')).toBe("same day");
+    expect(evaluate(FRUIT, "=SWITCH(1/0, 1, 2)")).toBe("#DIV/0!");
+    // (A case is matched as = matches: a number and a text reading as it are equal, as a table's cells are text; Excel's
+    // SWITCH would not match them)
+    expect(evaluate(FRUIT, '=SWITCH(1, "1", "a", "b")')).toBe("a");
+    // (An error in a case read before the match is the result; a range where one value is decided: each of its values,
+    // a list, a cell's #SPILL!, as IF's)
+    expect(evaluate(FRUIT, '=SWITCH(2, 1/0, "a", 2, "b")')).toBe("#DIV/0!");
+    expect(evaluate(FRUIT, '=SWITCH(B1:B2, 1, "a", "b")')).toBe("#SPILL!");
+    expect(evaluate(FRUIT, '=IFS(B1:B2 > 0, "a", TRUE, "b")')).toBe("#SPILL!");
+  });
+
   it("explains an error", () => {
     const table = parseTable(FRUIT);
     const rows = table.rows.map((r, i) => (i === 4 ? { cells: [r.cells[0]!, r.cells[1]!, formulaCell("", "=Q1")] } : r));
@@ -523,7 +547,7 @@ describe("formulaChoices of functions", () => {
     expect(choiceNames(formulaChoices("=AVE", 4, 4))).toEqual({ from: 1, to: 4, names: ["AVERAGE", "AVERAGEIFS"] });
     expect(choiceNames(formulaChoices("=sum(A1)+rou", 12, 12))).toEqual({ from: 9, to: 12, names: ["ROUND", "ROUNDDOWN", "ROUNDUP"] });
     expect(choiceNames(formulaChoices("=A", 2, 2))!.names).toEqual(["ABS", "AND", "AVERAGE", "AVERAGEIFS"]);
-    expect(choiceNames(formulaChoices("=IF", 3, 3))!.names).toEqual(["IF", "IFERROR"]);
+    expect(choiceNames(formulaChoices("=IF", 3, 3))!.names).toEqual(["IF", "IFERROR", "IFS"]);
   });
 
   it("offers none for cells, texts, existing parentheses, the middle of a name, or no function", () => {
@@ -697,7 +721,7 @@ describe("findFunctions", () => {
   });
 
   it("finds them in a group", () => {
-    expect(names("", "logic")).toEqual(["AND", "IF", "IFERROR", "ISNUMBER", "NOT", "OR"]);
+    expect(names("", "logic")).toEqual(["AND", "IF", "IFERROR", "IFS", "ISNUMBER", "NOT", "OR", "SWITCH"]);
     expect(names("", "lookup")).toEqual(["CHOOSECOLS", "DROP", "FILTER", "HSTACK", "ROW", "SORT", "SORTBY", "TAKE", "UNIQUE", "VSTACK", "XLOOKUP"]);
     expect(names("", "custom")).toEqual([]);
   });

@@ -16,17 +16,19 @@
 import { COMPANION_ATTRIBUTE, type EditorLook, type LinkOpening, type TextEditor } from "../../../../shared/editor.ts";
 import { el, openedHere } from "../../../../shared/elements.ts";
 import { markOverWindow } from "../../../../shared/overwindow.ts";
+import { byTouch } from "../../../../shared/pointer.ts";
 import type { Result } from "../../core/core.ts";
-import type { ModuleHost, OpenedFrom } from "../../core/module.ts";
+import type { ItemOpening, ModuleHost, OpenedFrom } from "../../core/module.ts";
 import { samePart } from "../../domain/itempart.ts";
 import { textOf, typeOf } from "../../domain/listing.ts";
 import type { Database, Item, ItemLook, Property, Value } from "../../model/database.ts";
 import { type EditorHost, editValue, toggle } from "../../views/editors.ts";
 import { reorder } from "../../../../shared/drag.ts";
 import { propertyIcon, typeIcon, VIEW_ICONS } from "../../views/icons.ts";
+import { formulaOf, isFormula } from "../../domain/formulas/model.ts";
 import type { PropertiesOffer } from "../properties/index.ts";
 import { type LookControls, lookControls } from "./look.ts";
-import { missing, valueNodes } from "../../views/values.ts";
+import { missing, problemOf, valueNodes } from "../../views/values.ts";
 import { takeFiles, uploadInto } from "../../views/takefiles.ts";
 
 // The panel's width where none is set (the module's setting `width`), the narrowest it may be set to, and its share of the
@@ -56,6 +58,8 @@ function withValue(item: Item, key: string, value: Value | undefined): Item {
 
 type Shown = {
   readonly database: string;
+  // Just added (+ New): the focus goes back to it in its view as the panel closes, whatever opened it (a day's +)
+  readonly added?: boolean;
   schema: Database;
   // The item as drawn: what a value edited is written against (changed since, the write is refused, never applied over it)
   item: Item;
@@ -85,6 +89,27 @@ function toRead(body: TextEditor): void {
   body.element.dataset.reading = "";
   body.setPlaceholder("Reading…");
 }
+
+/**
+ * The focus given back to what opened the panel; where its view drew it anew meanwhile (a write shown), to the item
+ * shown (`item`, its key as followed) where the opener was one of it or it was just added (`added`, its opener the +
+ * pressed): its element (`data-item`) in the nearest of what held the opener that is still there
+ */
+function focusOpener(opener: Element | null | undefined, item: string | undefined, added: boolean): void {
+  // (Not on a device worked by a finger: no keys go on from it, and the focus in the page's editor makes it scroll to its
+  // cursor, the page's top where it has none)
+  if (!(opener instanceof HTMLElement) || byTouch(opener.ownerDocument.defaultView)) return;
+  if (opener.isConnected && !(added && !opener.closest("[data-item]"))) return opener.focus({ preventScroll: true });
+  if (item === undefined || (!added && !opener.closest("[data-item]"))) return;
+  const within = openerHolders.get(opener)?.find((one) => one.isConnected);
+  const again = within?.querySelector<HTMLElement>(`[data-item="${CSS.escape(item)}"]`);
+  // (Not drawn, where its view does not list it: the opener still there has it)
+  if (!again) return void (opener.isConnected && opener.focus({ preventScroll: true }));
+  (again.matches("button, a, [tabindex]") ? again : (again.querySelector<HTMLElement>("button, a, [tabindex]") ?? again)).focus({ preventScroll: true });
+}
+
+// What held an opener as it opened the panel, nearest first: a removed element no longer knows it
+const openerHolders = new WeakMap<Element, Element[]>();
 
 /** A button whose press takes no focus (a field being edited stays so until what it opens takes the focus): its click not lost to a redraw */
 function keepFocus(button: HTMLElement): void {
@@ -129,25 +154,38 @@ export class PeekPanel {
     return this.shown?.item;
   }
 
-  /** An item shown; another shown before is left first (its field written), unless its body typed could not be written: then it stays */
-  async show(item: Item, database: string, from?: OpenedFrom): Promise<void> {
+  /**
+   * An item shown; another shown before is left first (its field written), unless its body typed could not be written:
+   * then it stays. One just added (`how.added`) has its name selected, to be typed over
+   */
+  async show(item: Item, database: string, from?: OpenedFrom, how?: ItemOpening): Promise<void> {
     this.asked++;
-    const opener = this.shown?.opener ?? this.host.document.activeElement;
+    // (What opened it: the panel's first opener while it shows, but an item just added its own, its row in the view)
+    const opener = (how?.added ? undefined : this.shown?.opener) ?? this.host.document.activeElement;
+    if (opener) {
+      const holders: Element[] = [];
+      for (let one = opener.parentElement; one; one = one.parentElement) holders.push(one);
+      openerHolders.set(opener, holders);
+    }
     if (!(await this.leave())) return;
     // (The page's look of what its content field draws read with it: the field is made at once as it is drawn)
     const [read, look] = await Promise.all([this.host.database(database), this.host.fieldLook?.().catch(() => undefined)]);
     if (!read) return;
     // (The item before's field let go: its editor's own listeners with it)
     this.shown?.field?.body.destroy();
-    this.shown = { database, schema: read.value, item, latest: item, body: undefined, stale: false, opener, ...(from ? { from } : {}), ...(look ? { look } : {}) };
+    this.shown = { database, schema: read.value, item, latest: item, body: undefined, stale: false, opener, ...(how?.added ? { added: true } : {}), ...(from ? { from } : {}), ...(look ? { look } : {}) };
     // (The view it was opened from followed: what it hides marked anew as it changes)
     this.stopFrom?.();
     this.stopFrom = from?.onChange(() => this.followFrom());
     if (!this.element) this.open();
     this.draw();
     void this.readBody();
-    // (The panel, not its name: on a phone a field focused brings the keyboard up)
-    this.element?.focus({ preventScroll: true });
+    // (The panel, not its name: on a phone a field focused brings the keyboard up; but an item just added is named first)
+    const name = how?.added ? this.element?.querySelector<HTMLInputElement>(".swd-peek-name") : undefined;
+    if (name) {
+      name.focus({ preventScroll: true });
+      name.select();
+    } else this.element?.focus({ preventScroll: true });
   }
 
   /** Closed, once the field being edited is written; not where a body typed could not be written (said beside it): false then */
@@ -238,11 +276,14 @@ export class PeekPanel {
     this.look?.close();
     this.look = undefined;
     const opener = this.shown?.opener;
+    // (The item as followed: a rename may have given it another key)
+    const item = this.shown?.latest.key;
+    const added = !!this.shown?.added;
     this.shown?.field?.body.destroy();
     this.element.remove();
     this.element = undefined;
     this.shown = undefined;
-    if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
+    focusOpener(opener, item, added);
   }
 
   private open(): void {
@@ -496,7 +537,8 @@ export class PeekPanel {
     const doc = this.host.document;
     const { item } = shown;
     const editor = this.editorHost(shown);
-    // What had the focus (the name, a value) has it again in the panel drawn anew
+    // What had the focus (the name, a value) has it again in the panel drawn anew, the name what of it was selected (an
+    // item just added: typed over)
     const active = doc.activeElement;
     const rowOf = (one: Element) => `.swd-peek-row[data-property="${CSS.escape((one.closest(".swd-peek-row") as HTMLElement | null)?.dataset.property ?? "")}"]`;
     const focused =
@@ -509,6 +551,7 @@ export class PeekPanel {
               ? `${rowOf(active)} .${active.matches(".swd-peek-grip") ? "swd-peek-grip" : "swd-peek-label"}`
               : undefined
         : undefined;
+    const selected = focused === ".swd-peek-name" && active instanceof HTMLInputElement ? ([active.selectionStart, active.selectionEnd] as const) : undefined;
     // Its icon and color over its name (a picker open of the item as drawn before closed)
     this.look?.close();
     this.look = lookControls(this.host, element, item, (look, refocus) => void this.writeLook(shown, look, refocus));
@@ -663,6 +706,7 @@ export class PeekPanel {
     // The focus where it was; brought into view only where it is out of it (a row moved by Alt+arrows past the box's edge)
     const again = focused ? element.querySelector<HTMLElement>(focused) : null;
     again?.focus({ preventScroll: true });
+    if (selected && again instanceof HTMLInputElement) again.setSelectionRange(selected[0], selected[1]);
     again?.scrollIntoView?.({ block: "nearest" });
   }
 
@@ -679,6 +723,11 @@ export class PeekPanel {
       // only a pointer's way, the value itself being the button the keys edit (Enter, F2), its press reaching it
       const pencil = !property.readonly && shownNodes.some((node) => node instanceof Element && node.matches("a, .swd-media-strip")) ? [el(doc, "span", { class: "swd-peek-edit", html: VIEW_ICONS.edit, title: `Edit ${property.label}`, attrs: { "aria-hidden": "true" } })] : [];
       value.replaceChildren(...(shownNodes.length ? shownNodes : [el(doc, "span", { class: `swd-peek-empty${lacking ? " swd-peek-missing" : ""}`, text: lacking ? "Required" : "Empty" })]), ...pencil);
+      // (A formula's error: its code shown, why over it, as a table's cell has it)
+      const problem = shownNodes.length ? problemOf(editor, now, property) : undefined;
+      value.classList.toggle("swd-invalid", !!problem);
+      if (problem) value.title = problem;
+      else value.removeAttribute("title");
     };
     show();
     if (!property.readonly) {
@@ -710,9 +759,9 @@ export class PeekPanel {
           "button",
           {
             class: "swd-peek-label",
-            title: `Edit ${property.label} (name, type, options…)`,
+            title: isFormula(property) ? `${property.label} = ${(formulaOf(property.params) ?? "(no formula yet)").replace(/^\s*=\s*/, "")}\nEdit its formula` : `Edit ${property.label} (name, type, options…)`,
             attrs: { "aria-label": `Edit the property ${property.label}${hiddenSaid}` },
-            run: () => void properties.open(shown.database, { property: property.key }).then(() => this.refocus(`.swd-peek-row[data-property="${CSS.escape(property.key)}"] .swd-peek-label`)),
+            run: () => void properties.open(shown.database, { property: property.key, item: shown.item.key }).then(() => this.refocus(`.swd-peek-row[data-property="${CSS.escape(property.key)}"] .swd-peek-label`)),
           },
           ...labelParts,
         )

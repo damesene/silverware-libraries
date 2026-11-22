@@ -51,6 +51,7 @@ export default {
   example: "=XLOOKUP([@fruit], prices![name], prices![price])",
   minArgs: 3,
   maxArgs: 6,
+  argument: (at) => (at === 1 || at === 2 ? "range" : at === 3 ? "branch" : "value"),
   call: ([value, lookIn, results, notFound, matchMode, searchMode]) => {
     const v = single(value!);
     if (isError(v)) return v;

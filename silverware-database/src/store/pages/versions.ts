@@ -8,6 +8,7 @@ import type { PageBuilder } from "../../../../shared/pages/changes.ts";
 import type { YamlMap } from "../../../../shared/yaml/tree.ts";
 import type { IndexedObject } from "../../../../shared/platform.ts";
 import type { Property, Value } from "../../model/database.ts";
+import { calculated } from "../../domain/calculated.ts";
 import { readLook } from "../../domain/look.ts";
 import type { ItemState, RecordState } from "../transaction.ts";
 
@@ -78,7 +79,8 @@ export function schemaEntry(property: Property): YamlMap {
   return {
     type: property.type,
     label: property.label,
-    ...(property.readonly ? { readonly: true } : {}),
+    // (A calculated property's read only, a system property's or a formula's, is forced as it is read, so not written)
+    ...(property.readonly && !calculated(property) ? { readonly: true } : {}),
     ...(property.required ? { required: true } : {}),
     ...(property.showName ? { showName: true } : {}),
     ...(property.icon !== undefined ? { icon: property.icon } : {}),
@@ -102,14 +104,15 @@ export const VERSION_1: PagesVersion = {
       const ownIcon = typeof raw.icon === "string" && raw.icon !== "";
       // (`hidden`, the schema's before each view had its own (2026-11-09): left out, so a schema written drops it)
       const params = Object.fromEntries(Object.entries(raw).filter(([field]) => field !== "hidden" && (field === "icon" ? !ownIcon : !PROPERTY_FIELDS.has(field))));
-      // (A system property is read only, whatever is written)
       const system = typeof raw.system === "string" && raw.system ? raw.system : undefined;
+      const type = typeof raw.type === "string" ? raw.type : "text";
       properties.push({
         key,
         label: typeof raw.label === "string" ? raw.label : key,
-        type: typeof raw.type === "string" ? raw.type : "text",
+        type,
         params,
-        readonly: raw.readonly === true || system !== undefined,
+        // (A calculated property, a system one or a formula, is read only, whatever is written)
+        readonly: raw.readonly === true || calculated({ type, system }),
         ...(raw.required === true ? { required: true } : {}),
         ...(raw.showName === true ? { showName: true } : {}),
         // (Its icon kept as written, one that is none too: the schema is written whole, so dropped here it would be lost)
@@ -122,9 +125,10 @@ export const VERSION_1: PagesVersion = {
   },
   readItem(object, name, record) {
     const values: Record<string, Value> = {};
-    // (A system property's values are none of the page's: its key in a page is the user's own, left as it is)
-    for (const { key, system } of record.database.properties) {
-      if (system !== undefined) continue;
+    // (A calculated property's values are none of the page's: its key in a page is the user's own, left as it is)
+    for (const property of record.database.properties) {
+      if (calculated(property)) continue;
+      const { key } = property;
       const value = modelValue(object[key]);
       if (value !== undefined) values[key] = value;
     }

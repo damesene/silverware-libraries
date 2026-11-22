@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { DatabaseCore } from "../../core/core.ts";
 import { DatabasePlace, VIEW_KEY } from "../../core/place.ts";
+import { calculatingStore } from "../../core/calculating.ts";
 import { ViewRegistry } from "../../core/views.ts";
 import { inRankOrder } from "../../domain/rank.ts";
 import { TypeRegistry } from "../../domain/types/registry.ts";
@@ -36,7 +37,8 @@ async function setup(view: string, state: Record<string, unknown> = {}, database
   const element = document.createElement("div");
   document.body.append(element);
   const viewState = new MemoryViewState({ [VIEW_KEY]: view, ...state });
-  const place = new DatabasePlace({ element, database: database.id, state: viewState, store, core, types, views: new ViewRegistry(BUILT_IN_VIEWS), settings: { get: (_path, fallback) => fallback }, ui: { notify: () => {} } });
+  // (Its items calculated, as the entry gives a place them: a formula's values; the core on the store itself)
+  const place = new DatabasePlace({ element, database: database.id, state: viewState, store: calculatingStore(store), core, types, views: new ViewRegistry(BUILT_IN_VIEWS), settings: { get: (_path, fallback) => fallback }, ui: { notify: () => {} } });
   await place.render();
   const items = async () => (await store.items(database.id)).value;
   const named = async (name: string) => (await items()).find((one) => one.name === name)!;
@@ -61,7 +63,59 @@ const choose = (label: string) => {
   item.click();
 };
 
+describe("a formula's values in the views", () => {
+  // (A formula shown as a number, a checkbox, a date: sorted, grouped and placed as that type)
+  const FORMULAS: Database = {
+    ...TASKS,
+    properties: [
+      ...TASKS.properties,
+      { key: "double", label: "Double", type: "formula", params: { formula: "=[@estimate]*2", resultType: "number" }, readonly: true },
+      { key: "big", label: "Big", type: "formula", params: { formula: "=IFERROR([@estimate] > 2, FALSE)", resultType: "checkbox" }, readonly: true },
+      { key: "today", label: "Today", type: "formula", params: { formula: "=TODAY()", resultType: "date" }, readonly: true },
+    ],
+  };
+
+  it("are sorted as their result's type: a number as a number", async () => {
+    const { all } = await setup("table", { "table.sort": [{ key: "double", direction: "desc" }] }, FORMULAS);
+    // (6 before 0: as numbers; "a lot" * 2 an error)
+    const names = all("tbody tr").map((tr) => tr.querySelector('td[data-key="name"]')!.textContent);
+    expect(names.indexOf("Fix login")).toBeLessThan(names.indexOf("Plan"));
+  });
+
+  it("are grouped as their result's type: a checkbox's Checked and Unchecked, a card not moved by hand", async () => {
+    const { all, named } = await setup("board", { "board.groupBy": "big" }, FORMULAS);
+    expect(all(".swd-board-column").map((one) => one.getAttribute("aria-label"))).toEqual(["Checked", "Unchecked"]);
+    // (A text is greater than any number, as in a spreadsheet: "a lot" > 2)
+    expect(all('.swd-board-column[aria-label="Checked"] .swd-board-name').map((one) => one.textContent)).toEqual(["Fix login", "Write docs"]);
+    expect(all('.swd-board-column[aria-label="Unchecked"] .swd-board-name').map((one) => one.textContent)).toEqual(["Plan"]);
+    expect((await named("Fix login")).values.big).toBeUndefined();
+  });
+
+  it("are placed in a calendar as their result's dates, never moved there", async () => {
+    const { all } = await setup("calendar", { "calendar.dateBy": "today" }, FORMULAS);
+    expect(new Set(all(".swd-cal-item").map((one) => one.textContent))).toEqual(new Set(["Fix login", "Write docs", "Plan"]));
+    expect(all(".swd-cal-item.swd-cal-movable, .swd-cal-item[draggable='true']")).toEqual([]);
+  });
+});
+
 describe("the table", () => {
+  it("shows a formula's values read only, its ƒ in its header with its formula over it, an error's cell its code with why", async () => {
+    const database: Database = { ...TASKS, properties: [...TASKS.properties, { key: "half", label: "Half", type: "formula", params: { formula: "=[@estimate]/2" }, readonly: true }] };
+    const { all, q } = await setup("table", {}, database);
+    const head = all("th").find((th) => th.textContent === "Half")!;
+    expect(head.querySelector(".swd-table-head-formula")).not.toBeNull();
+    expect(head.querySelector<HTMLElement>(".swd-table-sort")!.title).toBe("Half = [@estimate]/2\nSort by Half");
+    expect(all("th").find((th) => th.textContent === "Estimate")!.querySelector(".swd-table-head-icon")).toBeNull();
+    const cell = (name: string) => all("tbody tr").find((tr) => tr.textContent!.includes(name))!.querySelector<HTMLElement>('td[data-key="half"]')!;
+    expect(cell("Fix login").textContent).toBe("1.5");
+    expect(cell("Fix login").classList.contains("swd-readonly")).toBe(true);
+    // ("a lot" / 2: its code, why over it)
+    expect(cell("Write docs").textContent).toBe("#VALUE!");
+    expect(cell("Write docs").classList.contains("swd-formula-error")).toBe(true);
+    expect(cell("Write docs").title).toMatch(/^#VALUE!: /);
+    expect(q('td[data-key="half"].swd-formula-error')).not.toBeNull();
+  });
+
   it("shows a row per item and a column per property, a value that does not read marked with why", async () => {
     const { all, q } = await setup("table");
     // (The name's column first, its row's grip at its edge, no column of its own; the actions' last: no name)

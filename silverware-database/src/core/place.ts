@@ -4,6 +4,9 @@
 // core's writes), the view's own data (its meta) kept in the place's state
 // under its name. What makes a place and when it goes is the binding's
 // (docs/silverware-database.md, *The core*).
+import { revealItem, takeFocus, viewLimit, type LimitKey } from "./limit.ts";
+import { byTouch } from "../../../shared/pointer.ts";
+import { pageSize, settingValue } from "./general.ts";
 import { type Icons, iconsOf, isReference } from "../../../shared/icons.ts";
 import { writeClipboard } from "../../../shared/clipboard.ts";
 import { el } from "../../../shared/elements.ts";
@@ -24,7 +27,7 @@ import { focusPropertyList, propertiesEntry, type PropertiesFocus } from "./prop
 import { drawGrouped } from "./groups.ts";
 import { ICONS } from "./icons.ts";
 import { type ColorBy, colorable, itemIcon, itemLook, ownIconElement } from "./look.ts";
-import type { OpenedFrom, OpenedView, PlaceContext, PlaceTool } from "./module.ts";
+import type { ItemOpening, OpenedFrom, OpenedView, PlaceContext, PlaceTool } from "./module.ts";
 import { PlaceOpener } from "./opener.ts";
 import type { MenuEntry, MenuNaming } from "../../../shared/menu.ts";
 import { checkedGroups, type PlaceMenu, type PlaceMenuBuilder, type PlaceMenuGroup, placeMenu, toolMenu } from "./placemenu.ts";
@@ -63,8 +66,11 @@ export type PlaceOptions = {
   readonly editSource?: () => void;
   /** The database deleted, asked first (Delete database… in ⋯, last), where the host offers it */
   readonly deleteDatabase?: (id: string, name: string) => void;
-  /** An item opened by a module's own way (the peek, core/module.ts): whether one took it; else it opens where the store says. `from`: the view it was opened from, followed live */
-  readonly openItem?: (item: Item, database: string, from?: OpenedFrom) => boolean;
+  /**
+   * An item opened by a module's own way (the peek, core/module.ts): whether one took it; else it opens where the store
+   * says. `from`: the view it was opened from, followed live; `how`: one just added is opened so too (its name to give)
+   */
+  readonly openItem?: (item: Item, database: string, from?: OpenedFrom, how?: ItemOpening) => boolean;
   /**
    * What the place drawn before for the same block hands over (`handOver`: the
    * binding knows which place wrote the text this one is drawn for), asked once,
@@ -92,11 +98,23 @@ type Drawn = {
   keptTools?: () => PlaceKept;
   host?: ViewHost;
   grouped?: string;
+  // How many items it draws at first of each group, as the settings said as it was drawn
+  pageSize: number;
+  // Where what it draws of each group is kept (its database, view and listing), once its host is made
+  limit?: LimitKey;
   // Conditions of the filter being typed, by key ("" none), shown at once and kept only once the field is left: the view
   // filters by them meanwhile, nothing written (a write draws the block anew in SilverBullet, the field going with it, and
   // keys typed before the next one was focused were lost)
   typed?: Record<string, string>;
 };
+
+/** Whether a field has the focus, typed in (text, a number, a select, an editor): what it types is the user's */
+function typingIn(doc: Document): boolean {
+  const active = doc.activeElement;
+  if (!(active instanceof HTMLElement) || !active.isConnected) return false;
+  if (active.isContentEditable || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement) return true;
+  return active instanceof HTMLInputElement && !["button", "checkbox", "radio", "submit", "reset", "file", "color", "range"].includes(active.type);
+}
 
 /** The property a view is drawn once per group by (Group by picked, of a type it is grouped by, else the first where it always is; none where the view draws its own groups) */
 function groupingOf(view: ViewDefinition, host: ViewHost): Property | undefined {
@@ -223,12 +241,22 @@ export class DatabasePlace {
         drawn.syncTools?.();
         drawn.instance.update();
         this.putScroll();
+        this.focusLoaded();
       } catch (error) {
         this.note(`The view "${drawn.view.label}" failed: ${message(error)}`);
       }
     });
     this.pending = pending;
     return pending;
+  }
+
+  /**
+   * What it draws as it is now, copied (nothing of it listening): what the place drawn after it for the same block shows
+   * until its first drawing, so the block is never empty between them (SilverBullet's element for the block's new text
+   * comes before that place has read anything)
+   */
+  stillCopy(): Node[] {
+    return [...this.options.element.childNodes].map((node) => node.cloneNode(true));
   }
 
   /**
@@ -325,12 +353,16 @@ export class DatabasePlace {
     this.body = undefined;
     const data = await this.read();
     const on = await this.viewsOn();
+    const named = state.get(VIEW_KEY);
+    const view = typeof named === "string" ? on.find((one) => one.name === named) : on[0];
+    // (All it reads read before what shows is taken away: what was drawn, or what stands for it, replaced in one step, no
+    // frame of it empty)
+    const settings = data && view ? await this.settingsOf(view) : undefined;
+    const size = data && view ? await pageSize(this.options.settings) : 0;
     if (this.gone) return;
     this.on = on;
     element.replaceChildren();
     if (!data) return this.note(`No database "${this.options.database}"`);
-    const named = state.get(VIEW_KEY);
-    const view = typeof named === "string" ? on.find((one) => one.name === named) : on[0];
     // One bar: the database's name and how many items show, quietly, then the view shown (its picker), the tools
     // at its end (a note, not a heading: a heading over it is the page's own, written in its markdown)
     const count = el(doc, "span", { class: "swd-place-count", text: String(data.items.length) });
@@ -341,10 +373,8 @@ export class DatabasePlace {
     element.append(this.body);
     // (A scroll does not bubble: caught on its way down)
     this.body.addEventListener("scroll", (event) => this.keepScroll(event.target), { capture: true, passive: true });
-    if (!view) return this.note(typeof named === "string" ? `No view "${named}" is on here: pick one above` : "No view is on: turn one on in the settings");
-    const settings = await this.settingsOf(view);
-    if (this.gone) return;
-    const drawn: Drawn = { view, data, instance: undefined, ended: false };
+    if (!view || !settings) return this.note(typeof named === "string" ? `No view "${named}" is on here: pick one above` : "No view is on: turn one on in the settings");
+    const drawn: Drawn = { view, data, instance: undefined, ended: false, pageSize: size };
     this.drawn = drawn;
     const host = this.host(drawn, settings);
     drawn.host = host;
@@ -388,6 +418,7 @@ export class DatabasePlace {
       this.note(`The view "${view.label}" failed: ${message(error)}`);
     }
     this.putScroll();
+    this.focusLoaded();
   }
 
   /** Where its items are opened from: one for the place, made as the first is */
@@ -400,6 +431,40 @@ export class DatabasePlace {
     const drawn = this.drawn;
     if (this.gone || !drawn?.host || drawn.ended) return undefined;
     return { label: drawn.view.label, hidden: drawn.host.look.hiddenProperties };
+  }
+
+  /**
+   * The first item a Load more drew has the focus, once drawn, for the keys to go on from there; let go where the user
+   * has gone on elsewhere meanwhile, and on a device worked by a finger (no keys: the focus in the page's editor makes it
+   * scroll to its cursor)
+   */
+  private focusLoaded(): void {
+    const limit = this.drawn?.limit;
+    if (!limit) return;
+    const doc = this.options.element.ownerDocument;
+    takeFocus(limit, (focus) => {
+      if (byTouch(doc.defaultView)) return true;
+      // (The button pressed is gone with its drawing: the focus on the body, or still on something of the view's)
+      const active = doc.activeElement;
+      const free = !active || active === doc.body || !active.isConnected || (!!this.body?.contains(active) && !typingIn(doc));
+      return !free || this.focusItem(focus.item, focus.group);
+    });
+  }
+
+  /** An item drawn given the focus (itself where it takes it, else what it holds that does), in `group` where given: whether it is drawn */
+  private focusItem(key: string, group = ""): boolean {
+    if (!this.body) return false;
+    // (In its group, where the view draws it in one, or among rows marked as of it (a timeline's): an item of several
+    // values may be in another group too)
+    const item = `[data-item="${CSS.escape(key)}"]`;
+    const escaped = CSS.escape(group);
+    const element = group
+      ? (this.body.querySelector<HTMLElement>(`[data-group="${escaped}"] ${item}`) ?? this.body.querySelector<HTMLElement>(`${item}[data-in-group="${escaped}"]`))
+      : this.body.querySelector<HTMLElement>(item);
+    if (!element) return false;
+    const target = element.matches("button, a, [tabindex]") ? element : (element.querySelector<HTMLElement>("button, a, [tabindex]") ?? element);
+    target.focus({ preventScroll: false });
+    return true;
   }
 
   /** The key a view's scroll is kept by */
@@ -524,7 +589,7 @@ export class DatabasePlace {
 
   private async settingsOf(view: ViewDefinition): Promise<ReadonlyMap<string, unknown>> {
     const values = new Map<string, unknown>();
-    for (const setting of view.settings ?? []) values.set(setting.key, await this.options.settings.get(viewSettingPath(view.name, setting.key), setting.default));
+    for (const setting of view.settings ?? []) values.set(setting.key, await settingValue(this.options.settings, setting, viewSettingPath(view.name, setting.key)));
     return values;
   }
 
@@ -762,7 +827,7 @@ export class DatabasePlace {
       if (group) groups.push(menu.slot.view([group]));
       if (view.colors !== false) groups.push(menu.slot.view([colorEntry(host, menu, toAll("colorBy"))]));
       const copies = (this.options.converters?.() ?? []).filter((one) => one.write);
-      if (copies.length) groups.push(menu.slot.data(copies.map((one) => menu.item({ label: `Copy as ${one.label.toLowerCase()}`, icon: ICONS.copy, hint: `The items shown, as ${one.label.toLowerCase()} on the clipboard`, run: () => this.copyAs(one, doc, host.items, database) }))));
+      if (copies.length) groups.push(menu.slot.data(copies.map((one) => menu.item({ label: `Copy as ${one.label.toLowerCase()}`, icon: ICONS.copy, hint: `The items listed (those Load more has not drawn yet too), as ${one.label.toLowerCase()} on the clipboard`, run: () => this.copyAs(one, doc, host.items, database) }))));
       if (editSource) groups.push(menu.slot.source([menu.item({ label: "Edit source", icon: ICONS.source, hint: "Show the block's text, to edit it as markdown", run: editSource })]));
       const remove = this.options.deleteDatabase;
       if (remove) groups.push(menu.slot.remove([menu.item({ label: "Delete database…", icon: ICONS.remove, hint: "The database, its items and its views, asked first", danger: true, run: () => remove(database.id, database.name) })]));
@@ -966,6 +1031,9 @@ export class DatabasePlace {
       return visible;
     };
     const hiddenKeys = (): readonly string[] => visibility().hidden;
+    // How much of each group it draws: kept by database, view and the listing it was pressed in
+    const limitKey: LimitKey = (drawn.limit = { key: `${id}\u0000${drawn.view.name}`, signature: () => JSON.stringify([keptFilter(), listing().sort, group() ?? ""]) });
+    const limit = viewLimit({ ...limitKey, size: drawn.pageSize, document: this.options.element.ownerDocument, refresh: () => void shownAgain() });
     const shownProperties = (): readonly Property[] => visibility().shown;
     return {
       document: this.options.element.ownerDocument,
@@ -978,6 +1046,7 @@ export class DatabasePlace {
       get total() {
         return data().items.length;
       },
+      limit,
       get grouping() {
         const property = groupedBy(drawn.view, this);
         return property && { property, groups: arrangedGroups(this, property).shown };
@@ -1062,12 +1131,37 @@ export class DatabasePlace {
       },
       type: (property) => typeOf(types, property),
       text: (item, key) => textOf(item, key, data().database, types),
-      update: (item, key, value) => refreshed(core.update(id, item, key, value)),
-      create: (draft, where) => refreshed(core.create(id, draft, where)),
-      rename: (item, name) => refreshed(core.rename(id, item, name)),
+      // (An item changed, or renamed, shown wherever it lands, past what the view draws too: a sort's or a group's)
+      update: (item, key, value) => {
+        revealItem(limitKey, item.key);
+        return refreshed(core.update(id, item, key, value));
+      },
+      // An item added, or moved, shown wherever it lands, past what the view draws too; one added as the user's (`open`)
+      // opened by a module's own way (the peek), its name to give (the module gives the focus back to it as it closes):
+      // not where something is typed in meanwhile (another item's name, a field), which it would take the keys of
+      create: async (draft, where, how) => {
+        const result = await refreshed(
+          core.create(id, draft, where).then((result) => {
+            if (!("problem" in result) && result.key !== undefined) revealItem(limitKey, result.key);
+            return result;
+          }),
+        );
+        if (!how?.open || "problem" in result || result.key === undefined || drawn.ended || !this.options.openItem) return result;
+        const added = (await store.items(id)).value.find((one) => one.key === result.key);
+        if (!added || drawn.ended || typingIn(this.options.element.ownerDocument)) return result;
+        this.options.openItem(added, id, place.openerOf(), { added: true });
+        return result;
+      },
+      rename: (item, name) => {
+        revealItem(limitKey, item.key);
+        return refreshed(core.rename(id, item, name));
+      },
       // (The files the items alone named offered for deletion with them, where the host deletes files)
       remove: (items) => refreshed(core.remove(id, items, this.media?.remove ? { remove: this.media.remove } : undefined)),
-      move: (item, where) => refreshed(core.move(id, item, where)),
+      move: (item, where) => {
+        revealItem(limitKey, item.key);
+        return refreshed(core.move(id, item, where));
+      },
       undo: (progress) => refreshed(core.undo(id, progress)),
       current: async (item) => (await store.items(id)).value.find((one) => one.key === item.key),
       open: async (item) => {

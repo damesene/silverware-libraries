@@ -420,6 +420,10 @@ phone); each piece reviewed, fixed and tested (unit and Playwright against Silve
 * **Merging `feat/database` into main**: listed in REPO.md and the README (2026-11-09), the review's fixes made the same day
   (*The review before the merge*); left: CI green, a pull request.
 * **Conditional formatting**: planned, docs/silverware-database-conditional-formatting.md.
+* **Formula properties**: built (2026-11-22), docs/silverware-database-formulas.md; references outside the database (another database, a table of a page, a source) come after the release, its *Later*.
+* **Large databases in a table**: done (2026-11-22) as Load more, per group, its limit a setting
+  (docs/silverware-database-load-more.md): 20,000 items shown in 0.23 s (3.9 s drawing every row) and a change in
+  0.12 s (1.0 s).
 
 ### The review before the merge (2026-11-09)
 
@@ -471,7 +475,8 @@ says is two properties compared (`[@spent] > [@budget]`), conditions joined in o
 twice: a rule is stored as its condition and parameters, never as a formula, and formulas add the domain's condition
 `formula` beside the others, as the table has both.
 
-**Formulas in a database**, when they come (talked over, not decided in detail):
+**Formulas in a database**, when they come (talked over, not decided in detail; planned since 2026-11-22 in
+docs/silverware-database-formulas.md, which decides what of this it does first):
 
 * A database as a source of Silverware Table's formulas (`@tasks`, `defineSource`'s shape): small, and much at once (pivots,
   views, `SUMIFS`/`COUNTIFS` over a database: what rollups would give, matched by text).

@@ -18,8 +18,8 @@ describe("property keys", () => {
 });
 
 describe("the built-in types", () => {
-  it("are in their order, a day, a time and both side by side; tags and progress, the system properties' own, offered for no property of the user's", () => {
-    expect(types.all().map((one) => one.name)).toEqual(["text", "number", "checkbox", "date", "time", "datetime", "select", "person", "url", "reference", "files", "tags", "progress"]);
+  it("are in their order, a day, a time and both side by side; tags and progress, the system properties' own, offered for no property of the user's; a formula last", () => {
+    expect(types.all().map((one) => one.name)).toEqual(["text", "number", "checkbox", "date", "time", "datetime", "select", "person", "url", "reference", "files", "tags", "progress", "formula"]);
     expect(types.all().filter((one) => one.offered === false).map((one) => one.name)).toEqual(["tags", "progress"]);
     // (Tags: labels, no options to check them against; a list of texts)
     const tags = type("tags");
@@ -161,13 +161,50 @@ describe("the built-in types", () => {
   });
 });
 
+describe("the formula type", () => {
+  const typeFor = (params: Record<string, unknown>) => types.of("formula", params)!;
+
+  it("is Auto without a result's type: any one value of a formula as it is, nothing typed into it", () => {
+    const auto = typeFor({ formula: "=[@qty]*2" });
+    expect(auto.name).toBe("formula");
+    expect([auto.validate(6, {}), auto.validate("six", {}), auto.validate(true, {}), auto.validate(null, {})]).toEqual([undefined, undefined, undefined, undefined]);
+    expect(auto.validate(["a", "b"], {})).toBe("no value a formula gives");
+    expect([auto.text(6, {}), auto.text(true, {})]).toEqual(["6", "true"]);
+    expect(auto.parse("7", {})).toEqual({ problem: "a formula's values are calculated" });
+  });
+
+  it("is its result's type in all but its name, read only: shown, sorted and grouped as it, its editor kept (what the views know it by), no settings", () => {
+    const asNumber = typeFor({ formula: "=1", resultType: "number" });
+    expect([asNumber.name, asNumber.label, asNumber.validate(2.5, {}), asNumber.validate("x", {})]).toEqual(["formula", "Formula", undefined, "no number"]);
+    expect(asNumber.parse("3", {})).toEqual({ problem: "a formula's values are calculated" });
+    const asDate = typeFor({ formula: "=TODAY()", resultType: "date" });
+    expect([asDate.validate("2026-11-22", {}), asDate.editor, asDate.groupValue === type("date").groupValue]).toEqual([undefined, "date", true]);
+    const asCheckbox = typeFor({ formula: "=TRUE", resultType: "checkbox" });
+    expect([asCheckbox.look, asCheckbox.editor, asCheckbox.settings]).toEqual(["check", "toggle", undefined]);
+    // (The same object for the same result's type: the registry is asked often)
+    expect(typeFor({ formula: "=2", resultType: "number" })).toBe(asNumber);
+  });
+
+  it("checks its params: its formula a text, its result's type one it can show by", () => {
+    const formula = type("formula");
+    expect(formula.validateParams!({})).toBeUndefined();
+    expect(formula.validateParams!({ formula: "=1", resultType: "datetime" })).toBeUndefined();
+    expect(formula.validateParams!({ formula: 3 })).toBe("its formula is no text");
+    // (Its formula parsed, and read only of the database: references outside it come later)
+    expect(formula.validateParams!({ formula: "=SUM(" })).toMatch(/^its formula: /);
+    expect(formula.validateParams!({ formula: "=SUM(prices![price])" })).toMatch(/^its formula reads the table prices/);
+    expect(formula.validateParams!({ formula: "=1", resultType: "select" })).toBe('its result\'s type "select" is none of text, number, checkbox, date, datetime');
+    expect(typeFor({ formula: "=1", resultType: "number" }).validateParams!({ resultType: "files" })).toMatch(/^its result's type "files"/);
+  });
+});
+
 describe("the registry", () => {
   it("puts a type defined of a built-in name in its place, the others after", () => {
     const registry = new TypeRegistry();
     const mine: PropertyType = { name: "date", label: "My date", validate: () => undefined, text: String, parse: (text) => ({ value: text }) };
     const stars: PropertyType = { name: "stars", label: "Stars", validate: () => undefined, text: String, parse: (text) => ({ value: text }) };
     registry.define([stars, mine]);
-    expect(registry.all().map((one) => one.label)).toEqual(["Text", "Number", "Checkbox", "My date", "Time", "Date & time", "Select", "Person", "URL", "Reference", "Files & media", "Tags", "Progress", "Stars"]);
+    expect(registry.all().map((one) => one.label)).toEqual(["Text", "Number", "Checkbox", "My date", "Time", "Date & time", "Select", "Person", "URL", "Reference", "Files & media", "Tags", "Progress", "Formula", "Stars"]);
     registry.define([]);
     expect(registry.named("date")!.label).toBe("Date");
     expect(registry.named("stars")).toBeUndefined();

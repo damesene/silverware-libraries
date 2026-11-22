@@ -7,7 +7,7 @@
 // Excel has no form of) makes the formula its cell's value, with the reason.
 import { modelHeads } from "../../../shared/table/columns.ts";
 import type { TableModel } from "../../../shared/table/model.ts";
-import { columnLetters, type FormulaNode, FormulaError, functionNamed, isCustomFunction, parseFormula, referencedColumn, totalRows, cellsByName, type FormulaCells, rowsByName } from "../../../shared/formulas/index.ts";
+import { columnLetters, type FormulaNode, FormulaError, functionNamed, isCustomFunction, parseFormula, referencedColumn, totalRows, cellsByName, type FormulaCells, rowsByName, takesGrids } from "../../../shared/formulas/index.ts";
 import { type ExcelTemplates, excelCall, hasTemplate } from "./functions.ts";
 
 // The error values Excel has (ours #CYCLE! and #ERROR! are not among them)
@@ -174,14 +174,21 @@ export function excelFormula(formula: string, { table, name, cells, structured, 
         if (f && !hasTemplate(node.name, templates) && (count < f.minArgs || (f.maxArgs !== undefined && count > f.maxArgs))) {
           throw new NotInExcel(`${node.name} has a wrong number of arguments`);
         }
-        const args = node.args.map((arg) => ({
-          text: write(arg).text,
+        const parts = node.args.map((arg) => write(arg));
+        const args = node.args.map((arg, at) => ({
+          text: parts[at]!.text,
           ...(arg.kind === "binary" || arg.kind === "unary" ? { operation: true } : {}),
           ...(arg.kind === "literal" && arg.value !== null && !(arg.value instanceof FormulaError) ? { literal: arg.value } : {}),
         }));
         const written = excelCall(node.name, args, templates, isCustomFunction(node.name));
         if (typeof written !== "string") throw new NotInExcel(written.reason);
-        return { text: written, range: false };
+        // A range at a place of one value: the function called for each of its values (lifted), its result a range, so
+        // an array formula for an Excel before 365, as an operator on a range is
+        const lifts = !!f && !takesGrids(f) && parts.some((part, at) => part.range && (f.argument?.(at, count) ?? "value") === "value");
+        // (A table's data given where one value is expected: a grid, which Silverware Table refuses: the cell's value)
+        if (lifts && node.args.some((arg, at) => arg.kind === "data" && (f.argument?.(at, count) ?? "value") !== "range")) throw new NotInExcel(`${node.name} is given a table's data where one value is expected`);
+        if (lifts) array = true;
+        return { text: written, range: lifts };
       }
     }
   };

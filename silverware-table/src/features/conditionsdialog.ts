@@ -37,7 +37,7 @@ import {
   styleLook,
 } from "../conditions/index.ts";
 import { parseFilter } from "../../../shared/filter.ts";
-import { formulaField, type FormulaHelpers } from "../formulafield.ts";
+import { formulaField, type FormulaHelpers } from "../../../shared/formulafield.ts";
 
 /** A column a rule may apply to: its place and its name */
 export type ScopeColumn = { readonly column: number; readonly name: string };
@@ -462,7 +462,7 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
       case "choice":
         return labelled(select(spec.values, (v) => spec.labels?.[spec.values.indexOf(v)] ?? v, String(value ?? spec.values[0]), (v) => changed(v, false), focus, label));
       case "formula":
-        if (options.formulas) return labelled(formulaField(doc, options.formulas, typeof value === "string" ? value : "", (v) => changed(v, true), { focus, label, placeholder: "=[@due] < TODAY()" }));
+        if (options.formulas) return labelled(formulaField(doc, options.formulas, typeof value === "string" ? value : "", (v) => changed(v, true), { base: "swt", focus, label, placeholder: "=[@due] < TODAY()" }));
       // falls through: no formulas module, a text field
       case "text":
       case "pattern": {

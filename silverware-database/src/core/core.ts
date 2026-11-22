@@ -14,6 +14,7 @@
 import { type ItemPart, samePart } from "../domain/itempart.ts";
 import { keyFromLabel, slug } from "../domain/keys.ts";
 import { guessedType, optionsOfValues } from "../domain/loose.ts";
+import { calculated, paramsKept } from "../domain/calculated.ts";
 import { systemKind } from "../domain/system.ts";
 import { sameLook, validateIcon, validateLook } from "../domain/look.ts";
 import { DOCUMENT, type Noun } from "../domain/noun.ts";
@@ -666,6 +667,7 @@ export class DatabaseCore {
     const property = read.value.properties.find((one) => one.key === key);
     if (!property) return this.refuse(`No property "${key}"`);
     if (property.system !== undefined) return this.refuse(systemProperty(property));
+    if (!readonly && calculated(property)) return this.refuse(`${property.label} is a formula: its values are calculated, so read only`);
     if (property.readonly === readonly) return unchanged("It is so already");
     return this.writeOne(database, read, changing(key, { readonly }), `${readonly ? "Lock" : "Unlock"} property ${property.label}`);
   }
@@ -799,7 +801,7 @@ export class DatabaseCore {
     if (property.system !== undefined) return this.refuse(systemProperty(property));
     const newType = this.types.named(type);
     if (!newType) return this.refuse(`No property type "${type}"`);
-    const kept = params ?? (newType.validateParams?.(property.params) === undefined ? property.params : {});
+    const kept = params ?? paramsKept(property, newType);
     // (Only names alike, the params alike: nothing to change)
     const renaming = Object.entries(renames ?? {}).some(([from, to]) => from !== to);
     if (type === property.type && !renaming && JSON.stringify(kept) === JSON.stringify(property.params)) return unchanged("The type is the same");
@@ -843,7 +845,8 @@ export class DatabaseCore {
     if (!read) return this.refuse(`No database "${database}"`);
     const property = read.value.properties.find((one) => one.key === key);
     if (!property) return this.refuse(`No property "${key}"`);
-    const values = options.values && property.system === undefined;
+    // (A calculated property's values, the system's or a formula's, are none an item keeps)
+    const values = options.values && !calculated(property);
     return this.editOne(database, read, (now) => now.filter((one) => one.key !== key).map((one) => propertyEdit(one)), `Remove property ${property.label}${values ? " and its values" : ""}`, values ? { removedValues: [key] } : {});
   }
 
@@ -899,7 +902,7 @@ export class DatabaseCore {
         schema.push(withFlags({ ...property, label }, { required: property.required, showName: one.showName, icon: one.icon }));
         continue;
       }
-      const params = one.params ?? property.params;
+      const params = one.params ?? paramsKept(property, this.types.named(one.type));
       const type = this.types.of(one.type, params);
       if (!type) return this.refuse(`No property type "${one.type}"`);
       const problem = validateParamNames(label, params) ?? (type.validateParams?.(params) === undefined ? undefined : `${label}: ${type.validateParams(params)}`);
@@ -912,16 +915,19 @@ export class DatabaseCore {
       }
       const renames = one.renames && Object.keys(one.renames).length ? validateRenames(property, one.type, params, one.renames, items) : undefined;
       if (typeof renames === "string") return this.refuse(`${label}: ${renames}`);
-      const to = withFlags({ ...property, key, label, type: one.type, params, readonly: one.readonly ?? property.readonly }, one);
+      // (A formula is read only, always; one turned into another type is not, as its read only was the formula's, forced as
+      // read: Properties' retype gives back the one it read)
+      const readonly = calculated({ type: one.type }) ? true : calculated(property) ? false : (one.readonly ?? property.readonly);
+      const to = withFlags({ ...property, key, label, type: one.type, params, readonly }, one);
       planned.push({ from: property, to, ...(renames?.size ? { renaming: renames } : {}) });
       schema.push(to);
     }
     const keys = schema.map((one) => one.key);
     const twice = keys.find((one, at) => keys.indexOf(one) !== at);
     if (twice !== undefined) return this.refuse(`Two properties have the key "${twice}": give each a key of its own`);
-    // Those of the schema the edit names nowhere: removed, their values taken off where asked (a system property's are no item's)
+    // Those of the schema the edit names nowhere: removed, their values taken off where asked (a calculated property's are no item's)
     const removed = now.filter((one) => !named.has(one.key));
-    const takenOff = removed.filter((one) => one.system === undefined && edit.removedValues?.includes(one.key)).map((one) => one.key);
+    const takenOff = removed.filter((one) => !calculated(one) && edit.removedValues?.includes(one.key)).map((one) => one.key);
     const sameSchema = JSON.stringify(schema) === JSON.stringify(now);
     const changes = databaseChanges(database).expectDatabase(read.database.revision).schema(schema);
     const unreadable = new Set<ItemKey>();
@@ -932,6 +938,9 @@ export class DatabaseCore {
       const sets: [string, Value][] = [];
       const unsets: string[] = [];
       for (const { from, to, renaming } of planned) {
+        // (A formula's values are none of the item's: none converted to or from one, nor moved with its key; what the item
+        // keeps under the key stays, unseen while it is a formula)
+        if (calculated(from) || calculated(to)) continue;
         const value = item.values[from.key];
         if (value === undefined) continue;
         let next = value;
@@ -1207,7 +1216,8 @@ export class DatabaseCore {
     if (!type) return `No property type "${property.type}"`;
     const paramsProblem = validateParamNames(label, params) ?? type.validateParams?.(params);
     if (paramsProblem) return `${label}: ${paramsProblem}`;
-    return { key, label, type: property.type, params, readonly: property.readonly ?? false };
+    // (A formula's values are calculated: read only, whatever is asked)
+    return { key, label, type: property.type, params, readonly: calculated({ type: property.type }) || (property.readonly ?? false) };
   }
 
   private validateKey(key: string, properties: readonly Property[]): string | undefined {
@@ -1275,7 +1285,8 @@ function writable(database: Database, key: string): Property | string {
   if (key === NAME_KEY) return "An item's name is changed by renaming it";
   const property = database.properties.find((one) => one.key === key);
   if (!property) return `No property "${key}"`;
-  return property.readonly ? `${property.label} is read only` : property;
+  // (A calculated property's values are given, whatever a store keeps of its read only)
+  return property.readonly || calculated(property) ? `${property.label} is read only` : property;
 }
 
 /** Why a key cannot take a property's values: items keep values under it (a property removed, its values kept), which would be written over */

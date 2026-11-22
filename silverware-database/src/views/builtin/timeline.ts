@@ -466,11 +466,20 @@ function draw(host: ViewHost, element: HTMLElement, live: Live): void {
       track,
     );
   };
+  // Under a group's rows (or the timeline's): Load more where it has more, a row of its own over the axis (the axis of
+  // every item still, what is not drawn too)
+  const moreRow = (items: readonly Item[], group?: string) => {
+    const parts = host.limit.more(items, group);
+    if (!parts) return [];
+    const track = el(doc, "div", "swd-tl-track");
+    track.style.width = `${trackWidth}px`;
+    return [el(doc, "div", { class: "swd-tl-row swd-tl-more", attrs: group === undefined ? {} : { "data-in-group": group } }, el(doc, "div", "swd-tl-more-cell", el(doc, "div", "swd-load-more", ...parts)), track)];
+  };
   const lines = grouping
     ? grouping.groups.length
-      ? grouping.groups.flatMap((group) => [groupRow(group), ...(folded.has(group.key) ? [] : group.items.map((item) => row(item, group.key)))])
+      ? grouping.groups.flatMap((group) => [groupRow(group), ...(folded.has(group.key) ? [] : [...host.limit.shown(group.items, group.key).map((item) => row(item, group.key)), ...moreRow(group.items, group.key)])])
       : [el(doc, "p", { class: "swd-tl-none", text: "Every group is hidden: show one under Group in ⋯" })]
-    : host.items.map((item) => row(item));
+    : [...host.limit.shown(host.items).map((item) => row(item)), ...moreRow(host.items)];
   // Today's line, the weekends (Days) or the weeks' starts (Weeks) the rows' own background, under their bars: no layer
   // over the rows (one laid over them was drawn over the bars by the browser, and into the names as it scrolled), a week a
   // period from the axis' first day, a Monday; its scale by a class of its own (`swd-tl-months` is the axis' row of months)

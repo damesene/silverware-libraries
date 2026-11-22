@@ -19,8 +19,8 @@ export const PEEK_MODULE: ModuleDefinition = {
     return {
       // A place drawn anew (a schema changed, its properties' dialog): the panel follows (a store may tell only of changes made elsewhere)
       placeDrawn: () => void panel.follow(),
-      openItem: (item, database, from) => {
-        void panel.show(item, database, from);
+      openItem: (item, database, from, how) => {
+        void panel.show(item, database, from, how);
         return true;
       },
       stop: () => {

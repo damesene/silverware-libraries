@@ -47,6 +47,15 @@ export const SHARED_STYLES = [
     ],
   },
   {
+    // A formula's field (shared/formulafield.ts)
+    template: "shared/formulafield.css",
+    mark: "shared-formulafield",
+    pages: [
+      { page: "silverware-table/silverware-table-style.md", base: "swt" },
+      { page: "silverware-database/silverware-database-style.md", base: "swd" },
+    ],
+  },
+  {
     template: "shared/diffview.css",
     mark: "shared-diff",
     pages: [

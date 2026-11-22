@@ -1,5 +1,5 @@
 import { firstError, flatten, toText } from "../values.ts";
-import type { FormulaFunction } from "../function.ts";
+import { ALL_RANGES, type FormulaFunction } from "../function.ts";
 
 export default {
   name: "CONCAT",
@@ -8,6 +8,7 @@ export default {
   category: "text",
   example: '=CONCAT([@first], " ", [@last])',
   minArgs: 1,
+  argument: ALL_RANGES,
   call: (args) => {
     const error = firstError(args);
     if (error) return error;

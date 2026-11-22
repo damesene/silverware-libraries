@@ -7,6 +7,7 @@
 // binding defines its commands as it starts, before the modules are). Modules use each other's
 // only through what one offers (`offer`, `offered`), as Silverware Table's and
 // Silverware Tags' do. Modules import only types from here.
+import { settingValue } from "./general.ts";
 import type { Icons } from "../../../shared/icons.ts";
 import type { EditorLook, Editors, FieldDrawing, LinkOpening } from "../../../shared/editor.ts";
 import type { DocumentsHost } from "./documents.ts";
@@ -37,6 +38,9 @@ export type OpenedFrom = {
   /** Told as what `current` gives may have changed; what it gives back stops it */
   onChange(listener: () => void): () => void;
 };
+
+/** How an item is opened: `added` where the user has just added it (+ New), its name to be given first */
+export type ItemOpening = { readonly added?: boolean };
 
 export type PlaceContext = {
   readonly document: Document;
@@ -73,9 +77,10 @@ export type ModuleInstance = {
    * shows it in its own way (the peek), the first module to say so taking it;
    * else it opens where the store says (its page). The module reads and
    * writes the item through its own host (`items`, `core`), as of the
-   * database `database` (its id).
+   * database `database` (its id). `how`: an item just added is opened so too, its name to be given (none opens it
+   * where the store says: only a module's own way shows it)
    */
-  openItem?(item: Item, database: string, from?: OpenedFrom): boolean;
+  openItem?(item: Item, database: string, from?: OpenedFrom, how?: ItemOpening): boolean;
   /** The module turned off, or started again: what it listens to stops, what it shows closes */
   stop?(): void;
 };
@@ -91,7 +96,10 @@ export type ModuleHost = DocumentsHost & MentionsHost & MediaHost & {
   readonly core: DatabaseCore;
   readonly types: TypeRegistry;
   readonly ui: Pick<UserInterface, "notify" | "ask">;
+  /** A database as its views show it (a property's options by a formula listed: core/calculating.ts) */
   database(id: string): Promise<Revised<Database> | undefined>;
+  /** A database's schema as kept, what an edit of it is made of (Properties): never the one shown, whose options by a formula are no one's to write */
+  schema(id: string): Promise<Revised<Database> | undefined>;
   items(id: string): Promise<readonly Item[]>;
   /** Whether the store keeps an item's body (its content), which `body` reads */
   readonly itemBodies: boolean;
@@ -188,7 +196,7 @@ export class Modules {
     for (const definition of this.all) {
       const on = (await this.settings.get(moduleSettingPath(definition.name, "enabled"), true)) !== false;
       const values = new Map<string, unknown>();
-      if (on) for (const setting of definition.settings ?? []) values.set(setting.key, await this.settings.get(moduleSettingPath(definition.name, setting.key), setting.default));
+      if (on) for (const setting of definition.settings ?? []) values.set(setting.key, await settingValue(this.settings, setting, moduleSettingPath(definition.name, setting.key)));
       if (run !== this.generation) return;
       if (!on) continue;
       const host: ModuleHost = {
@@ -232,10 +240,10 @@ export class Modules {
   }
 
   /** An item a view opens taken by the first module that shows it in its own way: whether one did */
-  openItem(item: Item, database: string, from?: OpenedFrom): boolean {
+  openItem(item: Item, database: string, from?: OpenedFrom, how?: ItemOpening): boolean {
     for (const { definition, instance } of this.started) {
       try {
-        if (instance.openItem?.(item, database, from)) return true;
+        if (instance.openItem?.(item, database, from, how)) return true;
       } catch (error) {
         this.host.ui.notify(`Silverware Database: the module ${definition.label} failed to open "${item.name}" (${error instanceof Error ? error.message : String(error)})`, { type: "error" });
       }

@@ -176,6 +176,22 @@ export function storeContract(name: string, make: (seeds: readonly ContractSeed[
       expect((await itemOf(store, docs))!.values).toEqual({ status: "Done", due: "2026-11-10" });
     });
 
+    it("keeps a formula property with its params, read only; reads no value of it, one kept under its key unseen until it is another type again", async () => {
+      const { store, changeOutside } = make(SEED);
+      const docs = await keyOf(store, "Write docs");
+      // (A value the item keeps under the key, typed by hand or kept from before the property was a formula)
+      await changeOutside("tasks", docs, { values: { total: 7 } });
+      const total = { key: "total", label: "Total", type: "formula", params: { formula: "=1", resultType: "number" }, readonly: true };
+      expect((await store.apply(await store.plan(changes("tasks", { kind: "setSchema", properties: [...TASKS.properties, total] })))).skipped).toEqual([]);
+      expect((await store.database("tasks"))!.value.properties.find((property) => property.key === "total")).toEqual(total);
+      expect((await itemOf(store, docs))!.values).toEqual({ status: "Done", due: "2026-11-10" });
+      // A number again: the value shows, and it is not locked (a formula's read only is its kind's, not kept)
+      const asNumber = { key: "total", label: "Total", type: "number", params: {}, readonly: false };
+      await store.apply(await store.plan(changes("tasks", { kind: "setSchema", properties: [...TASKS.properties, asNumber] })));
+      expect((await store.database("tasks"))!.value.properties.find((property) => property.key === "total")).toEqual(asNumber);
+      expect((await itemOf(store, docs))!.values.total).toBe(7);
+    });
+
     it("refuses a schema of a key twice or one no store keeps, and a database without a name", async () => {
       const { store } = make(SEED);
       const twice = [...TASKS.properties, TASKS.properties[0]!];

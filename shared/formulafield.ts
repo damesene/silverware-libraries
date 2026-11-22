@@ -1,10 +1,9 @@
-// A formula's field, for any dialog of a module (conditional formatting's
-// formula conditions, a view's formula): the names offered as a name is typed
-// (functions, the page's names, the table's columns), the syntax of the
-// function the caret is in with its argument marked, why the formula does
-// not read. It knows nothing of formulas: the module gives it its helpers,
-// through the formulas module's offer (`complete`, `help`, `problem`).
-import { el, type ElementChild } from "../../shared/elements.ts";
+// A formula's field, for any plugin's dialog (Silverware Table's conditional formatting and views, Silverware
+// Database's formula property): the names offered as a name is typed (functions, the table's columns, a database's
+// properties), the syntax of the function the caret is in with its argument marked, why the formula does not read.
+// It knows nothing of formulas: the caller gives it its helpers (`complete`, `help`, `validate`). Its classes under
+// the caller's base, its CSS the template shared/formulafield.css.
+import { el, type ElementChild } from "./elements.ts";
 
 /** A choice offered while a formula is typed: what the list shows, what it puts in place of from..to */
 export type FormulaOffer = { readonly label: string; readonly insert: string; readonly kind: string };
@@ -21,6 +20,8 @@ export type FormulaHelpers = {
 
 /** Where the field is and what it says while empty */
 export type FormulaFieldOptions = {
+  // The plugin's base of its classes (`swt`: `swt-formulafield`)
+  readonly base: string;
   // Its name for a screen reader
   readonly label: string;
   // Its `data-focus`: the dialog's way of keeping the focus where it was as it is made anew
@@ -35,12 +36,13 @@ export type FormulaFieldOptions = {
  */
 export function formulaField(doc: Document, helpers: FormulaHelpers, value: string, changed: (v: string) => void, options: FormulaFieldOptions): HTMLElement {
   const e = <K extends keyof HTMLElementTagNameMap>(tag: K, props?: Parameters<typeof el>[2], ...children: ElementChild[]) => el(doc, tag, props, ...children);
-  const { focus, label } = options;
-  const input = e("input", { class: "swt-formulafield-text", attrs: { type: "text", "aria-label": label, "data-focus": focus, ...(options.placeholder ? { placeholder: options.placeholder } : {}), spellcheck: "false", autocomplete: "off" } });
+  const { focus, label, base } = options;
+  const c = (part: string) => `${base}-formulafield${part}`;
+  const input = e("input", { class: c("-text"), attrs: { type: "text", "aria-label": label, "data-focus": focus, ...(options.placeholder ? { placeholder: options.placeholder } : {}), spellcheck: "false", autocomplete: "off" } });
   input.value = value;
-  const list = e("div", { class: "swt-formulafield-choices", attrs: { role: "listbox" } });
-  const help = e("div", "swt-formulafield-help");
-  const problem = e("span", "swt-formulafield-problem");
+  const list = e("div", { class: c("-choices"), attrs: { role: "listbox" } });
+  const help = e("div", c("-help"));
+  const problem = e("span", c("-problem"));
   let offered: ReturnType<FormulaHelpers["complete"]>;
   let active = 0;
   // The list closed for the name it was closed at (Esc), until another is typed
@@ -61,13 +63,13 @@ export function formulaField(doc: Document, helpers: FormulaHelpers, value: stri
         e(
           "div",
           {
-            class: `swt-formulafield-choice${i === active ? " swt-formulafield-choice-active" : ""}`,
+            class: `${c("-choice")}${i === active ? ` ${c("-choice-active")}` : ""}`,
             attrs: { role: "option", "aria-selected": String(i === active) },
             // A press keeps the field's focus; the choice is put in
             on: { mousedown: (ev: Event) => ev.preventDefault(), click: () => put(i) },
           },
-          e("span", { class: "swt-formulafield-choice-name", text: choice.label }),
-          e("span", { class: "swt-formulafield-choice-kind", text: choice.kind }),
+          e("span", { class: c("-choice-name"), text: choice.label }),
+          e("span", { class: c("-choice-kind"), text: choice.kind }),
         ),
       ),
     );
@@ -78,26 +80,27 @@ export function formulaField(doc: Document, helpers: FormulaHelpers, value: stri
     list.style.left = `${box.left}px`;
     list.style.top = `${box.bottom + 2}px`;
     list.style.minWidth = `${Math.max(box.width / 2, 200)}px`;
-    list.querySelector<HTMLElement>(".swt-formulafield-choice-active")?.scrollIntoView?.({ block: "nearest" });
+    list.querySelector<HTMLElement>(`.${c("-choice-active")}`)?.scrollIntoView?.({ block: "nearest" });
   };
-  // The list stays under the field as the dialog's body scrolls: closed (it opens again as a name is typed)
-  const closeOnScroll = () => {
-    if (!offered) return;
+  // The list stays under the field as what holds it scrolls (a dialog's body): closed (it opens again as a name is
+  // typed); the list's own scrolling leaves it
+  const closeOnScroll = (ev: Event) => {
+    if (!offered || ev.target === list) return;
     offered = undefined;
     list.hidden = true;
   };
-  input.addEventListener("focus", () => input.closest(".swt-dialog-body")?.addEventListener("scroll", closeOnScroll, { passive: true }));
+  input.addEventListener("focus", () => doc.addEventListener("scroll", closeOnScroll, { capture: true, passive: true }));
   const showHelp = (at = caret()) => {
     const h = helpers.help(input.value, at);
     if (!h) {
       help.replaceChildren();
       return;
     }
-    const syntax = e("code", "swt-formulafield-syntax");
+    const syntax = e("code", c("-syntax"));
     if (h.argument) {
       syntax.append(h.syntax.slice(0, h.argument.from), e("b", { text: h.syntax.slice(h.argument.from, h.argument.to) }), h.syntax.slice(h.argument.to));
     } else syntax.textContent = h.syntax;
-    help.replaceChildren(syntax, ...(h.description ? [e("span", { class: "swt-formulafield-description", text: h.description })] : []));
+    help.replaceChildren(syntax, ...(h.description ? [e("span", { class: c("-description"), text: h.description })] : []));
   };
   // `typing`: the text changed (else only the caret moved: the list closes, it opens as a name is typed)
   const update = (typing: boolean) => {
@@ -121,6 +124,7 @@ export function formulaField(doc: Document, helpers: FormulaHelpers, value: stri
   // the formula's start first and then for where the press was, the dialog jumping between them)
   input.addEventListener("click", () => update(false));
   input.addEventListener("blur", () => {
+    doc.removeEventListener("scroll", closeOnScroll, { capture: true });
     offered = undefined;
     showList();
   });
@@ -145,5 +149,5 @@ export function formulaField(doc: Document, helpers: FormulaHelpers, value: stri
   // The help from the start, as for the caret at the formula's end: a press into the field changes it, not the dialog's height from nothing
   showHelp(value.length);
   // The list under the field itself, not under the help after it
-  return e("span", "swt-formulafield", e("span", "swt-formulafield-input", input, list), problem, help);
+  return e("span", c(""), e("span", c("-input"), input, list), problem, help);
 }

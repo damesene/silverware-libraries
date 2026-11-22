@@ -11,6 +11,7 @@
 // of) is checked again as it is applied, against the store as it is then, as
 // anything may have been written between the two. What a transaction comes
 // to is transaction.ts', the same for every store.
+import { calculatedKeys } from "../domain/calculated.ts";
 import { hasSystem, localStamp, tasksIn, withSystemValues } from "../domain/system.ts";
 import type { Changes } from "../core/changes.ts";
 import type { DatabaseStore, LooseKey, VersionStatus, MigrationScope, Planned, SkipCause, Skipped, StoreCapabilities, Target, TransactionPlan, TransactionReport, WriteProgress } from "../core/store.ts";
@@ -117,7 +118,13 @@ export class MemoryStore implements DatabaseStore {
     let latest = 0;
     for (const revision of kept.itemRevisions.values()) latest = Math.max(latest, revision);
     // (Its document's tags are a fact of where it is kept, not the item's: given as the system property Tags)
-    const plain = [...kept.items.values()].map(({ tags: _tags, ...item }) => ({ ...item, revision: String(kept.itemRevisions.get(item.key)) }));
+    // (A calculated property's values are no item's own: one kept under its key, set before the property was one, left unseen)
+    const calculated = calculatedKeys(kept.record.database);
+    const plain = [...kept.items.values()].map(({ tags: _tags, ...item }) => ({
+      ...item,
+      values: calculated.size ? Object.fromEntries(Object.entries(item.values).filter(([key]) => !calculated.has(key))) : item.values,
+      revision: String(kept.itemRevisions.get(item.key)),
+    }));
     // (The tasks of an item's body counted only where the database shows their progress)
     const tasks = hasSystem(kept.record.database, "taskProgress");
     const items = withSystemValues(plain, kept.record.database, (item) => ({ ...this.stamps.get(item.key), tags: kept.items.get(item.key)?.tags ?? [], ...(tasks ? { tasks: tasksIn(item.body ?? "") } : {}) }));

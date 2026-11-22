@@ -9,6 +9,7 @@
 // progress: domain/system.ts) change with every write and as other items
 // move, and are no part a write rests on.
 import type { Database, Item } from "../model/database.ts";
+import { calculatedKeys } from "./calculated.ts";
 import { sameLook } from "./look.ts";
 
 /** A value's text the same whatever the order of its maps' keys (what a revision is made of, the pages store's) */
@@ -26,14 +27,10 @@ export type ItemPart = { readonly values?: readonly string[]; readonly allValues
 
 const sameValue = (one: Item, other: Item, key: string) => stableText(one.values[key] ?? null) === stableText(other.values[key] ?? null);
 
-// The keys of a database's system properties, made once per reading of its schema (compared item by item)
-const systemKeys = new WeakMap<Database, ReadonlySet<string>>();
-
-/** The keys of the two readings' own values (not those the system gives) */
+/** The keys of the two readings' own values (not those calculated: the system's, a formula's) */
 function ownKeys(one: Item, other: Item, database: Database): string[] {
-  let system = systemKeys.get(database);
-  if (!system) systemKeys.set(database, (system = new Set(database.properties.filter((property) => property.system).map((property) => property.key))));
-  return [...new Set([...Object.keys(one.values), ...Object.keys(other.values)])].filter((key) => !system.has(key));
+  const calculated = calculatedKeys(database);
+  return [...new Set([...Object.keys(one.values), ...Object.keys(other.values)])].filter((key) => !calculated.has(key));
 }
 
 /** Whether two readings of an item of `database` are alike in `part` (a look taken off and none alike) */

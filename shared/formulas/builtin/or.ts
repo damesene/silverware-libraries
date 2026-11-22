@@ -1,6 +1,6 @@
 import { isError } from "../values.ts";
 import { booleans } from "../arguments.ts";
-import type { FormulaFunction } from "../function.ts";
+import { ALL_RANGES, type FormulaFunction } from "../function.ts";
 
 export default {
   name: "OR",
@@ -9,6 +9,7 @@ export default {
   category: "logic",
   example: "=OR([@qty] = 0, [@price] = 0)",
   minArgs: 1,
+  argument: ALL_RANGES,
   call: (args) => {
     const bs = booleans(args);
     return isError(bs) ? bs : bs.some(Boolean);

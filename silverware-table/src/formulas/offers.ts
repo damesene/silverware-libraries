@@ -3,7 +3,7 @@
 // holding formulas in a table's metadata (a choice list). The formulas themselves are shared/formulas/.
 import type { KeyedModel, TableModel } from "../../../shared/table/model.ts";
 import type { CalculatedBy, ErrorCode, FormulaCells, FormulaChoices, FormulaError, FormulaHelp, Grid, HeldFormulas, Scalar, Value } from "../../../shared/formulas/index.ts";
-import type { FormulaHelpers } from "../formulafield.ts";
+import type { FormulaHelpers } from "../../../shared/formulafield.ts";
 
 /**
  * What the formulas module offers other modules (ModelHost.offered("formulas")): its cells as the formulas read them;

@@ -381,8 +381,8 @@ describe("Row and column grips", () => {
       const item = menuButtons().find((b) => buttonLabel(b) === "Move 2 rows down")!;
       expect(item.getAttribute("aria-disabled")).toBeNull();
       item.click();
-      await flush();
-      expect(body()).toEqual(["| c | 3 |", "| a | 1 |", "| b | 2 |", "| d | 4 |"]);
+      // (The move written, waited for as it comes: a pause is too short under load)
+      await vi.waitFor(() => expect(body()).toEqual(["| c | 3 |", "| a | 1 |", "| b | 2 |", "| d | 4 |"]), { timeout: 5_000 });
       // They stay selected where they went
       await controller.scan();
       expect(Array.from(editor.querySelectorAll(".swt-selected")).map((td) => td.textContent!.trim())).toEqual(["a", "1", "b", "2"]);

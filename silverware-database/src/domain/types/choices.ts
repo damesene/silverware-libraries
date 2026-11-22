@@ -8,8 +8,13 @@
 // options then only offered); sorted in the options' order, the others after
 // them by their text. How a value shows (`shown`: a person's `@ada`) is its
 // text, which is what is filtered and copied; it is read back as typed
-// (`read`: `@ada` is `ada`), so a value is never kept as it shows.
+// (`read`: `@ada` is `ada`), so a value is never kept as it shows. Its options
+// may be a formula's (`optionsFormula`, docs/silverware-database-formulas.md,
+// decided 7): the params as kept then have no options, every value taken (the
+// core writes from them), and those a view shows have the formula's list as
+// their options (domain/formulas/options.ts), a value none of them marked.
 import { isEmpty, type Params } from "../../model/database.ts";
+import { validateFormula } from "../formulas/validate.ts";
 import { optionRank, optionsOf, validateOptions } from "./options.ts";
 import { keptText, type PropertyType, type TypeSwitch } from "./type.ts";
 
@@ -45,10 +50,21 @@ const texts = (value: unknown): readonly string[] => (Array.isArray(value) ? val
 export function choiceType(spec: ChoiceSpec): PropertyType {
   const shown = spec.shown ?? ((option: string) => option);
   const read = (typed: string) => (spec.read ?? ((one: string) => one))(typed.trim()).trim();
-  // (A value none of the options: refused unless the params take any)
-  const strange = (values: readonly string[], params: Params) => (spec.anyone && takesAny(params) ? [] : values.filter((one) => !optionsOf(params).includes(one)));
+  // (A value none of the options: refused unless the params take any, or their options are a formula's not calculated
+  // here: as kept, what the core writes from)
+  // (The options a formula gives none, its error kept in the params a view shows: why, for a value of any; none where the
+  // params take any value (a person's Anyone): the formula only offered its options)
+  const optionsFailed = (params: Params) => (typeof params.optionsProblem === "string" && !(spec.anyone && takesAny(params)) ? `its options' formula gives none: ${params.optionsProblem}` : undefined);
+  const strange = (values: readonly string[], params: Params) =>
+    (spec.anyone && takesAny(params)) || (typeof params.optionsFormula === "string" && params.options === undefined) ? [] : values.filter((one) => !optionsOf(params).includes(one));
   const validateParams = (params: Params): string | undefined => {
     for (const name of ["multiple", ...(spec.anyone ? [spec.anyone.param] : [])]) if (params[name] !== undefined && typeof params[name] !== "boolean") return `its ${name} is no logical value`;
+    const formula = params.optionsFormula;
+    if (formula !== undefined) {
+      if (typeof formula !== "string") return "its options' formula is no text";
+      const problem = formula.trim() ? validateFormula(formula) : undefined;
+      if (problem) return problem.replace(/^its formula/, "its options' formula");
+    }
     const problem = validateOptions(params, picksSeveral(params) ? { commas: false } : {});
     if (problem || !spec.validateOption) return problem;
     for (const option of optionsOf(params)) {
@@ -68,6 +84,8 @@ export function choiceType(spec: ChoiceSpec): PropertyType {
     validate: (value, params) => {
       if (isEmpty(value)) return undefined;
       if (typeof value !== "string") return "no option";
+      const failed = optionsFailed(params);
+      if (failed) return failed;
       return strange([value], params).length ? `"${value}" is none of its options` : undefined;
     },
     text: (value) => (typeof value === "string" ? shown(value) : keptText(value)),
@@ -77,6 +95,7 @@ export function choiceType(spec: ChoiceSpec): PropertyType {
       return { value: value === "" ? null : value };
     },
     optionShown: shown,
+    optionRead: read,
     ...(spec.mentions ? { mentions: true } : {}),
     // (Where the params take any value: its editors a field to type in too, offering the options)
     takesTyped: (params) => !!spec.anyone && takesAny(params),
@@ -90,6 +109,8 @@ export function choiceType(spec: ChoiceSpec): PropertyType {
       if (isEmpty(value)) return undefined;
       if (!Array.isArray(value) || !value.every((one) => typeof one === "string")) return "no list of options";
       if (new Set(value).size !== value.length) return "an option twice";
+      const failed = optionsFailed(params);
+      if (failed) return failed;
       const wrong = strange(texts(value), params);
       return wrong.length ? `${wrong.map((one) => `"${one}"`).join(", ")} ${wrong.length === 1 ? "is" : "are"} none of its options` : undefined;
     },

@@ -1,5 +1,14 @@
 # Silverware Database: changelog
 
+## 1.4.0 (2026-11-22)
+
+- Formula properties: a property calculated from the item's values or the whole database (`=[@qty]*[@price]`, `=[@hours]/SUM([hours])`), made in Properties with its result shown as you type, its formula over its column; never written into the items' pages.
+- A select's, a multiple select's or a person's options can be given by a formula.
+- `silverware.database.items(id)`: a database's items for Space Lua, with their formulas' values.
+- Load more: a view shows its first 50 items of each group, Load more shows more, so a database of tens of thousands of items stays quick; set how many in Settings, General, **Items shown at first**. The calendar's lists use it too.
+- An item you add opens in the item's panel, its name selected to type over.
+- Fixes: renaming an item in its panel no longer closes the panel; the panel closed on a phone leaves the page where it was; a sort, a filter or another view picked no longer makes the database blink.
+
 ## 1.3.1 (2026-11-21)
 
 - Shares updated code with Silverware Table 1.4.0; nothing changes in use.

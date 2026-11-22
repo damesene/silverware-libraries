@@ -13,7 +13,9 @@ import { documentsHost, type DocumentsSource } from "../silverware-database/src/
 import { mediaHost, type MediaSource } from "../silverware-database/src/core/media.ts";
 import { mentionsHost } from "../silverware-database/src/core/mentions.ts";
 import { ViewRegistry } from "../silverware-database/src/core/views.ts";
+import { ranksInOrder } from "../silverware-database/src/domain/rank.ts";
 import { TypeRegistry } from "../silverware-database/src/domain/types/registry.ts";
+import { calculatingStore, type CalculatingStore } from "../silverware-database/src/core/calculating.ts";
 import { MemoryStore } from "../silverware-database/src/store/memory.ts";
 import { MemoryViewState } from "../silverware-database/src/store/viewstate.ts";
 
@@ -21,6 +23,7 @@ import stylePage from "../silverware-database/silverware-database-style.md";
 // Silverware Icons beside it, as a space with both installed: its API given, its style applied
 import iconsStylePage from "../silverware-icons/silverware-icons-style.md";
 import { api as icons } from "../silverware-icons/src/index.ts";
+import { editorsOf } from "../shared/editor.ts";
 import { flash, setUpTheme } from "./common.ts";
 import { SAMPLE_DATABASES } from "./database-sample.ts";
 import { BUILT_IN_VIEWS } from "../silverware-database/src/views/builtin/index.ts";
@@ -64,6 +67,8 @@ const ui = {
 const settings = { get: (_path: string, fallback: unknown) => fallback };
 
 let store: MemoryStore;
+// Its items with their formulas' values: what the places and the modules read, as in SilverBullet
+let calculated: CalculatingStore;
 // The pages a reference may name: the playground has no space of its own
 const PAGES: DocumentsSource = { list: () => ["Projects/Alpha", "Projects/Beta", "People/Ada", "People/Linus", "Notes/Weekly"], open: (name) => flash(`Open ${name}`), folderSeparator: "/" };
 // The files as the playground has them: a few of the space's (images drawn by their address here), one opened said,
@@ -84,12 +89,38 @@ const EDITOR = { open: (ref: string) => flash(`Open ${ref}`), openMention: (name
 
 let places: DatabasePlace[] = [];
 
+/** A database of `count` items in their order by hand, numbers, a select and two formulas (one of each item's own values, one of the whole database's) */
+function bigDatabase(count: number): (typeof SAMPLE_DATABASES)[number] {
+  const ranks = ranksInOrder(count);
+  return {
+    database: {
+      id: "big",
+      name: "Big",
+      properties: [
+        { key: "qty", label: "Qty", type: "number", params: {}, readonly: false },
+        { key: "price", label: "Price", type: "number", params: {}, readonly: false },
+        { key: "hours", label: "Hours", type: "number", params: {}, readonly: false },
+        { key: "status", label: "Status", type: "select", params: { options: ["Todo", "Doing", "Done"] }, readonly: false },
+        { key: "total", label: "Total", type: "formula", params: { formula: "=[@qty]*[@price]", resultType: "number" }, readonly: true },
+        { key: "share", label: "Share", type: "formula", params: { formula: "=[@hours]/SUM([hours])" }, readonly: true },
+      ],
+    },
+    items: Array.from({ length: count }, (_, i) => ({ name: `Item ${i}`, values: { qty: (i * 7) % 13, price: (i % 5) + 1, hours: (i % 9) + 1, status: ["Todo", "Doing", "Done"][i % 3]! }, rank: ranks[i] })),
+  };
+}
+
 function start(): void {
   // The layers its style page lays its elements in, as Silverware Database's init sets them
   applyLayers(document);
   for (const place of places) place.destroy();
-  store = new MemoryStore(SAMPLE_DATABASES);
+  // (`?big=20000`: a database of that many items alone, to measure a large one's views by, Load more's and the formulas')
+  const big = Number(new URLSearchParams(location.search).get("big") ?? 0);
+  const seeds = big > 0 ? [bigDatabase(big)] : SAMPLE_DATABASES;
+  store = new MemoryStore(seeds);
+  // (Its store for a measuring script: an item changed as by hand elsewhere, `__bench.store().changeOutside(…)`)
+  (window as unknown as { __bench: unknown }).__bench = { store: () => store };
   const types = new TypeRegistry();
+  calculated = calculatingStore(store, types);
   // (The playground's items stand for pages, as SilverBullet's)
   const core = new DatabaseCore(store, types, ui, { one: "page", many: "pages" });
   // The built-in views, and the playground's own after them (the raw data a view gets)
@@ -99,11 +130,14 @@ function start(): void {
     {
       document,
       icons,
+      // (The item's content in a plain text field: Silverware Editor is not on the playground's page)
+      editors: editorsOf(undefined),
       core,
       types,
       ui,
-      database: (id) => store.database(id),
-      items: async (id) => (await store.items(id)).value,
+      database: (id) => calculated.database(id),
+      schema: (id) => store.database(id),
+      items: async (id) => (await calculated.items(id)).value,
       itemBodies: store.capabilities.itemBody,
       body: (id, item) => store.body(id, item.key),
       openDocument: async (item) => flash(`Open ${store.documentOf(item.key) ?? item.name}`),
@@ -121,14 +155,14 @@ function start(): void {
   );
   const main = document.getElementById("places")!;
   main.replaceChildren();
-  places = SAMPLE_DATABASES.map(({ database }) => {
+  places = seeds.map(({ database }) => {
     // (The place shows the database's name itself)
     const section = document.createElement("section");
     const element = document.createElement("div");
     element.className = "swd-place";
     section.append(element);
     main.append(section);
-    const place = new DatabasePlace({ element, database: database.id, state: new StoredViewState(`silverware-playground.database.state.${database.id}`), store, core, types, views, settings, ui, editor: EDITOR, documents: PAGES, media: MEDIA, moduleMenu: (where, menu) => modules.placeMenu(where, menu), moduleTools: (where) => modules.placeTools(where), placeDrawn: (where) => modules.placeDrawn(where), openItem: (item, database, from) => modules.openItem(item, database, from), deleteDatabase: (id, name) => openDeleteDatabase({ document, core, noun: core.noun, notify: (message) => flash(message), written: () => places.forEach((one) => void one.render()) }, id, name) });
+    const place = new DatabasePlace({ element, database: database.id, state: new StoredViewState(`silverware-playground.database.state.${database.id}`), store: calculated, core, types, views, settings, ui, editor: EDITOR, documents: PAGES, media: MEDIA, moduleMenu: (where, menu) => modules.placeMenu(where, menu), moduleTools: (where) => modules.placeTools(where), placeDrawn: (where) => modules.placeDrawn(where), openItem: (item, database, from, how) => modules.openItem(item, database, from, how), deleteDatabase: (id, name) => openDeleteDatabase({ document, core, noun: core.noun, notify: (message) => flash(message), written: () => places.forEach((one) => void one.render()) }, id, name) });
     return place;
   });
   void modules.start().then(() => places.forEach((place) => void place.render()));

@@ -8,7 +8,7 @@
 | Silverware Toolbar | `silverware-toolbar/` | `swb-` | `silverware-toolbar/CLAUDE.md`, docs/silverware-toolbar.md |
 | Silverware Tags | `silverware-tags/` | `swg-` | `silverware-tags/CLAUDE.md`, docs/silverware-tags.md |
 | Silverware Chart | `silverware-chart/` | `swc-` | `silverware-chart/CLAUDE.md`, docs/silverware-chart.md |
-| Silverware Database | `silverware-database/` | `swd-` | `silverware-database/CLAUDE.md`, docs/silverware-database.md |
+| Silverware Database | `silverware-database/` | `swd-` | `silverware-database/CLAUDE.md`, docs/silverware-database.md, docs/silverware-database-formulas.md (formula properties), docs/silverware-database-load-more.md (a view's first items and Load more, planned) |
 | Silverware Icons | `silverware-icons/` | `swi-` | `silverware-icons/CLAUDE.md`, docs/silverware-icons.md (a library for the other plugins, nothing on its own) |
 | Silverware Assets | `silverware-assets/` | `swa-` | `silverware-assets/CLAUDE.md`, docs/silverware-assets.md, docs/silverware-assets-split.md (split out of Layout), docs/silverware-layout-assets-next.md (what is left before the merge), docs/silverware-assets-stored-previews.md (previews kept in the space; files drawn in a grid's cell editor) |
 | Silverware Assets PDF | `silverware-assets-pdf/` | `swa-pdf-` | `silverware-assets-pdf/CLAUDE.md`, docs/silverware-assets-pdf.md (a PDF's preview, its first page, through Silverware Assets' API), docs/silverware-viewers.md (with DOCX and XLSX) |
@@ -99,6 +99,7 @@ Bundled into each plugin (nothing is shared at run time); its classes by a base 
 - `contentscale.ts`: how much the page's content is zoomed beyond its default (`--sw-content-scale` on the root, set by Silverware Layout where files zoom with the font): what draws content of a size of its own multiplies its sizes by it (`scaledPx`); controls do not.
 - `shadow.ts`: nodes in an open shadow root (an editor's field) taken as the page's: an event's real target, the element at a point, `contains` and `closest` past a root to its host.
 - `elements.ts` `el(...)`: a plugin's own elements in one synchronous expression; no reactive library (weighed, docs/ui-without-framework.md).
+- `formulafield.ts` (and its CSS template `formulafield.css`): a formula's field in a dialog, the names offered as one is typed, the help of the function the caret is in, why it does not read; it knows no formulas, its caller gives its helpers (Silverware Table's dialogs, Silverware Database's formula property).
 - `editor.ts`: a markdown editor of a plugin's field (`TextEditor`), Silverware Editor's API or a `<textarea>` stand-in (`editorsOf`), and the editing surfaces Silverware Toolbar acts on (`surfaceOf`); see silverware-editor/CLAUDE.md. `editorlook.ts`: the page's look of what the editor draws (a task's box, a hashtag), read of a sample the page renders, for a plugin to hand its editor (`EditorOptions.look`).
 - `docreader.ts` (and its CSS template `docreader.css`): the reader's shell Silverware Assets DOCX and XLSX draw a document in (bar, zoom, scroller, as wide as its line); `reads.ts`: a file's version and the turns of reads, theirs and Silverware Assets PDF's.
 

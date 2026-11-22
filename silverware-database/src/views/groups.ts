@@ -41,7 +41,7 @@ export function groupHead(doc: Document, group: ItemGroup, open: boolean, toggle
 }
 
 /** An item added in a group: with the group's value (none for the group of none, nor for a property not changed by hand, a system one's) */
-export function createInGroup(host: Pick<ViewHost, "create">, property: Property, group: ItemGroup | undefined, draft: Parameters<ViewHost["create"]>[0] = {}, place?: Parameters<ViewHost["create"]>[1]) {
+export function createInGroup(host: Pick<ViewHost, "create">, property: Property, group: ItemGroup | undefined, draft: Parameters<ViewHost["create"]>[0] = {}, place?: Parameters<ViewHost["create"]>[1], how?: Parameters<ViewHost["create"]>[2]) {
   const value = group?.value;
-  return host.create(value === undefined || property.readonly ? draft : { ...draft, values: { [property.key]: value, ...draft?.values } }, place);
+  return host.create(value === undefined || property.readonly ? draft : { ...draft, values: { [property.key]: value, ...draft?.values } }, place, how);
 }

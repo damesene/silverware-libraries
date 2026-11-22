@@ -58,6 +58,16 @@ const SEED: readonly ContractSeed[] = [{ database: TASKS, items: [{ name: "Fix l
 const changes = (database: string, ...list: Changes["changes"]): Changes => ({ database, changes: list });
 
 describe("the pages store", () => {
+  it("writes a formula property as its type and params, its read only not written (forced as it is read)", async () => {
+    const { memory, store } = harness([]);
+    const total = { key: "total", label: "Total", type: "formula", params: { formula: "=[@qty]*2", resultType: "number" }, readonly: true };
+    await store.apply(await store.plan(changes("tasks", { kind: "createDatabase", name: "Tasks" }, { kind: "setSchema", properties: [total] })));
+    expect(memory.pages.get("db-tasks")).toBe(
+      '---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    total: { type: formula, label: Total, formula: "=[@qty]*2", resultType: number }\n---\n',
+    );
+    expect((await store.database("tasks"))!.value.properties).toEqual([total]);
+  });
+
   it("keeps a database as its root page and an item a page of its folder, in the page's own form", async () => {
     const { memory, store } = harness([]);
     const made = await store.apply(
@@ -277,6 +287,44 @@ describe("the pages store", () => {
     const report = await store.apply(await store.plan(changes("tasks", { kind: "setBody", item: item!.key, body: `${read} and mine`, was: read })));
     expect(report.skipped.map((one) => one.cause)).toEqual(["changed"]);
     expect(memory.pages.get("db-tasks/A")).toContain("Body A edited by hand");
+  });
+
+  it("reads a database once for those asking while nothing changed, anew as the index tells a change or a write is made", async () => {
+    const { memory, store } = harness(SEED);
+    const objects = memory.platform.index.objects;
+    let queries = 0;
+    memory.platform.index.objects = (tag) => {
+      queries++;
+      return objects(tag);
+    };
+    const [item] = (await Promise.all([store.items("tasks"), store.database("tasks"), store.items("tasks")]))[0].value;
+    await store.items("tasks");
+    // (One reading: its roots and its items queried once, for four asking)
+    const once = queries;
+    expect(once).toBe(2);
+    // (A change told by the index: read anew)
+    memory.writeOutside("db-tasks/Fix login", (memory.pages.get("db-tasks/Fix login") ?? "").replace("Todo", "Done"));
+    expect((await store.items("tasks")).value[0]!.values.status).toBe("Done");
+    expect(queries).toBeGreaterThan(once);
+    // (A write of its own: read anew, its write shown)
+    await store.apply(await store.plan(changes("tasks", { kind: "setValue", item: item!.key, key: "status", value: "Todo" })));
+    expect((await store.items("tasks")).value[0]!.values.status).toBe("Todo");
+  });
+
+  it("keeps a renamed item's key for whoever reads while the rename is written (a listener told by the index meanwhile)", async () => {
+    const { memory, store } = harness(SEED);
+    const [item] = (await store.items("tasks")).value;
+    let meanwhile: (readonly [string, string])[] = [];
+    const rename = memory.platform.space.rename!;
+    memory.platform.space.rename = async (from, to) => {
+      const done = await rename(from, to);
+      // (Read before the write ends: the index has the page under its new name already)
+      meanwhile = (await store.items("tasks")).value.map((one) => [one.key, one.name] as const);
+      return done;
+    };
+    await store.apply(await store.plan(changes("tasks", { kind: "renameItem", item: item!.key, name: "Renamed" })));
+    expect(meanwhile).toEqual([[item!.key, "Renamed"]]);
+    expect((await store.items("tasks")).value.map((one) => one.key)).toEqual([item!.key]);
   });
 
   it("says a rename that changed the page's text wrote its name alone, and shows the page as it is", async () => {

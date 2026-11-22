@@ -1,7 +1,7 @@
 // The settings dialog (the command "Silverware Database: Settings"): tabs
-// Views and Modules, each view and module with its switch (`enabled`) and,
-// under it while it is on, the settings it declares, built-in and the user's
-// alike. It reads the settings as it opens and writes nothing until Save;
+// General (Silverware Database's own settings, core/general.ts), Views and
+// Modules, each view and module with its switch (`enabled`) and, under it
+// while it is on, the settings it declares, built-in and the user's alike. It reads the settings as it opens and writes nothing until Save;
 // saved, the modules are started anew and the places drawn anew (a view reads
 // its settings as it is drawn: no reload). The shared dialog, tabs and controls (shared/), in
 // the look of the other plugins' settings (classes `swd-settings-*`).
@@ -11,6 +11,7 @@ import type { Settings, UserInterface } from "../../../shared/platform.ts";
 import { tabs } from "../../../shared/tabs.ts";
 import { type ModuleDefinition, moduleSettingPath } from "./module.ts";
 import { viewSettingPath } from "./place.ts";
+import { GENERAL_SETTINGS, generalSettingPath, validateNumberSetting } from "./general.ts";
 import type { ViewSetting } from "./view.ts";
 import type { ViewRegistry } from "./views.ts";
 
@@ -35,6 +36,9 @@ type Switchable = {
   readonly path: (key: string) => string;
   readonly kind: "view" | "module";
 };
+
+// Silverware Database's own settings as the dialog shows them: no switch of their own, always kept
+const GENERAL = { settings: GENERAL_SETTINGS, path: generalSettingPath };
 
 export class SettingsDialog {
   private readonly dialogs: Dialogs;
@@ -83,6 +87,7 @@ export class SettingsDialog {
     const { settings } = this.options;
     const { views, modules } = this.switchables();
     this.initial = new Map();
+    for (const setting of GENERAL.settings) this.initial.set(GENERAL.path(setting.key), await settings.get(GENERAL.path(setting.key), setting.default));
     for (const one of [...views, ...modules]) {
       this.initial.set(one.path("enabled"), (await settings.get(one.path("enabled"), true)) !== false);
       for (const setting of one.settings) this.initial.set(one.path(setting.key), await settings.get(one.path(setting.key), setting.default));
@@ -113,7 +118,13 @@ export class SettingsDialog {
       panel.append(card);
       return panel;
     };
+    const general = doc.createElement("div");
+    const generalCard = doc.createElement("div");
+    generalCard.className = `${BASE}-card`;
+    for (const setting of GENERAL.settings) generalCard.append(this.settingRow(GENERAL, setting));
+    general.append(generalCard);
     const { bar, panels } = tabs(doc, BASE, "swd", [
+      { id: "general", title: "General", panel: general },
       { id: "views", title: "Views", panel: panelOf(views, "No view is defined yet.") },
       { id: "modules", title: "Modules", panel: panelOf(modules, "No module is defined.") },
     ]);
@@ -152,7 +163,7 @@ export class SettingsDialog {
   }
 
   /** A setting's row of the control its declaration names */
-  private settingRow(one: Switchable, setting: ViewSetting): HTMLElement {
+  private settingRow(one: Pick<Switchable, "path">, setting: ViewSetting): HTMLElement {
     const { doc } = this;
     const path = one.path(setting.key);
     const value = this.values.get(path);
@@ -180,13 +191,26 @@ export class SettingsDialog {
       input.value = value === undefined || value === null ? "" : String(value);
       input.addEventListener("input", () => {
         if (setting.control !== "number") return set(input.value);
-        // A number that does not read is shown so and not kept
+        // (Typed in: a number that does not read holds the dialog's Save back, till it does)
+        input.dataset.swdTyped = "";
         const number = Number(input.value);
-        const valid = input.value.trim() !== "" && Number.isFinite(number);
-        input.classList.toggle(`${BASE}-invalid`, !valid);
-        if (valid) set(number);
+        if (!mark(number)) set(number);
         else this.update();
       });
+      // A number that does not read, or outside its range, is shown so (why in its title) and not kept; one configured
+      // so marked as the dialog opens (the views read its default meanwhile), the rest saved as they change
+      const mark = (number: number) => {
+        const problem = input.value.trim() === "" ? "no number" : validateNumberSetting(setting, number);
+        input.classList.toggle(`${BASE}-invalid`, !!problem);
+        input.title = !problem ? "" : input.dataset.swdTyped === undefined ? `Read as ${String(setting.default)}: ${problem}` : `Not saved: ${problem}`;
+        return problem;
+      };
+      if (setting.control === "number") {
+        if (setting.min !== undefined) input.min = String(setting.min);
+        if (setting.max !== undefined) input.max = String(setting.max);
+        input.step = setting.whole ? "1" : "any";
+        if (input.value.trim() !== "") mark(Number(input.value));
+      }
       control = input;
     }
     control.dataset.swdSetting = path;
@@ -223,8 +247,8 @@ export class SettingsDialog {
     const canSave = !!this.options.settings.save;
     if (this.saveButton) {
       this.saveButton.textContent = this.saving ? "Saving…" : "Save";
-      // (A number that does not read: nothing saved until it does)
-      const invalid = !!this.dialog && this.doc.querySelector(`.${BASE} .${BASE}-invalid`) !== null;
+      // (A number typed that does not read: nothing saved until it does; one configured so holds nothing back)
+      const invalid = !!this.dialog && this.doc.querySelector(`.${BASE} .${BASE}-invalid[data-swd-typed]`) !== null;
       this.saveButton.disabled = this.saving || !canSave || !changed || invalid;
     }
     if (this.note) this.note.textContent = canSave ? "" : "Settings cannot be saved here.";

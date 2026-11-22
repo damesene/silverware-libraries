@@ -15,7 +15,9 @@ import type { Item, Property } from "../../model/database.ts";
 import { editValue, NAME, toggle } from "../editors.ts";
 import { FLOAT_HOME_SELECTOR } from "../float.ts";
 import { createInGroup, foldedOf, groupHead, setFolded } from "../groups.ts";
-import { ownIcon, VIEW_ICONS } from "../icons.ts";
+import { ownIcon, typeIcon, VIEW_ICONS } from "../icons.ts";
+import { formulaOf, isFormula } from "../../domain/formulas/model.ts";
+import { formulaProblemOf } from "../../domain/formulas/calculate.ts";
 import { rowGrip } from "../order.ts";
 import { missing, problemOf, valueNodes } from "../values.ts";
 import { takeFiles, uploadInto } from "../takefiles.ts";
@@ -48,12 +50,13 @@ function draw(host: ViewHost, element: HTMLElement, editing: Editing): void {
         doc,
         "th",
         { attrs: { scope: "col", "aria-sort": sorted?.key === column.key ? (sorted.direction === "asc" ? "ascending" : "descending") : undefined } },
-        // (A property's own icon before its name; its type's left out here, a header of every column's would be busy)
+        // (A property's own icon before its name; its type's left out here, a header of every column's would be busy, but
+        // a formula's ƒ: its values are calculated, its formula over it)
         el(
           doc,
           "button",
-          { class: "swd-table-sort", title: `Sort by ${column.label}`, run: () => void host.listing.setSort(nextSort(host, column.key)) },
-          ...((own) => (own ? [host.look.ownIcon(own, "swd-table-head-icon")] : []))(column.property && ownIcon(column.property)),
+          { class: "swd-table-sort", title: headTitle(column), run: () => void host.listing.setSort(nextSort(host, column.key)) },
+          ...((own) => (own ? [host.look.ownIcon(own, "swd-table-head-icon")] : column.property && isFormula(column.property) ? [el(doc, "span", { class: "swd-table-head-icon swd-table-head-formula", html: typeIcon("formula") })] : []))(column.property && ownIcon(column.property)),
           ...headLabel(doc, column.label, sorted?.key === column.key ? (sorted.direction === "asc" ? "↑" : "↓") : undefined),
         ),
       ),
@@ -69,13 +72,21 @@ function draw(host: ViewHost, element: HTMLElement, editing: Editing): void {
     tr.append(...columns.map((column) => cell(host, item, column, editing, column.key === NAME ? grip : undefined)), actions(host, item));
     return tr;
   };
-  const shown = host.items.length === host.total ? "" : `${host.items.length} of ${host.total} shown`;
+  // (How many the filter lists of all; how many of those are drawn is said by Load more)
+  const shown = host.items.length === host.total ? "" : `${host.items.length} of ${host.total} listed`;
   const count = shown && el(doc, "span", { class: "swd-table-count", text: shown });
+  const span = String(columns.length + 1);
+  // Under a group's (or the table's) rows drawn: Load more where it has more, a row across the table (no item's: a row
+  // dragged by hand moves among the items' rows alone)
+  const moreRow = (items: readonly Item[], group?: string) => {
+    const parts = host.limit.more(items, group);
+    return parts ? [el(doc, "tr", "swd-table-more", el(doc, "td", { attrs: { colspan: span } }, el(doc, "div", "swd-load-more", ...parts)))] : [];
+  };
   const grouping = host.grouping;
   if (!grouping) {
     const body: HTMLElement = el(doc, "tbody");
-    body.append(...host.items.map((item) => row(item, () => body)));
-    const add = el(doc, "button", { class: "swd-table-add", text: "+ New", title: "Add an item", run: () => void host.create() });
+    body.append(...host.limit.shown(host.items).map((item) => row(item, () => body)), ...moreRow(host.items));
+    const add = el(doc, "button", { class: "swd-table-add", text: "+ New", title: "Add an item", run: () => void host.create(undefined, undefined, { open: true }) });
     element.replaceChildren(el(doc, "div", "swd-table-box", el(doc, "table", "swd-table", el(doc, "thead", undefined, headRow()), body)), el(doc, "div", "swd-table-foot", add, count));
     return;
   }
@@ -83,21 +94,28 @@ function draw(host: ViewHost, element: HTMLElement, editing: Editing): void {
   const folded = foldedOf(host);
   // (A group's head pressed: the focus on it again, the table drawn anew)
   const fold = (key: string, open: boolean) => setFolded(host, key, open).then(() => element.querySelector<HTMLElement>(`.swd-table-group[data-group="${CSS.escape(key)}"] .swd-group-head`)?.focus({ preventScroll: true }));
-  const span = String(columns.length + 1);
   const parts = grouping.groups.map((group) => {
     const open = !folded.has(group.key);
     const part: HTMLElement = el(doc, "tbody", { class: `swd-table-group${open ? "" : " swd-folded"}`, attrs: { "data-group": group.key, "aria-label": `${grouping.property.label}: ${group.label}` } });
     part.append(
       el(doc, "tr", "swd-table-group-head", el(doc, "th", { attrs: { colspan: span, scope: "rowgroup" } }, groupHead(doc, group, open, () => void fold(group.key, open)))),
       headRow(),
-      ...group.items.map((item) => row(item, () => part)),
-      el(doc, "tr", "swd-table-group-add", el(doc, "td", { attrs: { colspan: span } }, el(doc, "button", { class: "swd-table-add", text: "+ New", title: `Add an item in ${group.label}`, run: () => void createInGroup(host, grouping.property, group) }))),
+      // (A folded group's rows drawn too, hidden by the style page)
+      ...host.limit.shown(group.items, group.key).map((item) => row(item, () => part)),
+      ...moreRow(group.items, group.key),
+      el(doc, "tr", "swd-table-group-add", el(doc, "td", { attrs: { colspan: span } }, el(doc, "button", { class: "swd-table-add", text: "+ New", title: `Add an item in ${group.label}`, run: () => void createInGroup(host, grouping.property, group, {}, undefined, { open: true }) }))),
     );
     return part;
   });
   // (No group shown, all hidden or none there: + New under the table still, an item added with no group's value)
-  const add = parts.length ? undefined : el(doc, "button", { class: "swd-table-add", text: "+ New", title: "Add an item", run: () => void host.create() });
+  const add = parts.length ? undefined : el(doc, "button", { class: "swd-table-add", text: "+ New", title: "Add an item", run: () => void host.create(undefined, undefined, { open: true }) });
   element.replaceChildren(el(doc, "div", "swd-table-box", el(doc, "table", "swd-table", ...parts)), ...(count || add ? [el(doc, "div", "swd-table-foot", add, count)] : []));
+}
+
+/** A column's header's title: what a press does; a formula's formula first */
+function headTitle(column: Column): string {
+  const formula = column.property && isFormula(column.property) ? formulaOf(column.property.params) : undefined;
+  return formula === undefined ? `Sort by ${column.label}` : `${column.label} = ${formula.replace(/^\s*=\s*/, "")}\nSort by ${column.label}`;
 }
 
 /**
@@ -125,6 +143,8 @@ function cell(host: ViewHost, item: Item, column: Column, editing: Editing, lead
   const problem = property ? problemOf(host, item, property) : undefined;
   if (problem) {
     td.classList.add("swd-invalid");
+    // (A formula's error: its code shown, muted)
+    if (formulaProblemOf(item, column.key)) td.classList.add("swd-formula-error");
     td.title = problem;
   }
   // A required value missing: its cell says so (the style page's word in it)

@@ -11,7 +11,7 @@
 import { type ModelCell, NO_ATTRIBUTES, type TableModel } from "../table/model.ts";
 import type { CellNameAt, RowName } from "../table/names.ts";
 import type { Following } from "./edits.ts";
-import { ERROR_CODES, type ErrorCode, type FormulaError, type Result } from "./values.ts";
+import { ERROR_CODES, type ErrorCode, type FormulaError, type Result, type Scalar } from "./values.ts";
 
 export type { CellNameAt, RowName };
 
@@ -34,6 +34,12 @@ export type FormulaCells = {
   readonly rowNames: (table: TableModel) => readonly RowName[];
   /** A table's named body cells, in their order (the first of a name counts) */
   readonly cellNames: (table: TableModel) => readonly CellNameAt[];
+  /**
+   * A plain cell's value as it is, where its rows keep values of a type of their own (a database's number, logical
+   * value, text): read so, not guessed from its text (`007` a text, not 7; `TRUE` a logical value). Undefined: the
+   * cell's text read as a markdown table's is (a number where it reads as one, a time, an error's code, else text).
+   */
+  readonly plainValue?: (cell: ModelCell) => Scalar | undefined;
   /**
    * How a table calculated from others (a view, a pivot) is calculated, as its
    * module gives it; undefined for any other table (none: no table is one)

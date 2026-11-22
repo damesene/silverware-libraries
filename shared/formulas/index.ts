@@ -14,7 +14,7 @@ export { type CalculatedBy, type CalculatedRead, type HeldFormulas, type CellNam
 
 export { type Area, areaText, callsCustomFunctions, callsPureFunctionsOnly, columnIdText, formulaPages, formulaTableNames, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, formulaSources, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredSources, referredTableNames, type SourceRef, type TableRef, withColumnKeys } from "./references.ts";
 export { autofixFormula, type FormulaFix, qualifyCellNames } from "./autofix.ts";
-export { type Calculation, cellWholeResult, evaluateFormula, formulaErrors, givesList, listResult, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows, calculatedNow, viewGrid, viewResult } from "./evaluate.ts";
+export { type Calculation, cellWholeResult, evaluateFormula, formulaErrors, formulaResults, givesList, type OwnReading, listResult, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows, calculatedNow, viewGrid, viewResult } from "./evaluate.ts";
 export { type Node as FormulaNode, parse as parseFormula } from "./parser.ts";
 export { parseDate, toUnit, type Unit } from "./dates.ts";
 export { asGrid, ERROR_CODES, type ErrorCode, FormulaError, Grid, parseClock, type Result, type Scalar, type Value } from "./values.ts";
@@ -23,6 +23,6 @@ export { REF_ERROR, type Token, tokenize } from "./tokens.ts";
 export { tablesWritten } from "./page.ts";
 export { calculatedFormula, filledFormula, followFormula, followOwnFormula, followTable, type Following, formulasAfterEdit, shiftReferences, withCalculatedCells, withoutFormulas } from "./edits.ts";
 export { argumentSpan, type ColumnChoice, columnChoicesOf, type FormulaChoice, type FormulaChoices, choiceText, cycleFixed, findFunctions, type FormulaHelp, formulaChoices, formulaHelp, functionHelp, nameTyped, needsOperator, type PointedSpan, REFERENCE_HELP, referenceSlot, sourceChoices } from "./help.ts";
-export { FUNCTION_CATEGORIES, type AnyFunction, type FormulaFunction, type FunctionCategory } from "./function.ts";
+export { ALL_RANGES, type ArgumentKind, FUNCTION_CATEGORIES, type AnyFunction, type FormulaFunction, type FunctionCategory, takesGrids } from "./function.ts";
 export { functionNamed, isCustomFunction } from "./registry.ts";
 export type { IndexMap } from "../table/ops.ts";

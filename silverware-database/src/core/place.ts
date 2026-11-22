@@ -238,10 +238,12 @@ export class DatabasePlace {
       // (Grouped otherwise now: by another property, its type changed, or none: drawn anew)
       if (drawn.host && groupingKey(drawn.view, drawn.host) !== drawn.grouped) return this.draw();
       try {
+        const focused = this.focusedItem();
         drawn.syncTools?.();
         drawn.instance.update();
         this.putScroll();
         this.focusLoaded();
+        this.focusAgain(focused);
       } catch (error) {
         this.note(`The view "${drawn.view.label}" failed: ${message(error)}`);
       }
@@ -349,6 +351,7 @@ export class DatabasePlace {
     const doc = element.ownerDocument;
     // (Drawn anew itself: what its tools had open shown again)
     const own = this.handedOver ? undefined : this.drawn?.keptTools?.();
+    const focused = this.focusedItem();
     this.endView();
     this.body = undefined;
     const data = await this.read();
@@ -419,6 +422,33 @@ export class DatabasePlace {
     }
     this.putScroll();
     this.focusLoaded();
+    this.focusAgain(focused);
+  }
+
+  /**
+   * The item whose element has the focus in the view (a row, a card, a bar: `data-item`) and its group, kept as the view
+   * is drawn anew (a change shown, the index catching up with a write), which replaces that element
+   */
+  private focusedItem(): { readonly item: string; readonly group: string } | undefined {
+    const active = this.options.element.ownerDocument.activeElement;
+    if (!this.body || !(active instanceof HTMLElement) || !this.body.contains(active)) return undefined;
+    const element = active.closest<HTMLElement>("[data-item]");
+    const item = element?.dataset.item;
+    if (!element || item === undefined) return undefined;
+    return { item, group: element.dataset.inGroup ?? element.closest<HTMLElement>("[data-group]")?.dataset.group ?? "" };
+  }
+
+  /**
+   * The focus back on the item that had it before the view was drawn anew, where it went nowhere else meanwhile; not on
+   * a device worked by a finger (no keys go on from it, and the focus in the page's editor scrolls it to its cursor)
+   */
+  private focusAgain(focused: { readonly item: string; readonly group: string } | undefined): void {
+    if (!focused) return;
+    const doc = this.options.element.ownerDocument;
+    if (byTouch(doc.defaultView)) return;
+    const active = doc.activeElement;
+    if (active && active !== doc.body && active.isConnected) return;
+    this.focusItem(focused.item, focused.group, { scroll: false });
   }
 
   /** Where its items are opened from: one for the place, made as the first is */
@@ -452,7 +482,7 @@ export class DatabasePlace {
   }
 
   /** An item drawn given the focus (itself where it takes it, else what it holds that does), in `group` where given: whether it is drawn */
-  private focusItem(key: string, group = ""): boolean {
+  private focusItem(key: string, group = "", { scroll = true }: { readonly scroll?: boolean } = {}): boolean {
     if (!this.body) return false;
     // (In its group, where the view draws it in one, or among rows marked as of it (a timeline's): an item of several
     // values may be in another group too)
@@ -463,7 +493,7 @@ export class DatabasePlace {
       : this.body.querySelector<HTMLElement>(item);
     if (!element) return false;
     const target = element.matches("button, a, [tabindex]") ? element : (element.querySelector<HTMLElement>("button, a, [tabindex]") ?? element);
-    target.focus({ preventScroll: false });
+    target.focus({ preventScroll: !scroll });
     return true;
   }
 

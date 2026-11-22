@@ -223,3 +223,24 @@ describe("Load more", () => {
     expect(after.map((group) => view.names(group).length)).toEqual([10, 20]);
   });
 });
+
+describe("the focus through a view drawn anew", () => {
+  it("stays on the item that had it, as the view is updated and as the place is drawn anew, where it went nowhere else", async () => {
+    const view = await setup(5);
+    const focusedName = () => document.activeElement?.closest("[data-item]")?.querySelector(".swd-list-name")?.textContent;
+    const third = () => [...view.element.querySelectorAll<HTMLElement>("[data-item]")][2]!;
+    (third().matches("button, a, [tabindex]") ? third() : third().querySelector<HTMLElement>("button, a, [tabindex]")!).focus();
+    expect(focusedName()).toBe("Item 03");
+    // (A change shown: the view updated, its elements made anew)
+    await view.place().refresh();
+    expect(focusedName()).toBe("Item 03");
+    await view.place().render();
+    expect(focusedName()).toBe("Item 03");
+    // (Gone elsewhere meanwhile: left there)
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    outside.focus();
+    await view.place().render();
+    expect(document.activeElement).toBe(outside);
+  });
+});

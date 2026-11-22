@@ -1,7 +1,7 @@
 # Silverware Database: Load more
 
-Status (2026-11-22): built, steps 1 to 6, on branch `feat/database-formulas`, not released; no UI tests yet (step 3's
-scenarios left for a run with the user).
+Status (2026-11-22): built, steps 1 to 6, released in Silverware Database 1.4.0 (PR #49); its UI test
+`silverware-database/ui-tests/loadmore.spec.ts` (the setting, a press, a write kept drawn).
 
 A database of thousands of items draws every one of them today: a table view of 20,000 items took 3.9 s to show and
 1.0 s to show a change (measured 2026-11-22, docs/silverware-database-formulas.md, step 3c). The calculation is not the

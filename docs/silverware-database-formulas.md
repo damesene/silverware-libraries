@@ -1,6 +1,6 @@
 # Silverware Database: formula properties (plan)
 
-Status (2026-11-22): built, steps 1 to 7, on branch `feat/database-formulas`, not released. Its scope decided with the
+Status (2026-11-22): built, steps 1 to 7, released in Silverware Database 1.4.0 (PR #49). Its scope decided with the
 user the same day (*Decided*), reviewed against the code (its findings are in *Decided* and *How it fits*); what was
 built otherwise than decided is said in each step; references outside the database come after its release (*Later*).
 

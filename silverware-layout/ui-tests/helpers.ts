@@ -49,7 +49,8 @@ export const test = base.extend<{ space: Space }>({
   page: async ({ page }, use) => {
     test.skip(!onSilverBullet, "the text's width is SilverBullet's own: tested against SilverBullet only");
     const errors: string[] = [];
-    page.on("pageerror", (e) => errors.push(e.message));
+    // (Read by its stack: SilverBullet's own, as it starts, thrown in its client alone)
+    page.on("pageerror", (e) => void (silverBulletsOwnError(e.stack ?? e.message) || errors.push(e.message)));
     page.on("console", (m) => {
       // (SilverBullet answers what it looks for and does not find with a 404, which the page logs; its own gesture of two
       // fingers prevents the default in a passive listener of the window, which Chrome logs: client/editor_ui.tsx)

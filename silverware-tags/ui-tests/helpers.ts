@@ -41,7 +41,8 @@ export const test = base.extend({
   },
   page: async ({ page }, use) => {
     const errors: string[] = [];
-    page.on("pageerror", (e) => errors.push(e.message));
+    // (Read by its stack: SilverBullet's own, as it starts, thrown in its client alone)
+    page.on("pageerror", (e) => void (silverBulletsOwnError(e.stack ?? e.message) || errors.push(e.message)));
     page.on("console", (m) => {
       if (m.type() === "error" && !silverBulletsOwnError(m.text())) errors.push(m.text());
     });

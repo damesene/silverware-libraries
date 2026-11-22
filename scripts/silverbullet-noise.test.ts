@@ -13,6 +13,12 @@ describe("SilverBullet's own errors in the console", () => {
     expect(silverBulletsOwnError("[Client] Error while dispatching event file:listed : TypeError: s is not a function\n    at a (http://127.0.0.1:3013/.client/client.js:184:6796)")).toBe(true);
   });
 
+  it("are told by the stack of one thrown in the page, its message alone none of them", () => {
+    const stack = "TypeError: Cannot read properties of undefined (reading 'dispatch')\n    at commandsUpdated (http://127.0.0.1:3010/.client/client.js:228:14900)\n    at Bc.emit (http://127.0.0.1:3010/.client/client.js:92:11944)";
+    expect(silverBulletsOwnError(stack)).toBe(true);
+    expect(silverBulletsOwnError("Cannot read properties of undefined (reading 'dispatch')")).toBe(false);
+  });
+
   it("are not a plugin's errors, nor the same message from elsewhere", () => {
     expect(silverBulletsOwnError("TypeError: Cannot read properties of undefined (reading 'dispatch')\n    at draw (http://127.0.0.1:3010/.fs/Library/damesene/silverware-database.js:1:200)")).toBe(false);
     expect(silverBulletsOwnError("Silverware Database: the view failed")).toBe(false);

@@ -23,7 +23,7 @@ const NOISE: readonly { readonly pattern: RegExp; readonly why: string }[] = [
   },
 ];
 
-/** Whether an error of the page's console is SilverBullet's own, none of a plugin's (`NOISE`) */
+/** Whether an error of the page's console, or one thrown in it (its stack given), is SilverBullet's own, none of a plugin's (`NOISE`) */
 export function silverBulletsOwnError(text: string): boolean {
   return NOISE.some((one) => one.pattern.test(text));
 }

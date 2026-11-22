@@ -26,7 +26,8 @@ export const test = base.extend<{ open: (text: string) => Promise<void> }>({
   page: async ({ page }, use) => {
     test.skip(!onSilverBullet, "charts are drawn by SilverBullet's code widgets: tested against SilverBullet only");
     const errors: string[] = [];
-    page.on("pageerror", (e) => errors.push(e.message));
+    // (Read by its stack: SilverBullet's own, as it starts, thrown in its client alone)
+    page.on("pageerror", (e) => void (silverBulletsOwnError(e.stack ?? e.message) || errors.push(e.message)));
     page.on("console", (m) => {
       // (SilverBullet answers what it looks for and does not find with a 404, which the page logs)
       if (m.type() === "error" && !/404/.test(m.text()) && !silverBulletsOwnError(m.text())) errors.push(m.text());

@@ -109,8 +109,10 @@ export const test = base.extend({
     const errors: string[] = [];
     const log: string[] = [];
     page.on("pageerror", (e) => {
-      errors.push(e.message);
       log.push(`[pageerror] ${e.message}`);
+      // (Read by its stack: SilverBullet's own, as it starts, thrown in its client alone)
+      if (target === "silverbullet" && silverBulletsOwnError(e.stack ?? e.message)) return;
+      errors.push(e.message);
     });
     page.on("console", (m) => {
       // (Where from: a failed load's message names no file)

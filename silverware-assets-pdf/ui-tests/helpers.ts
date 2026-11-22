@@ -33,7 +33,8 @@ export const test = base.extend<{ space: Space }>({
   page: async ({ page }, use) => {
     test.skip(!onSilverBullet, "files are drawn by SilverBullet: tested against SilverBullet only");
     const errors: string[] = [];
-    page.on("pageerror", (e) => errors.push(e.message));
+    // (Read by its stack: SilverBullet's own, as it starts, thrown in its client alone)
+    page.on("pageerror", (e) => void (silverBulletsOwnError(e.stack ?? e.message) || errors.push(e.message)));
     page.on("console", (m) => {
       // (SilverBullet answers what it looks for and does not find with a 404, which the page logs. Its edge, 2026-11,
       // indexes a file deleted or renamed after it is gone, its index plug's `indexDocument` failing to read it: its

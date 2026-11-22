@@ -80,7 +80,8 @@ export const test = base.extend<{ favorites: Favorites | null }>({
     // what a finger needs (src/index.ts) as on a phone
     if (testInfo.project.name !== "touch") await page.addInitScript(() => Object.defineProperty(Navigator.prototype, "maxTouchPoints", { get: () => 0 }));
     const errors: string[] = [];
-    page.on("pageerror", (e) => errors.push(e.message));
+    // (Read by its stack: SilverBullet's own, as it starts, thrown in its client alone)
+    page.on("pageerror", (e) => void (silverBulletsOwnError(e.stack ?? e.message) || errors.push(e.message)));
     page.on("console", (m) => {
       // (SilverBullet answers what it looks for and does not find with a 404, which the page logs: a file's preview kept
       // in the space looked for by Silverware Assets, as Assets' own tests allow)

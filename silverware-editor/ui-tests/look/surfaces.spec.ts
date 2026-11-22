@@ -351,7 +351,16 @@ async function read(page: Page, surface: Surface): Promise<{ look: Look; crops: 
   // (The code block highlighted in its language, which an editor (the page's, a field's, the one a grid's rendered cell
   // asks) loads as the block is first drawn: its string a node of its own)
   await expect(surface.target.locator("span", { hasText: /^"text"$/ }).first()).toBeVisible();
-  const look = await surface.target.evaluate(readLook, surface.shadow);
+  // (Its fonts loaded and its layout settled: read again until it reads the same, as a list's marks or the zoom laid out
+  // late moved its places by a few pixels in CI)
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  let look = await surface.target.evaluate(readLook, surface.shadow);
+  await expect(async () => {
+    const again = await surface.target.evaluate(readLook, surface.shadow);
+    const same = JSON.stringify(again) === JSON.stringify(look);
+    look = again;
+    expect(same).toBe(true);
+  }).toPass({ timeout: 10_000 });
   const crops: Record<string, Buffer> = {};
   for (const [block, [first, last]] of Object.entries(BLOCKS)) {
     const clip = await surface.target.evaluate(blockClip, [surface.shadow, first, last] as const);

@@ -26,6 +26,9 @@ config.define("silverware.database", {
   properties = {
     -- Each view's own settings, by its name (enabled, and those the view declares): silverware.database.views.<view>.<key>
     views = { type = "object", additionalProperties = true },
+    -- How many items a view (each group of it) shows at first, and Load more shows more by: 10 to 10,000, 50 by default
+    -- (one outside the range taken as 50)
+    pageSize = { type = "number" },
   },
 })
 

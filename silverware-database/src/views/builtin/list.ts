@@ -33,9 +33,11 @@ function line(host: ViewHost, item: Item, list: () => HTMLElement): HTMLElement 
 function draw(host: ViewHost, element: HTMLElement): void {
   const doc = host.document;
   const list: HTMLElement = el(doc, "ul", "swd-list");
-  list.append(...host.items.map((item) => line(host, item, () => list)));
+  list.append(...host.limit.shown(host.items).map((item) => line(host, item, () => list)));
+  const more = host.limit.more(host.items);
   element.replaceChildren(
     list,
+    ...(more ? [el(doc, "div", "swd-load-more", ...more)] : []),
     el(doc, "div", "swd-table-foot", el(doc, "button", { class: "swd-table-add", text: "+ New", title: "Add an item", run: () => void host.create() })),
   );
 }

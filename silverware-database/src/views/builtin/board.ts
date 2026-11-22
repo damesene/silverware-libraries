@@ -100,7 +100,8 @@ function valueText(column: ItemGroup): string {
 
 function columnElement(host: ViewHost, by: Property, column: ItemGroup, drag: Drag, sorted: boolean): HTMLElement {
   const doc = host.document;
-  const cards = el(doc, "div", "swd-board-cards", ...column.items.map((item) => card(host, by, item, column, drag)));
+  const cards = el(doc, "div", "swd-board-cards", ...host.limit.shown(column.items, column.key).map((item) => card(host, by, item, column, drag)));
+  const more = host.limit.more(column.items, column.key);
   // An item added here gets the column's value, where the property is changed by hand
   const values = column.value === undefined || by.readonly ? {} : { [by.key]: column.value };
   const box = el(
@@ -109,6 +110,7 @@ function columnElement(host: ViewHost, by: Property, column: ItemGroup, drag: Dr
     { class: "swd-board-column", attrs: { "data-value": valueText(column), "data-group": column.key, "aria-label": column.label } },
     el(doc, "h3", "swd-board-title", title(host, by, column), el(doc, "span", { class: "swd-board-count", text: String(column.items.length) })),
     cards,
+    ...(more ? [el(doc, "div", "swd-load-more", ...more)] : []),
     el(doc, "button", { class: "swd-board-add", text: "+ New", title: `Add an item to ${column.label}`, run: () => void host.create({ values }) }),
   );
   box.addEventListener("dragover", (event) => {
@@ -156,14 +158,16 @@ function columnElement(host: ViewHost, by: Property, column: ItemGroup, drag: Dr
     // A property not changed by hand: the card keeps its column
     if (!same && by.readonly) return void host.notify(`${by.label} is not changed by hand: the card stays in its column`);
     const values = { [by.key]: movedValue(item.values[by.key], from, column, host.type(by), by.params) };
-    const rest = column.items.filter((one) => one.key !== item.key);
+    // (Among the cards drawn: the column's end drawn so far is its end for a drop, those past it not shown)
+    const drawn = host.limit.shown(column.items, column.key);
+    const rest = drawn.filter((one) => one.key !== item.key);
     // Sorted (no order by hand shown): its column alone; in its own column nothing moves
     if (sorted) return same ? undefined : void host.move(item, { values });
     const target = before ? rest.find((one) => one.key === before) : undefined;
     // Where it is already (before the card after it, or at the end as the last): nothing moves
     if (same) {
-      const at = column.items.findIndex((one) => one.key === item.key);
-      if ((target && column.items[at + 1]?.key === target.key) || (!target && at === column.items.length - 1)) return;
+      const at = drawn.findIndex((one) => one.key === item.key);
+      if ((target && drawn[at + 1]?.key === target.key) || (!target && at === drawn.length - 1)) return;
     }
     const last = rest.at(-1);
     const place = target ? { before: target } : last ? { after: last } : {};

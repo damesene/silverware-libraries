@@ -421,9 +421,9 @@ phone); each piece reviewed, fixed and tested (unit and Playwright against Silve
   (*The review before the merge*); left: CI green, a pull request.
 * **Conditional formatting**: planned, docs/silverware-database-conditional-formatting.md.
 * **Formula properties**: built (2026-11-22), docs/silverware-database-formulas.md; references outside the database (another database, a table of a page, a source) come after the release, its *Later*.
-* **Large databases in a table** (measured 2026-11-22, docs/silverware-database-formulas.md, step 3c): the table view
-  draws every row, 26 elements each; 20,000 items take 3.9 s to show and 1.0 s to show a change. Drawing only the rows
-  in sight (and a board's cards alike) would keep it quick; a plan of its own when wanted.
+* **Large databases in a table**: done (2026-11-22) as Load more, per group, its limit a setting
+  (docs/silverware-database-load-more.md): 20,000 items shown in 0.23 s (3.9 s drawing every row) and a change in
+  0.12 s (1.0 s).
 
 ### The review before the merge (2026-11-09)
 

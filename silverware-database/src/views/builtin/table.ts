@@ -72,12 +72,20 @@ function draw(host: ViewHost, element: HTMLElement, editing: Editing): void {
     tr.append(...columns.map((column) => cell(host, item, column, editing, column.key === NAME ? grip : undefined)), actions(host, item));
     return tr;
   };
-  const shown = host.items.length === host.total ? "" : `${host.items.length} of ${host.total} shown`;
+  // (How many the filter lists of all; how many of those are drawn is said by Load more)
+  const shown = host.items.length === host.total ? "" : `${host.items.length} of ${host.total} listed`;
   const count = shown && el(doc, "span", { class: "swd-table-count", text: shown });
+  const span = String(columns.length + 1);
+  // Under a group's (or the table's) rows drawn: Load more where it has more, a row across the table (no item's: a row
+  // dragged by hand moves among the items' rows alone)
+  const moreRow = (items: readonly Item[], group?: string) => {
+    const parts = host.limit.more(items, group);
+    return parts ? [el(doc, "tr", "swd-table-more", el(doc, "td", { attrs: { colspan: span } }, el(doc, "div", "swd-load-more", ...parts)))] : [];
+  };
   const grouping = host.grouping;
   if (!grouping) {
     const body: HTMLElement = el(doc, "tbody");
-    body.append(...host.items.map((item) => row(item, () => body)));
+    body.append(...host.limit.shown(host.items).map((item) => row(item, () => body)), ...moreRow(host.items));
     const add = el(doc, "button", { class: "swd-table-add", text: "+ New", title: "Add an item", run: () => void host.create() });
     element.replaceChildren(el(doc, "div", "swd-table-box", el(doc, "table", "swd-table", el(doc, "thead", undefined, headRow()), body)), el(doc, "div", "swd-table-foot", add, count));
     return;
@@ -86,14 +94,15 @@ function draw(host: ViewHost, element: HTMLElement, editing: Editing): void {
   const folded = foldedOf(host);
   // (A group's head pressed: the focus on it again, the table drawn anew)
   const fold = (key: string, open: boolean) => setFolded(host, key, open).then(() => element.querySelector<HTMLElement>(`.swd-table-group[data-group="${CSS.escape(key)}"] .swd-group-head`)?.focus({ preventScroll: true }));
-  const span = String(columns.length + 1);
   const parts = grouping.groups.map((group) => {
     const open = !folded.has(group.key);
     const part: HTMLElement = el(doc, "tbody", { class: `swd-table-group${open ? "" : " swd-folded"}`, attrs: { "data-group": group.key, "aria-label": `${grouping.property.label}: ${group.label}` } });
     part.append(
       el(doc, "tr", "swd-table-group-head", el(doc, "th", { attrs: { colspan: span, scope: "rowgroup" } }, groupHead(doc, group, open, () => void fold(group.key, open)))),
       headRow(),
-      ...group.items.map((item) => row(item, () => part)),
+      // (A folded group's rows drawn too, hidden by the style page)
+      ...host.limit.shown(group.items, group.key).map((item) => row(item, () => part)),
+      ...moreRow(group.items, group.key),
       el(doc, "tr", "swd-table-group-add", el(doc, "td", { attrs: { colspan: span } }, el(doc, "button", { class: "swd-table-add", text: "+ New", title: `Add an item in ${group.label}`, run: () => void createInGroup(host, grouping.property, group) }))),
     );
     return part;

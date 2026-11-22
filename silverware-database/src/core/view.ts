@@ -3,6 +3,7 @@
 // (docs/silverware-database.md, *The core*). Views import only types from
 // here: no view leans on the core's insides, and a custom view outside the
 // bundle uses the same.
+import type { ViewLimit } from "./limit.ts";
 import type { DocumentsHost } from "./documents.ts";
 import type { MediaHost } from "./media.ts";
 import type { MentionsHost } from "./mentions.ts";
@@ -27,6 +28,10 @@ export type ViewSetting = {
   readonly control: "switch" | "number" | "text" | "choice";
   // A choice's values, in their order
   readonly choices?: readonly string[];
+  // A number's range and whether it is whole (none: any number); one outside them is not saved, said why
+  readonly min?: number;
+  readonly max?: number;
+  readonly whole?: boolean;
   readonly default: unknown;
 };
 
@@ -152,6 +157,13 @@ export type ViewHost = DocumentsHost & MentionsHost & MediaHost & {
   readonly grouping: { readonly property: Property; readonly groups: readonly ItemGroup[] } | undefined;
   readonly listing: ViewListing;
   readonly look: ViewLook;
+  /**
+   * How much of its items (of a group's) a view draws: its first ones, Load more drawing more
+   * (docs/silverware-database-load-more.md). A view drawing its items itself draws `limit.shown(items, group)` and
+   * puts `limit.more(items, group)`'s parts in a row under them; one drawn by the place once per group gets its
+   * group's items cut already. A view not reading it draws every item
+   */
+  readonly limit: ViewLimit;
   /** A property's type (the text type for one not defined now): how a value shows, sorts, reads from text typed */
   type(property: Property): PropertyType;
   /** An item's value as it shows: the name for `name` */

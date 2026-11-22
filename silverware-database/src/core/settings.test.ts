@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModuleDefinition } from "./module.ts";
 import { SettingsDialog } from "./settings.ts";
+import { pageSize } from "./general.ts";
 import type { ViewDefinition } from "./view.ts";
 import { ViewRegistry } from "./views.ts";
 
@@ -49,8 +50,7 @@ describe("the settings dialog", () => {
     list.checked = false;
     list.dispatchEvent(new Event("change"));
     q<HTMLButtonElement>(".swd-settings-save").click();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(saves).toEqual([{ "silverware.database.views.board.columns": 4, "silverware.database.views.list.enabled": false }]);
+    await vi.waitFor(() => expect(saves).toEqual([{ "silverware.database.views.board.columns": 4, "silverware.database.views.list.enabled": false }]), { timeout: 5_000 });
     expect(saved()).toBe(1);
     expect(dialog.isOpen).toBe(false);
   });
@@ -67,8 +67,7 @@ describe("the settings dialog", () => {
     peek.checked = false;
     peek.dispatchEvent(new Event("change"));
     q<HTMLButtonElement>(".swd-settings-save").click();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(saves).toEqual([{ "silverware.database.modules.peek.width": 320, "silverware.database.modules.peek.enabled": false }]);
+    await vi.waitFor(() => expect(saves).toEqual([{ "silverware.database.modules.peek.width": 320, "silverware.database.modules.peek.enabled": false }]), { timeout: 5_000 });
     expect(saved()).toBe(1);
   });
 
@@ -99,5 +98,44 @@ describe("the settings dialog", () => {
     columns.value = "";
     columns.dispatchEvent(new Event("input"));
     expect(q<HTMLButtonElement>(".swd-settings-save").disabled).toBe(true);
+  });
+});
+
+describe("Silverware Database's own settings", () => {
+  it("are on the General tab: the items shown at first, 50 by default, one outside 10 to 10,000 or not whole kept back, said why", async () => {
+    const { dialog, saves, q } = setup();
+    await dialog.open();
+    const size = q<HTMLInputElement>('[data-swd-setting="silverware.database.pageSize"]');
+    expect(size.value).toBe("50");
+    for (const wrong of ["5", "20000", "12.5"]) {
+      size.value = wrong;
+      size.dispatchEvent(new Event("input"));
+      expect([wrong, size.classList.contains("swd-settings-invalid"), size.title.startsWith("Not saved: ")]).toEqual([wrong, true, true]);
+      expect(q<HTMLButtonElement>(".swd-settings-save").disabled).toBe(true);
+    }
+    size.value = "120";
+    size.dispatchEvent(new Event("input"));
+    q<HTMLButtonElement>(".swd-settings-save").click();
+    await vi.waitFor(() => expect(saves).toEqual([{ "silverware.database.pageSize": 120 }]), { timeout: 5_000 });
+  });
+
+  it("mark one configured outside its range as the dialog opens, holding no other change back; a number setting of no range taking any number", async () => {
+    const { dialog, saves, q } = setup({ "silverware.database.pageSize": 5 });
+    await dialog.open();
+    const size = q<HTMLInputElement>('[data-swd-setting="silverware.database.pageSize"]');
+    expect([size.classList.contains("swd-settings-invalid"), size.title]).toEqual([true, "Read as 50: 10 or more"]);
+    expect(q<HTMLInputElement>('[data-swd-setting="silverware.database.modules.peek.width"]').step).toBe("any");
+    const list = q<HTMLInputElement>('[data-swd-view="list"]');
+    list.checked = false;
+    list.dispatchEvent(new Event("change"));
+    q<HTMLButtonElement>(".swd-settings-save").click();
+    await vi.waitFor(() => expect(saves).toEqual([{ "silverware.database.views.list.enabled": false }]), { timeout: 5_000 });
+  });
+
+  it("are read as configured, the default where a hand wrote one outside the range", async () => {
+    const read = (value: unknown) => pageSize({ get: (path: string, fallback: unknown) => (path === "silverware.database.pageSize" && value !== undefined ? value : fallback) });
+    expect(await read(undefined)).toBe(50);
+    expect(await read(200)).toBe(200);
+    for (const wrong of [5, 20_000, 12.5, "100", null]) expect(await read(wrong)).toBe(50);
   });
 });

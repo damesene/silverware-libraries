@@ -681,6 +681,7 @@ test("the settings turn a view off: saved in CONFIG, the picker without it at on
   await expect(page.locator(".swd-menu .swd-menu-item")).toHaveCount(7);
   await page.keyboard.press("Escape");
   await runCommand(page, "Silverware Database: Settings");
+  await page.locator('.swd-settings [data-swd-tab="views"]').click();
   await page.locator('.swd-settings [data-swd-view="count"]').click();
   await page.locator(".swd-settings-save").click();
   await expect(page.locator(".swd-settings")).toHaveCount(0);

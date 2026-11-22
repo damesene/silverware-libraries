@@ -7,6 +7,7 @@
 // binding defines its commands as it starts, before the modules are). Modules use each other's
 // only through what one offers (`offer`, `offered`), as Silverware Table's and
 // Silverware Tags' do. Modules import only types from here.
+import { settingValue } from "./general.ts";
 import type { Icons } from "../../../shared/icons.ts";
 import type { EditorLook, Editors, FieldDrawing, LinkOpening } from "../../../shared/editor.ts";
 import type { DocumentsHost } from "./documents.ts";
@@ -191,7 +192,7 @@ export class Modules {
     for (const definition of this.all) {
       const on = (await this.settings.get(moduleSettingPath(definition.name, "enabled"), true)) !== false;
       const values = new Map<string, unknown>();
-      if (on) for (const setting of definition.settings ?? []) values.set(setting.key, await this.settings.get(moduleSettingPath(definition.name, setting.key), setting.default));
+      if (on) for (const setting of definition.settings ?? []) values.set(setting.key, await settingValue(this.settings, setting, moduleSettingPath(definition.name, setting.key)));
       if (run !== this.generation) return;
       if (!on) continue;
       const host: ModuleHost = {

@@ -1477,6 +1477,58 @@ tr:focus-within .swd-open {
 .swd-table-actions {
   width: 1px;
 }
+/* Load more under a group's (or a view's) items drawn: its button and how many are shown (src/views/more.ts); in a
+   table's row across it, kept at its left edge as a wide table scrolls sideways */
+.swd-load-more {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+}
+.swd-load-more[hidden] {
+  display: none;
+}
+.swd-table-more .swd-load-more {
+  position: sticky;
+  left: 0;
+  width: max-content;
+  margin: 2px 0;
+}
+/* In a timeline's row: from the names' column on, on one line over the row's empty track where the column is narrower
+   (folded to a strip, a narrow place), the row as high as any */
+.swd-tl-more-cell {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  flex: none;
+  display: flex;
+  align-items: center;
+  width: var(--swd-tl-names);
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+.swd-tl-more-cell .swd-load-more {
+  width: max-content;
+  margin: 0;
+  white-space: nowrap;
+}
+.swd-load-more-button {
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 0.9em;
+  color: inherit;
+  background: transparent;
+  border: 1px dashed var(--swd-line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swd-load-more-button:hover {
+  background: color-mix(in srgb, var(--ui-accent-color) 12%, transparent);
+}
+.swd-load-more-count {
+  color: var(--swd-quiet);
+  font-size: 0.85em;
+}
 .swd-table-foot {
   display: flex;
   align-items: center;

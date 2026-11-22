@@ -129,7 +129,7 @@ describe("the calendar", () => {
     expect([onDay("2026-11-10").length, element.querySelector(".swd-cal-more")]).toEqual([4, null]);
   });
 
-  it("never draws all of many items: a week opened 50 lanes at a time, the day's list and those without a start 100 at a time", async () => {
+  it("never draws all of many items: a week opened 50 lanes at a time, the day's list and those without a start the place's first items, Load more for more", async () => {
     const many = [...Array.from({ length: 230 }, (_, at) => ({ name: `T${at}`, due: "2026-11-10" })), ...Array.from({ length: 150 }, (_, at) => ({ name: `U${at}` }))];
     const { day, onDay, element, all } = await setup(many);
     const week = () => day("2026-11-10").closest(".swd-cal-week")!;
@@ -141,16 +141,17 @@ describe("the calendar", () => {
     expect(onDay("2026-11-10").length).toBe(100);
     week().querySelector<HTMLButtonElement>(".swd-cal-fewer")!.click();
     expect(onDay("2026-11-10").length).toBe(3);
-    // The lists: 100 shown, a button for the next, the first of them focused once shown
+    // The lists: the place's first items (50 by default), Load more for the next, the first of them focused once drawn
     day("2026-11-10").click();
     const agenda = () => all(".swd-cal-agenda .swd-cal-item");
-    expect([agenda().length, element.querySelector(".swd-cal-agenda .swd-cal-list-more")!.textContent]).toEqual([100, "Show 100 more (130 left)"]);
-    element.querySelector<HTMLButtonElement>(".swd-cal-agenda .swd-cal-list-more")!.click();
-    // (The 101st as listed: the first of those just shown)
-    expect([agenda().length, document.activeElement === agenda()[100]]).toEqual([200, true]);
-    expect(all(".swd-cal-undated-items .swd-cal-item").length).toBe(100);
-    element.querySelector<HTMLButtonElement>(".swd-cal-undated .swd-cal-list-more")!.click();
-    expect([all(".swd-cal-undated-items .swd-cal-item").length, element.querySelector(".swd-cal-undated .swd-cal-list-more")]).toEqual([150, null]);
+    const loadMore = (list: string) => element.querySelector<HTMLButtonElement>(`${list} .swd-load-more-button`);
+    expect([agenda().length, loadMore(".swd-cal-agenda")!.textContent, element.querySelector(".swd-cal-agenda .swd-load-more-count")!.textContent]).toEqual([50, "Load 50 more", "50 of 230"]);
+    loadMore(".swd-cal-agenda")!.click();
+    // (The 51st as listed: the first of those just drawn, in the list, not in the grid)
+    await vi.waitFor(() => expect([agenda().length, document.activeElement === agenda()[50]]).toEqual([100, true]), { timeout: 5_000 });
+    expect(all(".swd-cal-undated-items .swd-cal-item").length).toBe(50);
+    loadMore(".swd-cal-undated")!.click();
+    await vi.waitFor(() => expect(all(".swd-cal-undated-items .swd-cal-item").length).toBe(100), { timeout: 5_000 });
   });
 
   it("shows its days by the properties picked under Start and End in ⋯; one not changed by hand offers no + nor a drag", async () => {

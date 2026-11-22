@@ -34,10 +34,9 @@ const DRAG_TYPE = "application/x-silverware-database-item";
 // The lanes a week shows before +N more (one more shown rather than +1 more)
 const SHOWN_LANES = 3;
 
-// The lanes +N more shows more each time it is pressed, and the items a list (the day picked, those without a start)
-// shows more each time: as many items as anyone has, never all of them drawn at once
+// The lanes +N more shows more each time it is pressed (a list, the day picked or those without a start, shows the place's
+// first items, Load more drawing more: never all of them drawn at once)
 const MORE_LANES = 50;
-const LISTED = 100;
 
 // A place this narrow shows its bars as marks, the picked day's items listed under the month (the style page's container query)
 const NARROW = 600;
@@ -51,7 +50,6 @@ const months = new Map<string, Month>();
 const picked = new Map<string, Day>();
 const opened = new Map<string, Map<Day, number>>();
 const undatedFolded = new Set<string>();
-const listed = new Map<string, number>();
 
 // What a drag is: the item, what of it is dragged (it whole, by the day it was taken by; its start; its end)
 type Drag = { item?: Item; what?: "move" | "start" | "end"; grab?: Day };
@@ -310,21 +308,11 @@ function draw(host: ViewHost, element: HTMLElement, drag: Drag): void {
     return row;
   });
   const grid = el(doc, "div", { class: "swd-cal-grid", attrs: { role: "list", "aria-label": title } }, ...rows);
-  // A list's first items (LISTED, more as asked), a button after them showing more, the first of those focused once shown
-  const limited = (list: string, within: string, items: readonly Item[], entryOf: (item: Item) => HTMLElement): HTMLElement[] => {
-    const count = listed.get(list) ?? LISTED;
-    const left = items.length - count;
-    if (left <= 0) return items.map(entryOf);
-    const more = el(doc, "button", {
-      class: "swd-cal-more swd-cal-list-more",
-      text: `Show ${Math.min(LISTED, left)} more (${left} left)`,
-      run: () => {
-        listed.set(list, count + LISTED);
-        redraw();
-        element.querySelector<HTMLElement>(`${within} [data-item="${CSS.escape(items[count]!.key)}"]`)?.focus({ preventScroll: true });
-      },
-    });
-    return [...items.slice(0, count).map(entryOf), more];
+  // A list's first items (the place's limit, by the list's name), Load more after them, the first of those focused once
+  // drawn (in the list: an item of the day picked is in the grid too)
+  const limited = (list: string, items: readonly Item[], entryOf: (item: Item) => HTMLElement): HTMLElement[] => {
+    const more = host.limit.more(items, list);
+    return [...host.limit.shown(items, list).map(entryOf), ...(more ? [el(doc, "div", "swd-load-more", ...more)] : [])];
   };
   // The items without a start, over the month (folded by their label): dragged onto a day to give them one
   const folded = undatedFolded.has(key);
@@ -347,14 +335,14 @@ function draw(host: ViewHost, element: HTMLElement, drag: Drag): void {
       },
       `No ${spans.start.label} · ${undated.length}`,
     ),
-    ...(folded ? [] : [el(doc, "div", "swd-cal-undated-items", ...limited(`${key}\u0000undated`, ".swd-cal-undated-items", undated, (item) => entry(item)))]),
+    ...(folded ? [] : [el(doc, "div", { class: "swd-cal-undated-items", attrs: { "data-group": "undated" } }, ...limited("undated", undated, (item) => entry(item)))]),
   );
   // The day picked: its items whole (those lasting over it too, their days said), its + (where the place is narrow, how they are reached)
   const onChosen = dated.filter((item) => spanOf.get(item)!.start <= chosen && spanOf.get(item)!.end >= chosen);
   const agenda = el(
     doc,
     "div",
-    { class: "swd-cal-agenda", attrs: { "aria-label": longDay.format(utc(chosen)) } },
+    { class: "swd-cal-agenda", attrs: { "aria-label": longDay.format(utc(chosen)), "data-group": `day:${chosen}` } },
     el(
       doc,
       "div",
@@ -363,7 +351,7 @@ function draw(host: ViewHost, element: HTMLElement, drag: Drag): void {
       ...(spans.movable ? [el(doc, "button", { class: "swd-cal-agenda-add", text: "+ New", title: `Add an item on ${longDay.format(utc(chosen))}`, run: () => add(chosen) })] : []),
     ),
     ...(onChosen.length
-      ? limited(`${key}\u0000${chosen}`, ".swd-cal-agenda", onChosen, (item) => {
+      ? limited(`day:${chosen}`, onChosen, (item) => {
           const span = spanOf.get(item)!;
           const box = entry(item);
           if (span.start !== span.end) box.querySelector(".swd-cal-text")?.append(el(doc, "span", { class: "swd-cal-days", text: ` ${shortDay.format(utc(span.start))} – ${shortDay.format(utc(span.end))}` }));

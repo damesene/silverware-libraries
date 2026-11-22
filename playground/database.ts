@@ -13,6 +13,7 @@ import { documentsHost, type DocumentsSource } from "../silverware-database/src/
 import { mediaHost, type MediaSource } from "../silverware-database/src/core/media.ts";
 import { mentionsHost } from "../silverware-database/src/core/mentions.ts";
 import { ViewRegistry } from "../silverware-database/src/core/views.ts";
+import { ranksInOrder } from "../silverware-database/src/domain/rank.ts";
 import { TypeRegistry } from "../silverware-database/src/domain/types/registry.ts";
 import { calculatingStore, type CalculatingStore } from "../silverware-database/src/core/calculating.ts";
 import { MemoryStore } from "../silverware-database/src/store/memory.ts";
@@ -87,11 +88,36 @@ const EDITOR = { open: (ref: string) => flash(`Open ${ref}`), openMention: (name
 
 let places: DatabasePlace[] = [];
 
+/** A database of `count` items in their order by hand, numbers, a select and two formulas (one of each item's own values, one of the whole database's) */
+function bigDatabase(count: number): (typeof SAMPLE_DATABASES)[number] {
+  const ranks = ranksInOrder(count);
+  return {
+    database: {
+      id: "big",
+      name: "Big",
+      properties: [
+        { key: "qty", label: "Qty", type: "number", params: {}, readonly: false },
+        { key: "price", label: "Price", type: "number", params: {}, readonly: false },
+        { key: "hours", label: "Hours", type: "number", params: {}, readonly: false },
+        { key: "status", label: "Status", type: "select", params: { options: ["Todo", "Doing", "Done"] }, readonly: false },
+        { key: "total", label: "Total", type: "formula", params: { formula: "=[@qty]*[@price]", resultType: "number" }, readonly: true },
+        { key: "share", label: "Share", type: "formula", params: { formula: "=[@hours]/SUM([hours])" }, readonly: true },
+      ],
+    },
+    items: Array.from({ length: count }, (_, i) => ({ name: `Item ${i}`, values: { qty: (i * 7) % 13, price: (i % 5) + 1, hours: (i % 9) + 1, status: ["Todo", "Doing", "Done"][i % 3]! }, rank: ranks[i] })),
+  };
+}
+
 function start(): void {
   // The layers its style page lays its elements in, as Silverware Database's init sets them
   applyLayers(document);
   for (const place of places) place.destroy();
-  store = new MemoryStore(SAMPLE_DATABASES);
+  // (`?big=20000`: a database of that many items alone, to measure a large one's views by, Load more's and the formulas')
+  const big = Number(new URLSearchParams(location.search).get("big") ?? 0);
+  const seeds = big > 0 ? [bigDatabase(big)] : SAMPLE_DATABASES;
+  store = new MemoryStore(seeds);
+  // (Its store for a measuring script: an item changed as by hand elsewhere, `__bench.store().changeOutside(…)`)
+  (window as unknown as { __bench: unknown }).__bench = { store: () => store };
   const types = new TypeRegistry();
   calculated = calculatingStore(store, types);
   // (The playground's items stand for pages, as SilverBullet's)
@@ -126,7 +152,7 @@ function start(): void {
   );
   const main = document.getElementById("places")!;
   main.replaceChildren();
-  places = SAMPLE_DATABASES.map(({ database }) => {
+  places = seeds.map(({ database }) => {
     // (The place shows the database's name itself)
     const section = document.createElement("section");
     const element = document.createElement("div");

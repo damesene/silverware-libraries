@@ -193,7 +193,11 @@ Ordered by the code (each step's tests passing before the next; UI tests where a
    0.35 s, a change in 0.1 s; 10,000 in 1.9 s and 0.5 s; 20,000 in 3.9 s and 1.0 s. The formulas' share is small
    (all of 50,000 items' formulas calculated in 0.7 s, 3b): the table view draws every row (26 elements each, 520,000
    at 20,000 items), so incremental calculation is not done; drawing only the rows in sight is the views' work, a
-   plan of its own (docs/silverware-database.md, *Left open after the UI work*).
+   plan of its own (docs/silverware-database.md, *Left open after the UI work*). Measured again with Load more
+   (docs/silverware-database-load-more.md, 2026-11-22; the playground's `database.html?big=N`, a table of the first 50
+   rows, 52 drawn): 2,000 items shown in 0.14 s, a change in 0.02 s; 10,000 in 0.12 s and 0.05 s; 20,000 in 0.23 s and
+   0.12 s; 50,000 in 0.41 s and 0.24 s. What is left grows with the items (the calculation, the filter, the sort), not
+   with what is drawn.
 3d. **A type changed keeps none of the old type's params** (found on the way: a select turned into a number kept its
    options), its own commit.
 4. **The views.** What *How it is used* decided:

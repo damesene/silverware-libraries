@@ -57,19 +57,24 @@ export function watchPaneWidth(page: PageHost, changed: (width: number) => void)
   return () => observer.disconnect();
 }
 
-/** The editor's text shown at a font size (px; none: the host's, nothing of ours left), its editor marked for the rule */
-export function showFontSize(doc: Document, page: PageHost, size: number | undefined): void {
+/**
+ * The editor's text shown at a font size (px; none: the host's, nothing of ours left), its editor marked for the rule;
+ * whether it was marked now (an editor made since: the size shown on it from now, what reads its look to read it again)
+ */
+export function showFontSize(doc: Document, page: PageHost, size: number | undefined): boolean {
   const root = doc.documentElement;
   const editor = page.editor();
-  if (editor && !editor.hasAttribute(EDITOR_ATTRIBUTE)) editor.setAttribute(EDITOR_ATTRIBUTE, "");
+  const marked = !!editor && !editor.hasAttribute(EDITOR_ATTRIBUTE);
+  if (marked) editor.setAttribute(EDITOR_ATTRIBUTE, "");
   if (size === undefined) {
     if (root.hasAttribute(FONT_SIZE_ATTRIBUTE)) root.removeAttribute(FONT_SIZE_ATTRIBUTE);
     if (root.style.getPropertyValue(FONT_SIZE)) root.style.removeProperty(FONT_SIZE);
-    return;
+    return marked;
   }
   const value = `${size}px`;
   if (root.getAttribute(FONT_SIZE_ATTRIBUTE) !== String(size)) root.setAttribute(FONT_SIZE_ATTRIBUTE, String(size));
   if (root.style.getPropertyValue(FONT_SIZE) !== value) root.style.setProperty(FONT_SIZE, value);
+  return marked;
 }
 
 /** The font size the host gives its editor (px), Silverware Layout's own set aside a moment; none without an editor */
@@ -83,6 +88,27 @@ export function themeFontSize(doc: Document, page: PageHost): number | undefined
   const size = parseFloat(win.getComputedStyle(editor).fontSize);
   if (shown !== null) root.setAttribute(FONT_SIZE_ATTRIBUTE, shown);
   return Number.isFinite(size) ? Math.round(size) : undefined;
+}
+
+/** The editor's font size as it is drawn (px; none without an editor or a size): what its look is read at */
+export function editorFontSize(doc: Document, page: PageHost): number | undefined {
+  const editor = page.editor();
+  const size = editor ? parseFloat(doc.defaultView?.getComputedStyle(editor).fontSize ?? "") : NaN;
+  return Number.isFinite(size) ? size : undefined;
+}
+
+/**
+ * The page's styles watched: told as one is added, taken out or changed (a host loading its styles after its scripts:
+ * the font a size of ours sets shown only then); what it gives back stops it
+ */
+export function watchStyles(doc: Document, changed: () => void): () => void {
+  const win = doc.defaultView;
+  if (!win?.MutationObserver) return () => {};
+  const observer = new win.MutationObserver((records) => {
+    if (records.some((record) => [record.target, ...record.addedNodes, ...record.removedNodes].some((node) => node.nodeName === "STYLE" || node.nodeName === "LINK" || node.parentNode?.nodeName === "STYLE"))) changed();
+  });
+  observer.observe(doc.head, { childList: true, subtree: true, characterData: true });
+  return () => observer.disconnect();
 }
 
 /** Whether a node is in the editor (its text, its widgets): where Ctrl + scroll zooms its font */

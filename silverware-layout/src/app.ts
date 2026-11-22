@@ -7,7 +7,7 @@ import { fontSizeShown } from "./core/fontsize.ts";
 import type { Registry } from "./core/registry.ts";
 import { textWidthShown } from "./core/textwidth.ts";
 import { snapTargets } from "./core/widgetwidth.ts";
-import { inEditor, markNarrow, paneWidth, showFontSize, showPaneWidth, textWidthOf, themeFontSize, watchPaneWidth } from "./host/marks.ts";
+import { editorFontSize, inEditor, markNarrow, paneWidth, showFontSize, showPaneWidth, textWidthOf, themeFontSize, watchPaneWidth, watchStyles } from "./host/marks.ts";
 import type { PageHost } from "./host/page.ts";
 import { DEFAULT_GUIDES, type Guide, type Settings } from "./model/settings.ts";
 import type { Width } from "./model/width.ts";
@@ -84,8 +84,10 @@ export class LayoutApp {
 
   /** Told once the page's font shows at another size (a zoom, a size set): what read the page's look reads it again (the grids) */
   fontSizeChanged: (() => void) | undefined;
-  // The page's font size shown last (fontSizeChanged told where it changes)
+  // The page's font size shown last, and the editor's as drawn then (fontSizeChanged told where either changes)
   private fontSizeShownLast: number | undefined | null = null;
+  private fontDrawnLast: number | undefined;
+  private stopStyles: (() => void) | undefined;
 
   /** Where the page's text is (x in the window, its padding left out); none before it is laid out */
   textEdges(): { readonly left: number; readonly right: number } | undefined {
@@ -120,6 +122,10 @@ export class LayoutApp {
     // kept, so the dialog open over it is not taken for one of another page and closed)
     const was = this.state;
     this.state = { store, settings: await store.readSettings(), page: was?.page ?? "", pageWidth: was?.pageWidth, zoom: store.readZoom() };
+    // (The host's styles loaded after its scripts, a size of ours shown by its rule only then: what read the page's look
+    // before reads it again)
+    this.stopStyles?.();
+    this.stopStyles = watchStyles(this.doc, () => this.tellFontShown(false));
     this.stopWatching?.();
     this.stopWatching = watchPaneWidth(this.page, (width) => {
       showPaneWidth(this.doc, width);
@@ -223,14 +229,23 @@ export class LayoutApp {
     // (Font zoom off: this device's zoom not shown, still kept)
     const zoomed = shown.fontZoom ? shown.zoom : undefined;
     const size = fontSizeShown(zoomed, shown.fontSize);
-    showFontSize(this.doc, this.page, size);
-    if (size !== this.fontSizeShownLast) {
-      this.fontSizeShownLast = size;
-      this.fontSizeChanged?.();
-    }
+    // (Told where the page's text shows at another size: the size changed, an editor made since marked now, or its font
+    // drawn otherwise: a grid drawn before read the page's look at the host's own)
+    const marked = showFontSize(this.doc, this.page, size);
+    const changed = size !== this.fontSizeShownLast || (marked && size !== undefined);
+    this.fontSizeShownLast = size;
+    this.tellFontShown(changed);
     // The files grown or shrunk with this device's zoom, where asked: by its share of the size of all pages (the
     // theme's where none), so a page at its default shows them at theirs
     showContentScale(this.doc, shown.scaleFiles && zoomed !== undefined ? zoomed / (shown.fontSize ?? (this.themeSizeKept ??= this.themeSize())) : 1);
+  }
+
+  /** What reads the page's look told it shows otherwise: `changed` (a size of ours), or the editor's font drawn at another size */
+  private tellFontShown(changed: boolean): void {
+    const drawn = editorFontSize(this.doc, this.page);
+    if (!changed && drawn === this.fontDrawnLast) return;
+    this.fontDrawnLast = drawn;
+    this.fontSizeChanged?.();
   }
 
   /** The font size Silverware Layout shows now (none: the host's) */

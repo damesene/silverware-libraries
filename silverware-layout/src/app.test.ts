@@ -136,6 +136,55 @@ describe("Silverware Layout's app over a page of no host's", () => {
     expect(told).toBe(2);
   });
 
+  it("tells what reads the page's look once the font shows where the editor came later (marked then, its size the same)", async () => {
+    const { page } = plainPage();
+    const { api, store } = memoryStore({ Page: undefined });
+    store.zoom = 30;
+    // (No editor yet as it starts: the zoom set on the root, nothing of the page's shown at it)
+    const editor = document.querySelector(".editor")!;
+    const content = editor.firstElementChild!;
+    editor.replaceWith(content);
+    const app = new LayoutApp(document, page, new Registry(() => undefined));
+    let told = 0;
+    app.fontSizeChanged = () => void told++;
+    await app.start(api);
+    expect(told).toBe(1);
+    // The editor made: marked as the page is shown again, the size the same, the page's look now at it
+    const made = document.createElement("div");
+    made.className = "editor";
+    content.replaceWith(made);
+    made.append(content);
+    await app.start(api);
+    expect([made.hasAttribute("data-swl-editor"), told]).toEqual([true, 2]);
+    await app.start(api);
+    expect(told).toBe(2);
+  });
+
+  it("tells what reads the page's look once the editor's font is drawn at another size, a style come later (its size the same)", async () => {
+    const { page } = plainPage();
+    const { api, store } = memoryStore({ Page: undefined });
+    store.zoom = 30;
+    const app = new LayoutApp(document, page, new Registry(() => undefined));
+    let told = 0;
+    app.fontSizeChanged = () => void told++;
+    await app.start(api);
+    expect(told).toBe(1);
+    // The style page come after the scripts: the rule showing the size, the editor's font drawn at it
+    const style = document.createElement("style");
+    style.textContent = ":root[data-swl-font-size] [data-swl-editor] { font-size: 30px; }";
+    document.head.append(style);
+    await vi.waitFor(() => expect(told).toBe(2), { timeout: 5_000 });
+    // (Another style changing nothing of it: not told)
+    const other = document.createElement("style");
+    other.textContent = ".nothing { color: red; }";
+    document.head.append(other);
+    // (Its observer told as the style is in: a microtask, done before this goes on)
+    await Promise.resolve();
+    expect(told).toBe(2);
+    style.remove();
+    other.remove();
+  });
+
   it("closes its dialog as another page opens under it, the page put back: its Save would write into the other", async () => {
     const { page, shown } = plainPage();
     const { api, store } = memoryStore({ First: undefined, Second: { amount: 700, unit: "px" } });

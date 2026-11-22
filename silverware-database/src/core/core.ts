@@ -83,7 +83,7 @@ export type Proposal = {
   readonly label: string;
   readonly plan: TransactionPlan;
   readonly unreadable?: readonly ItemKey[];
-  /** Where each item is a document of its own (a page): how many documents it writes, one after another, and whether that is many (it takes a while, not to be stopped) */
+  /** Where each item is a document of its own (a page): how many documents it writes, a few at once, and whether that is many (it takes a while, not to be stopped) */
   readonly documents?: { readonly count: number; readonly many: boolean };
   /** Options renamed (`retypeProperty`'s `renames`): each with how many items' values it renames */
   readonly renamed?: readonly OptionRenamed[];
@@ -763,16 +763,19 @@ export class DatabaseCore {
    * The database deleted, a proposal (nothing written: `apply` writes it):
    * every item of it and its own record (where each is a document: every
    * item's document and the database's own) in one transaction, written whole
-   * or not at all, put back by Undo; and its places, found in every document
-   * (`finding` told as they are read), taken out of them with it. Refused
-   * where any part of it could not be written as it stands (none of it then)
+   * or not at all, put back by Undo (`progress.reading` told as its parts are
+   * planned: a store of documents reads each); and its places, found in every
+   * document (`progress.finding` told as they are read), taken out of them
+   * with it. Refused where any part of it could not be written as it stands
+   * (none of it then)
    */
-  async planDeleteDatabase(database: string, finding?: WriteProgress): Promise<Proposal | Refused> {
+  async planDeleteDatabase(database: string, progress: { readonly reading?: WriteProgress; readonly finding?: WriteProgress } = {}): Promise<Proposal | Refused> {
+    const { reading, finding } = progress;
     const read = await this.read(database);
     if ("problem" in read) return read;
     const changes = databaseChanges(database).expectDatabase(read.database.revision);
     for (const item of read.items.value) changes.item(item, (i) => i.remove());
-    const proposal = await this.propose(changes.removeDatabase().build(), `Delete the database "${read.database.value.name}"`);
+    const proposal = await this.propose(changes.removeDatabase().build(), `Delete the database "${read.database.value.name}"`, reading);
     if (proposal.plan.skipped.length) return this.refuse(`${proposal.label}: it cannot be deleted as it stands: ${[...new Set(proposal.plan.skipped.map((one) => one.reason))].join("; ")}`);
     // (Not in the documents it deletes: a block there goes with its document)
     const gone = new Set([this.store.databaseDocumentOf(database), ...read.items.value.map((item) => this.store.documentOf(item.key))].filter((one) => one !== undefined));
@@ -1108,9 +1111,9 @@ export class DatabaseCore {
       const last = this.history.last(database);
       let plan = last && (await this.history.planUndo(last.report));
       if (!last || !plan) return undefined;
-      // Many pages, one after another (an option renamed in thousands of items): said, and asked first
+      // Many pages (an option renamed in thousands of items): said, and asked first
       if (this.store.capabilities.itemDocument && manyDocuments(plan).many) {
-        if (!(await this.ui.ask(`Undo "${last.label}"? It writes ${plan.planned.length.toLocaleString("en-US")} ${this.noun.many}, one after another: it takes a while; keep this window open until it is done.`))) return { problem: "Not undone", cause: "declined" };
+        if (!(await this.ui.ask(`Undo "${last.label}"? It writes ${plan.planned.length.toLocaleString("en-US")} ${this.noun.many}: it takes a while; keep this window open until it is done.`))) return { problem: "Not undone", cause: "declined" };
         // (Asked, the pages may have changed meanwhile, another client's, a change recorded since: the last one planned anew)
         if (this.history.last(database) !== last) return this.refuse(`Undo: "${last.label}" is no longer the last change: not undone, undo again`);
         plan = await this.history.planUndo(last.report);
@@ -1180,8 +1183,8 @@ export class DatabaseCore {
     else if (kept.kept.length || left.length) this.ui.notify(`${label}: ${kept.left.length === 1 ? "one part" : `${kept.left.length} parts`} could not be put back nor kept elsewhere: Undo tries again`, { type: "error" });
   }
 
-  private async propose(changes: Changes, label: string): Promise<Proposal> {
-    const plan = await this.store.plan(changes);
+  private async propose(changes: Changes, label: string, progress?: WriteProgress): Promise<Proposal> {
+    const plan = await this.store.plan(changes, progress);
     return { label, plan, ...(this.store.capabilities.itemDocument ? { documents: manyDocuments(plan) } : {}) };
   }
 

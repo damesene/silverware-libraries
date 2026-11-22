@@ -167,7 +167,8 @@ describe("the pages store", () => {
     memory.writeOutside("Elsewhere", "x");
     expect(told).toEqual([]);
     await memory.platform.space.rename!("db-tasks/Fix login", "db-tasks/Renamed by hand");
-    expect(told).toEqual(["tasks", "tasks"]);
+    // (Its page written and the old one deleted, told in one go: its readers told once)
+    await vi.waitFor(() => expect(told).toEqual(["tasks"]));
     const [again] = (await store.items("tasks")).value;
     expect(again!.name).toBe("Renamed by hand");
     expect(again!.key).not.toBe(item!.key);
@@ -266,7 +267,7 @@ describe("the pages store", () => {
     expect(memory.pages.get("db-tasks/Fix login")).toBe('---\ntags: [db]\nstatus: { nested: 1 }\ndue: "2026-12-01"\n_database:\n  rank: a0\n---\n');
   });
 
-  it("tells its progress page by page as it writes them, one after another", async () => {
+  it("tells its progress page by page as it writes them, a few at once", async () => {
     const seed: ContractSeed[] = [{ database: TASKS, items: ["A", "B", "C"].map((name, at) => ({ name, values: { status: "Todo" }, rank: `a${at}` })) }];
     const { memory, store } = harness(seed);
     const items = (await store.items("tasks")).value;
@@ -275,8 +276,12 @@ describe("the pages store", () => {
     // (With each told: how many items' pages hold Done by then)
     const done = () => [...memory.pages.values()].filter((text) => text.includes("status: Done")).length;
     await store.apply(plan, (at, of) => void told.push([at, of, done()]));
-    // (The database's own page first, then the items', the last told again once all is done)
-    expect(told).toEqual([[1, 4, 0], [2, 4, 1], [3, 4, 2], [4, 4, 3], [4, 4, 3]]);
+    // (The database's own page first, then the items' (each told once written, a few written at once), the last told again
+    // once all is done)
+    expect(told.map(([at, of]) => [at, of])).toEqual([[1, 4], [2, 4], [3, 4], [4, 4], [4, 4]]);
+    expect(told[0]![2]).toBe(0);
+    for (const [at, , written] of told.slice(1)) expect(written).toBeGreaterThanOrEqual(at - 1);
+    expect(told.at(-1)![2]).toBe(3);
   });
 
   it("never writes a body over one changed by hand since it was read", async () => {
@@ -403,6 +408,55 @@ describe("the pages store", () => {
     expect(await store.body("tasks", item!.key)).toBeUndefined();
     const plan = await store.plan(changes("tasks", { kind: "setBody", item: item!.key, body: "x", was: "" }));
     expect(plan.planned).toEqual([]);
+  });
+
+  it("tells its progress page by page as it plans them (each page read), the plan in the order of its changes", async () => {
+    const seed: ContractSeed[] = [{ database: TASKS, items: ["A", "B", "C"].map((name, at) => ({ name, values: { status: "Todo" }, rank: `a${at}` })) }];
+    const { store } = harness(seed);
+    const items = (await store.items("tasks")).value;
+    const told: [number, number][] = [];
+    const plan = await store.plan(changes("tasks", ...items.map((item) => ({ kind: "removeItem" as const, item: item.key })), { kind: "removeDatabase" }), (done, of) => void told.push([done, of]));
+    expect(told).toEqual([[1, 4], [2, 4], [3, 4], [4, 4]]);
+    expect(plan.planned.map((one) => one.target)).toEqual([{ database: "tasks" }, ...items.map((item) => ({ item: item.key }))]);
+  });
+
+  it("tells the changes of its own pages the index gives while it writes once it is done, a database once (not once a page); another database's at once", async () => {
+    const IDEAS: Database = { ...TASKS, id: "ideas", name: "Ideas" };
+    const seed: ContractSeed[] = [
+      { database: TASKS, items: ["A", "B", "C", "D"].map((name, at) => ({ name, values: { status: "Todo" }, rank: `a${at}` })) },
+      { database: IDEAS, items: [{ name: "Idea", values: { status: "Todo" }, rank: "a0" }] },
+    ];
+    const { memory, store } = harness(seed);
+    const items = (await store.items("tasks")).value;
+    const idea = (await store.items("ideas")).value[0]!;
+    const told: string[] = [];
+    store.onChanged((change) => told.push(change.database));
+    const plan = await store.plan(changes("tasks", ...items.map((item) => ({ kind: "removeItem" as const, item: item.key })), { kind: "removeDatabase" }));
+    // (What was told as each page was written: the last told as all is written, before the transaction ends); the other
+    // database's page changed by hand as the first is written
+    const toldAsWritten: string[][] = [];
+    const report = await store.apply(plan, () => {
+      if (!toldAsWritten.length) memory.writeOutside(store.documentOf(idea.key)!, "---\ntags: [db]\nstatus: Done\n_database:\n  rank: a0\n---\n");
+      toldAsWritten.push([...told]);
+    });
+    expect(report.skipped).toEqual([]);
+    expect(report.written).toHaveLength(5);
+    await vi.waitFor(() => expect(toldAsWritten.at(-1)).toContain("ideas"));
+    expect(toldAsWritten.every((one) => !one.includes("tasks"))).toBe(true);
+    await vi.waitFor(() => expect(told.filter((one) => one === "tasks")).toEqual(["tasks"]));
+  });
+
+  it("tells a database's readers once for many of its pages the index tells in one go", async () => {
+    const seed: ContractSeed[] = [{ database: TASKS, items: ["A", "B", "C"].map((name, at) => ({ name, values: { status: "Todo" }, rank: `a${at}` })) }];
+    const { memory, store } = harness(seed);
+    const items = (await store.items("tasks")).value;
+    const told: string[] = [];
+    store.onChanged((change) => told.push(change.database));
+    // (Each page written by hand at once, the index telling each: SilverBullet's tells every page indexed meanwhile so)
+    for (const item of items) memory.writeOutside(store.documentOf(item.key)!, "---\ntags: [db]\nstatus: Done\n---\n");
+    expect(told).toEqual([]);
+    await Promise.resolve();
+    expect(told).toEqual(["tasks"]);
   });
 
   it("gives an item made its key before it is written: a reader told meanwhile sees the key it keeps", async () => {
@@ -540,7 +594,7 @@ describe("the pages store", () => {
     const names = async () => (await store.items("tasks")).value.map((one) => one.name);
     expect(await names()).toEqual(["New"]);
     memory.catchUp();
-    expect(told.length).toBeGreaterThan(0);
+    await vi.waitFor(() => expect(told.length).toBeGreaterThan(0));
     expect(await names()).toEqual(["New"]);
   });
 });

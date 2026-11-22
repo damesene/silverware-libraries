@@ -2800,6 +2800,8 @@ tr:focus-within .swd-open {
 .swd-delete-status {
   margin: 0;
   color: var(--swd-quiet);
+  /* (Its counts' digits of one width: the line does not shift as they change) */
+  font-variant-numeric: tabular-nums;
 }
 .swd-delete-status.swd-delete-problem {
   color: var(--danger-color, #c62828);

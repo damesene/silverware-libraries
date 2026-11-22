@@ -11,6 +11,7 @@
 // whole: what it has then is the page as it is (changed by hand right after,
 // maybe). A change told whole without that start (one of before the write)
 // lets nothing go: the index may not have taken the write up yet.
+import { inBatches } from "../../../../shared/pages/batch.ts";
 import { type PageBuilder, pageChanges } from "../../../../shared/pages/changes.ts";
 import { readFrontmatter } from "../../../../shared/pages/frontmatter.ts";
 import { validateName as validateTagName } from "../../../../shared/pages/tags/names.ts";
@@ -151,6 +152,12 @@ export class PagesStore implements DatabaseStore {
   private generation = 0;
   // Transactions being written: a reading meanwhile is made anew each time (the store's own pages change as they go)
   private applying = 0;
+  // Each database's transactions being written, and those the index told changed meanwhile, told on once its last ends
+  // (another database's change told at once)
+  private readonly writing = new Map<string, number>();
+  private readonly tellAfter = new Set<string>();
+  // Databases whose readers are to be told once the code running now is done (a microtask)
+  private readonly telling = new Set<string>();
   private readonly reads = new Map<string, { readonly generation: number; readonly read: Promise<Read | undefined> }>();
   private readonly itemsRead = new WeakMap<Read, Promise<Revised<readonly Item[]>>>();
   private readonly parts = new WeakMap<Planned, Part>();
@@ -208,15 +215,14 @@ export class PagesStore implements DatabaseStore {
       }
       // (Its readers told once the index has the change whole: read early, they would read it without it)
       if (change.early) return;
-      const tell = () => {
-        for (const [id, root] of this.roots) {
-          if (change.document !== root && !change.document.startsWith(`${root}/`)) continue;
-          // (Its pages' tasks counted anew at the next read)
-          this.taskCounts.delete(id);
-          for (const listener of this.listeners) listener({ database: id });
-        }
-      };
-      tell();
+      for (const [id, root] of this.roots) {
+        if (change.document !== root && !change.document.startsWith(`${root}/`)) continue;
+        // (Its pages' tasks counted anew at the next read)
+        this.taskCounts.delete(id);
+        // (While a transaction writes, its readers told once it ends: each told now would read the database whole once a
+        // page, tens of thousands of times for a database deleted)
+        this.toldChanged(id);
+      }
       // A database not found yet told once the index has its root (any page may be it): the roots read once for every
       // one missing, none told while none is found (a block's id mistyped, a database deleted)
       if (this.missing.size) this.checkFound();
@@ -250,7 +256,7 @@ export class PagesStore implements DatabaseStore {
       if ("problem" in read || !this.missing.delete(read.record.database.id)) continue;
       // (Known at once: its pages indexed before it is read again are its changes)
       this.roots.set(read.record.database.id, String(object.name));
-      for (const listener of this.listeners) listener({ database: read.record.database.id });
+      this.toldChanged(read.record.database.id);
     }
   }
 
@@ -333,7 +339,7 @@ export class PagesStore implements DatabaseStore {
     }
   }
 
-  async plan(changes: Changes): Promise<TransactionPlan> {
+  async plan(changes: Changes, progress?: WriteProgress): Promise<TransactionPlan> {
     const id = changes.database;
     const read = await this.read(id);
     // The bodies a transaction writes, read now (the index has none): one changed since it was read is left
@@ -389,19 +395,29 @@ export class PagesStore implements DatabaseStore {
       });
     }
     const planned: Planned[] = [];
-    for (const of of toPlan) {
-      const batch = pageChanges();
-      of.write(batch);
-      const pagePlan = await this.writer.plan(batch.build());
+    // (A few pages read at once, each read for its plan: a database deleted reads tens of thousands; kept in their order)
+    const pagePlans = await inBatches(
+      toPlan,
+      (of) => {
+        const batch = pageChanges();
+        of.write(batch);
+        return this.writer.plan(batch.build());
+      },
+      progress && ((done, of) => told(progress, done, of)),
+    );
+    toPlan.forEach((of, at) => {
+      const pagePlan = pagePlans[at]!;
       for (const one of pagePlan.skipped) skipped.push({ target: of.target, cause: one.cause, reason: one.reason });
       for (const one of pagePlan.pages) planned.push(this.part({ target: of.target, changes: of.count, preview: () => one.preview() }, { ...of.part, pagePlan: { pages: [one], skipped: [] } }));
-    }
+    });
     return { database: id, planned, skipped };
   }
 
   async apply(plan: TransactionPlan, progress?: WriteProgress): Promise<TransactionReport> {
     // (Read anew while it writes, the store's own pages changing as it goes, and after it)
     this.applying++;
+    const id = plan.database;
+    this.writing.set(id, (this.writing.get(id) ?? 0) + 1);
     try {
       const report = await this.applyParts(plan, (done, of) => told(progress, done, of));
       told(progress, plan.planned.length, plan.planned.length);
@@ -409,7 +425,32 @@ export class PagesStore implements DatabaseStore {
     } finally {
       this.applying--;
       this.generation++;
+      const left = this.writing.get(id)! - 1;
+      if (left) this.writing.set(id, left);
+      else {
+        this.writing.delete(id);
+        if (this.tellAfter.delete(id)) this.tell(id);
+      }
     }
+  }
+
+  /** A database the index told changed: its readers told, once its transactions being written end */
+  private toldChanged(database: string): void {
+    if (this.writing.has(database)) this.tellAfter.add(database);
+    else this.tell(database);
+  }
+
+  /**
+   * A database's readers told, once for the code running now: the index tells many pages in one go (SilverBullet's, once its queue
+   * empties, every page indexed meanwhile), each reader reading the database whole as told
+   */
+  private tell(database: string): void {
+    if (this.telling.has(database)) return;
+    this.telling.add(database);
+    queueMicrotask(() => {
+      this.telling.delete(database);
+      for (const listener of this.listeners) listener({ database });
+    });
   }
 
   private async applyParts(plan: TransactionPlan, progress?: WriteProgress): Promise<TransactionReport> {
@@ -470,7 +511,12 @@ export class PagesStore implements DatabaseStore {
     const parts = ready.map((one) => ({ ...one, own: one.part, part: { key: one.part.key, ref: one.part.ref, after: one.part.after as ItemState | undefined } }));
     // Pages removed first: a name another part takes may be one of theirs
     const ordered = withoutClashes(now, parts, this.rules, ({ one: left }, reason) => skip(left, "refused", reason)).sort((a, b) => Number(a.own.after !== undefined) - Number(b.own.after !== undefined));
-    for (const { one, own } of ordered) {
+    // Kept in the plan's order whatever order the pages are written in
+    const kept: (() => void)[] = [];
+    // A write that threw: the parts not started after it left, said why; those written before reported (Undo has them)
+    let failed: string | undefined;
+    const writeItem = async ({ one, own }: (typeof ordered)[number], at: number): Promise<void> => {
+      if (failed !== undefined) return void skip(one, "refused", `not written: the write of another page failed (${failed})`);
       try {
         const before = own.key === undefined ? undefined : read!.items.get(own.key)?.item;
         // A page made gets its key before it is written, and a page renamed its key under its new name: whoever reads
@@ -492,7 +538,7 @@ export class PagesStore implements DatabaseStore {
         if ("cause" in result) {
           if (early) this.keys.delete(early);
           skip(one, result.cause, result.reason);
-          continue;
+          return;
         }
         // Its name written alone (the rename changed its text, so the rest was left): said, and kept for Undo
         if (result.renamedAlone) skip(one, "changed", "renamed, but the rename changed its text, so its other changes were left");
@@ -500,11 +546,38 @@ export class PagesStore implements DatabaseStore {
         const page = after ? `${read!.folder}/${after.name}` : own.page;
         const key = this.keyAfter(own, page, after);
         if (own.ref !== undefined) created.set(own.ref, key);
-        this.keep(written, one, { part: own, report: result.report, before, made: read!.made, key });
+        const report = result.report;
+        kept[at] = () => this.keep(written, one, { part: own, report, before, made: read!.made, key });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        failed ??= reason;
+        skip(one, "refused", `could not be written (${reason})`);
       } finally {
         tick();
       }
-    }
+    };
+    // Pages removed first, a few at once (a database deleted: tens of thousands, each a call into the platform); then those
+    // written in place and those made, a few at once, before any rename (a rename follows links in the pages there are: one
+    // it rewrote after it was read would be left as changed, one made after it would keep the old name); then those renamed,
+    // one after another (a name one frees may be the one another takes); last the pages made under a name a rename frees
+    const renames = ordered.filter(({ own }) => own.pagePlan.pages[0]?.renamedTo !== undefined);
+    const freed = new Set(renames.map(({ own }) => this.rules.nameKey(own.page)));
+    const stage = ({ own }: (typeof ordered)[number]) =>
+      own.after === undefined
+        ? "removed"
+        : own.pagePlan.pages[0]?.renamedTo !== undefined
+          ? "renamed"
+          : // (Made: a page the writer makes, an item's made again by an undo among them, its key the one it had)
+            own.pagePlan.pages[0]?.created && freed.has(this.rules.nameKey(own.page))
+            ? "madeInFreed"
+            : "written";
+    const indexed = ordered.map((each, at) => ({ each, at, stage: stage(each) }));
+    const of = (name: ReturnType<typeof stage>) => indexed.filter((one) => one.stage === name);
+    await inBatches(of("removed"), ({ each, at }) => writeItem(each, at));
+    await inBatches(of("written"), ({ each, at }) => writeItem(each, at));
+    for (const { each, at } of of("renamed")) await writeItem(each, at);
+    await inBatches(of("madeInFreed"), ({ each, at }) => writeItem(each, at));
+    for (const keep of kept) keep?.();
     for (const one of records.filter(({ part }) => part.after === undefined)) await writeRecord(one);
     return { database: plan.database, written, skipped, created, ...(plan.undoes ? { undoes: plan.undoes } : {}) };
   }

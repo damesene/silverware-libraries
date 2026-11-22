@@ -812,7 +812,7 @@ export class DatabasePlace {
       ];
     });
 
-    // Undo, and how far it is while it writes (many pages: one after another), kept by the place as it is drawn anew meanwhile
+    // Undo, and how far it is while it writes (many pages), kept by the place as it is drawn anew meanwhile
     const undoText = el(doc, "span", { class: "swd-tool-text swd-undo-progress" });
     const undo = el(doc, "button", { class: "swd-tool swd-undo", title: "Undo this database's last change", attrs: { "aria-label": "Undo this database's last change" }, run: () => void this.undo(host) }, el(doc, "span", { class: "swd-tool-icon", html: ICONS.undo }), undoText);
     this.undoShown = () => {

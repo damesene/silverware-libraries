@@ -44,6 +44,7 @@ import { layoutEntries, withLayout } from "./host/silverbullet/layout.ts";
 import { type Bridge, editorArea, editorLook, fieldLook, listOf as luaList, silverBulletPlatform, watchEditorArea } from "./host/silverbullet/platform.ts";
 import { LOOK_SAMPLE } from "../../shared/editorlook.ts";
 import { calculatingStore, type CalculatingStore } from "./core/calculating.ts";
+import { inRankOrder } from "./domain/rank.ts";
 import { PagesStore } from "./store/pages/store.ts";
 import { BUILT_IN_MODULES } from "./modules/builtin.ts";
 import { BUILT_IN_VIEWS } from "./views/builtin/index.ts";
@@ -346,6 +347,21 @@ export function slashCommands(): { name: string; description: string; command: s
 
 export async function runCommand(name: string): Promise<void> {
   await COMMANDS[name]?.();
+}
+
+/**
+ * A database's items for Space Lua (`silverware.database.items`), in their order by hand: each its values by key, a
+ * formula's calculated (an error's its code) and the system's (Created, Modified) among them, its `name` and its page
+ * (`ref`); none where there is no such database, Silverware Database has not started, or the index has it not yet
+ */
+export async function items(id: unknown): Promise<readonly Record<string, unknown>[] | undefined> {
+  if (!app || typeof id !== "string") return undefined;
+  const { calculated } = app;
+  if (!(await calculated.database(id))) return undefined;
+  return inRankOrder((await calculated.items(id)).value).map((item) => {
+    const ref = calculated.documentOf(item.key);
+    return { ...item.values, name: item.name, ...(ref === undefined ? {} : { ref }) };
+  });
 }
 
 /** Space Lua loads (again): the definitions of its scripts replace those of before */

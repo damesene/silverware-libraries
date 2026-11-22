@@ -17,7 +17,7 @@ test("a formula made in Properties: a property's button puts it in, its result s
   // (The function offered as typed, put in by Enter)
   await expect(page.locator(".swd-formulafield-choice-active")).toContainText("UPPER");
   await page.keyboard.press("Enter");
-  await page.locator(".swd-formula-property", { hasText: /^Name$/ }).click();
+  await page.locator(".swd-formula-property-row", { hasText: /^Name/ }).locator(".swd-formula-property").click();
   await field.pressSequentially(")");
   await expect(field).toHaveValue("=UPPER([@name])");
   await expect(page.locator(".swd-formula-result")).toHaveText("FIX LOGIN");
@@ -28,6 +28,30 @@ test("a formula made in Properties: a property's button puts it in, its result s
   await expect(cell("Write docs")).toHaveText("WRITE DOCS");
   // (No value of it in an item's page)
   expect(await space.saved("Page/db-tasks/Fix login")).not.toContain("shout");
+});
+
+test("a formula on a phone's width: its field and panel first, a property found by its name typed", async ({ page, space }) => {
+  await page.setViewportSize({ width: 390, height: 760 });
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS }, "Page");
+  await page.locator(".swd-more").click();
+  await page.locator(".swd-menu .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: /^Properties$/ }) }).first().click();
+  await page.locator(".swd-property-new-label").fill("Shout");
+  await page.locator(".swd-property-new-type").selectOption("formula");
+  await page.locator(".swd-property-add").click();
+  const field = page.locator('[data-focus="formula"]');
+  await expect(field).toBeFocused();
+  // (The formula above the name in the details, its panel under it)
+  const top = async (selector: string) => (await page.locator(`[data-property="new:1"] ${selector}`).boundingBox())!.y;
+  expect(await top(".swd-prop-formula")).toBeLessThan(await top(".swd-property-label"));
+  await expect(page.locator(".swd-formula-panel")).toBeVisible();
+  // A property found by its name typed, offered in the list as typed and in the panel
+  await field.pressSequentially("=UPPER(Na");
+  await expect(page.locator(".swd-formula-property-row:not([hidden]) .swd-formula-property-name")).toHaveText(["Name"]);
+  await page.locator(".swd-formula-property", { hasText: "Name" }).click();
+  await expect(field).toHaveValue("=UPPER([@name]");
+  await expect(field).toBeFocused();
+  await field.pressSequentially(")");
+  await expect(page.locator(".swd-formula-result")).toHaveText("FIX LOGIN");
 });
 
 test("a formula read: ƒ in its column's header, its formula over it, an error's cell its code with why, its formula in the item's panel", async ({ page, space }) => {
@@ -55,4 +79,25 @@ test("a formula read: ƒ in its column's header, its formula over it, an error's
   await expect(value).toHaveText("#DIV/0!");
   await expect(value).toHaveClass(/swd-invalid/);
   await expect(value).toHaveAttribute("title", /^#DIV\/0!: /);
+});
+
+test("silverware.database.items in a ${…}: the items in their order, a formula's values among their values, nil for no database", async ({ page, space }) => {
+  const rootPage = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n    shout: { type: formula, label: Shout, formula: \"=UPPER([@name])\" }\n---\n";
+  // (Before the index has the database a ${…} may be evaluated once: nil then, taken as no items)
+  const lines = [
+    "# Page",
+    "",
+    'Items: ${(function() local t = {} for _, it in ipairs(silverware.database.items("tasks") or {}) do t[#t + 1] = it.name .. "/" .. it.status .. "/" .. tostring(it.shout) end return table.concat(t, ", ") end)()}',
+    "",
+    'Pages: ${(function() local t = {} for _, it in ipairs(silverware.database.items("tasks") or {}) do t[#t + 1] = it.ref end return table.concat(t, ", ") end)()}',
+    "",
+    'Missing: ${tostring(silverware.database.items("nope"))}',
+    "",
+  ].join("\n");
+  await space.open({ Page: lines, ...TASKS, "Page/db-tasks": rootPage }, "Page");
+  const line = (start: string) => page.locator(".cm-line", { hasText: start });
+  await expect(line("Items:")).toContainText("Items: Fix login/Todo/FIX LOGIN, Write docs/Done/WRITE DOCS");
+  // (The test's pages are in a folder of its own)
+  await expect(line("Pages:")).toContainText(`Pages: ${space.folder}/Page/db-tasks/Fix login, ${space.folder}/Page/db-tasks/Write docs`);
+  await expect(line("Missing:")).toContainText("Missing: nil");
 });

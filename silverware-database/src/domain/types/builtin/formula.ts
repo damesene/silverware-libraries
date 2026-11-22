@@ -46,8 +46,9 @@ function resultTyped(params: Params): PropertyType {
   if (!result) return formula;
   let made = asResult.get(result.name);
   if (!made) {
-    // (Its editor and settings none: no value is typed; its params the formula type's to check)
-    const { forParams: _forParams, editor: _editor, settings: _settings, validateParams: _validateParams, ...shown } = result;
+    // (Its settings none and its params the formula type's to check; its editor kept, what the views know its values by (a
+    // date's day placed in a calendar, a checkbox grouped as one), no value typed in it: a formula is read only)
+    const { forParams: _forParams, settings: _settings, validateParams: _validateParams, ...shown } = result;
     made = { ...shown, name: FORMULA_TYPE, label: formula.label, parse: calculatedOnly, validateParams: validateFormulaParams };
     asResult.set(result.name, made);
   }

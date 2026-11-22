@@ -3654,8 +3654,8 @@ button.swd-editor-document-folder:hover,
 .swd-prop-field-name .swd-settings-hint {
   font-size: 0.85em;
 }
-/* A formula property's details (src/modules/properties/formula.ts): its field across the width, its properties' buttons
-   under it, its result for an item */
+/* A formula property's details (src/modules/properties/formula.ts): its field across the width, its panel under it (its
+   result for an item, the properties to put in with their values for that item) */
 .swd-prop-field.swd-prop-formula {
   align-items: start;
 }
@@ -3676,53 +3676,47 @@ button.swd-editor-document-folder:hover,
 .swd-formula-box .swd-formulafield-input input.swd-formulafield-text {
   width: 100%;
 }
-.swd-formula-properties {
+/* On a phone: the formula and its panel first in the property's details */
+@media (max-width: 520px) {
+  .swd-prop-detail > .swd-prop-formula {
+    order: -1;
+  }
+}
+.swd-formula-panel {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.swd-formula-properties {
-  align-items: center;
-}
-.swd-formula-properties-title,
-.swd-formula-references {
-  color: var(--swd-quiet);
-  font-size: 0.85em;
-}
-.swd-formula-references {
-  margin: 0;
-}
-.swd-formula-references code {
-  font-size: 0.95em;
-}
-.swd-formula-property {
-  padding: 1px 8px;
-  font: inherit;
-  font-size: 0.85em;
-  color: inherit;
-  background: transparent;
+  flex-direction: column;
+  min-width: 0;
   border: 1px solid var(--swd-settings-line);
-  border-radius: 999px;
-  cursor: pointer;
+  border-radius: 6px;
 }
-.swd-formula-property:hover {
-  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
-}
-.swd-formula-result-row {
+/* Its head: = the result for the item picked, the item's field */
+.swd-formula-panel-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  min-width: 0;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--swd-settings-line);
 }
-.swd-formula-result-arrow {
+.swd-formula-result-equals,
+.swd-formula-result-for {
   color: var(--swd-quiet);
 }
-.swd-prop-field.swd-prop-formula-result {
-  align-items: start;
+.swd-formula-result {
+  flex: 1 1 8em;
+  min-width: 0;
+  font-family: var(--editor-font, monospace);
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
-.swd-prop-formula-result > .swd-prop-field-name {
-  padding-top: 5px;
+.swd-formula-result:empty::before {
+  content: "…";
+  color: var(--swd-quiet);
+  font-weight: normal;
+}
+.swd-formula-result-error {
+  color: var(--danger-color, #c62828);
+  font-weight: normal;
 }
 /* Its items' list over the dialog (fixed: the dialog's body scrolls and would cut it), placed under the field by the script */
 .swd-formula-result-item-box .swd-suggest {
@@ -3730,18 +3724,86 @@ button.swd-editor-document-folder:hover,
   z-index: 2;
 }
 .swd-formula-result-item {
-  width: 12em;
+  width: 11em;
   max-width: 100%;
 }
 .swd-formula-result-item[hidden] {
   display: none;
 }
-.swd-formula-result {
-  font-family: var(--editor-font, monospace);
-  overflow-wrap: anywhere;
+/* The properties: a row each, its icon, name and value for the item, Σ at its end; a few rows high, scrolled */
+.swd-formula-properties {
+  max-height: 12.5em;
+  overflow-y: auto;
+  padding: 3px;
 }
-.swd-formula-result-error {
-  color: var(--danger-color, #c62828);
+.swd-formula-property-row {
+  display: flex;
+  align-items: stretch;
+  border-radius: 4px;
+}
+.swd-formula-property-row[hidden] {
+  display: none;
+}
+.swd-formula-property-row:hover {
+  background: color-mix(in srgb, var(--ui-accent-color) 10%, transparent);
+}
+.swd-formula-property,
+.swd-formula-property-all {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swd-formula-property {
+  display: grid;
+  grid-template-columns: 1.2em minmax(6em, 2fr) minmax(0, 3fr);
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  text-align: left;
+}
+.swd-formula-property-icon {
+  display: inline-flex;
+  color: var(--swd-quiet);
+}
+.swd-formula-property-icon svg {
+  width: 1em;
+  height: 1em;
+}
+.swd-formula-property-name,
+.swd-formula-property-value {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.swd-formula-property-value {
+  color: var(--swd-quiet);
+  font-size: 0.9em;
+}
+.swd-formula-property-value.swd-formula-property-empty {
+  font-style: italic;
+  opacity: 0.7;
+}
+.swd-formula-property-all {
+  flex: none;
+  width: 2em;
+  color: var(--swd-quiet);
+}
+.swd-formula-property:hover,
+.swd-formula-property-all:hover {
+  color: inherit;
+  background: color-mix(in srgb, var(--ui-accent-color) 16%, transparent);
+}
+.swd-formula-panel-foot {
+  margin: 0;
+  padding: 4px 8px 6px;
+  border-top: 1px solid var(--swd-settings-line);
+  color: var(--swd-quiet);
+  font-size: 0.8em;
 }
 /* A setting turned by a switch (Required, Name in views, Locked in views): its name and hint across the width, the switch
    at the right, on a phone too (in the names' narrow column the hint broke every few words) */

@@ -775,6 +775,11 @@ export class PropertiesDialog {
     return formulaDetails({
       doc: this.host.document,
       types: this.host.types,
+      iconOf: (one) => {
+        const icon = propertyIcon(this.host.document, this.host.look, one, typeOf(this.host.types, one), "swd-formula-property-icon");
+        icon.setAttribute("aria-hidden", "true");
+        return icon;
+      },
       property,
       key,
       database: { ...this.database!, properties },
@@ -993,7 +998,10 @@ export class PropertiesDialog {
           this.entries.push({ id, saved: undefined, property, options: this.hasOptions(property.type) ? [] : undefined });
           if (formula) this.opened = id;
         });
-        this.body?.querySelector<HTMLElement>(formula ? `[data-property="${CSS.escape(id)}"] [data-focus="formula"]` : ".swd-property-new-label")?.focus();
+        if (!formula) return this.body?.querySelector<HTMLElement>(".swd-property-new-label")?.focus();
+        // (Its formula and its panel at the top of the dialog's body, as much of them in sight as it holds)
+        this.body?.querySelector(`[data-property="${CSS.escape(id)}"] .swd-prop-formula`)?.scrollIntoView?.({ block: "start" });
+        this.body?.querySelector<HTMLElement>(`[data-property="${CSS.escape(id)}"] [data-focus="formula"]`)?.focus({ preventScroll: true });
       },
     });
     label.addEventListener("keydown", (event) => {

@@ -153,7 +153,8 @@ first idea.
 7. **Phones**: a property's dialog over the whole screen, the formula field at its top, the names offered as a strip
    over the keyboard, the result under the field.
 8. **Large databases**: a database of tens of thousands of items stays usable (measured, *Steps* 3b and 3c); while a
-   calculation takes long, *Calculating…* instead of a frozen page.
+   calculation takes long, *Calculating…* instead of a frozen page. **Not built (3c)**: every formula of 50,000 items
+   is calculated in 0.7 s; what takes long is drawing them, which Load more cuts (docs/silverware-database-load-more.md).
 
 ## Steps
 
@@ -198,6 +199,20 @@ Ordered by the code (each step's tests passing before the next; UI tests where a
    making and editing a formula; its icon (the formula type's, or its result's type's: today the views draw a type's
    icon by its name); values read only in tables, lists, boards, calendars, timelines and the item's panel;
    errors shown as decided. UI tests for making, editing and reading one, a phone's too.
+   **Done (2026-11-22)**, as decided but:
+   - A property's button and the names offered write it by its key (`[@unit_price]`), not its label: a key stays as
+     the property is renamed, a label would break the formula; the buttons and the list show the labels.
+   - The item's panel: ƒ and the formula over the property's name (its title), a press opening Properties at it (its
+     formula edited there), not a view of the formula of its own.
+   - The preview's item: found by its name among all of them (ten offered), the one the panel was opened from first.
+   - A formula's result type keeps its type's editor (what the views know a date or a checkbox by), no value typed in
+     it: a formula is read only; a calendar places its dates, never moved there.
+   - The properties (decided again with the user, 2026-11-22: a row of buttons did not scale, needed `[@` known and
+     showed no values): a panel under the field, its head the preview (`= 7.5 for Fix login`), its rows the
+     properties with their values for that item, filtered by the name typed, a press putting one in for this item
+     (`[@key]`), its Σ for every item (`[key]`, for SUM, COUNT…); the names offered as typed have the properties too,
+     no `[@` needed (`Est` offers Estimate). A strip over a phone's keyboard dropped with the buttons.
+   - Phones: the formula and its panel first in the details.
 5. **Space Lua's read.** `silverware.database.items(id)` (the entry's export over the calculating store, the API
    page's function with its `---` docs).
 6. **Options by a formula.** `optionsFormula` (a choice type's param, validated as a formula), the derived schema

@@ -1,14 +1,17 @@
 // A formula property's details in the properties' dialog (docs/silverware-database-formulas.md, *How it is used*,
-// decided 1 to 4): its formula's field (shared/formulafield.ts: the functions and the properties offered as a name is
-// typed, the function the caret is in, why it cannot be), the database's properties under it as buttons writing each
-// as a formula reads it, its result for one item as it is typed, and the type it is shown as.
+// decided 1 to 4, the panel decided again 2026-11-22): its formula's field (shared/formulafield.ts: the properties and
+// the functions offered as a name is typed, the function the caret is in, why it cannot be); under it a panel: its
+// result for one item as it is typed (a preview: nothing kept), and the database's properties, each with its value for
+// that item, filtered by the name typed, a press putting it in for this item, its Σ for every item; the type it is
+// shown as.
 import { el } from "../../../../shared/elements.ts";
 import { suggestionList } from "../../../../shared/suggest.ts";
 import { formulaField } from "../../../../shared/formulafield.ts";
-import { formulaCompletion, formulaFunctionHelp, formulaPreview, formulaTypedProblem, propertyReference } from "../../domain/formulas/help.ts";
+import { columnReference, formulaCompletion, formulaFunctionHelp, formulaNameTyped, formulaPreview, formulaTypedProblem, propertyReference, propertyStarts } from "../../domain/formulas/help.ts";
+import { typeIcon } from "../../views/icons.ts";
 import { FORMULA_RESULT_TYPES } from "../../domain/types/builtin/formula.ts";
 import type { TypeRegistry } from "../../domain/types/registry.ts";
-import { type Database, type Item, NAME_KEY, type Params, type Property } from "../../model/database.ts";
+import { type Database, isEmpty, type Item, NAME_KEY, type Params, type Property } from "../../model/database.ts";
 
 const BASE = "swd-settings";
 
@@ -59,6 +62,8 @@ export type FormulaDetails = {
   /** Its params as typed (the formula: nothing drawn anew, the focus stays) and as picked (its type: drawn anew) */
   readonly typed: (params: Params) => void;
   readonly picked: (params: Params) => void;
+  /** A property's icon as the dialog draws it (its own, else its type's: a formula's ƒ) */
+  readonly iconOf: (property: Property) => HTMLElement;
 };
 
 /** An example of a formula of the database's own properties, what an empty field shows */
@@ -111,6 +116,7 @@ export function formulaDetails(details: FormulaDetails): HTMLElement[] {
   which.addEventListener("blur", () => doc.removeEventListener("scroll", placePicker, { capture: true }));
   const show = () => {
     if (!items) return;
+    showValues();
     const item = shownItem();
     if (!item) return void (result.textContent = "No item yet");
     if (typeof params.formula !== "string" || !params.formula.trim() || formulaTypedProblem(params.formula)) return void result.replaceChildren();
@@ -132,7 +138,7 @@ export function formulaDetails(details: FormulaDetails): HTMLElement[] {
   });
   const field = formulaField(
     doc,
-    { complete: (text, caret) => formulaCompletion(database, text, caret), help: formulaFunctionHelp, validate: formulaTypedProblem },
+    { complete: (text, caret) => formulaCompletion(database, text, caret, key), help: formulaFunctionHelp, validate: formulaTypedProblem },
     formulaText,
     (text) => {
       params = { ...params, formula: text };
@@ -142,43 +148,92 @@ export function formulaDetails(details: FormulaDetails): HTMLElement[] {
     { base: "swd", label: `Formula of ${property.label}`, focus: "formula", placeholder: formulaExample(database, key) },
   );
   const input = field.querySelector<HTMLInputElement>("input")!;
-  // A property's button: its reference written at the caret, as typed
+  // What is being typed of a property at the caret (none while text is selected: the selection is what a press replaces)
+  const typedNow = () => (input.selectionStart === input.selectionEnd ? formulaNameTyped(input.value, input.selectionStart ?? input.value.length, database, key) : undefined);
+  // A reference written in place of the selection, else of the name being typed (`Est` of Estimate, `[es`), else at the
+  // caret; the field's focus kept
   const put = (text: string) => {
-    const from = input.selectionStart ?? input.value.length;
-    const to = input.selectionEnd ?? from;
+    const typed = typedNow();
+    const from = typed?.from ?? input.selectionStart ?? input.value.length;
+    const to = typed?.to ?? input.selectionEnd ?? from;
     input.value = input.value.slice(0, from) + text + input.value.slice(to);
     input.setSelectionRange(from + text.length, from + text.length);
     input.focus();
     input.dispatchEvent(new Event("input"));
   };
-  const named = [{ key: NAME_KEY, label: "Name" }, ...database.properties.filter((one) => one.key !== key).map((one) => ({ key: one.key, label: one.label || one.key }))];
-  const buttons = el(
+  // The properties a formula reads, the item's name first (not this one: it would read itself)
+  const named: { readonly key: string; readonly label: string; readonly property?: Property }[] = [
+    { key: NAME_KEY, label: "Name" },
+    ...database.properties.filter((one) => one.key !== key).map((one) => ({ key: one.key, label: one.label || one.key, property: one })),
+  ];
+  const valueText = (one: (typeof named)[number], item: Item | undefined): string => {
+    if (!item) return "";
+    if (!one.property) return item.name;
+    const value = item.values[one.key];
+    if (value === undefined || isEmpty(value)) return "";
+    return types.of(one.property.type, one.property.params)?.text(value, one.property.params) ?? String(value);
+  };
+  // A press keeps the field's focus and its caret
+  const keep = { mousedown: (event: Event) => event.preventDefault() };
+  const rows = named.map((one) => {
+    const value = el(doc, "span", "swd-formula-property-value");
+    const row = el(
+      doc,
+      "div",
+      { class: "swd-formula-property-row", attrs: { role: "listitem", "data-key": one.key } },
+      el(
+        doc,
+        "button",
+        { class: "swd-formula-property", title: `Insert ${propertyReference(one)}: this item's ${one.label}`, attrs: { "aria-label": `Insert ${one.label}` }, on: keep, run: () => put(propertyReference(one)) },
+        one.property ? details.iconOf(one.property) : el(doc, "span", { class: "swd-formula-property-icon", html: typeIcon("text") }),
+        el(doc, "span", { class: "swd-formula-property-name", text: one.label }),
+        value,
+      ),
+      el(doc, "button", {
+        class: "swd-formula-property-all",
+        text: "Σ",
+        title: `Insert ${columnReference(one)}: every item's ${one.label}, for SUM, COUNT, AVERAGE…`,
+        attrs: { "aria-label": `Insert every item's ${one.label}` },
+        on: keep,
+        run: () => put(columnReference(one)),
+      }),
+    );
+    return { one, row, value };
+  });
+  const showValues = () => {
+    const item = shownItem();
+    for (const { one, value } of rows) {
+      const text = valueText(one, item);
+      value.textContent = text || "empty";
+      // (Said with its value for the item shown, as it reads)
+      value.parentElement?.setAttribute("aria-label", `Insert ${one.label}, ${text || "empty"} for ${item?.name ?? "the item"}`);
+      value.classList.toggle("swd-formula-property-empty", !text);
+    }
+  };
+  // Filtered by the name being typed: those it starts, all where none is typed (or none starts so)
+  const list = el(doc, "div", { class: "swd-formula-properties", attrs: { role: "list", "aria-label": "Properties to insert into the formula" } }, ...rows.map(({ row }) => row));
+  const filter = () => {
+    const typed = typedNow()?.typed ?? "";
+    const matching = rows.filter(({ one }) => propertyStarts(one, typed));
+    for (const { row } of rows) row.hidden = matching.length > 0 && !matching.some((one) => one.row === row);
+  };
+  for (const event of ["input", "keyup", "click"]) input.addEventListener(event, filter);
+  const panel = el(
     doc,
     "div",
-    { class: "swd-formula-properties", attrs: { role: "group", "aria-label": "Insert a property into the formula" } },
-    el(doc, "span", { class: "swd-formula-properties-title", text: "Insert a property:", attrs: { "aria-hidden": "true" } }),
-    ...named.map((one) =>
-      el(doc, "button", {
-        class: "swd-formula-property",
-        text: one.label,
-        title: `Insert ${propertyReference(one)}: this item's ${one.label}`,
-        // (A press keeps the field's focus and its caret)
-        on: { mousedown: (event: Event) => event.preventDefault() },
-        run: () => put(propertyReference(one)),
-      }),
+    "swd-formula-panel",
+    // (A preview: the result for one item as the formula is typed, nothing of it kept)
+    el(
+      doc,
+      "div",
+      { class: "swd-formula-panel-head", title: "A preview: the result for one item as you type; nothing is saved" },
+      el(doc, "span", { class: "swd-formula-result-equals", text: "=", attrs: { "aria-hidden": "true" } }),
+      result,
+      el(doc, "span", { class: "swd-formula-result-for", text: "for" }),
+      el(doc, "div", "swd-suggest-field swd-formula-result-item-box", which, picker),
     ),
-  );
-  // What @ means, by a property of the database's own (its first, else the name)
-  const sample = named[1] ?? named[0]!;
-  const code = (text: string) => el(doc, "code", { text });
-  const references = el(
-    doc,
-    "p",
-    "swd-formula-references",
-    code(propertyReference(sample)),
-    ` this item's ${sample.label} · `,
-    code(`[${sample.key}]`),
-    ` every item's, for SUM, COUNT, AVERAGE…`,
+    list,
+    el(doc, "p", { class: "swd-formula-panel-foot", text: "A property: this item's value · Σ: every item's, for SUM, COUNT, AVERAGE…" }),
   );
   const shownAs = el(
     doc,
@@ -194,9 +249,7 @@ export function formulaDetails(details: FormulaDetails): HTMLElement[] {
   const fieldRow = (name: string, control: HTMLElement, hint?: string, cls = "") =>
     el(doc, "div", `swd-prop-field ${cls}`.trim(), el(doc, "span", "swd-prop-field-name", name, ...(hint ? [el(doc, "span", { class: `${BASE}-hint`, text: hint })] : [])), control);
   return [
-    fieldRow("Formula", el(doc, "div", "swd-formula-box", field, buttons, references), undefined, "swd-prop-formula"),
-    // (A preview: the result for one item as the formula is typed, nothing of it kept)
-    fieldRow("Preview", el(doc, "div", "swd-formula-result-row", el(doc, "div", "swd-suggest-field swd-formula-result-item-box", which, picker), el(doc, "span", { class: "swd-formula-result-arrow", text: "→", attrs: { "aria-hidden": "true" } }), result), "The result for one item, as you type; nothing is saved", "swd-prop-formula-result"),
+    fieldRow("Formula", el(doc, "div", "swd-formula-box", field, panel), undefined, "swd-prop-formula"),
     fieldRow("Show as", shownAs, SHOWN_AS[typeof params.resultType === "string" ? params.resultType : ""] ?? "", "swd-prop-formula-shown-as"),
   ];
 }

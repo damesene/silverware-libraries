@@ -332,11 +332,36 @@ describe("the properties' dialog", () => {
     expect(document.activeElement).toBe(field());
     // (An example of the database's own properties while it is empty)
     expect(field().placeholder).toBe("=UPPER([@name])");
-    expect([...document.querySelectorAll(".swd-formula-property")].map((one) => one.textContent)).toEqual(["Name", "Status", "Estimate"]);
-    field().value = "=";
-    field().setSelectionRange(1, 1);
-    [...document.querySelectorAll<HTMLButtonElement>(".swd-formula-property")].find((one) => one.textContent === "Estimate")!.click();
+    const names = () => [...document.querySelectorAll<HTMLElement>(".swd-formula-property-row:not([hidden]) .swd-formula-property-name")].map((one) => one.textContent);
+    expect(names()).toEqual(["Name", "Status", "Estimate"]);
+    const row = (name: string) => [...document.querySelectorAll<HTMLElement>(".swd-formula-property-row")].find((one) => one.querySelector(".swd-formula-property-name")!.textContent === name)!;
+    // (Each with its value for the item the preview is for: the first)
+    await vi.waitFor(() => expect(row("Estimate").querySelector(".swd-formula-property-value")!.textContent).toBe("3"), { timeout: 5_000 });
+    // A name typed: the properties it starts alone; a press puts the one pressed in its place, for this item
+    field().value = "=Est";
+    field().setSelectionRange(4, 4);
+    field().dispatchEvent(new Event("input"));
+    expect(names()).toEqual(["Estimate"]);
+    row("Estimate").querySelector<HTMLButtonElement>(".swd-formula-property")!.click();
     expect(field().value).toBe("=[@estimate]");
+    expect(names()).toEqual(["Name", "Status", "Estimate"]);
+    // Σ: every item's, for SUM and the like
+    field().value = "=COUNTA(";
+    field().setSelectionRange(8, 8);
+    row("Status").querySelector<HTMLButtonElement>(".swd-formula-property-all")!.click();
+    expect(field().value).toBe("=COUNTA([status]");
+    // (Text selected: what a press replaces, whatever name is before it)
+    field().value = "=Est+1";
+    field().setSelectionRange(4, 6);
+    row("Estimate").querySelector<HTMLButtonElement>(".swd-formula-property")!.click();
+    expect(field().value).toBe("=Est[@estimate]");
+    // (A reference opened: replaced whole)
+    field().value = "=[es";
+    field().setSelectionRange(4, 4);
+    field().dispatchEvent(new Event("input"));
+    expect(names()).toEqual(["Estimate"]);
+    row("Estimate").querySelector<HTMLButtonElement>(".swd-formula-property-all")!.click();
+    expect(field().value).toBe("=[estimate]");
     field().value = '=[@estimate]&"!"';
     field().dispatchEvent(new Event("input"));
     // (Calculated after a pause in typing, for the first item)
@@ -368,7 +393,7 @@ describe("the properties' dialog", () => {
     change(q<HTMLInputElement>(".swd-property-new-label"), "Total");
     q<HTMLSelectElement>(".swd-property-new-type").value = "formula";
     q<HTMLButtonElement>(".swd-property-add").click();
-    expect([...document.querySelectorAll(".swd-formula-property")].map((one) => one.textContent)).toEqual(["Name", "Status", "Estimate"]);
+    expect([...document.querySelectorAll(".swd-formula-property-name")].map((one) => one.textContent)).toEqual(["Name", "Status", "Estimate"]);
   });
 
   it("makes a property turned into a formula read only and not required, and one turned back no longer read only, as Save writes them", async () => {

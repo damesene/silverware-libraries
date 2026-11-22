@@ -173,14 +173,14 @@ describe("the formula type", () => {
     expect(auto.parse("7", {})).toEqual({ problem: "a formula's values are calculated" });
   });
 
-  it("is its result's type in all but its name, read only: shown, sorted and grouped as it, no editor nor settings", () => {
+  it("is its result's type in all but its name, read only: shown, sorted and grouped as it, its editor kept (what the views know it by), no settings", () => {
     const asNumber = typeFor({ formula: "=1", resultType: "number" });
     expect([asNumber.name, asNumber.label, asNumber.validate(2.5, {}), asNumber.validate("x", {})]).toEqual(["formula", "Formula", undefined, "no number"]);
     expect(asNumber.parse("3", {})).toEqual({ problem: "a formula's values are calculated" });
     const asDate = typeFor({ formula: "=TODAY()", resultType: "date" });
-    expect([asDate.validate("2026-11-22", {}), asDate.editor, asDate.groupValue === type("date").groupValue]).toEqual([undefined, undefined, true]);
+    expect([asDate.validate("2026-11-22", {}), asDate.editor, asDate.groupValue === type("date").groupValue]).toEqual([undefined, "date", true]);
     const asCheckbox = typeFor({ formula: "=TRUE", resultType: "checkbox" });
-    expect([asCheckbox.look, asCheckbox.editor, asCheckbox.settings]).toEqual(["check", undefined, undefined]);
+    expect([asCheckbox.look, asCheckbox.editor, asCheckbox.settings]).toEqual(["check", "toggle", undefined]);
     // (The same object for the same result's type: the registry is asked often)
     expect(typeFor({ formula: "=2", resultType: "number" })).toBe(asNumber);
   });

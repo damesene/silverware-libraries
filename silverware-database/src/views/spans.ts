@@ -11,6 +11,7 @@ import type { PlaceMenuBuilder, PlaceMenuGroup } from "../core/placemenu.ts";
 import type { ViewHost } from "../core/view.ts";
 import { addDays, type Day } from "../domain/calendar.ts";
 import { readMoment } from "../domain/types/moment.ts";
+import { calculated } from "../domain/calculated.ts";
 import type { Item, Property, Value } from "../model/database.ts";
 
 /** What an item lasts as read: its first and last day (the same for a day alone), its start's time, why its end was not taken */
@@ -120,12 +121,15 @@ export function startEndSpans(host: Pick<ViewHost, "type">, start: Property, end
  * The properties whose values are days: a type edited as a date or a date and
  * time (a system one's too: Created, Modified) that keeps a day as one (its
  * `parse` of a day reads back as it: a type of the user's keeping another form
- * would be placed nowhere, and written where it could not be read back)
+ * would be placed nowhere, and written where it could not be read back); a
+ * formula's of a date's result too, never written
  */
 export function dayProperties(host: Pick<ViewHost, "database" | "type">): Property[] {
   return host.database.properties.filter((property) => {
     const type = host.type(property);
     if (type.editor !== "date" && type.editor !== "datetime-local") return false;
+    // (A formula's dates are never written: placed as read, its type's parse refusing every value)
+    if (calculated(property) && property.system === undefined) return true;
     const made = type.parse("2026-01-31", property.params);
     return "value" in made && typeof made.value === "string" && readMoment(made.value)?.day === "2026-01-31";
   });

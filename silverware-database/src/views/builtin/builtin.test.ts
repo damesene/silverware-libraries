@@ -63,6 +63,41 @@ const choose = (label: string) => {
   item.click();
 };
 
+describe("a formula's values in the views", () => {
+  // (A formula shown as a number, a checkbox, a date: sorted, grouped and placed as that type)
+  const FORMULAS: Database = {
+    ...TASKS,
+    properties: [
+      ...TASKS.properties,
+      { key: "double", label: "Double", type: "formula", params: { formula: "=[@estimate]*2", resultType: "number" }, readonly: true },
+      { key: "big", label: "Big", type: "formula", params: { formula: "=IFERROR([@estimate] > 2, FALSE)", resultType: "checkbox" }, readonly: true },
+      { key: "today", label: "Today", type: "formula", params: { formula: "=TODAY()", resultType: "date" }, readonly: true },
+    ],
+  };
+
+  it("are sorted as their result's type: a number as a number", async () => {
+    const { all } = await setup("table", { "table.sort": [{ key: "double", direction: "desc" }] }, FORMULAS);
+    // (6 before 0: as numbers; "a lot" * 2 an error)
+    const names = all("tbody tr").map((tr) => tr.querySelector('td[data-key="name"]')!.textContent);
+    expect(names.indexOf("Fix login")).toBeLessThan(names.indexOf("Plan"));
+  });
+
+  it("are grouped as their result's type: a checkbox's Checked and Unchecked, a card not moved by hand", async () => {
+    const { all, named } = await setup("board", { "board.groupBy": "big" }, FORMULAS);
+    expect(all(".swd-board-column").map((one) => one.getAttribute("aria-label"))).toEqual(["Checked", "Unchecked"]);
+    // (A text is greater than any number, as in a spreadsheet: "a lot" > 2)
+    expect(all('.swd-board-column[aria-label="Checked"] .swd-board-name').map((one) => one.textContent)).toEqual(["Fix login", "Write docs"]);
+    expect(all('.swd-board-column[aria-label="Unchecked"] .swd-board-name').map((one) => one.textContent)).toEqual(["Plan"]);
+    expect((await named("Fix login")).values.big).toBeUndefined();
+  });
+
+  it("are placed in a calendar as their result's dates, never moved there", async () => {
+    const { all } = await setup("calendar", { "calendar.dateBy": "today" }, FORMULAS);
+    expect(new Set(all(".swd-cal-item").map((one) => one.textContent))).toEqual(new Set(["Fix login", "Write docs", "Plan"]));
+    expect(all(".swd-cal-item.swd-cal-movable, .swd-cal-item[draggable='true']")).toEqual([]);
+  });
+});
+
 describe("the table", () => {
   it("shows a formula's values read only, its ƒ in its header with its formula over it, an error's cell its code with why", async () => {
     const database: Database = { ...TASKS, properties: [...TASKS.properties, { key: "half", label: "Half", type: "formula", params: { formula: "=[@estimate]/2" }, readonly: true }] };

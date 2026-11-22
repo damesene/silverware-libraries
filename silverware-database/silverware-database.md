@@ -122,6 +122,19 @@ Select a list of tasks and run **Silverware Database: Convert selection to datab
 * Removing items asks first, and a change can be undone (where a view offers Undo): what is still as it was written is put back. Where the items removed alone named files uploaded for the database (no other item names them), you are asked whether those go too, each named; Undo of the removal does not bring a file back, and taking a file out of a value never deletes it.
 * A value that does not read as its property's type is kept as written and shown as invalid, never emptied; a property removed from a database keeps its values in the pages.
 
+## Reading a database from Space Lua
+
+`silverware.database.items(id)` gives a database's items, in their order by hand, for a script or a `${…}` of a page: each has its values by their properties' keys (a formula's calculated, as the views show it; an error's as its code, `#DIV/0!`), its `name` and its page (`ref`); `nil` where there is no database of that id, or not yet (as the space is being indexed), so a script reads it as no items.
+
+```lua
+-- How many items are done, and the total of a formula property (an error's code is no number: left out)
+local done, total = 0, 0
+for _, item in ipairs(silverware.database.items("tasks") or {}) do
+  if item.status == "Done" then done = done + 1 end
+  if type(item.total) == "number" then total = total + item.total end
+end
+```
+
 ## Your own views and types
 
 Views and property types of your own are JS modules of your space, given to Silverware Database in a `space-lua` block on a page under `Library/` (any page in SilverBullet 2.12 and before):

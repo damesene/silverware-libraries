@@ -1,5 +1,10 @@
 # Silverware Table: changelog
 
+## 2.0.1 (2026-11-22)
+
+- **Changed:** a custom function reading every argument whole declares it as `argument: "range"`; the helper `ALL_RANGES` of the first 2.0.0 is gone (write `"range"` in its place). A function by its arguments' place, `argument: (at) => …`, is as it was.
+- Fixed: cells held by Lazy saving are no longer lost from the page when you come back to it before they were written.
+
 ## 2.0.0 (2026-11-22)
 
 - **Breaking:** a custom function that reads a range (a sum or a lookup of your own) has to say so: `argument: "range"`, or by the argument's place, `argument: (at) => (at === 0 ? "range" : "value")`. Without it, a function given a range is now called once for each of its values, as a built-in one is. Add `argument` to such functions in the files you load with `silverware.table.defineFunctions`.

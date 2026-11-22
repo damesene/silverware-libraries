@@ -121,3 +121,22 @@ test("a select whose options are a formula's: its list picked from in a cell, th
   expect(await space.saved("Page/db-tasks")).not.toMatch(/next: \{[^}]*options:/);
 });
 
+
+test("a date picked in the item's panel is written at once, a formula reading it shown anew, no press elsewhere needed", async ({ page, space }) => {
+  const rootPage = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    due: { type: date, label: Due }\n    when: { type: formula, label: When, formula: \"=IF([@due] < TODAY(), \\\"past\\\", \\\"ahead\\\")\" }\n---\n";
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", "Page/db-tasks": rootPage, "Page/db-tasks/Fix login": "---\ntags: [db]\ndue: 2020-01-01\n_database:\n  rank: a0\n---\n" }, "Page");
+  const row = page.locator(".swd-table tbody tr", { hasText: "Fix login" });
+  await row.hover();
+  await row.locator(".swd-open").click();
+  const when = page.locator('.swd-peek-value[data-key="when"]');
+  await expect(when).toHaveText("past");
+  await page.locator('.swd-peek-value[data-key="due"]').click();
+  // (As the browser's picker sets a day: its value and a change, no key pressed, the field still focused)
+  await page.locator('.swd-peek-value[data-key="due"] input').evaluate((input: HTMLInputElement) => {
+    input.value = "2099-01-01";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("2099-01-01");
+  await expect(when).toHaveText("ahead");
+});

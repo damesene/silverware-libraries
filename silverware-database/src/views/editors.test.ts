@@ -98,6 +98,35 @@ describe("the built-in views' editors", () => {
     ]);
   });
 
+  it("write a date or a time picked in the browser's picker at once, one typed only by Enter or as the field is left", async () => {
+    const { cell, writes, edit } = setup();
+    // (Picked: a change no key came before)
+    edit("due");
+    const day = cell.querySelector("input")!;
+    day.value = "2026-11-12";
+    day.dispatchEvent(new Event("change"));
+    await Promise.resolve();
+    expect(writes).toEqual([["update", "Fix login", "due", "2026-11-12"]]);
+    // (Left after: written once)
+    day.dispatchEvent(new Event("blur"));
+    await Promise.resolve();
+    expect(writes).toHaveLength(1);
+    // (Typed: its change waits for Enter)
+    edit("at");
+    const time = cell.querySelector("input")!;
+    key(time, "1");
+    time.value = "14:30";
+    time.dispatchEvent(new Event("change"));
+    await Promise.resolve();
+    expect(writes).toHaveLength(1);
+    key(time, "Enter");
+    await Promise.resolve();
+    expect(writes).toEqual([
+      ["update", "Fix login", "due", "2026-11-12"],
+      ["update", "Fix login", "at", "14:30"],
+    ]);
+  });
+
   it("edit a date with a time in the date field, its time kept; a day alone in the date and time field from midnight, written only if changed", async () => {
     const { cell, writes, edit } = setup();
     edit("due", { ...ITEM, values: { due: "2026-11-08T14:30" } });

@@ -388,12 +388,16 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
   };
   input.addEventListener("input", () => input.setCustomValidity(""));
   input.addEventListener("blur", () => commit(true));
+  // A date or a time picked in the browser's own picker is written at once, as a select's option picked is: a change no key
+  // came before (one typed, a part at a time, is written by Enter or as the field is left, never half typed)
+  let byKeys = false;
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
       commit(false);
-    }
+    } else if (event.key !== "Tab" && event.key !== "Escape") byKeys = true;
   });
+  if (input.type !== "text") input.addEventListener("change", () => byKeys || commit(false));
   escape(input);
   cell.replaceChildren(input);
   editing.set(cell, input);

@@ -344,7 +344,7 @@ function alike(a: unknown, b: unknown): boolean {
 type Surface = { readonly name: string; readonly target: Locator; readonly shadow: boolean };
 
 /** A surface read: its look, and its blocks' crops (the pointer away first: no handle, grip or "…" over them) */
-async function read(page: Page, surface: Surface): Promise<{ look: Look; crops: Readonly<Record<string, Buffer>> }> {
+async function read(page: Page, surface: Surface): Promise<{ look: Look; crops: Readonly<Record<string, Buffer>>; headings: Record<string, unknown> }> {
   await page.mouse.move(1, 1);
   // (Its files drawn by Silverware Assets, as it does a moment after the text: a preview, a card, a link's icon)
   for (const selector of ['[data-swa-view="preview"]', ".swa-card", ".swa-link-icon"]) await expect(surface.target.locator(selector).first()).toBeVisible();
@@ -361,12 +361,36 @@ async function read(page: Page, surface: Surface): Promise<{ look: Look; crops: 
     look = again;
     expect(same).toBe(true);
   }).toPass({ timeout: 10_000 });
+  const headings = await surface.target.evaluate(headingsDrawn, surface.shadow);
   const crops: Record<string, Buffer> = {};
   for (const [block, [first, last]] of Object.entries(BLOCKS)) {
     const clip = await surface.target.evaluate(blockClip, [surface.shadow, first, last] as const);
     crops[block] = await page.screenshot({ clip, caret: "hide", animations: "disabled" });
   }
-  return { look, crops };
+  return { look, crops, headings };
+}
+
+/**
+ * How a surface draws its headings: each level's line's font size, line height, room above and under and height, its
+ * parent's font size, the variables a grid's cell takes of the page's look and the zoom on the root (a diagnostic,
+ * told where a heading's place differs from the page's: what differed in a run seen in CI alone)
+ */
+function headingsDrawn(element: HTMLElement, shadow: boolean): Record<string, unknown> {
+  const scope: ParentNode = shadow ? element.shadowRoot! : element;
+  const walker = document.createTreeWalker(scope as Node, NodeFilter.SHOW_TEXT);
+  const lineOf = (word: string): Element | undefined => {
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) if (node.textContent?.trim() === word) return node.parentElement?.closest("h1, h2, h3, .cm-line") ?? undefined;
+    return undefined;
+  };
+  const read = (line: Element | undefined) => {
+    if (!line) return "not drawn";
+    const s = getComputedStyle(line);
+    return { font: s.fontSize, line: s.lineHeight, above: s.paddingTop, under: s.paddingBottom, marginAbove: s.marginTop, marginUnder: s.marginBottom, height: Math.round(line.getBoundingClientRect().height * 10) / 10, parentFont: line.parentElement ? getComputedStyle(line.parentElement).fontSize : "" };
+  };
+  const levels = { h1: read(lineOf("First level")), h2: read(lineOf("Second level")), h3: read(lineOf("Third level")) };
+  const grid = element.closest(".swl-grid") as HTMLElement | null;
+  const variables = grid ? Object.fromEntries(["--swl-h1-size", "--swl-h1-above", "--swl-h1-under", "--swl-h2-size", "--swl-h2-above", "--swl-h2-under"].map((name) => [name, grid.style.getPropertyValue(name)])) : {};
+  return { ...levels, variables, zoom: document.documentElement.getAttribute("data-swl-font-size"), rootFont: document.documentElement.style.getPropertyValue("--swl-font-size") };
 }
 
 test("one markdown on the page, in a grid's cell, the cell edited and a database's peek, read and edited: drawn alike", async ({ page, space }) => {
@@ -408,7 +432,7 @@ async function compareSurfaces(page: Page, space: Space): Promise<void> {
     "Plain",
     { "pic.svg": PICTURE },
   );
-  const surfaces: { name: string; look: Look; crops: Readonly<Record<string, Buffer>> }[] = [];
+  const surfaces: { name: string; look: Look; crops: Readonly<Record<string, Buffer>>; headings: Record<string, unknown> }[] = [];
   const take = async (surface: Surface) => surfaces.push({ name: surface.name, ...(await read(page, surface)) });
 
   // The page, its caret on the last line (no block's marks shown)
@@ -470,7 +494,15 @@ async function compareSurfaces(page: Page, space: Space): Promise<void> {
       // (A place is no part of a look: entries of a part do not hold it)
       const known = knownOf(surface.name, key).filter((entry) => !entry.parts);
       if (known.length) tell(differs ? "known difference" : "known difference not shown", surface.name, key, `${value} px, the page ${onPage} px (${known.map((entry) => entry.why).join("; ")})`);
-      else expect.soft(Math.abs(value - onPage), `${surface.name}: where "${key}" starts (${value} px, the page ${onPage} px)`).toBeLessThanOrEqual(within);
+      else {
+        // (A heading's place differing: how the page and the surface drew their headings, in the run's log and report)
+        if (differs && key.includes("level")) {
+          const told = JSON.stringify({ page: reference!.headings, [surface.name]: surface.headings });
+          console.log(`Headings drawn (${key}): ${told}`);
+          test.info().annotations.push({ type: "headings drawn", description: told });
+        }
+        expect.soft(Math.abs(value - onPage), `${surface.name}: where "${key}" starts (${value} px, the page ${onPage} px)`).toBeLessThanOrEqual(within);
+      }
     }
     for (const [key, value] of Object.entries(surface.look.looks)) {
       const onPage = reference!.look.looks[key];

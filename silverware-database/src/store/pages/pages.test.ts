@@ -289,6 +289,28 @@ describe("the pages store", () => {
     expect(memory.pages.get("db-tasks/A")).toContain("Body A edited by hand");
   });
 
+  it("reads a database once for those asking while nothing changed, anew as the index tells a change or a write is made", async () => {
+    const { memory, store } = harness(SEED);
+    const objects = memory.platform.index.objects;
+    let queries = 0;
+    memory.platform.index.objects = (tag) => {
+      queries++;
+      return objects(tag);
+    };
+    const [item] = (await Promise.all([store.items("tasks"), store.database("tasks"), store.items("tasks")]))[0].value;
+    await store.items("tasks");
+    // (One reading: its roots and its items queried once, for four asking)
+    const once = queries;
+    expect(once).toBe(2);
+    // (A change told by the index: read anew)
+    memory.writeOutside("db-tasks/Fix login", (memory.pages.get("db-tasks/Fix login") ?? "").replace("Todo", "Done"));
+    expect((await store.items("tasks")).value[0]!.values.status).toBe("Done");
+    expect(queries).toBeGreaterThan(once);
+    // (A write of its own: read anew, its write shown)
+    await store.apply(await store.plan(changes("tasks", { kind: "setValue", item: item!.key, key: "status", value: "Todo" })));
+    expect((await store.items("tasks")).value[0]!.values.status).toBe("Todo");
+  });
+
   it("keeps a renamed item's key for whoever reads while the rename is written (a listener told by the index meanwhile)", async () => {
     const { memory, store } = harness(SEED);
     const [item] = (await store.items("tasks")).value;

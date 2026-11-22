@@ -5,6 +5,7 @@ import { readTextWidth, readWidth, type Width, type WidthUnit } from "./width.ts
 /** Where each setting is in SilverBullet's configuration */
 export const PATHS = {
   textWidth: "silverware.layout.textWidth",
+  textAlign: "silverware.layout.textAlign",
   minPaneWidth: "silverware.layout.minPaneWidth",
   guides: "silverware.layout.guides",
   alignments: "silverware.layout.alignments",
@@ -44,9 +45,23 @@ export const ALIGN_NAMES: Readonly<Record<Align, string>> = { left: "Left", cent
 /** An alignment as kept: left, center or right; anything else none */
 export const readAlign = (value: unknown): Align | undefined => (ALIGNS.includes(value as Align) ? (value as Align) : undefined);
 
+/**
+ * Where the page's text stands in its pane (docs/silverware-layout-text-align.md): centred (the host's own), at the
+ * left, or centred and at the left while a side panel is open (a panel lying over the page's right, marked so:
+ * shared/sidepanel.ts)
+ */
+export type TextAlign = "center" | "left" | "left-with-panel";
+export const TEXT_ALIGNS: readonly TextAlign[] = ["center", "left", "left-with-panel"];
+export const TEXT_ALIGN_NAMES: Readonly<Record<TextAlign, string>> = { center: "Centred", left: "Left", "left-with-panel": "Left while a panel is open" };
+
+/** The text's alignment as kept (a page's `_layout.align`, the setting); anything else none */
+export const readTextAlign = (value: unknown): TextAlign | undefined => (TEXT_ALIGNS.includes(value as TextAlign) ? (value as TextAlign) : undefined);
+
 export type Settings = {
   // The text's width on a page without its own; none: the theme's
   readonly textWidth: Width | undefined;
+  // Where the text of a page without its own stands; none: centred
+  readonly textAlign: TextAlign | undefined;
   // Narrower than this (px), the pane gets no layout of Silverware Layout's
   readonly minPaneWidth: number;
   readonly guides: readonly Guide[];
@@ -111,6 +126,7 @@ export function readSettings(get: (path: string) => unknown): Settings {
   const pane = get(PATHS.minPaneWidth);
   return {
     textWidth: readTextWidth(get(PATHS.textWidth)),
+    textAlign: readTextAlign(get(PATHS.textAlign)),
     minPaneWidth: typeof pane === "number" && Number.isFinite(pane) && pane >= 0 ? pane : DEFAULT_MIN_PANE_WIDTH,
     guides: readGuides(get(PATHS.guides)) ?? DEFAULT_GUIDES,
     fontSize: readFontSize(get(PATHS.fontSize)),

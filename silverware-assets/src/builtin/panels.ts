@@ -9,6 +9,9 @@ import { el } from "../../../shared/elements.ts";
 import { sheetRect } from "../../../shared/sheetarea.ts";
 
 const OVER_WINDOW = "data-silverware-over-window";
+// A panel at the window's right, over the page: Silverware Layout may move the page's text to the left while one is open
+// (shared/sidepanel.ts' attribute, named here as the over-window one is: this part imports the contract alone)
+const SIDE_PANEL = "data-silverware-side-panel";
 
 // What a panel shows: an asset drawn larger than its card (a card alone is no more than the card in the page)
 const shows = (_asset: Asset, can: Capabilities) => can.views.includes("full") || can.views.includes("preview");
@@ -152,6 +155,7 @@ export const sidePanel: AssetAction = {
       const body = el(document, "div", { class: "swa-panel-body" });
       const root = el(document, "aside", { class: "swa-side-panel", attrs: { role: "dialog", "aria-label": assetName(context.asset) } }, head(context, close, true), body);
       root.prepend(resizer(root));
+      root.setAttribute(SIDE_PANEL, "");
       // (Over the area the host gives, its editor's: under its top bar and a toolbar docked at the editor's edge)
       const place = () => placeIn(root, context);
       place();

@@ -19,4 +19,10 @@ export type PageHost = {
   showTextWidth(width: Width | undefined): void;
   /** The text's width the host gives (px), Silverware Layout's own set aside */
   themeTextWidth(): number;
+  /**
+   * Optional: the host's own elements placed by the text as it centres it (a title over the page, notifications), each
+   * handed to `found` as it is there (now, and as one comes later), so they move with the text where it stands at the
+   * left (docs/silverware-layout-text-align.md); the function given back stops it. None: only the text moves
+   */
+  watchAlongText?(found: (element: HTMLElement) => void): () => void;
 };

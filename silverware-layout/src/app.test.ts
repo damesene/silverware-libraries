@@ -5,10 +5,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { LayoutApp, type LayoutStore } from "./app.ts";
 import { Registry } from "./core/registry.ts";
 import type { PageHost } from "./host/page.ts";
-import { DEFAULT_GUIDES, type Settings } from "./model/settings.ts";
+import { DEFAULT_GUIDES, type Settings, type TextAlign } from "./model/settings.ts";
+import { markSidePanel } from "../../shared/sidepanel.ts";
 import { type Width } from "./model/width.ts";
 
-const SETTINGS: Settings = { textWidth: undefined, minPaneWidth: 600, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true, fontPinch: false, fontScaleFiles: false, alignments: {} };
+const SETTINGS: Settings = { textWidth: undefined, textAlign: undefined, minPaneWidth: 600, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true, fontPinch: false, fontScaleFiles: false, alignments: {} };
 
 /** A page of plain elements: its pane 1200 px wide (jsdom lays nothing out), its text width kept as shown */
 function plainPage(paneWidth = 1200) {
@@ -29,7 +30,7 @@ function plainPage(paneWidth = 1200) {
 }
 
 /** A store of memory: the pages' own widths by name, the settings and this device's zoom as saved */
-function memoryStore(pages: Record<string, Width | undefined>, settings: Partial<Settings> = {}) {
+function memoryStore(pages: Record<string, Width | undefined>, settings: Partial<Settings> = {}, aligns: Record<string, TextAlign | undefined> = {}) {
   const store = {
     open: Object.keys(pages)[0]!,
     settings: { ...SETTINGS, ...settings },
@@ -41,13 +42,15 @@ function memoryStore(pages: Record<string, Width | undefined>, settings: Partial
   const api: LayoutStore = {
     canSaveSettings: true,
     readSettings: async () => store.settings,
-    readPage: async () => ({ page: store.open, width: pages[store.open] }),
-    savePageWidth: async (page, width) => {
+    readPage: async () => ({ page: store.open, width: pages[store.open], align: aligns[store.open] }),
+    savePageLayout: async (page, { width, align }) => {
       pages[page] = width;
+      aligns[page] = align;
       store.saved.push(`page ${page}`);
       return undefined;
     },
     saveTextWidth: async (width) => void store.saved.push(`textWidth ${width?.amount}`),
+    saveTextAlign: async (align) => void store.saved.push(`textAlign ${align}`),
     saveGuides: async (guides) => void store.saved.push(`guides ${guides.join(" ")}`),
     saveAlignments: async (alignments) => void store.saved.push(`alignments ${JSON.stringify(alignments)}`),
     saveFont: async (font) => void store.saved.push(`font ${font.fontSize} ${font.fontZoom}`),
@@ -87,9 +90,49 @@ describe("Silverware Layout's app over a page of no host's", () => {
     await small.start(memoryStore({ Wide: { amount: 1100, unit: "px" } }).api);
     expect(narrow.shown.at(-1)).toBeUndefined();
     expect(document.documentElement.hasAttribute("data-swl-narrow")).toBe(true);
-    // The Page width tab says the widths show on a wider screen
+    // The Page tab says the widths show on a wider screen
     await small.openDialog();
     expect(document.querySelector(".swl-dialog-notice")!.textContent).toBe("Widths apply on screens wider than 600 px. On this one, the text fills the screen.");
+  });
+
+  it("places the text: the page's own alignment, else the default; left while a panel is open follows one, the others do not", async () => {
+    const { page } = plainPage();
+    const { api, store } = memoryStore({ Follows: undefined, Left: undefined, Centred: undefined }, { textAlign: "left-with-panel" }, { Left: "left", Centred: "center" });
+    const app = new LayoutApp(document, page, new Registry(() => undefined));
+    await app.start(api);
+    const root = document.documentElement;
+    const aligned = () => root.getAttribute("data-swl-text-align");
+    // (Left while a panel is open, the default: centred by a margin of ours, to move from)
+    expect(aligned()).toBe("center");
+    expect(root.style.getPropertyValue("--swl-text-shift")).toBe("0px");
+    const panel = document.createElement("aside");
+    markSidePanel(panel, true);
+    document.body.append(panel);
+    await vi.waitFor(() => expect(aligned()).toBe("left"));
+    // A page of its own at the left, or centred: as it says, the panel open or not
+    store.open = "Left";
+    app.pageLoaded("Left", undefined, "left");
+    expect(aligned()).toBe("left");
+    store.open = "Centred";
+    app.pageLoaded("Centred", undefined, "center");
+    expect(aligned()).toBeNull();
+    // Back on the page following the default, the panel closed: centred again
+    store.open = "Follows";
+    app.pageLoaded("Follows", undefined, undefined);
+    expect(aligned()).toBe("left");
+    panel.remove();
+    await vi.waitFor(() => expect(aligned()).toBe("center"));
+  });
+
+  it("the host's elements placed by the text marked to move with it", async () => {
+    const { page } = plainPage();
+    const title = document.createElement("div");
+    document.body.append(title);
+    const withTitle: PageHost = { ...page, watchAlongText: (found) => (found(title), () => undefined) };
+    const app = new LayoutApp(document, withTitle, new Registry(() => undefined));
+    await app.start(memoryStore({ Page: undefined }, { textAlign: "left" }).api);
+    expect(title.hasAttribute("data-swl-along-text")).toBe(true);
+    expect(document.documentElement.getAttribute("data-swl-text-align")).toBe("left");
   });
 
   it("a page read later than another was opened is dropped: the page opened last is shown", async () => {

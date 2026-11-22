@@ -3,7 +3,7 @@
 // once).
 import type { LayoutAlign } from "../../shared/layout.ts";
 import type { Registry } from "./core/registry.ts";
-import { paneWidth, textWidthOf } from "./host/marks.ts";
+import { paneWidth, textAtLeft, textWidthOf } from "./host/marks.ts";
 import type { PageHost } from "./host/page.ts";
 import { type Widget, Widgets } from "./host/widgets.ts";
 import type { Guide } from "./model/settings.ts";
@@ -45,6 +45,7 @@ export function layOutWidgets(doc: Document, page: PageHost, registry: Registry,
     guideLayer: () => page.guideLayer(),
     seen: (widget) => widgets.seen(widget),
     enabled: options.enabled,
+    textAtLeft: () => textAtLeft(doc, page),
     anchor: (widget) => widgets.anchor(widget),
     resizable: (widget) => widgets.resizable(widget),
     unsized: (widget) => widget.provider.unsized ?? "text",

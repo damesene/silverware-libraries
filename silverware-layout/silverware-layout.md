@@ -2,7 +2,7 @@
 name: Library/damesene/silverware-layout
 tags: meta/library
 version: 2.0.4
-description: "Silverware Layout: Columns in a page (/grid), the width of a page's text (its own or a default for every page) and of its tables, databases, charts and grids, wider or narrower than the text by a handle beside them that snaps to guides of your own, and placed at the left, in the middle or at the right; the editor's font size, and font zoom with Ctrl + scroll or a pinch, files zooming with the text."
+description: "Silverware Layout: Columns in a page (/grid), the width of a page's text and where it stands, centred, at the left or at the left while a side panel is open (its own or a default for every page) and of its tables, databases, charts and grids, wider or narrower than the text by a handle beside them that snaps to guides of your own, and placed at the left, in the middle or at the right; the editor's font size, and font zoom with Ctrl + scroll or a pinch, files zooming with the text."
 files:
 - silverware-layout.js
 - silverware-layout-init.md
@@ -15,7 +15,7 @@ The layout of your pages: columns side by side, how wide a page's text is, how w
 
 ## Page width
 
-Run **Silverware Layout: Settings** from the command palette. Its **Page width** tab has two rows:
+Run **Silverware Layout: Settings** from the command palette. Its **Page** tab has the text's **Width** in two rows:
 
 - **All pages**: the width of every page without its own.
 - **This page**: the width of this page alone.
@@ -32,6 +32,24 @@ _layout:
 ```
 
 or `width: "90%"`. You can type it there too: the page follows as you type. Taking the width away (**↺** in the dialog) takes `_layout` away with it, where it holds nothing else.
+
+## Where the text stands
+
+The **Page** tab's **Alignment**, again for **All pages** and **This page**, puts the page's text:
+
+- **Centred**: in the middle of the editor, as SilverBullet has it (the default).
+- **Left**: at the editor's left edge.
+- **Left while a panel is open**: in the middle, and at the left while a file is open in a side panel ([Silverware Assets](https://github.com/damesene/silverware-libraries/blob/main/silverware-assets/silverware-assets.md)) or an item of a [Silverware Database](https://github.com/damesene/silverware-libraries/blob/main/silverware-database/silverware-database.md) is open beside the page, so the text is not under the panel. It moves back to the middle as the panel closes.
+
+Only **Left while a panel is open** follows a panel; with the others, a panel opened changes nothing. The text keeps its width, and the panel still lies over the page as before. The page's title moves with the text, and so do the notifications. A table, a database, a chart or a grid wider than the text grows from the text's left edge to the right while the text is at the left, whether it is set to stand at the left, in the middle or at the right; back in the middle, it is centred again (nothing is saved). This page's first choice, *Same as all pages*, says which alignment that is. A page's own alignment is kept beside its width:
+
+```yaml
+_layout:
+  width: 1100
+  align: left
+```
+
+(`center`, `left` or `left-with-panel`). On a phone, as for the width, the text fills the screen.
 
 ## A widget's width
 
@@ -140,6 +158,7 @@ In the Configuration Manager (Configuration: Open), under Silverware Layout, or 
 
 ```lua
 config.set("silverware.layout.textWidth", "1100px")
+config.set("silverware.layout.textAlign", "left-with-panel")
 config.set("silverware.layout.minPaneWidth", 600)
 config.set("silverware.layout.guides", { "900px", "1200px", "full" })
 config.set("silverware.layout.fontSize", "18px")
@@ -147,6 +166,7 @@ config.set("silverware.layout.fontZoom.enabled", true)
 ```
 
 - `textWidth`: the default text width, in px or % (empty: your theme's).
+- `textAlign`: where the text of a page without its own alignment stands: `center` (the default), `left` or `left-with-panel` (see *Where the text stands*).
 - `minPaneWidth`: where the editor is narrower than this (px), as on a phone, Silverware Layout sets no width: the text is as wide as the screen. Wider again (a phone turned), the widths come back.
 - `guides`: the guides (see above), each a width in px (`"1200px"`), in % of the editor's width (`"80%"`), or `full` for the editor's whole width.
 - `fontSize`: the editor's font size on every page, in px (empty: your theme's).

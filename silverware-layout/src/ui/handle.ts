@@ -17,7 +17,7 @@ import { type PopupMenu, showPopup } from "../../../shared/popupmenu.ts";
 import { COMPANION_ATTRIBUTE } from "../../../shared/editor.ts";
 import { composedTarget, deepElementFromPoint, inShadow } from "../../../shared/shadow.ts";
 import { ALIGN_NAMES, ALIGNS, type Guide } from "../model/settings.ts";
-import { draggedRoomWidth, draggedWidth, type LayoutAnchor, MIN_ROOM_WIDTH, MIN_WIDGET_WIDTH, PANE_GUTTER, roomTargets, type SnapTarget, snapped, snapTargets, type WidgetWidth, widestWidth, widthName } from "../core/widgetwidth.ts";
+import { draggedAtLeft, draggedRoomWidth, draggedWidth, type LayoutAnchor, MIN_ROOM_WIDTH, MIN_WIDGET_WIDTH, PANE_GUTTER, roomTargets, type SnapTarget, snapped, snapTargets, type WidgetWidth, widestAtLeft, widestWidth, widthName } from "../core/widgetwidth.ts";
 import { GuideLines } from "./guidelines.ts";
 
 const BASE = "swl-handle";
@@ -62,6 +62,9 @@ export type HandleHost<W> = {
   guideLayer(): HTMLElement | undefined;
   // Whether widgets are laid out now (not in a narrow pane)
   enabled(): boolean;
+  // Where the text starts where it stands at the pane's left (x in the window, and px from the pane's left edge); none
+  // where it is centred (docs/silverware-layout-text-align.md): a widget wider than the text grows from there then
+  textAtLeft?(): { readonly x: number; readonly start: number } | undefined;
   // Where a widget stays as its width changes (none: centred): a drag widens it on both sides, or on its one side alone
   anchor?(widget: W): LayoutAnchor;
   // Whether a widget's width is dragged at all (none: yes): a widget placed alone (a preview) gets no handle
@@ -80,7 +83,9 @@ export type HandleHost<W> = {
   title?(widget: W): string | undefined;
 };
 
-type Drag = { readonly pointer: number; readonly x: number; readonly start: number; readonly was: WidgetWidth | undefined; now: WidgetWidth | undefined; moved: boolean; readonly element: HTMLElement };
+// (`anchor`: where the widget stays, settled as the drag starts: with the text at the left, one at its end wider than the
+// text stays at its start, and a width read on each move would flip it back as it is dragged narrower)
+type Drag = { readonly pointer: number; readonly x: number; readonly start: number; readonly was: WidgetWidth | undefined; now: WidgetWidth | undefined; moved: boolean; readonly element: HTMLElement; readonly anchor: LayoutAnchor };
 
 export class WidthHandle<W> {
   private readonly box: HTMLElement;
@@ -307,7 +312,7 @@ export class WidthHandle<W> {
     this.bar.setPointerCapture(e.pointerId);
     const element = this.host.element(this.widget);
     const was = this.host.kept(this.widget);
-    this.drag = { pointer: e.pointerId, x: e.clientX, start: element.getBoundingClientRect().width, was, now: was, moved: false, element };
+    this.drag = { pointer: e.pointerId, x: e.clientX, start: element.getBoundingClientRect().width, was, now: was, moved: false, element, anchor: this.anchorOf() };
     // (The drag's look, the widget's mark and the guides once it moves: a click, which opens the menu, flashed them)
   }
 
@@ -393,15 +398,15 @@ export class WidthHandle<W> {
 
   /** The guides of a drag: the targets it can snap to, placed by its widget's middle */
   private showGuides(): void {
-    const middle = this.middleOf();
-    if (middle === undefined) return;
-    this.lines.show(this.targets(), middle, this.anchorOf());
+    const from = this.guideAnchor();
+    if (!from) return;
+    this.lines.show(this.targets(), from.x, from.anchor);
   }
 
   /** The guides placed again by the widget's middle (the page scrolled, the widget wider), the one of `near` lit */
   private placeGuides(near: string | undefined): void {
-    const middle = this.middleOf();
-    if (middle !== undefined) this.lines.place(middle, near, this.anchorOf());
+    const from = this.guideAnchor();
+    if (from) this.lines.place(from.x, near, from.anchor);
   }
 
   /** The width of the room the widget is in, where it is not the page's text */
@@ -414,20 +419,43 @@ export class WidthHandle<W> {
     const room = this.roomOf();
     const unsized = this.widget ? this.host.unsized?.(this.widget) : undefined;
     if (room !== undefined) return roomTargets(room);
-    // (A widget at the text's start reaches the pane's right edge alone: a guide wider, Full width, none of its)
-    const widest = widestWidth(this.host.paneWidth(), this.anchorOf(), this.host.textWidth());
+    // (A widget at the text's start reaches the pane's right edge alone: a guide wider, Full width, none of its; with the
+    // text at the left, any widget wider than it)
+    const left = this.host.textAtLeft?.();
+    const widest = left ? widestAtLeft(this.host.paneWidth(), left.start) : widestWidth(this.host.paneWidth(), this.anchorOf(), this.host.textWidth());
     return snapTargets(this.host.textWidth(), this.host.guides(), this.host.paneWidth(), unsized).filter((target) => target.width <= widest + 0.5);
   }
 
   /** Where a drag by `moved` from `start` takes the width: within its room, else within the pane */
   private draggedTo(start: number, moved: number): number {
     const room = this.roomOf();
-    return room !== undefined ? draggedRoomWidth(start, moved, room, this.anchorOf()) : draggedWidth(start, moved, this.host.paneWidth(), this.anchorOf(), this.host.textWidth());
+    if (room !== undefined) return draggedRoomWidth(start, moved, room, this.anchorOf());
+    const left = this.host.textAtLeft?.();
+    const anchor = this.anchorOf();
+    const text = this.host.textWidth();
+    // (The text at the left: from its start, or, at its end, within the text, no narrower than it was)
+    if (left && anchor !== "end") return draggedAtLeft(start, moved, anchor, text, widestAtLeft(this.host.paneWidth(), left.start));
+    if (left) return Math.min(Math.max(text, start), draggedWidth(start, moved, this.host.paneWidth(), anchor, text));
+    return draggedWidth(start, moved, this.host.paneWidth(), anchor, text);
   }
 
   /** Where the widget dragged (or one given) stays as its width changes */
   private anchorOf(widget: W | undefined = this.widget): LayoutAnchor {
-    return (widget && this.host.anchor?.(widget)) || "center";
+    if (this.drag && widget === this.widget) return this.drag.anchor;
+    const anchor = (widget && this.host.anchor?.(widget)) || "center";
+    // (The text at the left: one at its end wider than it grows from its start, its handle at its right edge)
+    if (anchor === "end" && widget && this.host.textAtLeft?.() && this.host.element(widget).getBoundingClientRect().width > this.host.textWidth() + 0.5) return "start";
+    return anchor;
+  }
+
+  /** Where the guides are drawn from: the text's start where it stands at the left (a widget not at its end), else the widget's middle or edge */
+  private guideAnchor(): { readonly x: number; readonly anchor: LayoutAnchor } | undefined {
+    // (Not in a room of its own, a grid's cell: its guides are the room's quarters, placed by the widget)
+    const left = this.roomOf() === undefined ? this.host.textAtLeft?.() : undefined;
+    const anchor = this.anchorOf();
+    if (left && anchor !== "end") return { x: left.x, anchor: "start" };
+    const middle = this.middleOf();
+    return middle === undefined ? undefined : { x: middle, anchor };
   }
 
   /** Where the guides are placed from (x in the window): the widget's middle, or the edge it stays at (its left at the start, its right at the end); none where it is not in the page */
@@ -513,7 +541,12 @@ export class WidthHandle<W> {
     const from = this.keyed?.widget === widget ? this.keyed.width : this.host.element(widget).getBoundingClientRect().width;
     const to = Math.round(from + step * (e.shiftKey ? 50 : 10));
     const room = this.roomOf();
-    const width = room !== undefined ? Math.max(Math.min(MIN_ROOM_WIDTH, room), Math.min(room, to)) : Math.max(MIN_WIDGET_WIDTH, Math.min(this.host.paneWidth() - PANE_GUTTER, to));
+    // (The text at the left: no wider than the pane right of its start allows, one at its end within the text as a drag
+    // holds it)
+    const left = this.host.textAtLeft?.();
+    const text = this.host.textWidth();
+    const widest = !left ? this.host.paneWidth() - PANE_GUTTER : this.anchorOf(widget) === "end" ? Math.max(text, from) : widestAtLeft(this.host.paneWidth(), left.start);
+    const width = room !== undefined ? Math.max(Math.min(MIN_ROOM_WIDTH, room), Math.min(room, to)) : Math.max(MIN_WIDGET_WIDTH, Math.min(widest, to));
     this.keyed = { widget, width };
     this.host.show(this.host.element(widget), width);
     this.place();

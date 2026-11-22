@@ -70,6 +70,29 @@ export const draggedWidth = (start: number, moved: number, pane: number, anchor:
 export const widestWidth = (pane: number, anchor: LayoutAnchor = "center", text?: number): number =>
   anchor !== "center" && text !== undefined ? Math.floor((pane + text) / 2 - PANE_GUTTER / 2) : pane - PANE_GUTTER;
 
+/**
+ * With the text at the pane's left (docs/silverware-layout-text-align.md), `start` px from its left edge: the widest a
+ * widget is shown, as far as the pane's right edge less half the gutter (a widget wider than the text grows from the
+ * text's start to the right alone, however it stands)
+ */
+export const widestAtLeft = (pane: number, start: number): number => Math.floor(pane - start - PANE_GUTTER / 2);
+
+/**
+ * With the text at the left: where a drag of a widget's right edge by `moved` takes its width. Centred, it grows on both
+ * sides while it is narrower than the text (its right edge moves half its growth), from the text's start alone once it
+ * is wider; at the start, by the move. Not narrower than the least, nor wider than `widest` (`widestAtLeft`)
+ */
+export function draggedAtLeft(start: number, moved: number, anchor: LayoutAnchor, text: number, widest: number): number {
+  let width = start + moved;
+  if (anchor === "center") {
+    // (Where its right edge is from the text's start, at a width; and the width whose edge is the pointer's)
+    const edge = (w: number) => (w < text ? (text + w) / 2 : w);
+    const to = edge(start) + moved;
+    width = to < text ? 2 * to - text : to;
+  }
+  return Math.max(MIN_WIDGET_WIDTH, Math.min(widest, width));
+}
+
 /** What a width may snap to: the text's (the widget then keeps no width, or its pixels where it is of its own size without one), a guide (its own width) */
 export type SnapTarget = { readonly width: number; readonly kept: WidgetWidth | undefined; readonly name: string };
 

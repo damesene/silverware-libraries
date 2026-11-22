@@ -27,9 +27,9 @@ import { silverBulletGridHost, silverBulletPutHost } from "./host/silverbullet/g
 import { keepCursorOutOfGrids } from "./host/silverbullet/cursor.ts";
 import { keepDeviceZoom, readDeviceZoom } from "./host/devicezoom.ts";
 import { silverBulletPage } from "./host/silverbullet/dom.ts";
-import { pageLayoutOf, writePageWidth } from "./host/silverbullet/page.ts";
+import { pageLayoutOf, writePageLayout } from "./host/silverbullet/page.ts";
 import { silverBulletPlatform } from "../../shared/silverbullet/platform.ts";
-import { DEFAULT_GUIDES, DEFAULT_MIN_PANE_WIDTH, keptGuides, PATHS, readSettings, readSyntaxModeSettings, type Settings, type SyntaxModeSettings } from "./model/settings.ts";
+import { DEFAULT_GUIDES, DEFAULT_MIN_PANE_WIDTH, keptGuides, PATHS, readSettings, readTextAlign, readSyntaxModeSettings, type Settings, type SyntaxModeSettings } from "./model/settings.ts";
 import { syntaxTab } from "./ui/syntaxtab.ts";
 import { cssWidth, readTextWidth } from "./model/width.ts";
 
@@ -155,12 +155,12 @@ export function renderGrid(body: unknown): Promise<HTMLElement> | HTMLElement {
 }
 
 /**
- * A page opened (editor:pageLoaded): its name and its frontmatter's `_layout.width` as the page's meta has them, read
- * by the init page's Lua and given here, so the width is set at once, before the page is painted (each call of the
+ * A page opened (editor:pageLoaded): its name and its frontmatter's `_layout.width` and `_layout.align` as the page's
+ * meta has them, read by the init page's Lua and given here, so they are set at once, before the page is painted (each call of the
  * bridge from here is a promise answered later: reading the text took frames)
  */
-export function pageLoaded(page: unknown, width: unknown): void {
-  app.pageLoaded(String(page), readTextWidth(width));
+export function pageLoaded(page: unknown, width: unknown, align?: unknown): void {
+  app.pageLoaded(String(page), readTextWidth(width), readTextAlign(align));
   grids?.pageShown(String(page));
 }
 
@@ -304,11 +304,14 @@ function silverBulletStore(bridge: Bridge, writer: PageWriter): LayoutStore {
     readSettings: () => settingsOf(bridge),
     readPage: async () => {
       const [page, text] = await Promise.all([bridge.getCurrentPage(), bridge.getText()]);
-      return { page: String(page), width: pageLayoutOf(String(text)).width };
+      const { width, align } = pageLayoutOf(String(text));
+      return { page: String(page), width, align };
     },
-    savePageWidth: async (page, width) => writePageWidth(writer, page, String(await bridge.getText()), width),
+    savePageLayout: async (page, layout) => writePageLayout(writer, page, String(await bridge.getText()), layout),
     // In the Configuration Manager's block of CONFIG (it shows it, Ctrl-,), as the other plugins save theirs
     saveTextWidth: (width) => saveConfig({ [PATHS.textWidth]: width ? cssWidth(width) : undefined }),
+    // (Centred, the default, written as none)
+    saveTextAlign: (align) => saveConfig({ [PATHS.textAlign]: align && align !== "center" ? align : undefined }),
     // In Silverware Layout's own block: a list, which the Configuration Manager would lose
     saveGuides: (guides) => saveConfig({ [PATHS.guides]: keptGuides(guides) }, OWN_MARKER),
     // (A table: in Silverware Layout's own block; none set, taken out)
@@ -331,7 +334,7 @@ function silverBulletStore(bridge: Bridge, writer: PageWriter): LayoutStore {
 
 /** The settings as configured (none read: the defaults) */
 async function settingsOf(bridge: Bridge): Promise<Settings> {
-  if (!bridge.getConfig) return { textWidth: undefined, minPaneWidth: DEFAULT_MIN_PANE_WIDTH, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true, fontPinch: true, fontScaleFiles: true, alignments: {} };
+  if (!bridge.getConfig) return { textWidth: undefined, textAlign: undefined, minPaneWidth: DEFAULT_MIN_PANE_WIDTH, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true, fontPinch: true, fontScaleFiles: true, alignments: {} };
   const values = new Map<string, unknown>();
   for (const path of Object.values(PATHS)) values.set(path, await bridge.getConfig(path, undefined));
   return readSettings((path) => values.get(path));

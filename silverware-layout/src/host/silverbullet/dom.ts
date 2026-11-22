@@ -36,7 +36,40 @@ export function silverBulletPage(doc: Document): PageHost {
     guideLayer: () => doc.querySelector<HTMLElement>(SCROLLER_SELECTOR) ?? undefined,
     showTextWidth: (width) => showTextWidth(doc, width),
     themeTextWidth: () => themeTextWidth(doc),
+    watchAlongText: (found) => watchAlongText(doc, found),
   };
+}
+
+// What SilverBullet places by the text's width, centred as the text is (its `--editor-width`): the page's title in its
+// top bar (`#sb-top .main .inner`, its left edge the text's: verified 2026-11-22 on its edge build) and the
+// notifications (`.sb-notifications`, put in the body as one shows, taken out as the last goes)
+const ALONG_TEXT = ["#sb-top .main .inner", ".sb-notifications"];
+
+/** SilverBullet's elements placed by the text, each told as it is there: now, and as one is put in the body later */
+function watchAlongText(doc: Document, found: (element: HTMLElement) => void): () => void {
+  const look = () => {
+    for (const selector of ALONG_TEXT) for (const element of doc.querySelectorAll<HTMLElement>(selector)) found(element);
+  };
+  look();
+  const win = doc.defaultView;
+  if (!win?.MutationObserver) return () => undefined;
+  // (The body's own children, where the notifications are put, and the top bar, which its client may draw anew or later:
+  // not the whole page, which the editor changes as it is typed in; until there is a top bar, the body's whole tree)
+  let top: Element | null = null;
+  const observer = new win.MutationObserver((records) => {
+    if (!records.some((record) => record.addedNodes.length)) return;
+    look();
+    if (doc.querySelector("#sb-top") !== top) watch();
+  });
+  const watch = () => {
+    observer.disconnect();
+    top = doc.querySelector("#sb-top");
+    observer.observe(doc.body, { childList: true, subtree: !top });
+    if (top?.parentElement && top.parentElement !== doc.body) observer.observe(top.parentElement, { childList: true });
+    if (top) observer.observe(top, { childList: true, subtree: true });
+  };
+  watch();
+  return () => observer.disconnect();
 }
 
 /** The page's text shown at a width (none: the theme's, nothing of ours left) */

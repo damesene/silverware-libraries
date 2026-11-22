@@ -16,6 +16,7 @@
 import { COMPANION_ATTRIBUTE, type EditorLook, type LinkOpening, type TextEditor } from "../../../../shared/editor.ts";
 import { el, openedHere } from "../../../../shared/elements.ts";
 import { markOverWindow } from "../../../../shared/overwindow.ts";
+import { markSidePanel } from "../../../../shared/sidepanel.ts";
 import { byTouch } from "../../../../shared/pointer.ts";
 import type { Result } from "../../core/core.ts";
 import type { ItemOpening, ModuleHost, OpenedFrom } from "../../core/module.ts";
@@ -292,6 +293,9 @@ export class PeekPanel {
     // Over the window as a full screen is (shared/overwindow.ts): the other plugins' controls placed by the pointer
     // (a table's +, a chart's toolbar under it) stand back from it
     markOverWindow(element, true);
+    // A panel at the window's right, over the page (shared/sidepanel.ts): Silverware Layout may move the page's text to
+    // the left while one is open
+    markSidePanel(element, true);
     // Its keys its own: none goes on to the page (SilverBullet would act on them), a shortcut of the host's told that it
     // does nothing here (as it goes down: what a field took then is known); Esc closes it where no field takes it
     const keep = (event: KeyboardEvent) => event.stopPropagation();

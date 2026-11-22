@@ -770,11 +770,11 @@ test("a time, a date and time and a link: edited in their own fields, written an
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS, "Page/db-tasks": rootPage }, "Page");
   const row = page.locator(".swd-table tbody tr", { hasText: "Fix login" });
   const cell = (key: string) => row.locator(`td[data-key="${key}"]`);
-  // A time
+  // A time (set whole, as the browser's picker sets one: written at once, no Enter; one typed waits for Enter or the field
+  // left, views/editors.test.ts)
   await cell("at").click();
   await expect(cell("at").locator("input")).toHaveAttribute("type", "time");
   await cell("at").locator("input").fill("14:30");
-  await cell("at").locator("input").press("Enter");
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toMatch(/at: "?14:30"?/);
   await expect(cell("at")).toHaveText("14:30");
   await expect(cell("at")).not.toHaveClass(/swd-invalid/);
@@ -782,7 +782,6 @@ test("a time, a date and time and a link: edited in their own fields, written an
   await cell("when").click();
   await expect(cell("when").locator("input")).toHaveAttribute("type", "datetime-local");
   await cell("when").locator("input").fill("2026-11-08T14:30");
-  await cell("when").locator("input").press("Enter");
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toMatch(/when: "?2026-11-08T14:30"?/);
   await expect(cell("when")).toHaveText("2026-11-08 14:30");
   await expect(cell("when")).not.toHaveClass(/swd-invalid/);

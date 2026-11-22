@@ -294,6 +294,9 @@ test("a file pasted into a grid's cell's field: inserted into the cell", async (
   await expect(dialog(page)).toBeVisible();
   const path = await rows(page).first().locator(".swa-insert-path").inputValue();
   await dialog(page).getByRole("button", { name: "Insert" }).click();
+  // (Uploaded, then put into the field: its link there before the field is left, else it is left without it; the caret
+  // after it, its markdown shown)
+  await expect(field.locator(".cm-content")).toContainText(`![[${path}]]`);
   // (Left by a click below: the cell written)
   await page.locator("#sb-main .cm-line", { hasText: "After" }).click();
   await expect.poll(() => space.saved("Page")).toContain(`<cell>\n\nLeft ![[${path}]]\n\n</cell>`);

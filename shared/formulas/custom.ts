@@ -20,10 +20,14 @@ import {
   toText,
 } from "./values.ts";
 import { CELL_RE } from "../table/namerules.ts";
-import { FUNCTION_CATEGORIES, type FormulaFunction, type FunctionCategory } from "./function.ts";
+import { ALL_RANGES, type ArgumentKind, FUNCTION_CATEGORIES, type FormulaFunction, type FunctionCategory } from "./function.ts";
+
+const ARGUMENT_KINDS: readonly ArgumentKind[] = ["value", "range", "branch"];
 
 /** The conversions the built-in functions use, for custom functions (a definitions function gets them) */
 export const HELPERS = {
+  // (What a function says of its arguments: every one a range)
+  ALL_RANGES,
   FormulaError,
   TimeValue,
   isError,
@@ -72,7 +76,7 @@ export function customFunctions(definitions: unknown): { functions: FormulaFunct
 /** One definition as a function formulas can call, or what is wrong with it */
 function customFunction(definition: unknown): FormulaFunction | string {
   if (!isObject(definition)) return "not an object";
-  const { name, syntax, description, category, example, minArgs = 0, maxArgs, call } = definition;
+  const { name, syntax, description, category, example, minArgs = 0, maxArgs, argument, call } = definition;
   if (typeof name !== "string" || !NAME_RE.test(name)) return `its name ${JSON.stringify(name)} is not letters, digits, _ and . starting with a letter`;
   const upper = name.toUpperCase();
   // Formulas would read it as a cell (LOG2 is the cell in column LOG) or a value
@@ -86,6 +90,10 @@ function customFunction(definition: unknown): FormulaFunction | string {
   if (example !== undefined && typeof example !== "string") return `${upper}: its example is not text`;
   if (!isCount(minArgs)) return `${upper}: minArgs is not a whole number of 0 or more`;
   if (maxArgs !== undefined && (!isCount(maxArgs) || maxArgs < minArgs)) return `${upper}: maxArgs is not a whole number of minArgs or more`;
+  if (argument !== undefined && typeof argument !== "function") return `${upper}: its argument is not a function ((at, count) => "value", "range" or "branch")`;
+  // (Asked as defined of its first argument: a throw or another answer said now, not met in a formula)
+  const said = argument === undefined ? undefined : argumentSaid(argument as (at: number, count: number) => unknown, 0, 1);
+  if (said && "problem" in said) return `${upper}: its argument(0, 1) ${said.problem}`;
   return {
     name: upper,
     syntax: syntax ?? `${upper}(…)`,
@@ -94,6 +102,9 @@ function customFunction(definition: unknown): FormulaFunction | string {
     ...(example === undefined ? {} : { example }),
     minArgs,
     ...(maxArgs === undefined ? {} : { maxArgs }),
+    // (What it says of an argument, each answer kept (asked for every call), guarded: a throw or another answer for
+    // another argument taken as one value, the kind of none declared)
+    ...(argument === undefined ? {} : { argument: keptArgument(argument as (at: number, count: number) => unknown) }),
     call: (args, context) => {
       let result: unknown;
       try {
@@ -104,6 +115,35 @@ function customFunction(definition: unknown): FormulaFunction | string {
       }
       return resultOf(upper, result);
     },
+  };
+}
+
+/** What a function's `argument` says of an argument: its kind, or what is wrong with its answer */
+function argumentSaid(argument: (at: number, count: number) => unknown, at: number, count: number): { readonly kind: ArgumentKind } | { readonly problem: string } {
+  let kind: unknown;
+  try {
+    kind = argument(at, count);
+  } catch (e) {
+    return { problem: `failed: ${message(e)}` };
+  }
+  if (ARGUMENT_KINDS.includes(kind as ArgumentKind)) return { kind: kind as ArgumentKind };
+  // (What it gave said as text, whatever it is: a text quoted, anything else as String says it)
+  const shown = typeof kind === "string" ? `"${kind}"` : typeof kind === "symbol" ? kind.toString() : String(kind);
+  return { problem: `gave ${shown}, which is none of "value", "range", "branch"` };
+}
+
+/** A function's `argument` asked once for each place and count, a wrong answer taken as one value */
+function keptArgument(argument: (at: number, count: number) => unknown): (at: number, count: number) => ArgumentKind {
+  const kept = new Map<string, ArgumentKind>();
+  return (at, count) => {
+    const key = `${at},${count}`;
+    let kind = kept.get(key);
+    if (kind === undefined) {
+      const said = argumentSaid(argument, at, count);
+      kind = "kind" in said ? said.kind : "value";
+      kept.set(key, kind);
+    }
+    return kind;
   };
 }
 

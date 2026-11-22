@@ -1,5 +1,5 @@
 import { flatten } from "../values.ts";
-import type { FormulaFunction } from "../function.ts";
+import { ALL_RANGES, type FormulaFunction } from "../function.ts";
 
 export default {
   name: "COUNTA",
@@ -8,5 +8,6 @@ export default {
   category: "math",
   example: "=COUNTA([name])",
   minArgs: 1,
+  argument: ALL_RANGES,
   call: (args) => flatten(args).filter((v) => v !== null && v !== "").length,
 } satisfies FormulaFunction;

@@ -23,6 +23,6 @@ export { REF_ERROR, type Token, tokenize } from "./tokens.ts";
 export { tablesWritten } from "./page.ts";
 export { calculatedFormula, filledFormula, followFormula, followOwnFormula, followTable, type Following, formulasAfterEdit, shiftReferences, withCalculatedCells, withoutFormulas } from "./edits.ts";
 export { argumentSpan, type ColumnChoice, columnChoicesOf, type FormulaChoice, type FormulaChoices, choiceText, cycleFixed, findFunctions, type FormulaHelp, formulaChoices, formulaHelp, functionHelp, nameTyped, needsOperator, type PointedSpan, REFERENCE_HELP, referenceSlot, sourceChoices } from "./help.ts";
-export { FUNCTION_CATEGORIES, type AnyFunction, type FormulaFunction, type FunctionCategory } from "./function.ts";
+export { ALL_RANGES, type ArgumentKind, FUNCTION_CATEGORIES, type AnyFunction, type FormulaFunction, type FunctionCategory, takesGrids } from "./function.ts";
 export { functionNamed, isCustomFunction } from "./registry.ts";
 export type { IndexMap } from "../table/ops.ts";

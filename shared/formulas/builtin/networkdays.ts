@@ -12,6 +12,7 @@ export default {
   example: "=NETWORKDAYS([@start], [@end], holidays![date])",
   minArgs: 2,
   maxArgs: 3,
+  argument: (at) => (at === 2 ? "range" : "value"),
   call: ([start, end, holidays]) => {
     const a = toDate(start!);
     const b = toDate(end!);

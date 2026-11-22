@@ -9,7 +9,7 @@ import { dateArithmetic } from "./dates.ts";
 import { compareValues } from "./compare.ts";
 import { type Node, parse, refersToOwnData, wholeColumnNames } from "./parser.ts";
 import { type Area, areaText, cellName, formulaOutside, referencedColumn, type SourceRef, tablePrefix, type TableRef } from "./references.ts";
-import { takesGrids } from "./function.ts";
+import { type ArgumentKind, takesGrids } from "./function.ts";
 import { functionNamed, isCustomFunction } from "./registry.ts";
 import {
   asGrid,
@@ -715,19 +715,25 @@ class Sheet {
         const context = { row: row + 1, column: column + 1 };
         // A function taking grids gets them as they are, its references with their shape
         if (takesGrids(f)) return f.call(node.args.map((arg) => this.shaped(arg, row, column)), context);
-        // Any other a grid's cells as a list; a reference as a range, so number functions skip a text cell as in a range.
-        // (A function of the user's gets its lists as copies: a part reading no row is calculated once for every row
-        // (rowFree), so one changing a list it is given would change it for the next rows; the built-in ones change none)
+        // Any other a grid's cells as a list where it reads a range; where it reads one value a list (lifted below), a
+        // grid of several rows and columns refused whole, as an operator refuses one. A reference to one cell as a list of
+        // one, wherever it is: number functions skip a text cell as in a range, and an empty cell is told from an
+        // argument left out (a null literal). (A function of the user's gets its lists as copies: a part reading no row
+        // is calculated once for every row (rowFree), so one changing a list it is given would change it for the next
+        // rows; the built-in ones change none)
         const custom = isCustomFunction(node.name);
-        return f.call(
-          node.args.map((arg) => {
-            const value = asValue(this.evaluate(arg, row, column));
-            const reference = arg.kind === "area" || (arg.kind === "column" && arg.thisRow);
-            if (reference && !isRange(value) && !isError(value)) return [value];
-            return custom && Array.isArray(value) ? [...value] : value;
-          }),
-          context,
-        );
+        const count = node.args.length;
+        const kindAt = (at: number): ArgumentKind => f.argument?.(at, count) ?? "value";
+        const args: Value[] = [];
+        for (const [at, arg] of node.args.entries()) {
+          const result = this.evaluate(arg, row, column);
+          const value = kindAt(at) === "range" ? asValue(result) : oneValueArgument(result);
+          if (value instanceof GridRefused) return value.error;
+          const reference = arg.kind === "area" || (arg.kind === "column" && arg.thisRow);
+          args.push(reference && !isRange(value) && !isError(value) ? [value] : custom && Array.isArray(value) ? [...value] : value);
+        }
+        // A range at a place of one value: called for each of its values (lifted, as an operator works cell by cell)
+        return lifted(args, kindAt, (given) => f.call(given, context));
       }
       case "unary":
         return cellByCell([operand(this.evaluate(node.arg, row, column))], ([arg]) => this.unary(node.op, arg!));
@@ -786,6 +792,40 @@ function operand(value: Result): Value {
   if (!isGrid(value)) return value;
   if (value.width === 1 || value.height <= 1) return value.cells;
   return new FormulaError("#VALUE!", `an operator on ${value.height} rows and ${value.width} columns: pick a column first (CHOOSECOLS), or compare a column`);
+}
+
+/** A grid of several rows and columns given where one value is expected: its error, the call's whole result */
+class GridRefused {
+  constructor(readonly error: FormulaError) {}
+}
+
+/**
+ * What a function's argument of one value (or a branch) is given, as an operator takes its operand: a grid of one
+ * column or one row as the list of its cells; one of several rows and columns refused (decided with the user,
+ * 2026-11-22: its columns would be mixed), so the call's result is that error, not a list of it. An area of several
+ * columns (`A1:B2`) comes as its cells row by row, as an operator reads it.
+ */
+function oneValueArgument(value: Result): Value | GridRefused {
+  if (!isGrid(value)) return value;
+  if (value.width === 1 || value.height <= 1) return value.cells;
+  return new GridRefused(new FormulaError("#VALUE!", `${value.height} rows and ${value.width} columns where one value is expected: pick a column first (CHOOSECOLS)`));
+}
+
+/**
+ * A function given a range at a place of one value, as Excel 365 calls it (docs/silverware-formulas-lifting.md): for
+ * each of its values, its results the list (`UPPER([name])`). Several such ranges must be of one size, as an
+ * operator's; a branch (IF's `value_if_true`…) a range of that size taken place by place, anything else as it is. A
+ * range of one cell is that cell's value: nothing lifted. An error at a place is that place's result.
+ */
+function lifted(args: readonly Value[], kindAt: (at: number) => ArgumentKind, call: (args: readonly Value[]) => Scalar): Value {
+  const lifts = args.map((value, at) => kindAt(at) === "value" && isRange(value) && value.length !== 1);
+  const first = lifts.indexOf(true);
+  if (first < 0) return call(args);
+  const size = (args[first] as readonly Scalar[]).length;
+  const other = args.find((value, at) => lifts[at] && (value as readonly Scalar[]).length !== size) as readonly Scalar[] | undefined;
+  if (other) return new FormulaError("#VALUE!", `the ranges are not the same size (${size} and ${other.length} cells)`);
+  const placed = args.map((value, at) => lifts[at] || (kindAt(at) === "branch" && isRange(value) && value.length === size && size !== 1));
+  return Array.from({ length: size }, (_, place) => call(args.map((value, at) => (placed[at] ? (value as readonly Scalar[])[place]! : value))));
 }
 
 /**
@@ -886,9 +926,10 @@ function listNode(node: Node): boolean {
     case "data":
       return true;
     case "call": {
-      // A function taking grids gives one (FILTER, SORT…): a list here
+      // A function taking grids gives one (FILTER, SORT…), one of one value given a list there gives a list (lifted)
       const f = functionNamed(node.name);
-      return !!f && takesGrids(f);
+      if (!f) return false;
+      return takesGrids(f) || node.args.some((arg, at) => (f.argument?.(at, node.args.length) ?? "value") === "value" && listNode(arg));
     }
     case "unary":
       return listNode(node.arg);

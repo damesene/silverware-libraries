@@ -11,6 +11,7 @@ export default {
   category: "math",
   example: '=SUMIFS([amount], [status], "open", [due], "<"&TODAY())',
   minArgs: 3,
+  argument: (at) => (at === 0 || at % 2 === 1 ? "range" : "value"),
   call: ([values, ...conditions]) => {
     const cells = matchingCells(values!, conditions);
     return isError(cells) ? cells : sum.call([cells]);

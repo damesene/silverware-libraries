@@ -11,6 +11,7 @@ export default {
   category: "math",
   example: '=AVERAGEIFS([price], [fruit], "app*")',
   minArgs: 3,
+  argument: (at) => (at === 0 || at % 2 === 1 ? "range" : "value"),
   call: ([values, ...conditions]) => {
     const cells = matchingCells(values!, conditions);
     return isError(cells) ? cells : average.call([cells]);

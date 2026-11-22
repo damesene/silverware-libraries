@@ -9,6 +9,7 @@ export default {
   example: "=IFERROR([@price] / [@qty], 0)",
   minArgs: 2,
   maxArgs: 2,
+  argument: (at) => (at === 0 ? "value" : "branch"),
   call: ([value, ifError]) => {
     const v = single(value!);
     return isError(v) ? single(ifError!) : v;

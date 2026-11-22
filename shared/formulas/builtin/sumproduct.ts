@@ -1,6 +1,6 @@
 import { cellsOf } from "../criteria.ts";
 import { firstError, FormulaError, numbers } from "../values.ts";
-import type { FormulaFunction } from "../function.ts";
+import { ALL_RANGES, type FormulaFunction } from "../function.ts";
 
 export default {
   name: "SUMPRODUCT",
@@ -9,6 +9,7 @@ export default {
   category: "math",
   example: "=SUMPRODUCT([qty], [price])",
   minArgs: 1,
+  argument: ALL_RANGES,
   call: (args) => {
     const error = firstError(args);
     if (error) return error;

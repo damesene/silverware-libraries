@@ -325,10 +325,11 @@ describe("evaluation", () => {
     // (A case is matched as = matches: a number and a text reading as it are equal, as a table's cells are text; Excel's
     // SWITCH would not match them)
     expect(evaluate(FRUIT, '=SWITCH(1, "1", "a", "b")')).toBe("a");
-    // (An error in a case read before the match is the result; a range where one value is expected is #VALUE!, as IF's)
+    // (An error in a case read before the match is the result; a range where one value is decided: each of its values,
+    // a list, a cell's #SPILL!, as IF's)
     expect(evaluate(FRUIT, '=SWITCH(2, 1/0, "a", 2, "b")')).toBe("#DIV/0!");
-    expect(evaluate(FRUIT, '=SWITCH(B1:B2, 1, "a", "b")')).toBe("#VALUE!");
-    expect(evaluate(FRUIT, '=IFS(B1:B2 > 0, "a", TRUE, "b")')).toBe("#VALUE!");
+    expect(evaluate(FRUIT, '=SWITCH(B1:B2, 1, "a", "b")')).toBe("#SPILL!");
+    expect(evaluate(FRUIT, '=IFS(B1:B2 > 0, "a", TRUE, "b")')).toBe("#SPILL!");
   });
 
   it("explains an error", () => {

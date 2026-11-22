@@ -69,6 +69,12 @@ describe("Excel's formulas", () => {
     expect(write('=MAXIFS([qty], [fruit], "p*")')).toBe('_xlfn.MAXIFS(B2:B3,A2:A3,"p*")');
     expect(write('=IFS(C1 > 1, "a", TRUE, "b")')).toBe('_xlfn.IFS(C2>1,"a",TRUE,"b")');
     expect(write('=SWITCH(A1, "Pear", 1, 0)')).toBe('_xlfn.SWITCH(A2,"Pear",1,0)');
+    // (A function of one value given a range: lifted, a range; inside one taking it an array formula, alone no value)
+    expect(write("=SUM(ROUND(C1:C2, 0))")).toEqual({ array: "SUM(ROUND(C2:C3,0))" });
+    expect(write("=UPPER([fruit])")).toEqual({ reason: "its result is a range, not one value" });
+    expect(write("=UPPER(A1)")).toBe("UPPER(A2)");
+    // (A table's data where one value is expected: refused in the table, its value in the file)
+    expect(write("=SUM(UPPER([#Data]))")).toEqual({ reason: "UPPER is given a table's data where one value is expected" });
     // (A condition without its value: Excel refuses it, the cell written as its value)
     expect(write('=IFS(C1 > 1, "a", TRUE)')).toEqual({ reason: "IFS takes its conditions and values in pairs" });
   });

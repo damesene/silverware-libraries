@@ -10,6 +10,7 @@ export default {
   category: "math",
   example: '=COUNTIFS([status], "open", [qty], ">10")',
   minArgs: 2,
+  argument: (at) => (at % 2 === 0 ? "range" : "value"),
   call: (conditions) => {
     const places = matchingPlaces(conditions, undefined);
     return isError(places) ? places : places.length;

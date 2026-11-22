@@ -10,6 +10,8 @@ export default {
   example: '=SWITCH([@status], "Done", "✓", "Doing", "…", "—")',
   minArgs: 3,
   maxArgs: 254,
+  // (Its value decides; its cases are compared with it place by place where it is a list, its results and default chosen)
+  argument: (at) => (at === 0 ? "value" : "branch"),
   call: ([value, ...rest]) => {
     const v = single(value!);
     if (isError(v)) return v;

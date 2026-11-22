@@ -9,6 +9,7 @@ export default {
   example: "=RANK([@score], [score])",
   minArgs: 2,
   maxArgs: 3,
+  argument: (at) => (at === 1 ? "range" : "value"),
   call: ([number, ref, order = 0]) => {
     const n = toNumber(number!);
     const ns = numbers([ref!]);

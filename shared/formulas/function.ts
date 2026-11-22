@@ -1,6 +1,17 @@
 import type { Result, Scalar, Value } from "./values.ts";
 
 /**
+ * What a function's argument takes (docs/silverware-formulas-lifting.md): `value` one value (a range given there: the
+ * function called for each of its values, its result a list), `range` a range read whole (SUM's), `branch` one a
+ * choosing function chooses among (IF's `value_if_true`: read as it is where what decides is one value, taken place by
+ * place where it is a list)
+ */
+export type ArgumentKind = "value" | "range" | "branch";
+
+/** Every argument a range (SUM, COUNT, CONCAT…) */
+export const ALL_RANGES = (): ArgumentKind => "range";
+
+/**
  * A function formulas can call: a built-in one (builtin/, where a test
  * requires its syntax and description in the Functions table of
  * silverware-table.md) or a custom one (custom.ts). `syntax` and `description` are
@@ -22,6 +33,11 @@ export type FormulaFunction = {
   // True where its result depends on the cell it is calculated in (`context`: ROW()), not on its arguments alone: a
   // part of a formula calling it is calculated in every row, never once for all (evaluate.ts, rowFree)
   readonly readsPlace?: true;
+  /**
+   * What its argument at `at` (from 0) takes, of `count` given (none: one value each, `value`); a function of the
+   * user's declares it as a built-in one does
+   */
+  readonly argument?: (at: number, count: number) => ArgumentKind;
   /**
    * Gets the evaluated arguments: a range or a cell reference (A1:B3, [Qty], A1)
    * is the list of its cells' values, an empty cell is null, an error is a

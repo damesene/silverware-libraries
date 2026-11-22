@@ -74,7 +74,7 @@ describe("a formula's parts reading nothing of its row", () => {
   });
 
   it("give a function of the user's its own copy of a list they read, which it may change", () => {
-    defineCustomFunctions([{ name: "POPLEN", syntax: "POPLEN(list)", description: "A list's length less one", minArgs: 1, maxArgs: 1, call: ([list]) => ((list as unknown[]).pop(), (list as unknown[]).length) }]);
+    defineCustomFunctions([{ name: "POPLEN", syntax: "POPLEN(list)", description: "A list's length less one", minArgs: 1, maxArgs: 1, argument: () => "range", call: ([list]) => ((list as unknown[]).pop(), (list as unknown[]).length) }]);
     const { cells } = counting();
     const model = table(["X", "N"], [
       [plain("1"), formula("=POPLEN([x])")],

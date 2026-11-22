@@ -1,6 +1,6 @@
 import { FormulaError } from "../values.ts";
 import { withNumbers } from "../arguments.ts";
-import type { FormulaFunction } from "../function.ts";
+import { ALL_RANGES, type FormulaFunction } from "../function.ts";
 
 export default {
   name: "STDEV",
@@ -9,6 +9,7 @@ export default {
   category: "math",
   example: "=STDEV([score])",
   minArgs: 1,
+  argument: ALL_RANGES,
   call: (args) =>
     withNumbers(args, (ns) => {
       if (ns.length < 2) return new FormulaError("#DIV/0!", "a standard deviation needs two numbers at least");

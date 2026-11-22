@@ -69,6 +69,42 @@ describe("custom functions", () => {
     ).toEqual(["the definitions failed: oops"]);
   });
 
+  it("takes what a function says of its arguments (value, range, branch), one saying otherwise or failing taken as of one value", () => {
+    const sum = only([{ name: "MYSUM", argument: () => "range", call: () => 1 }]);
+    expect([sum.argument!(0, 1), sum.argument!(3, 4)]).toEqual(["range", "range"]);
+    // (Another answer for another argument, as a formula asks: taken as one value)
+    const odd = only([{ name: "ODD", argument: (at: number) => (at === 1 ? "range" : at === 0 ? "value" : "nonsense"), call: () => 1 }]);
+    expect([odd.argument!(0, 3), odd.argument!(1, 3), odd.argument!(2, 3)]).toEqual(["value", "range", "value"]);
+    // (Asked once for each place and count)
+    let asked = 0;
+    const counted = only([{ name: "COUNTED", argument: () => (asked++, "range"), call: () => 1 }]);
+    counted.argument!(1, 2);
+    counted.argument!(1, 2);
+    expect(asked).toBe(2);
+    // (None said: every argument one value)
+    expect(only([{ name: "PLAIN", argument: undefined, call: () => 1 }]).argument).toBeUndefined();
+    expect(HELPERS.ALL_RANGES()).toBe("range");
+    // A wrong declaration said as the function is defined, the others defined
+    const { functions, problems } = customFunctions([
+      { name: "BAD", argument: "range", call: () => 1 },
+      {
+        name: "FAILING",
+        argument: () => {
+          throw new Error("oops");
+        },
+        call: () => 1,
+      },
+      { name: "WRONG", argument: () => "Range", call: () => 1 },
+      { name: "GOOD", argument: HELPERS.ALL_RANGES, call: () => 1 },
+    ]);
+    expect(functions.map((one) => one.name)).toEqual(["GOOD"]);
+    expect(problems).toEqual([
+      'function 1: BAD: its argument is not a function ((at, count) => "value", "range" or "branch")',
+      "function 2: FAILING: its argument(0, 1) failed: oops",
+      'function 3: WRONG: its argument(0, 1) gave "Range", which is none of "value", "range", "branch"',
+    ]);
+  });
+
   it("turns what a function throws or gives wrongly into the formula's error", () => {
     const result = (call: () => unknown) => only([{ name: "F", call }]).call([], PLACE);
     expect(

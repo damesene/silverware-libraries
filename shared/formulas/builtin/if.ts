@@ -9,6 +9,7 @@ export default {
   example: '=IF([@qty] > 10, "bulk", "single")',
   minArgs: 2,
   maxArgs: 3,
+  argument: (at) => (at === 0 ? "value" : "branch"),
   call: ([condition, ifTrue, ifFalse = false]) => {
     const c = toBoolean(condition!);
     if (isError(c)) return c;

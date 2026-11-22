@@ -14,6 +14,7 @@ export default {
   example: "=WORKDAY([@ordered], 5, holidays![date])",
   minArgs: 2,
   maxArgs: 3,
+  argument: (at) => (at === 2 ? "range" : "value"),
   call: ([start, days, holidays]) => {
     const a = toDate(start!);
     const n = toWhole(days!);

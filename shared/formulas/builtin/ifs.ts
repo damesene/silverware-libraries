@@ -9,6 +9,7 @@ export default {
   example: '=IFS([@score] >= 90, "A", [@score] >= 75, "B", TRUE, "C")',
   minArgs: 2,
   maxArgs: 254,
+  argument: (at) => (at % 2 === 0 ? "value" : "branch"),
   call: (args) => {
     if (args.length % 2 !== 0) return new FormulaError("#N/A", "IFS takes its conditions and values in pairs: one is missing its value");
     for (let at = 0; at < args.length; at += 2) {

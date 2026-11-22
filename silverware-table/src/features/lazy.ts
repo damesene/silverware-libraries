@@ -182,6 +182,11 @@ class LazyTable {
       await this.flushToPage(held);
       return false;
     }
+    return this.intoEditor();
+  }
+
+  /** What is held written into the editor, its page there: whether it went in (one undo step) */
+  private async intoEditor(): Promise<boolean> {
     const target = this.table.current();
     // Not rendered (scrolled far out of view): written once it is (enhanced), or when the page is left;
     // a cell opened meanwhile: written once it closes (a write now would render the table anew under it)
@@ -203,10 +208,15 @@ class LazyTable {
       };
       // Its table there by its key
       if ((await this.host.replaceTables(held.page, [{ key: held.key, change }])) === "failed") return lost();
-      this.held = undefined;
+      // The page opened again meanwhile (a quick way back): its editor may hold it as read before this write, which its
+      // next save would write back over the file; what was held is put into the editor too (a cell holding it already
+      // left as it is), now where its table is drawn, else once it is
+      const back = (await this.host.documentNameNow()) === held.page;
+      if (!back) this.held = undefined;
       const saved = count - skipped;
       if (saved) this.host.notify(`Silverware Table: saved ${saved} ${saved === 1 ? "cell" : "cells"} edited on ${held.page}`, "info");
       if (skipped) this.host.notify(`Silverware Table: ${skipped} ${skipped === 1 ? "cell" : "cells"} on ${held.page} changed elsewhere meanwhile, the edit there was not saved`, "error");
+      if (back && this.held === held) await this.intoEditor();
     } catch (e) {
       console.error("Silverware Table: could not save the cells held", e);
       lost();

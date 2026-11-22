@@ -206,6 +206,32 @@ describe("Lazy saving", () => {
     expect(text).toBe(PAGE.replace("| Pear | 3 |", "| Plum | 3 |\n| | |"));
   });
 
+  it("puts what it wrote into the page's file into the editor too where the page was opened again meanwhile", async () => {
+    let page = "Test";
+    const files: Record<string, string> = {};
+    await setup(PAGE, { "silverware.table.modules.lazy.delay": 10000, "silverware.table.editor.enterKey": "save" }, {
+      getCurrentPage: () => page,
+      readPage: (name) => files[name] ?? "",
+      // (Back on the page as its file is written: the editor shows it as it was read before)
+      writePage: (name, content) => {
+        files[name] = content;
+        page = "Test";
+      },
+    });
+    button().click();
+    type(3, 1, "6");
+    key(field()!, "Enter");
+    await flush();
+    expect(text).toBe(PAGE);
+    files.Test = text;
+    page = "Other";
+    await controller.pageLoaded();
+    await flush();
+    expect(files.Test).toBe(PAGE.replace("| Fig | 2 |", "| Fig | 6 |"));
+    expect(text).toBe(PAGE.replace("| Fig | 2 |", "| Fig | 6 |"));
+    expect(flashes.filter((f) => f.includes("changed elsewhere"))).toEqual([]);
+  });
+
   it("writes into the page's file once another page is loaded, and asks before the tab closes", async () => {
     let page = "Test";
     const files: Record<string, string> = {};

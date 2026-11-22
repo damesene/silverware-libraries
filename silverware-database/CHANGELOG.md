@@ -1,5 +1,10 @@
 # Silverware Database: changelog
 
+## 1.4.1 (2026-11-22)
+
+- A date or a time picked in its calendar is saved at once, its formulas shown anew; one typed is still saved by Enter or as you leave the field.
+- Fixed: the item that had the focus keeps it as its view is drawn again (a change shown, a sort).
+
 ## 1.4.0 (2026-11-22)
 
 - Formula properties: a property calculated from the item's values or the whole database (`=[@qty]*[@price]`, `=[@hours]/SUM([hours])`), made in Properties with its result shown as you type, its formula over its column; never written into the items' pages.

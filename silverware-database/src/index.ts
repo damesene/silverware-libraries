@@ -472,9 +472,12 @@ function start(element: HTMLElement, shown: Shown): void {
     handovers.delete(key);
     return handover.until > Date.now() && handover.from !== shown.place ? handover.from.handOver() : undefined;
   };
-  // (The place before it for this block over the window: this one so from its first drawing, no frame in the page between)
+  // (The place before it for this block over the window: this one so from its first drawing, no frame in the page between;
+  // in the page, what it drew shown until this one draws, the block never empty meanwhile: no blink as a sort is written)
   const before = handovers.get(JSON.stringify([shown.page, shown.current]));
-  const overWindow = !!before && before.until > Date.now() && before.from !== shown.place && before.from.isOverWindow;
+  const after = !!before && before.until > Date.now() && before.from !== shown.place;
+  const overWindow = after && before.from.isOverWindow;
+  if (after && !overWindow && !element.hasChildNodes()) element.replaceChildren(...before.from.stillCopy());
   shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, converters: () => converters.all(), overWindow, settings: platform.settings, ui: platform.ui, editor: platform.editor, documents: platformDocuments(app!.platform), media: app!.media, moduleMenu: (place, menu) => app!.modules.placeMenu(place, menu), moduleTools: (place) => app!.modules.placeTools(place), placeDrawn: (place) => app!.modules.placeDrawn(place), openItem: (item, database, from, how) => app!.modules.openItem(item, database, from, how), editSource: () => void editSource(element, shown), deleteDatabase: (one, name) => deleteDatabase(core, one, name), takeOver });
   void shown.place.render();
 }

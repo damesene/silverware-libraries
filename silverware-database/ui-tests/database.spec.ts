@@ -701,6 +701,25 @@ test("the settings turn a view off: saved in CONFIG, the picker without it at on
   await expect(page.locator(".swd-menu .swd-menu-item")).toHaveCount(6);
 });
 
+test("a sort written into the block draws the place anew with no frame of it empty (no blink)", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS }, "Page");
+  await expect(page.locator(".swd-table tbody tr[data-item]")).toHaveCount(2);
+  // (Each frame looked at, from the press until the sort is shown: SilverBullet's element for the block's new text comes
+  // before its place has drawn anything)
+  await page.evaluate(() => {
+    (window as unknown as { emptyFrames: number }).emptyFrames = 0;
+    const look = () => {
+      if (!document.querySelector(".swd-table tbody tr[data-item]")) (window as unknown as { emptyFrames: number }).emptyFrames++;
+      if (!document.querySelector(".swd-table-sort-end")?.textContent?.includes("↑")) requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
+  await page.locator(".swd-table-sort").first().click();
+  await expect.poll(() => space.saved("Page")).toContain("table.sort");
+  await expect(page.locator(".swd-table-sort-end").first()).toContainText("↑");
+  expect(await page.evaluate(() => (window as unknown as { emptyFrames: number }).emptyFrames)).toBe(0);
+});
+
 test("the table edits a value in place, written into the item's page", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\n```\n", ...TASKS }, "Page");
   const cell = page.locator('.swd-table tbody tr:first-child [data-key="status"]');

@@ -251,6 +251,15 @@ export class DatabasePlace {
   }
 
   /**
+   * What it draws as it is now, copied (nothing of it listening): what the place drawn after it for the same block shows
+   * until its first drawing, so the block is never empty between them (SilverBullet's element for the block's new text
+   * comes before that place has read anything)
+   */
+  stillCopy(): Node[] {
+    return [...this.options.element.childNodes].map((node) => node.cloneNode(true));
+  }
+
+  /**
    * What it has open, handed to the place drawn after it for the same block:
    * its tools stopped (a filter typed and not applied yet is the next place's
    * to apply), so it writes nothing of them after
@@ -344,12 +353,16 @@ export class DatabasePlace {
     this.body = undefined;
     const data = await this.read();
     const on = await this.viewsOn();
+    const named = state.get(VIEW_KEY);
+    const view = typeof named === "string" ? on.find((one) => one.name === named) : on[0];
+    // (All it reads read before what shows is taken away: what was drawn, or what stands for it, replaced in one step, no
+    // frame of it empty)
+    const settings = data && view ? await this.settingsOf(view) : undefined;
+    const size = data && view ? await pageSize(this.options.settings) : 0;
     if (this.gone) return;
     this.on = on;
     element.replaceChildren();
     if (!data) return this.note(`No database "${this.options.database}"`);
-    const named = state.get(VIEW_KEY);
-    const view = typeof named === "string" ? on.find((one) => one.name === named) : on[0];
     // One bar: the database's name and how many items show, quietly, then the view shown (its picker), the tools
     // at its end (a note, not a heading: a heading over it is the page's own, written in its markdown)
     const count = el(doc, "span", { class: "swd-place-count", text: String(data.items.length) });
@@ -360,10 +373,7 @@ export class DatabasePlace {
     element.append(this.body);
     // (A scroll does not bubble: caught on its way down)
     this.body.addEventListener("scroll", (event) => this.keepScroll(event.target), { capture: true, passive: true });
-    if (!view) return this.note(typeof named === "string" ? `No view "${named}" is on here: pick one above` : "No view is on: turn one on in the settings");
-    const settings = await this.settingsOf(view);
-    const size = await pageSize(this.options.settings);
-    if (this.gone) return;
+    if (!view || !settings) return this.note(typeof named === "string" ? `No view "${named}" is on here: pick one above` : "No view is on: turn one on in the settings");
     const drawn: Drawn = { view, data, instance: undefined, ended: false, pageSize: size };
     this.drawn = drawn;
     const host = this.host(drawn, settings);

@@ -92,8 +92,8 @@ function start(): void {
   applyLayers(document);
   for (const place of places) place.destroy();
   store = new MemoryStore(SAMPLE_DATABASES);
-  calculated = calculatingStore(store);
   const types = new TypeRegistry();
+  calculated = calculatingStore(store, types);
   // (The playground's items stand for pages, as SilverBullet's)
   const core = new DatabaseCore(store, types, ui, { one: "page", many: "pages" });
   // The built-in views, and the playground's own after them (the raw data a view gets)

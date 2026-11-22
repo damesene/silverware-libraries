@@ -21,20 +21,25 @@ export function formulaOptions(database: Database, items: readonly Item[], formu
 }
 
 /**
- * The database as its views show it: each property whose options are a formula's with its list as its `options` (none
- * where it gives an error, said by its problem); the same database where none is
+ * The database as its views show it: each property whose options are a formula's with its list as its `options`, each
+ * read as its type reads an option typed (`readOption`: a person's `@ada` is `ada`); none where it gives an error, its
+ * why kept as `optionsProblem` (a view says it for every value); the same database where none is
  */
-export function withFormulaOptions(database: Database, items: readonly Item[]): { readonly database: Database; readonly problems: ReadonlyMap<string, FormulaProblem> } {
-  const problems = new Map<string, FormulaProblem>();
-  if (!database.properties.some((property) => optionsFormulaOf(property.params) !== undefined)) return { database, problems };
+export function withFormulaOptions(
+  database: Database,
+  items: readonly Item[],
+  readOption: (type: string, params: Params) => ((option: string) => string) | undefined = () => undefined,
+): { readonly database: Database } {
+  if (!database.properties.some((property) => optionsFormulaOf(property.params) !== undefined)) return { database };
   const properties = database.properties.map((property) => {
     const formula = optionsFormulaOf(property.params);
     if (formula === undefined) return property;
     const given = formulaOptions(database, items, formula);
-    if ("code" in given) problems.set(property.key, given);
     // (A multi-select's values are typed with commas between: an option with one would be split, so it is none)
-    const options = "code" in given ? [] : property.params.multiple === true ? given.filter((one) => !one.includes(",")) : [...given];
-    return { ...property, params: { ...property.params, options } };
+    const read = readOption(property.type, property.params);
+    const listed = "code" in given ? [] : [...new Set(read ? given.map(read).filter(Boolean) : given)];
+    const options = property.params.multiple === true ? listed.filter((one) => !one.includes(",")) : listed;
+    return { ...property, params: { ...property.params, options, ...("code" in given ? { optionsProblem: `${given.code}: ${given.detail}` } : {}) } };
   });
-  return { database: { ...database, properties }, problems };
+  return { database: { ...database, properties } };
 }

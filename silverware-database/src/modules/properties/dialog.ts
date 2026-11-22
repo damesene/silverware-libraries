@@ -885,7 +885,11 @@ export class PropertiesDialog {
         return void given.replaceChildren(el(doc, "span", { class: "swd-options-given-error", text: `${made.code}: ${made.detail}` }));
       }
       // (A multi-select's as the views have them: none with a comma)
-      const options = entry.property.params.multiple === true ? made.filter((one) => !one.includes(",")) : made;
+      // (As the views have them: each read as its type reads one typed, a person's @ada as ada; a multiple select's none
+      // with a comma)
+      const type = this.host.types.of(entry.property.type, entry.property.params);
+      const read = [...new Set(type?.optionRead ? made.map((one) => type.optionRead!(one)).filter(Boolean) : made)];
+      const options = entry.property.params.multiple === true ? read.filter((one) => !one.includes(",")) : read;
       this.lastOptions.set(entry.id, options);
       const shown = options.slice(0, 20);
       given.replaceChildren(

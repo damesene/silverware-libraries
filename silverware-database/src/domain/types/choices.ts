@@ -52,6 +52,9 @@ export function choiceType(spec: ChoiceSpec): PropertyType {
   const read = (typed: string) => (spec.read ?? ((one: string) => one))(typed.trim()).trim();
   // (A value none of the options: refused unless the params take any, or their options are a formula's not calculated
   // here: as kept, what the core writes from)
+  // (The options a formula gives none, its error kept in the params a view shows: why, for a value of any; none where the
+  // params take any value (a person's Anyone): the formula only offered its options)
+  const optionsFailed = (params: Params) => (typeof params.optionsProblem === "string" && !(spec.anyone && takesAny(params)) ? `its options' formula gives none: ${params.optionsProblem}` : undefined);
   const strange = (values: readonly string[], params: Params) =>
     (spec.anyone && takesAny(params)) || (typeof params.optionsFormula === "string" && params.options === undefined) ? [] : values.filter((one) => !optionsOf(params).includes(one));
   const validateParams = (params: Params): string | undefined => {
@@ -81,6 +84,8 @@ export function choiceType(spec: ChoiceSpec): PropertyType {
     validate: (value, params) => {
       if (isEmpty(value)) return undefined;
       if (typeof value !== "string") return "no option";
+      const failed = optionsFailed(params);
+      if (failed) return failed;
       return strange([value], params).length ? `"${value}" is none of its options` : undefined;
     },
     text: (value) => (typeof value === "string" ? shown(value) : keptText(value)),
@@ -90,6 +95,7 @@ export function choiceType(spec: ChoiceSpec): PropertyType {
       return { value: value === "" ? null : value };
     },
     optionShown: shown,
+    optionRead: read,
     ...(spec.mentions ? { mentions: true } : {}),
     // (Where the params take any value: its editors a field to type in too, offering the options)
     takesTyped: (params) => !!spec.anyone && takesAny(params),
@@ -103,6 +109,8 @@ export function choiceType(spec: ChoiceSpec): PropertyType {
       if (isEmpty(value)) return undefined;
       if (!Array.isArray(value) || !value.every((one) => typeof one === "string")) return "no list of options";
       if (new Set(value).size !== value.length) return "an option twice";
+      const failed = optionsFailed(params);
+      if (failed) return failed;
       const wrong = strange(texts(value), params);
       return wrong.length ? `${wrong.map((one) => `"${one}"`).join(", ")} ${wrong.length === 1 ? "is" : "are"} none of its options` : undefined;
     },

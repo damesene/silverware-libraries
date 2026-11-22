@@ -6,9 +6,9 @@
 // formula's list as its options (decided 7), the revision the store's (a write against it is the schema as kept).
 // Every other member is the store's own.
 import { changesByItself, type FormulaValues, withFormulaValues } from "../domain/formulas/calculate.ts";
-import type { FormulaProblem } from "../domain/formulas/model.ts";
 import { withFormulaOptions } from "../domain/formulas/options.ts";
 import type { Database, Item, Revised } from "../model/database.ts";
+import type { TypeRegistry } from "../domain/types/registry.ts";
 import type { DatabaseStore } from "./store.ts";
 
 /** A formula's errors among a database's items, by item and property key */
@@ -18,8 +18,6 @@ export type FormulaProblems = FormulaValues["problems"];
 export type CalculatingStore = DatabaseStore & {
   /** The errors a database's formulas give its items, as its items were last read (none: no formula fails) */
   formulaProblems(database: string): Promise<FormulaProblems>;
-  /** Why a property's options' formula gives none, by its key (none: every one gives its list) */
-  optionsProblems(database: string): Promise<ReadonlyMap<string, FormulaProblem>>;
 };
 
 type Calculated = {
@@ -27,11 +25,15 @@ type Calculated = {
   readonly items: Revised<readonly Item[]>;
   readonly problems: FormulaProblems;
   readonly database: Revised<Database> | undefined;
-  readonly optionsProblems: ReadonlyMap<string, FormulaProblem>;
 };
 
 /** `store`'s items calculated; the last calculation of each database kept while its schema and items are as read */
-export function calculatingStore(store: DatabaseStore): CalculatingStore {
+export function calculatingStore(store: DatabaseStore, types?: Pick<TypeRegistry, "of">): CalculatingStore {
+  // (An option a formula gives read as its type reads one typed: a person's `@ada` is `ada`)
+  const readOption = (type: string, params: Database["properties"][number]["params"]) => {
+    const made = types?.of(type, params);
+    return made?.optionRead ? (option: string) => made.optionRead!(option) : undefined;
+  };
   const kept = new Map<string, Calculated>();
 
   async function calculated(id: string): Promise<Calculated> {
@@ -39,7 +41,7 @@ export function calculatingStore(store: DatabaseStore): CalculatingStore {
     const items = await store.items(id);
     if (!database) {
       kept.delete(id);
-      return { key: "", items, problems: new Map(), database: undefined, optionsProblems: new Map() };
+      return { key: "", items, problems: new Map(), database: undefined };
     }
     // (A formula giving another value as time goes, TODAY(), NOW(), or as functions defined from Space Lua change: kept
     // for its minute only, its values and their errors one calculation)
@@ -51,8 +53,9 @@ export function calculatingStore(store: DatabaseStore): CalculatingStore {
     // (Its revision moved with the schema's where it has formulas: a formula changed gives other values, its items the same)
     const revision = values === items.value ? items.revision : `${items.revision}:${database.revision}${moment ? `:${moment}` : ""}`;
     // (Options by a formula read the items with their formulas' values: a formula property's values may be them)
-    const shown = withFormulaOptions(database.value, values);
-    const made = { key, items: { value: values, revision }, problems, database: shown.database === database.value ? database : { value: shown.database, revision: database.revision }, optionsProblems: shown.problems };
+    const shown = withFormulaOptions(database.value, values, readOption);
+    // (A formula's options failing: its why in the property's params shown, `optionsProblem`, which its values say)
+    const made = { key, items: { value: values, revision }, problems, database: shown.database === database.value ? database : { value: shown.database, revision: database.revision } };
     kept.set(id, made);
     return made;
   }
@@ -61,7 +64,6 @@ export function calculatingStore(store: DatabaseStore): CalculatingStore {
     items: async (id: string) => (await calculated(id)).items,
     formulaProblems: async (id: string) => (await calculated(id)).problems,
     database: async (id: string) => (await calculated(id)).database,
-    optionsProblems: async (id: string) => (await calculated(id)).optionsProblems,
   };
   return new Proxy(store, {
     get(target, member) {

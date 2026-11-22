@@ -1,8 +1,8 @@
 # Silverware Database: formula properties (plan)
 
-Status (2026-11-22): planned, on branch `feat/database-formulas`; nothing built. Its scope decided with the user the
-same day (*Decided*), reviewed against the code the same day (its findings are in *Decided* and *How it fits*);
-references outside the database come after its release (*Later*).
+Status (2026-11-22): built, steps 1 to 7, on branch `feat/database-formulas`, not released. Its scope decided with the
+user the same day (*Decided*), reviewed against the code (its findings are in *Decided* and *How it fits*); what was
+built otherwise than decided is said in each step; references outside the database come after its release (*Later*).
 
 ## What
 
@@ -57,7 +57,8 @@ items with their calculated values readable from Space Lua.
    keys taken; `validateKeptValues`), so a calculated value can never be written. The stores calculate nothing; system
    values stay theirs (they need the store's facts).
 6. **Space Lua reads the items**: `silverware.database.items(id)` on the API page: the items as records (`name`,
-   `page` where kept as pages, every property's value by key, calculated ones too), read only.
+   `ref`, the item's page as SilverBullet names a page object's, where kept as pages; every property's value by key,
+   calculated ones too), read only.
 7. **Options by a formula** for select, multi-select and person: kept in a param of their own (`optionsFormula`), not
    in `options` (a list, which `validateOptions` checks). The calculating store gives everything that shows a database
    a derived schema whose `options` are the formula's list (by the engine's `listResult`, "a choice list's formula"),
@@ -214,13 +215,21 @@ Ordered by the code (each step's tests passing before the next; UI tests where a
      no `[@` needed (`Est` offers Estimate). A strip over a phone's keyboard dropped with the buttons.
    - Phones: the formula and its panel first in the details.
 5. **Space Lua's read.** `silverware.database.items(id)` (the entry's export over the calculating store, the API
-   page's function with its `---` docs).
+   page's function with its `---` docs). **Done**: the items in their order by hand, each `{ ...values, name, ref }`
+   (`ref` rather than the decided `page`: SilverBullet's own name of a page object's page; neither a property may be,
+   the pages store refuses both keys); `nil` where there is no such database, or the index has it not yet.
 6. **Options by a formula.** `optionsFormula` (a choice type's param, validated as a formula), the derived schema
    given by the calculating store (decided 7), the editors offering its options, no option added to such a property,
-   Properties saying they are a formula's; the core never writing the derived schema.
+   Properties saying they are a formula's; the core never writing the derived schema. **Done**: the derived schema is
+   the calculating store's `database(id)` (the store's revision), a module's `ModuleHost.database`; Properties reads the
+   schema as kept (`ModuleHost.schema`). An option the formula gives is read as its type reads one typed
+   (`optionRead`: a person's `@ada` is `ada`); one with a comma left out of a multiple select's; a formula giving none
+   keeps its why in the derived params (`optionsProblem`), which every value says (not a person's with Anyone). A
+   value of such a property is taken by the core whatever it is (the schema as kept has no options), a view marking
+   one none of them. Properties: **Fixed list / From a formula**, the options it gives shown as typed.
 7. **Docs.** The library page's *Formulas* (what they read, the result's type, what is not kept and why, the
    functions: Silverware Table's library page has their table), docs/silverware-database.md's *Later* pointing here,
-   silverware-database/CLAUDE.md (the calculating store, the raw store's reads).
+   silverware-database/CLAUDE.md (the calculating store, the raw store's reads). **Done**.
 
 ## Later (after the release, each a plan step of its own)
 

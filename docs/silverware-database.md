@@ -420,6 +420,7 @@ phone); each piece reviewed, fixed and tested (unit and Playwright against Silve
 * **Merging `feat/database` into main**: listed in REPO.md and the README (2026-11-09), the review's fixes made the same day
   (*The review before the merge*); left: CI green, a pull request.
 * **Conditional formatting**: planned, docs/silverware-database-conditional-formatting.md.
+* **Formula properties**: built (2026-11-22), docs/silverware-database-formulas.md; references outside the database (another database, a table of a page, a source) come after the release, its *Later*.
 * **Large databases in a table** (measured 2026-11-22, docs/silverware-database-formulas.md, step 3c): the table view
   draws every row, 26 elements each; 20,000 items take 3.9 s to show and 1.0 s to show a change. Drawing only the rows
   in sight (and a board's cards alike) would keep it quick; a plan of its own when wanted.

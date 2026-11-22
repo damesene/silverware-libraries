@@ -281,7 +281,7 @@ function keptParts(): Kept {
       actions: [{ name: "Show conflict", run: () => openConflict(conflictHost(platform, redrawAll), one) }],
     });
   const core = new DatabaseCore(store, types, { ...ui, conflict }, platform.space.noun, { store: blockPlaces(platform.space, writer), propertyMeta: (view) => views.named(view)?.propertyMeta ?? [] });
-  return { platform, store, calculated: calculatingStore(store), writer, core, ui, own };
+  return { platform, store, calculated: calculatingStore(store, types), writer, core, ui, own };
 }
 
 /**

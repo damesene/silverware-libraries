@@ -173,7 +173,7 @@ describe("a property's options by a formula", () => {
     expect((await property(store, "pick")).params.options).toBeUndefined();
     // (The same revision: an edit made of it is against the schema kept)
     expect(shown.revision).toBe((await store.database("orders"))!.revision);
-    expect((await calculated.optionsProblems("orders")).size).toBe(0);
+    expect(shown.value.properties.find((one) => one.key === "pick")!.params.optionsProblem).toBeUndefined();
   });
 
   it("take any value as the core writes one (the list is the views'), a view marking one none of them", async () => {
@@ -190,7 +190,7 @@ describe("a property's options by a formula", () => {
     const { calculated } = setup([...ORDERS.properties, { ...PICK, params: { optionsFormula: "=SUM([qty])/0" } }]);
     const shown = (await calculated.database("orders"))!.value.properties.find((one) => one.key === "pick")!;
     expect(shown.params.options).toEqual([]);
-    expect((await calculated.optionsProblems("orders")).get("pick")?.code).toBe("#DIV/0!");
+    expect(shown.params.optionsProblem).toBe("#DIV/0!: division by zero");
   });
 
   it("are calculated anew as time goes where their formula reads it, a multi-select's none with a comma", async () => {
@@ -207,6 +207,30 @@ describe("a property's options by a formula", () => {
     }
     const several = setup([...ORDERS.properties, { ...PICK, params: { multiple: true, optionsFormula: '=VSTACK("Prague, CZ", "Brno")' } }]);
     expect((await several.calculated.database("orders"))!.value.properties.find((one) => one.key === "pick")!.params.options).toEqual(["Brno"]);
+  });
+
+  it("are read as their type reads an option typed (a person's @ada is ada), and say why for every value where the formula gives none", async () => {
+    const types = new TypeRegistry();
+    const { store } = setup([...ORDERS.properties, { key: "who", label: "Who", type: "person", params: { optionsFormula: '="@" & LOWER([name])' }, readonly: false }]);
+    const calculated = calculatingStore(store, types);
+    const who = (await calculated.database("orders"))!.value.properties.find((one) => one.key === "who")!;
+    expect(who.params.options).toEqual(["pear", "fig"]);
+    expect(types.of("person", who.params)!.validate("pear", who.params)).toBeUndefined();
+    // (A formula giving an error: every value says why, not "none of its options")
+    const failing = setup([...ORDERS.properties, { ...PICK, params: { optionsFormula: "=SUM([qty])/0" } }]);
+    const pick = (await calculatingStore(failing.store, types).database("orders"))!.value.properties.find((one) => one.key === "pick")!;
+    expect(types.of("select", pick.params)!.validate("Pear", pick.params)).toBe("its options' formula gives none: #DIV/0!: division by zero");
+    const several = { ...pick.params, multiple: true };
+    expect(types.of("select", several)!.validate(["Pear"], several)).toBe("its options' formula gives none: #DIV/0!: division by zero");
+    // (An empty value none the less; Anyone taking any value whatever the formula gives)
+    expect(types.of("select", pick.params)!.validate(null, pick.params)).toBeUndefined();
+    const anyone = { ...pick.params, anyone: true };
+    expect(types.of("person", anyone)!.validate("bob", anyone)).toBeUndefined();
+    // (Never in the schema kept)
+    expect((await failing.store.database("orders"))!.value.properties.find((one) => one.key === "pick")!.params.optionsProblem).toBeUndefined();
+    // (@ada and ada one option)
+    const merged = setup([...ORDERS.properties, { key: "who", label: "Who", type: "person", params: { optionsFormula: '=VSTACK("@ada", "ada", "bob")' }, readonly: false }]);
+    expect((await calculatingStore(merged.store, types).database("orders"))!.value.properties.find((one) => one.key === "who")!.params.options).toEqual(["ada", "bob"]);
   });
 
   it("are refused where their formula does not read, or reads outside the database", async () => {

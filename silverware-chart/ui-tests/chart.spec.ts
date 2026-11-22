@@ -1,3 +1,4 @@
+import { embedOf, expectWidgetMenuKept, onSilverBulletEdge } from "../../scripts/silverbullet-widgetmenu.ts";
 import { charts, expect, savedText, test } from "./helpers.ts";
 
 const SALES = `| Month | Revenue | Cost |
@@ -343,4 +344,12 @@ test("a chart under what another plugin shows over the window (a table in full s
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
   await page.waitForTimeout(300);
   await expect(bar).toHaveCount(0);
+});
+
+test("SilverBullet's ⋮ beside a widget (its edge): kept from a chart, shown beside a widget not ours (shared/silverbullet/widgetmenu.ts)", async ({ page, open }) => {
+  test.skip(!onSilverBulletEdge, "the ⋮ beside a widget is SilverBullet's edge's (after 2.12.1)");
+  // (Its own library page embedded, under the chart: a page every test's space has, long, the chart drawn above it)
+  await open(`# Charts\n\n\`\`\`mermaid\nxychart-beta\n  x-axis ["a", "b"]\n  bar "one" [1, 2]\n\`\`\`\n\nBetween\n\n${embedOf("Library/damesene/silverware-chart")}\n`);
+  await expect.poll(() => charts(page)).toHaveLength(1);
+  await expectWidgetMenuKept(page, page.locator("#sb-main [data-sb-widget-menu]").first(), "Embed", page.locator(".swc-chart").first());
 });

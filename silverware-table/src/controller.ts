@@ -1074,6 +1074,7 @@ export class Controller implements TableHost {
           const rows = this.rows.renderedRows(table);
           // How it looks as a whole, from its metadata as rendered, before the browser lays it out
           this.binding.markRendered(widget, rows, (table) => this.tableLook(table));
+          this.binding.tableFound?.(widget);
           for (const feature of this.features) feature.tableAdded?.(widget, table, rows);
         }
       }

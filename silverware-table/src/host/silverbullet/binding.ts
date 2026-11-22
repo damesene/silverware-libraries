@@ -3,6 +3,7 @@
 // the modules (turned on or off by `silverware.table.modules.<name>.enabled`)
 // and those always there. The controller creates those turned on from this
 // list and knows none of them.
+import { keepFromWidgetMenu } from "../../../../shared/silverbullet/widgetmenu.ts";
 import type { FeatureName } from "../../bridge.ts";
 import type { AdapterFeature, Feature, TableHost } from "../../core/feature.ts";
 import type { FeatureEntry, TableBinding } from "../../core/binding.ts";
@@ -107,5 +108,8 @@ export const silverBulletBinding: TableBinding<MarkdownStore> = {
   adapter: (doc, rows, context, store) => new SilverBulletAdapter(doc, rows, context, store),
   features: featureEntries,
   markRendered: (widget, rows, look) => markTable(widget, look(renderedModel(rows))),
+  // (SilverBullet's ⋮ beside a table offers what Silverware Table's own menus do: kept from it as it is found, registered
+  // before it is in the page; shared/silverbullet/widgetmenu.ts)
+  tableFound: (widget) => keepFromWidgetMenu(widget),
   layoutProvider: tablesLayoutProvider,
 };

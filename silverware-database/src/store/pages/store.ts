@@ -449,13 +449,24 @@ export class PagesStore implements DatabaseStore {
     for (const { one, own } of ordered) {
       try {
         const before = own.key === undefined ? undefined : read!.items.get(own.key)?.item;
-        // A page made gets its key before it is written: whoever reads meanwhile (a listener told by the index) sees the key it keeps
+        // A page made gets its key before it is written, and a page renamed its key under its new name: whoever reads
+        // meanwhile (a listener told by the index, which has the new name before the write ends) sees the key it keeps
         if (own.key === undefined && own.after) {
           this.keys.delete(own.page);
           this.keyOf(own.page);
         }
-        const result = await this.applyPage(own, before);
+        const renamed = own.key !== undefined && own.after ? `${read!.folder}/${(own.after as ItemState).name}` : undefined;
+        const early = renamed !== undefined && renamed !== own.page && !this.keys.has(renamed) ? renamed : undefined;
+        if (early) this.keys.set(early, own.key!);
+        let result: Awaited<ReturnType<typeof this.applyPage>>;
+        try {
+          result = await this.applyPage(own, before);
+        } catch (error) {
+          if (early) this.keys.delete(early);
+          throw error;
+        }
         if ("cause" in result) {
+          if (early) this.keys.delete(early);
           skip(one, result.cause, result.reason);
           continue;
         }

@@ -1510,7 +1510,9 @@ tr:focus-within .swd-open {
 .swd-tl-more-cell .swd-load-more {
   width: max-content;
   margin: 0;
+  padding-right: 8px;
   white-space: nowrap;
+  background: var(--root-background-color);
 }
 .swd-load-more-button {
   padding: 3px 10px;

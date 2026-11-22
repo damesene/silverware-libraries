@@ -86,7 +86,7 @@ function draw(host: ViewHost, element: HTMLElement, editing: Editing): void {
   if (!grouping) {
     const body: HTMLElement = el(doc, "tbody");
     body.append(...host.limit.shown(host.items).map((item) => row(item, () => body)), ...moreRow(host.items));
-    const add = el(doc, "button", { class: "swd-table-add", text: "+ New", title: "Add an item", run: () => void host.create() });
+    const add = el(doc, "button", { class: "swd-table-add", text: "+ New", title: "Add an item", run: () => void host.create(undefined, undefined, { open: true }) });
     element.replaceChildren(el(doc, "div", "swd-table-box", el(doc, "table", "swd-table", el(doc, "thead", undefined, headRow()), body)), el(doc, "div", "swd-table-foot", add, count));
     return;
   }
@@ -103,12 +103,12 @@ function draw(host: ViewHost, element: HTMLElement, editing: Editing): void {
       // (A folded group's rows drawn too, hidden by the style page)
       ...host.limit.shown(group.items, group.key).map((item) => row(item, () => part)),
       ...moreRow(group.items, group.key),
-      el(doc, "tr", "swd-table-group-add", el(doc, "td", { attrs: { colspan: span } }, el(doc, "button", { class: "swd-table-add", text: "+ New", title: `Add an item in ${group.label}`, run: () => void createInGroup(host, grouping.property, group) }))),
+      el(doc, "tr", "swd-table-group-add", el(doc, "td", { attrs: { colspan: span } }, el(doc, "button", { class: "swd-table-add", text: "+ New", title: `Add an item in ${group.label}`, run: () => void createInGroup(host, grouping.property, group, {}, undefined, { open: true }) }))),
     );
     return part;
   });
   // (No group shown, all hidden or none there: + New under the table still, an item added with no group's value)
-  const add = parts.length ? undefined : el(doc, "button", { class: "swd-table-add", text: "+ New", title: "Add an item", run: () => void host.create() });
+  const add = parts.length ? undefined : el(doc, "button", { class: "swd-table-add", text: "+ New", title: "Add an item", run: () => void host.create(undefined, undefined, { open: true }) });
   element.replaceChildren(el(doc, "div", "swd-table-box", el(doc, "table", "swd-table", ...parts)), ...(count || add ? [el(doc, "div", "swd-table-foot", add, count)] : []));
 }
 

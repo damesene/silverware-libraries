@@ -5,6 +5,7 @@
 // under its name. What makes a place and when it goes is the binding's
 // (docs/silverware-database.md, *The core*).
 import { revealItem, takeFocus, viewLimit, type LimitKey } from "./limit.ts";
+import { byTouch } from "../../../shared/pointer.ts";
 import { pageSize, settingValue } from "./general.ts";
 import { type Icons, iconsOf, isReference } from "../../../shared/icons.ts";
 import { writeClipboard } from "../../../shared/clipboard.ts";
@@ -26,7 +27,7 @@ import { focusPropertyList, propertiesEntry, type PropertiesFocus } from "./prop
 import { drawGrouped } from "./groups.ts";
 import { ICONS } from "./icons.ts";
 import { type ColorBy, colorable, itemIcon, itemLook, ownIconElement } from "./look.ts";
-import type { OpenedFrom, OpenedView, PlaceContext, PlaceTool } from "./module.ts";
+import type { ItemOpening, OpenedFrom, OpenedView, PlaceContext, PlaceTool } from "./module.ts";
 import { PlaceOpener } from "./opener.ts";
 import type { MenuEntry, MenuNaming } from "../../../shared/menu.ts";
 import { checkedGroups, type PlaceMenu, type PlaceMenuBuilder, type PlaceMenuGroup, placeMenu, toolMenu } from "./placemenu.ts";
@@ -65,8 +66,11 @@ export type PlaceOptions = {
   readonly editSource?: () => void;
   /** The database deleted, asked first (Delete database… in ⋯, last), where the host offers it */
   readonly deleteDatabase?: (id: string, name: string) => void;
-  /** An item opened by a module's own way (the peek, core/module.ts): whether one took it; else it opens where the store says. `from`: the view it was opened from, followed live */
-  readonly openItem?: (item: Item, database: string, from?: OpenedFrom) => boolean;
+  /**
+   * An item opened by a module's own way (the peek, core/module.ts): whether one took it; else it opens where the store
+   * says. `from`: the view it was opened from, followed live; `how`: one just added is opened so too (its name to give)
+   */
+  readonly openItem?: (item: Item, database: string, from?: OpenedFrom, how?: ItemOpening) => boolean;
   /**
    * What the place drawn before for the same block hands over (`handOver`: the
    * binding knows which place wrote the text this one is drawn for), asked once,
@@ -103,6 +107,14 @@ type Drawn = {
   // keys typed before the next one was focused were lost)
   typed?: Record<string, string>;
 };
+
+/** Whether a field has the focus, typed in (text, a number, a select, an editor): what it types is the user's */
+function typingIn(doc: Document): boolean {
+  const active = doc.activeElement;
+  if (!(active instanceof HTMLElement) || !active.isConnected) return false;
+  if (active.isContentEditable || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement) return true;
+  return active instanceof HTMLInputElement && !["button", "checkbox", "radio", "submit", "reset", "file", "color", "range"].includes(active.type);
+}
 
 /** The property a view is drawn once per group by (Group by picked, of a type it is grouped by, else the first where it always is; none where the view draws its own groups) */
 function groupingOf(view: ViewDefinition, host: ViewHost): Property | undefined {
@@ -411,10 +423,22 @@ export class DatabasePlace {
     return { label: drawn.view.label, hidden: drawn.host.look.hiddenProperties };
   }
 
-  /** The first item a Load more drew has the focus, once drawn */
+  /**
+   * The first item a Load more drew has the focus, once drawn, for the keys to go on from there; let go where the user
+   * has gone on elsewhere meanwhile, and on a device worked by a finger (no keys: the focus in the page's editor makes it
+   * scroll to its cursor)
+   */
   private focusLoaded(): void {
     const limit = this.drawn?.limit;
-    if (limit) takeFocus(limit, (focus) => this.focusItem(focus.item, focus.group));
+    if (!limit) return;
+    const doc = this.options.element.ownerDocument;
+    takeFocus(limit, (focus) => {
+      if (byTouch(doc.defaultView)) return true;
+      // (The button pressed is gone with its drawing: the focus on the body, or still on something of the view's)
+      const active = doc.activeElement;
+      const free = !active || active === doc.body || !active.isConnected || (!!this.body?.contains(active) && !typingIn(doc));
+      return !free || this.focusItem(focus.item, focus.group);
+    });
   }
 
   /** An item drawn given the focus (itself where it takes it, else what it holds that does), in `group` where given: whether it is drawn */
@@ -1102,14 +1126,22 @@ export class DatabasePlace {
         revealItem(limitKey, item.key);
         return refreshed(core.update(id, item, key, value));
       },
-      // (An item added, or moved, shown wherever it lands, past what the view draws too)
-      create: (draft, where) =>
-        refreshed(
+      // An item added, or moved, shown wherever it lands, past what the view draws too; one added as the user's (`open`)
+      // opened by a module's own way (the peek), its name to give (the module gives the focus back to it as it closes):
+      // not where something is typed in meanwhile (another item's name, a field), which it would take the keys of
+      create: async (draft, where, how) => {
+        const result = await refreshed(
           core.create(id, draft, where).then((result) => {
             if (!("problem" in result) && result.key !== undefined) revealItem(limitKey, result.key);
             return result;
           }),
-        ),
+        );
+        if (!how?.open || "problem" in result || result.key === undefined || drawn.ended || !this.options.openItem) return result;
+        const added = (await store.items(id)).value.find((one) => one.key === result.key);
+        if (!added || drawn.ended || typingIn(this.options.element.ownerDocument)) return result;
+        this.options.openItem(added, id, place.openerOf(), { added: true });
+        return result;
+      },
       rename: (item, name) => {
         revealItem(limitKey, item.key);
         return refreshed(core.rename(id, item, name));

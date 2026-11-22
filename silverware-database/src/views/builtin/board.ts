@@ -111,7 +111,7 @@ function columnElement(host: ViewHost, by: Property, column: ItemGroup, drag: Dr
     el(doc, "h3", "swd-board-title", title(host, by, column), el(doc, "span", { class: "swd-board-count", text: String(column.items.length) })),
     cards,
     ...(more ? [el(doc, "div", "swd-load-more", ...more)] : []),
-    el(doc, "button", { class: "swd-board-add", text: "+ New", title: `Add an item to ${column.label}`, run: () => void host.create({ values }) }),
+    el(doc, "button", { class: "swd-board-add", text: "+ New", title: `Add an item to ${column.label}`, run: () => void host.create({ values }, undefined, { open: true }) }),
   );
   box.addEventListener("dragover", (event) => {
     if (!carries(event, drag)) return;

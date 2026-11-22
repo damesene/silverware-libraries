@@ -80,7 +80,7 @@ async function setup(answer = true, withProperties = false, configured: Record<s
   const element = document.createElement("div");
   document.body.append(element);
   const state = new MemoryViewState({ [VIEW_KEY]: "list", ...viewState });
-  const place = new DatabasePlace({ element, database: "tasks", state, store, core, types, views: new ViewRegistry(BUILT_IN_VIEWS), settings: { get: (_path, fallback) => fallback }, ui, openItem: (item, database, from) => modules.openItem(item, database, from) });
+  const place = new DatabasePlace({ element, database: "tasks", state, store, core, types, views: new ViewRegistry(BUILT_IN_VIEWS), settings: { get: (_path, fallback) => fallback }, ui, openItem: (item, database, from, how) => modules.openItem(item, database, from, how) });
   await place.render();
   const named = async (name: string) => (await store.items("tasks")).value.find((one) => one.name === name)!;
   const q = <T extends Element = HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
@@ -175,6 +175,23 @@ describe("the peek", () => {
     place.destroy();
     await settle();
     expect(rows().filter(([, hidden]) => hidden).map(([key]) => key)).toEqual(["status", "done"]);
+  });
+
+  it("shows an item added by + New, its name selected to be typed over; closed, the focus on its row drawn anew by the rename", async () => {
+    const { q, named, place } = await setup();
+    q<HTMLButtonElement>(".swd-table-add").click();
+    await vi.waitFor(() => expect(document.activeElement?.matches(".swd-peek-name")).toBe(true), { timeout: 5_000 });
+    const name = q<HTMLInputElement>(".swd-peek-name");
+    expect([name.value, name.selectionStart, name.selectionEnd]).toEqual(["Untitled", 0, "Untitled".length]);
+    name.value = "Plan";
+    name.dispatchEvent(new Event("change"));
+    await vi.waitFor(async () => expect(await named("Plan")).toBeDefined(), { timeout: 5_000 });
+    // (Its view drawn anew with it, as SilverBullet draws a block as the index tells the write: the row it was opened from gone)
+    await place.render();
+    expect([...document.querySelectorAll(".swd-list-name")].map((one) => one.textContent)).toContain("Plan");
+    key(q(".swd-peek-name"), "Escape");
+    await vi.waitFor(() => expect(document.querySelector(".swd-peek")).toBeNull(), { timeout: 5_000 });
+    expect(document.activeElement?.closest("[data-item]")?.textContent).toContain("Plan");
   });
 
   it("shows an item opened from a view, its values and its body, and opens its page by Open", async () => {

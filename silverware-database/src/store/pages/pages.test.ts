@@ -289,6 +289,22 @@ describe("the pages store", () => {
     expect(memory.pages.get("db-tasks/A")).toContain("Body A edited by hand");
   });
 
+  it("keeps a renamed item's key for whoever reads while the rename is written (a listener told by the index meanwhile)", async () => {
+    const { memory, store } = harness(SEED);
+    const [item] = (await store.items("tasks")).value;
+    let meanwhile: (readonly [string, string])[] = [];
+    const rename = memory.platform.space.rename!;
+    memory.platform.space.rename = async (from, to) => {
+      const done = await rename(from, to);
+      // (Read before the write ends: the index has the page under its new name already)
+      meanwhile = (await store.items("tasks")).value.map((one) => [one.key, one.name] as const);
+      return done;
+    };
+    await store.apply(await store.plan(changes("tasks", { kind: "renameItem", item: item!.key, name: "Renamed" })));
+    expect(meanwhile).toEqual([[item!.key, "Renamed"]]);
+    expect((await store.items("tasks")).value.map((one) => one.key)).toEqual([item!.key]);
+  });
+
   it("says a rename that changed the page's text wrote its name alone, and shows the page as it is", async () => {
     const { memory, store } = harness(SEED);
     const rename = memory.platform.space.rename!;

@@ -39,6 +39,9 @@ export type OpenedFrom = {
   onChange(listener: () => void): () => void;
 };
 
+/** How an item is opened: `added` where the user has just added it (+ New), its name to be given first */
+export type ItemOpening = { readonly added?: boolean };
+
 export type PlaceContext = {
   readonly document: Document;
   readonly database: Database;
@@ -74,9 +77,10 @@ export type ModuleInstance = {
    * shows it in its own way (the peek), the first module to say so taking it;
    * else it opens where the store says (its page). The module reads and
    * writes the item through its own host (`items`, `core`), as of the
-   * database `database` (its id).
+   * database `database` (its id). `how`: an item just added is opened so too, its name to be given (none opens it
+   * where the store says: only a module's own way shows it)
    */
-  openItem?(item: Item, database: string, from?: OpenedFrom): boolean;
+  openItem?(item: Item, database: string, from?: OpenedFrom, how?: ItemOpening): boolean;
   /** The module turned off, or started again: what it listens to stops, what it shows closes */
   stop?(): void;
 };
@@ -236,10 +240,10 @@ export class Modules {
   }
 
   /** An item a view opens taken by the first module that shows it in its own way: whether one did */
-  openItem(item: Item, database: string, from?: OpenedFrom): boolean {
+  openItem(item: Item, database: string, from?: OpenedFrom, how?: ItemOpening): boolean {
     for (const { definition, instance } of this.started) {
       try {
-        if (instance.openItem?.(item, database, from)) return true;
+        if (instance.openItem?.(item, database, from, how)) return true;
       } catch (error) {
         this.host.ui.notify(`Silverware Database: the module ${definition.label} failed to open "${item.name}" (${error instanceof Error ? error.message : String(error)})`, { type: "error" });
       }

@@ -12,6 +12,8 @@ import { MemoryStore } from "../../store/memory.ts";
 import { MemoryViewState } from "../../store/viewstate.ts";
 import { BUILT_IN_VIEWS } from "./index.ts";
 import { ranksInOrder } from "../../domain/rank.ts";
+import { revealItem, viewLimit } from "../../core/limit.ts";
+import type { Item } from "../../model/database.ts";
 
 // What a press or a write draws, waited for as it comes (a place draws anew after its data is read again)
 const settled = (check: () => void) => vi.waitFor(check, { timeout: 5_000 });
@@ -61,6 +63,19 @@ async function setup(count: number, state: Record<string, unknown> = {}, size = 
 }
 
 describe("Load more", () => {
+  it("draws by a press the next items not shown yet, past a page shown whole already (its items changed past the cut)", () => {
+    const items = Array.from({ length: 30 }, (_, n) => ({ key: `i${n}`, name: `I${n}`, values: {} }) as unknown as Item);
+    const key = { key: `limit${++databases}`, signature: () => "" };
+    let drawn = 0;
+    const limit = viewLimit({ ...key, size: 10, document, refresh: () => drawn++ });
+    for (const item of items.slice(10, 20)) revealItem(key, item.key);
+    expect(limit.shown(items)).toHaveLength(20);
+    const [button, count] = limit.more(items)!;
+    expect([button!.textContent, count!.textContent]).toEqual(["Load 10 more", "20 of 30"]);
+    button!.click();
+    expect([drawn, limit.shown(items).length, limit.more(items)]).toEqual([1, 30, undefined]);
+  });
+
   it("draws a view's first items, as many more each press, the first of them focused, none past the last", async () => {
     const view = await setup(25);
     expect(view.names()).toHaveLength(10);

@@ -39,8 +39,9 @@ cost (all of 50,000 items' formulas in 0.7 s); the drawing is (26 elements a row
   table, a list or a board's column puts it at the end; a value changed moves it where a sort or a group puts it; a
   card dropped in a sorted column lands where its value sorts it): its
   key kept as shown (not the group's count raised: + New at the end of 20,000 would draw them all), drawn in its place
-  in the order after the cut, once the store lists it (the index catching up). It stays shown until the listing
-  changes as above.
+  in the order after the cut, once the store lists it (the index catching up). It stays shown with its listing's
+  state, for the window (the last 50 listings), a press then drawing the next items not shown yet (a page of those
+  shown already skipped).
 - Dragging by hand moves among the items drawn; a group's end drawn so far is its end for a drag (Alt+↓ on the last
   drawn does nothing).
 - A calendar's month shows every item of its days; its list of items without a date (100 at a time today, `Show N

@@ -23,6 +23,7 @@ import stylePage from "../silverware-database/silverware-database-style.md";
 // Silverware Icons beside it, as a space with both installed: its API given, its style applied
 import iconsStylePage from "../silverware-icons/silverware-icons-style.md";
 import { api as icons } from "../silverware-icons/src/index.ts";
+import { editorsOf } from "../shared/editor.ts";
 import { flash, setUpTheme } from "./common.ts";
 import { SAMPLE_DATABASES } from "./database-sample.ts";
 import { BUILT_IN_VIEWS } from "../silverware-database/src/views/builtin/index.ts";
@@ -129,6 +130,8 @@ function start(): void {
     {
       document,
       icons,
+      // (The item's content in a plain text field: Silverware Editor is not on the playground's page)
+      editors: editorsOf(undefined),
       core,
       types,
       ui,
@@ -159,7 +162,7 @@ function start(): void {
     element.className = "swd-place";
     section.append(element);
     main.append(section);
-    const place = new DatabasePlace({ element, database: database.id, state: new StoredViewState(`silverware-playground.database.state.${database.id}`), store: calculated, core, types, views, settings, ui, editor: EDITOR, documents: PAGES, media: MEDIA, moduleMenu: (where, menu) => modules.placeMenu(where, menu), moduleTools: (where) => modules.placeTools(where), placeDrawn: (where) => modules.placeDrawn(where), openItem: (item, database, from) => modules.openItem(item, database, from), deleteDatabase: (id, name) => openDeleteDatabase({ document, core, noun: core.noun, notify: (message) => flash(message), written: () => places.forEach((one) => void one.render()) }, id, name) });
+    const place = new DatabasePlace({ element, database: database.id, state: new StoredViewState(`silverware-playground.database.state.${database.id}`), store: calculated, core, types, views, settings, ui, editor: EDITOR, documents: PAGES, media: MEDIA, moduleMenu: (where, menu) => modules.placeMenu(where, menu), moduleTools: (where) => modules.placeTools(where), placeDrawn: (where) => modules.placeDrawn(where), openItem: (item, database, from, how) => modules.openItem(item, database, from, how), deleteDatabase: (id, name) => openDeleteDatabase({ document, core, noun: core.noun, notify: (message) => flash(message), written: () => places.forEach((one) => void one.render()) }, id, name) });
     return place;
   });
   void modules.start().then(() => places.forEach((place) => void place.render()));

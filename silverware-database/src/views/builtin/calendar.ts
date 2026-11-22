@@ -211,7 +211,7 @@ function draw(host: ViewHost, element: HTMLElement, drag: Drag): void {
   const add = (day: Day) => {
     const made = spans.created(day);
     if ("problem" in made) return host.notify(made.problem);
-    void host.create({ values: made.values });
+    void host.create({ values: made.values }, undefined, { open: true });
   };
   const title = fmt({ month: "long", year: "numeric" }).format(new Date(Date.UTC(shown.year, shown.month, 1)));
   const head = el(

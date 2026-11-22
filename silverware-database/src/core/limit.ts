@@ -53,9 +53,15 @@ export function viewLimit(options: LimitOptions): ViewLimit {
     const view = viewShown(options);
     const count = Math.min(items.length, options.size * ((view.presses.get(group) ?? 0) + 1));
     const past = view.revealed.size ? items.slice(count).filter((item) => view.revealed.has(item.key)) : [];
-    // (What a press draws: the next page's items, but for those shown already past the cut)
-    const next = items.slice(count, count + options.size).filter((item) => !view.revealed.has(item.key));
-    return { view, count, past, next };
+    // (What a press draws: the next page's items, but for those shown already past the cut; pages of those alone gone
+    // past, so a press draws something)
+    let pages = 1;
+    let next: Item[] = [];
+    for (; count + (pages - 1) * options.size < items.length; pages++) {
+      next = items.slice(count, count + pages * options.size).filter((item) => !view.revealed.has(item.key));
+      if (next.length) break;
+    }
+    return { view, count, past, next, pages };
   };
   return {
     shown(items, group = "") {
@@ -63,14 +69,14 @@ export function viewLimit(options: LimitOptions): ViewLimit {
       return count >= items.length ? items : [...items.slice(0, count), ...past];
     },
     more(items, group = "") {
-      const { count, past, next } = cut(items, group);
+      const { count, past, next, pages } = cut(items, group);
       if (count + past.length >= items.length) return undefined;
       return moreParts(options.document, count + past.length, items.length, next.length, () => {
         const now = viewShown(options);
         // (The first of those it draws has the focus once drawn: the keys go on from there)
         const first = next[0];
         now.focus = first && { item: first.key, group };
-        now.presses.set(group, (now.presses.get(group) ?? 0) + 1);
+        now.presses.set(group, (now.presses.get(group) ?? 0) + pages);
         options.refresh();
       });
     },

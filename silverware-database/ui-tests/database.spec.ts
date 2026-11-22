@@ -92,10 +92,19 @@ test("the calendar: items on their days, one dragged to another day keeping its 
   // One without a date dragged onto a day: given it
   await page.locator(".swd-cal-undated .swd-cal-item").dragTo(cell(13));
   await expect.poll(() => space.saved("Page/db-tasks/Someday")).toContain(day(13));
-  // A day's +: an item added on it
+  // A day's +: an item added on it, opened in the peek with its name selected, typed over there; Esc closes it
   await cell(20).hover({ position: { x: 10, y: 10 } });
   await cell(20).locator(".swd-cal-add").click();
-  await expect.poll(() => space.saved("Page/db-tasks/Untitled")).toContain(day(20));
+  await expect(page.locator(".swd-peek-name")).toBeFocused();
+  await page.keyboard.type("Review");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => space.saved("Page/db-tasks/Review")).toContain(day(20));
+  // (The panel still on it, renamed: its key kept through the rename as the index tells the new page)
+  await expect(page.locator(".swd-peek-name")).toHaveValue("Review");
+  await page.locator(".swd-peek-name").press("Escape");
+  await expect(page.locator(".swd-peek")).toHaveCount(0);
+  // (The focus back on the item added, drawn anew by its rename)
+  await expect(bar("Review")).toBeFocused();
   // A phone: the days show marks, a day pressed lists its items whole under the month
   await page.setViewportSize({ width: 390, height: 844 });
   await cell(12).click({ position: { x: 4, y: 12 } });

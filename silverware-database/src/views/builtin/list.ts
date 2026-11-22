@@ -38,7 +38,7 @@ function draw(host: ViewHost, element: HTMLElement): void {
   element.replaceChildren(
     list,
     ...(more ? [el(doc, "div", "swd-load-more", ...more)] : []),
-    el(doc, "div", "swd-table-foot", el(doc, "button", { class: "swd-table-add", text: "+ New", title: "Add an item", run: () => void host.create() })),
+    el(doc, "div", "swd-table-foot", el(doc, "button", { class: "swd-table-add", text: "+ New", title: "Add an item", run: () => void host.create(undefined, undefined, { open: true }) })),
   );
 }
 

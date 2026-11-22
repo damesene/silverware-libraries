@@ -33,7 +33,7 @@ function groupHost(host: ViewHost, property: Property, key: string, groups: () =
   Object.defineProperty(grouped, "total", { get: () => group()?.items.length ?? 0 });
   // (Its items are one group's: grouped no further)
   Object.defineProperty(grouped, "grouping", { get: () => undefined });
-  grouped.create = (draft = {}, place) => createInGroup(host, property, group(), draft, place);
+  grouped.create = (draft = {}, place, how) => createInGroup(host, property, group(), draft, place, how);
   return grouped;
 }
 

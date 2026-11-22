@@ -170,7 +170,8 @@ export type ViewHost = DocumentsHost & MentionsHost & MediaHost & {
   text(item: Item, key: string): string;
   /** The core's writes, for this database (`items` may be several, the others one); each says why where refused (`isRefused`), the user told already */
   update(item: Item, key: string, value: Value | undefined): Promise<Result>;
-  create(draft?: ItemDraft, place?: Place): Promise<Result>;
+  /** `how.open`: the item, once added, opened as one the user adds (the item's panel, its name to type), where nothing else is typed in meanwhile */
+  create(draft?: ItemDraft, place?: Place, how?: { readonly open?: boolean }): Promise<Result>;
   rename(item: Item, name: string): Promise<Result>;
   remove(items: readonly Item[]): Promise<Result>;
   move(item: Item, place: Place): Promise<Result>;

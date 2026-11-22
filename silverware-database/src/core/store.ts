@@ -16,7 +16,7 @@ export type StoreCapabilities = {
   readonly renameFollowsLinks: boolean;
   // An item has a body of its own (content in the markdown language)
   readonly itemBody: boolean;
-  // An item is a document of its own (a page): a change of many items writes as many documents, one after another
+  // An item is a document of its own (a page): a change of many items writes as many documents, a few at once
   readonly itemDocument: boolean;
 };
 

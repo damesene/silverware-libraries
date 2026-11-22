@@ -917,7 +917,7 @@ describe("renaming options", () => {
     expect(await status()).toBe(200);
     // Declined: nothing undone, still to undo
     expect(await core.undo("tasks")).toMatchObject({ cause: "declined" });
-    expect(asked.at(-1)).toContain("It writes 201 pages, one after another: it takes a while; keep this window open");
+    expect(asked.at(-1)).toContain("It writes 201 pages: it takes a while; keep this window open");
     expect(await status()).toBe(200);
     // A change recorded while the user is asked: the one asked about is no longer the last, nothing undone
     answer = true;

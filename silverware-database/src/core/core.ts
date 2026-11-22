@@ -83,7 +83,7 @@ export type Proposal = {
   readonly label: string;
   readonly plan: TransactionPlan;
   readonly unreadable?: readonly ItemKey[];
-  /** Where each item is a document of its own (a page): how many documents it writes, one after another, and whether that is many (it takes a while, not to be stopped) */
+  /** Where each item is a document of its own (a page): how many documents it writes, a few at once, and whether that is many (it takes a while, not to be stopped) */
   readonly documents?: { readonly count: number; readonly many: boolean };
   /** Options renamed (`retypeProperty`'s `renames`): each with how many items' values it renames */
   readonly renamed?: readonly OptionRenamed[];
@@ -1108,9 +1108,9 @@ export class DatabaseCore {
       const last = this.history.last(database);
       let plan = last && (await this.history.planUndo(last.report));
       if (!last || !plan) return undefined;
-      // Many pages, one after another (an option renamed in thousands of items): said, and asked first
+      // Many pages (an option renamed in thousands of items): said, and asked first
       if (this.store.capabilities.itemDocument && manyDocuments(plan).many) {
-        if (!(await this.ui.ask(`Undo "${last.label}"? It writes ${plan.planned.length.toLocaleString("en-US")} ${this.noun.many}, one after another: it takes a while; keep this window open until it is done.`))) return { problem: "Not undone", cause: "declined" };
+        if (!(await this.ui.ask(`Undo "${last.label}"? It writes ${plan.planned.length.toLocaleString("en-US")} ${this.noun.many}: it takes a while; keep this window open until it is done.`))) return { problem: "Not undone", cause: "declined" };
         // (Asked, the pages may have changed meanwhile, another client's, a change recorded since: the last one planned anew)
         if (this.history.last(database) !== last) return this.refuse(`Undo: "${last.label}" is no longer the last change: not undone, undo again`);
         plan = await this.history.planUndo(last.report);

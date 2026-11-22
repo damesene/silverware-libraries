@@ -1189,7 +1189,7 @@ export class PropertiesDialog {
     const left = proposal.plan.skipped.length;
     const kept = proposal.unreadable?.length ?? 0;
     const count = (n: number) => (n === 1 ? "1 item" : `${n} items`);
-    // Each item a page of its own: as many pages written, one after another (the database's own page too)
+    // Each item a page of its own: as many pages written, a few at once (the database's own page too)
     const pages = proposal.documents?.count ?? 0;
     const number = (n: number) => n.toLocaleString("en-US");
     const lines = [
@@ -1203,9 +1203,9 @@ export class PropertiesDialog {
       // (A block in a list item is not written: left as it is, to change by hand)
       proposal.places?.byHand?.length ? `Views of it in a list item are left as they are (change them by hand): ${placesNamed(proposal.places.byHand, this.host.noun)}.` : "",
       // (Said of every change of items, however few: it is seldom made, and stopped halfway it is half written)
-      pages ? `Writes ${pages === 1 ? `1 ${this.host.noun.one}` : `${number(pages)} ${this.host.noun.many}`}, one after another: keep this window open until it is done (stopped halfway, the items not written yet keep their old values).` : "",
+      pages ? `Writes ${pages === 1 ? `1 ${this.host.noun.one}` : `${number(pages)} ${this.host.noun.many}`}: keep this window open until it is done (stopped halfway, the items not written yet keep their old values).` : "",
     ].filter(Boolean);
-    // How far the write is, told as it goes (a store of pages writes them one after another)
+    // How far the write is, told as it goes (a store of pages writes them a few at once)
     const progress = el(doc, "p", { class: "swd-property-progress", attrs: { hidden: "" } });
     const apply = el(doc, "button", {
       class: `${BASE}-save swd-property-apply`,

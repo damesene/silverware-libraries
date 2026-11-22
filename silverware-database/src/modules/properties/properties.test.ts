@@ -620,7 +620,7 @@ describe("the properties' dialog", () => {
     typeOption(optionNames()[0]!, "To do");
     await save();
     // (One item holds Todo: its page and the database's)
-    expect(q(".swd-property-review").textContent).toContain("Writes 2 pages, one after another: keep this window open until it is done");
+    expect(q(".swd-property-review").textContent).toContain("Writes 2 pages: keep this window open until it is done");
   });
 
   it("stays open while a change is written, said why, and closes once it is", async () => {

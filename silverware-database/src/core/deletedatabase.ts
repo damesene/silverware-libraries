@@ -101,7 +101,7 @@ export function openDeleteDatabase(host: DeleteDatabaseHost, id: string, name: s
       places.length ? `Its views, taken out of ${many(places.length, noun.one, noun.many)}: ${listed(places)}.` : byHand.length ? "" : `No view of it on any ${noun.one}.`,
       // (A block in a list item is not written: left, to take out by hand)
       byHand.length ? `Its views in a list item, left (take them out by hand): ${listed(byHand)}.` : "",
-      ...(pages ? [`Writes ${many(pages, noun.one, noun.many)}, one after another: keep this window open until it is done.`] : []),
+      ...(pages ? [`Writes ${many(pages, noun.one, noun.many)}: keep this window open until it is done.`] : []),
       "Undo brings it all back as long as this window stays open; once it is reloaded, it cannot.",
     ];
     said.replaceChildren(...lines.filter(Boolean).map((text) => el(doc, "li", { text })));

@@ -4,14 +4,15 @@
 // The mark is on the element itself, so an element taken out of the page takes
 // its mark along.
 
+import { marked, watchMark } from "./watchmark.ts";
+
 /** The attribute on an element shown over the whole window */
 export const OVER_WINDOW_ATTRIBUTE = "data-silverware-over-window";
 
 const SELECTOR = `[${OVER_WINDOW_ATTRIBUTE}]`;
 
-// How long nothing is marked before the end is told: a view rendered anew (its element replaced, the new one marked
-// a moment later) does not end
-export const ENDED_MS = 100;
+// (How long nothing is marked before the end is told: the shared watcher's)
+export { ENDED_MS } from "./watchmark.ts";
 
 /** An element marked as shown over the whole window, or not */
 export function markOverWindow(element: Element, on: boolean): void {
@@ -29,7 +30,7 @@ export function overWindowOf(node: EventTarget | null): Element | undefined {
 
 /** Whether a plugin shows something over the whole window in a document */
 export function overWindowShown(doc: Document): boolean {
-  return !!doc.querySelector(SELECTOR);
+  return marked(doc, OVER_WINDOW_ATTRIBUTE);
 }
 
 /**
@@ -38,27 +39,5 @@ export function overWindowShown(doc: Document): boolean {
  * element put in or taken out with its mark. Gives the way to stop watching
  */
 export function watchOverWindow(doc: Document, changed: (shown: boolean) => void): () => void {
-  const view = doc.defaultView;
-  if (!view?.MutationObserver) return () => undefined;
-  let shown = overWindowShown(doc);
-  let ending: number | undefined;
-  const tell = (now: boolean) => {
-    if (now === shown) return;
-    shown = now;
-    changed(now);
-  };
-  // (Only changes that may concern a mark are looked at: the page's editor changes the document as it is typed in)
-  const marked = (node: Node) => node instanceof view.Element && (node.hasAttribute(OVER_WINDOW_ATTRIBUTE) || !!node.querySelector(SELECTOR));
-  const observer = new view.MutationObserver((records) => {
-    if (!records.some((r) => r.type === "attributes" || [...r.addedNodes, ...r.removedNodes].some(marked))) return;
-    view.clearTimeout(ending);
-    ending = undefined;
-    if (overWindowShown(doc)) tell(true);
-    else if (shown) ending = view.setTimeout(() => tell(overWindowShown(doc)), ENDED_MS);
-  });
-  observer.observe(doc.documentElement, { attributes: true, attributeFilter: [OVER_WINDOW_ATTRIBUTE], childList: true, subtree: true });
-  return () => {
-    observer.disconnect();
-    view.clearTimeout(ending);
-  };
+  return watchMark(doc, OVER_WINDOW_ATTRIBUTE, changed);
 }

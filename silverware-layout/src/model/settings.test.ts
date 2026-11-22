@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_GUIDES, DEFAULT_MIN_PANE_WIDTH, guideName, keptGuides, PATHS, readFontSize, readSettings, validateFontSize, validateGuide } from "./settings.ts";
+import { DEFAULT_GUIDES, DEFAULT_MIN_PANE_WIDTH, guideName, keptGuides, PATHS, readFontSize, readSettings, readTextAlign, validateFontSize, validateGuide } from "./settings.ts";
 
 const configured = (values: Record<string, unknown>) => (path: string) => values[path];
 
 describe("Silverware Layout's settings", () => {
   it("their defaults where nothing is configured: the theme's text width, 600 px, guides of 900 px, 1200 px and full, the theme's font size, font zoom on", () => {
-    expect(readSettings(configured({}))).toEqual({ textWidth: undefined, minPaneWidth: DEFAULT_MIN_PANE_WIDTH, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true, fontPinch: true, fontScaleFiles: true, alignments: {} });
+    expect(readSettings(configured({}))).toEqual({ textWidth: undefined, textAlign: undefined, minPaneWidth: DEFAULT_MIN_PANE_WIDTH, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true, fontPinch: true, fontScaleFiles: true, alignments: {} });
     expect(DEFAULT_GUIDES).toEqual([900, 1200, "full"]);
   });
 
@@ -20,6 +20,14 @@ describe("Silverware Layout's settings", () => {
   it("guides from Lua (an object of 1, 2, …), each once, one not read left out, an empty list kept empty", () => {
     expect(readSettings(configured({ [PATHS.guides]: { 1: "900px", 2: "900", 3: "wide", 4: "90%", 5: 50, 6: "full", 7: "5%", 8: "120%", 9: "90 %" } })).guides).toEqual([900, "90%", "full"]);
     expect(readSettings(configured({ [PATHS.guides]: {} })).guides).toEqual([]);
+  });
+
+  it("the text's alignment: centred, left or left while a panel is open; anything else none (centred)", () => {
+    expect(readSettings(configured({ [PATHS.textAlign]: "left" })).textAlign).toBe("left");
+    expect(readSettings(configured({ [PATHS.textAlign]: "left-with-panel" })).textAlign).toBe("left-with-panel");
+    expect(readSettings(configured({ [PATHS.textAlign]: "right" })).textAlign).toBeUndefined();
+    expect(readTextAlign("center")).toBe("center");
+    expect(readTextAlign(undefined)).toBeUndefined();
   });
 
   it("a value not read takes its default", () => {

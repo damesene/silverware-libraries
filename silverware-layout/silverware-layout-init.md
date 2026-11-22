@@ -29,6 +29,13 @@ config.define("silverware.layout", {
       description = "The width of the text of pages without their own, in px (1100px) or in % of the editor's pane (90%). Empty: your theme's.",
       ui = { category = "Silverware Layout", label = "Default text width", priority = 1 },
     },
+    textAlign = {
+      type = "string",
+      enum = { "center", "left", "left-with-panel" },
+      default = "center",
+      description = "Where the text of pages without their own alignment stands: centred, at the left, or centred and at the left while a file or an item is open in a side panel (left-with-panel).",
+      ui = { category = "Silverware Layout", label = "Default text alignment", priority = 0.95 },
+    },
     minPaneWidth = {
       type = "number",
       default = 600,
@@ -218,7 +225,7 @@ if js and js.window then
     run = function()
       local meta = editor.getCurrentPageMeta()
       local layout = meta and meta._layout
-      silverwareLayoutJs.pageLoaded(editor.getCurrentPage(), type(layout) == "table" and layout.width or nil)
+      silverwareLayoutJs.pageLoaded(editor.getCurrentPage(), type(layout) == "table" and layout.width or nil, type(layout) == "table" and layout.align or nil)
     end,
   })
   -- The page edited: its frontmatter read again once it is still a moment (a width typed by hand)

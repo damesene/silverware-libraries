@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Platform } from "../../../../shared/platform.ts";
 import { pageWriter } from "../../../../shared/pages/writer.ts";
-import { pageLayoutOf, writePageWidth } from "./page.ts";
+import { type PageTextLayout, pageLayoutOf, writePageLayout } from "./page.ts";
 
 /** A page open in an editor of memory, as the page writer writes it (through the editor) */
 function openPage(name: string, text: string) {
@@ -22,13 +22,14 @@ function openPage(name: string, text: string) {
       list: () => [name],
     },
   };
-  return { page, write: (width: Parameters<typeof writePageWidth>[3]) => writePageWidth(pageWriter(platform), name, page.text, width) };
+  const layout = (written: PageTextLayout) => writePageLayout(pageWriter(platform), name, page.text, written);
+  return { page, layout, write: (width: PageTextLayout["width"]) => layout({ width, align: pageLayoutOf(page.text).align }) };
 }
 
 describe("A page's layout in its frontmatter", () => {
   it("its text width read from _layout.width: pixels a number, percent a text", () => {
-    expect(pageLayoutOf("---\n_layout:\n  width: 1100\n---\n# Page\n")).toEqual({ width: { amount: 1100, unit: "px" }, more: false });
-    expect(pageLayoutOf('---\n_layout:\n  width: "90%"\n  other: 1\n---\n')).toEqual({ width: { amount: 90, unit: "%" }, more: true });
+    expect(pageLayoutOf("---\n_layout:\n  width: 1100\n---\n# Page\n")).toEqual({ width: { amount: 1100, unit: "px" }, align: undefined, more: false });
+    expect(pageLayoutOf('---\n_layout:\n  width: "90%"\n  other: 1\n---\n')).toEqual({ width: { amount: 90, unit: "%" }, align: undefined, more: true });
   });
 
   it("none without a frontmatter, without _layout, with a width not read, or a frontmatter not read", () => {
@@ -52,5 +53,29 @@ describe("A page's layout in its frontmatter", () => {
     const more = openPage("Page", "---\n_layout:\n  width: 1100\n  other: 1\n---\n# Page\n");
     await more.write(undefined);
     expect(more.page.text).toBe("---\n_layout:\n  other: 1\n---\n# Page\n");
+  });
+
+  it("its text's alignment read from _layout.align, beside the width; one not read none", () => {
+    expect(pageLayoutOf("---\n_layout:\n  width: 1100\n  align: left-with-panel\n---\n")).toEqual({ width: { amount: 1100, unit: "px" }, align: "left-with-panel", more: false });
+    expect(pageLayoutOf("---\n_layout:\n  align: right\n---\n").align).toBeUndefined();
+  });
+
+  it("width and alignment written in one edit; each taken off alone, _layout with the last", async () => {
+    const one = openPage("Page", "---\ntags: a\n---\n# Page\n");
+    expect(await one.layout({ width: { amount: 1100, unit: "px" }, align: "left" })).toBeUndefined();
+    expect(one.page.text).toBe("---\ntags: a\n_layout:\n  width: 1100\n  align: left\n---\n# Page\n");
+    await one.layout({ width: undefined, align: "left" });
+    expect(one.page.text).toBe("---\ntags: a\n_layout:\n  align: left\n---\n# Page\n");
+    await one.layout({ width: undefined, align: undefined });
+    expect(one.page.text).toBe("---\ntags: a\n---\n# Page\n");
+  });
+
+  it("an alignment it does not read (typed by hand) kept as the rest of _layout: a width written beside it, none taken off", async () => {
+    const one = openPage("Page", "---\n_layout:\n  align: right\n---\n# Page\n");
+    expect(pageLayoutOf(one.page.text)).toEqual({ width: undefined, align: undefined, more: true });
+    await one.layout({ width: { amount: 1100, unit: "px" }, align: undefined });
+    expect(one.page.text).toBe("---\n_layout:\n  align: right\n  width: 1100\n---\n# Page\n");
+    await one.layout({ width: undefined, align: undefined });
+    expect(one.page.text).toBe("---\n_layout:\n  align: right\n---\n# Page\n");
   });
 });

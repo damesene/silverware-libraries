@@ -2,8 +2,9 @@
 // (this page, all pages, this device), the same in each: a slider, the value typed and ↺, and under them what it
 // follows while it has no value of its own (the field empty, that value its placeholder); moved or typed in, it is its
 // own, ↺ takes it back:
-// - Page width: this page's (or all pages') and all pages' (or the theme's), in px or % of the pane, the sliders
-//   marked with the guides and snapping to them.
+// - Page: the text's width, this page's (or all pages') and all pages' (or the theme's), in px or % of the pane, the
+//   sliders marked with the guides and snapping to them; and where the text stands (docs/silverware-layout-text-align.md),
+//   all pages' (or centred) and this page's (or all pages'), each a pick list.
 // - Font: the editor's font size for all pages (or the theme's) and this device's zoom (or the size of all pages), as
 //   Ctrl + scroll sets it, with whether Ctrl + scroll zooms at all (docs/silverware-layout-font-size.md).
 //   While a slider is held, the dialog all but goes, its slider alone shown: the page under it seen as it changes
@@ -21,7 +22,7 @@ import { type SegmentedControl, segmentedControl } from "../../../shared/control
 import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { el } from "../../../shared/elements.ts";
 import { tabs } from "../../../shared/tabs.ts";
-import { DEFAULT_GUIDES, FONT_SIZE_LIMITS, GUIDE_LIMITS, type Guide, guideName, guideOf, percentOf, validateFontSize, validateGuide } from "../model/settings.ts";
+import { DEFAULT_GUIDES, FONT_SIZE_LIMITS, GUIDE_LIMITS, type Guide, guideName, guideOf, percentOf, readTextAlign, TEXT_ALIGN_NAMES, TEXT_ALIGNS, type TextAlign, validateFontSize, validateGuide } from "../model/settings.ts";
 import { sameWidth, TEXT_WIDTH_LIMITS, validateTextWidth, type Width, type WidthUnit } from "../model/width.ts";
 import { widthInPane } from "../core/widgetwidth.ts";
 import { ICONS } from "./icons.ts";
@@ -56,10 +57,13 @@ export type PageDialogStore = {
   // As saved now: the page's own width, the default, the guides
   readonly pageWidth: Width | undefined;
   readonly defaultWidth: Width | undefined;
+  // Where the text stands: the page's own, all pages' (each none: what it follows)
+  readonly pageAlign: TextAlign | undefined;
+  readonly defaultAlign: TextAlign | undefined;
   readonly guides: readonly Guide[];
   // Whether settings can be saved here (else only this page's width)
   readonly canSaveSettings: boolean;
-  // Narrower than this (px), the pane gets no width of Silverware Layout's (a phone): said on the Page width tab
+  // Narrower than this (px), the pane gets no width of Silverware Layout's (a phone): said on the Page tab
   readonly minPaneWidth: number;
   // The editor's pane now (px): a slider's room, and what % are of
   paneWidth(): number;
@@ -78,8 +82,9 @@ export type PageDialogStore = {
   preview(shown: Preview): void;
   restore(): void;
   // Each saved; why not, as text
-  savePage(width: Width | undefined): Promise<string | undefined>;
+  savePage(layout: { readonly width: Width | undefined; readonly align: TextAlign | undefined }): Promise<string | undefined>;
   saveDefault(width: Width | undefined): Promise<string | undefined>;
+  saveDefaultAlign(align: TextAlign | undefined): Promise<string | undefined>;
   saveGuides(guides: readonly Guide[]): Promise<string | undefined>;
   saveFont(font: { readonly fontSize: number | undefined; readonly fontZoom: boolean; readonly fontPinch: boolean; readonly fontScaleFiles: boolean }): Promise<string | undefined>;
   // This device's zoom kept (none: taken off)
@@ -96,12 +101,18 @@ export type PageDialogStore = {
 export type Preview = {
   readonly pageWidth: Width | undefined;
   readonly defaultWidth: Width | undefined;
+  // Where the text stands: the page's own, all pages' (each none: what it follows)
+  readonly pageAlign: TextAlign | undefined;
+  readonly defaultAlign: TextAlign | undefined;
   readonly fontSize: number | undefined;
   readonly fontZoom: boolean;
   // Whether the files zoom with the font (none said: no)
   readonly scaleFiles?: boolean;
   readonly zoom: number | undefined;
 };
+
+/** All pages' alignment as saved, centred (its default) as none: what its pick list shows and is compared with */
+const savedDefaultAlign = (store: PageDialogStore): TextAlign | undefined => (store.defaultAlign === "center" ? undefined : store.defaultAlign);
 
 /** The font size being set: its own (or the theme's), its number as typed */
 type FontField = { own: boolean; amount: string };
@@ -167,6 +178,9 @@ export class PageDialog {
   private saving = false;
   private page: WidthRow | undefined;
   private fallback: WidthRow | undefined;
+  // Where the text stands: this page's and all pages' pick lists (empty: what each follows)
+  private pageAlign: HTMLSelectElement | undefined;
+  private fallbackAlign: HTMLSelectElement | undefined;
   private guideRows: GuideRow[] = [];
   private guideList: HTMLElement | undefined;
   private full: HTMLInputElement | undefined;
@@ -227,7 +241,10 @@ export class PageDialog {
     // (All pages first, as on the Font tab: what holds everywhere, then what holds here alone)
     this.fallback.element.dataset.swlRow = "all";
     this.page.element.dataset.swlRow = "page";
-    const pagePanel = el(doc, "div", `${BASE}-widths`, this.fallback.element, this.page.element);
+    const [fallbackAlign, pageAlign] = this.alignRows();
+    if (!store.canSaveSettings) fallbackAlign.classList.add(`${BASE}-readonly`);
+    const section = (title: string) => el(doc, "h3", `${BASE}-section`, title);
+    const pagePanel = el(doc, "div", `${BASE}-widths`, section("Width"), this.fallback.element, this.page.element, section("Alignment"), fallbackAlign, pageAlign);
     // On a screen too narrow for widths (a phone): said first, that what is set here shows on a wider one
     if (store.paneWidth() < store.minPaneWidth) {
       pagePanel.prepend(
@@ -290,8 +307,8 @@ export class PageDialog {
     // Settings that cannot be saved here cannot be changed either (Save would leave them as they are); Preview still shows
     if (!store.canSaveSettings) {
       guidesPanel.classList.add(`${BASE}-readonly`);
-      for (const part of [this.fallback.element, guidesPanel, this.fontZoom!, this.fontPinch!, this.fontScaleFiles!]) {
-        const controls = part instanceof HTMLInputElement ? [part] : part.querySelectorAll<HTMLInputElement | HTMLButtonElement>("input, button");
+      for (const part of [this.fallback.element, fallbackAlign, guidesPanel, this.fontZoom!, this.fontPinch!, this.fontScaleFiles!]) {
+        const controls = part instanceof HTMLInputElement ? [part] : part.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>("input, button, select");
         for (const control of controls) if (control !== preview) control.disabled = true;
       }
     }
@@ -300,7 +317,7 @@ export class PageDialog {
     this.fallback.show();
 
     const { bar, panels, select } = tabs(doc, BASE, "swl", [
-      { id: "page", title: "Page width", panel: pagePanel },
+      { id: "page", title: "Page", panel: pagePanel },
       { id: "font", title: "Font", panel: fontPanel },
       { id: "guides", title: "Guides", panel: guidesPanel },
       ...(store.tabs ?? []).map(({ id, title, panel }) => ({ id, title, panel })),
@@ -341,6 +358,37 @@ export class PageDialog {
     });
     select("page");
     this.update();
+  }
+
+  /**
+   * The rows of where the text stands: all pages' (centred, its default, or its own) and this page's (all pages', or its
+   * own), each a pick list; this page's first entry names what all pages' is set to now
+   */
+  private alignRows(): [HTMLElement, HTMLElement] {
+    const { doc } = this;
+    const store = this.store!;
+    // (All pages: centred its default, no entry of its own; this page: centred too, over all pages' other one)
+    const select = (name: string, own: TextAlign | undefined, centred: boolean) => {
+      const list = el(doc, "select", { class: `${BASE}-align`, attrs: { "aria-label": `${name}: where the text stands` } });
+      list.append(el(doc, "option", { attrs: { value: "" } }));
+      for (const align of TEXT_ALIGNS) if (centred || align !== "center") list.append(el(doc, "option", { text: TEXT_ALIGN_NAMES[align], attrs: { value: align } }));
+      list.value = own ?? "";
+      list.addEventListener("change", () => this.update());
+      return list;
+    };
+    this.fallbackAlign = select("All pages", savedDefaultAlign(store), false);
+    this.pageAlign = select("This page", store.pageAlign, true);
+    this.fallbackAlign.options[0]!.text = `${TEXT_ALIGN_NAMES.center} (default)`;
+    this.drawPageAlign();
+    const note = el(doc, "div", `${BASE}-row-note`, "Left while a panel is open: centred, and at the left while a file or an item is open in a side panel.");
+    return [this.rowOf("All pages", el(doc, "div", `${BASE}-align-controls`, this.fallbackAlign), note), this.rowOf("This page", el(doc, "div", `${BASE}-align-controls`, this.pageAlign), el(doc, "div", `${BASE}-row-note`))];
+  }
+
+  /** This page's first entry named by what all pages' is set to now */
+  private drawPageAlign(): void {
+    const all = readTextAlign(this.fallbackAlign?.value) ?? "center";
+    const first = this.pageAlign?.options[0];
+    if (first) first.text = `Same as all pages (${TEXT_ALIGN_NAMES[all]})`;
   }
 
   /** What a row follows where it has no width of its own, in px: the default (else the theme's), the theme's */
@@ -756,11 +804,12 @@ export class PageDialog {
     // font's size), as that one changes
     if (!this.page.field.own) this.page.show();
     this.drawDevice?.();
+    this.drawPageAlign();
     const font = fontSizeOf(this.fontField);
     const zoom = fontSizeOf(this.device);
     const problem = page.problem ?? fallback.problem ?? font.problem ?? zoom.problem ?? (badGuide ? rowProblem(badGuide) : undefined);
     if (!page.problem && !fallback.problem && !font.problem && !zoom.problem) {
-      store.preview({ pageWidth: page.width, defaultWidth: fallback.width, fontSize: font.size, fontZoom: !!this.fontZoom?.checked, scaleFiles: !!this.fontScaleFiles?.checked, zoom: zoom.size });
+      store.preview({ pageWidth: page.width, defaultWidth: fallback.width, pageAlign: readTextAlign(this.pageAlign?.value), defaultAlign: readTextAlign(this.fallbackAlign?.value), fontSize: font.size, fontZoom: !!this.fontZoom?.checked, scaleFiles: !!this.fontScaleFiles?.checked, zoom: zoom.size });
     }
     if (this.saveButton) {
       this.saveButton.textContent = this.saving ? "Saving…" : "Save";
@@ -780,6 +829,8 @@ export class PageDialog {
     return (
       !sameWidth(widthOf(this.page.field).width, store.pageWidth) ||
       !sameWidth(widthOf(this.fallback.field).width, store.defaultWidth) ||
+      readTextAlign(this.pageAlign?.value) !== store.pageAlign ||
+      readTextAlign(this.fallbackAlign?.value) !== savedDefaultAlign(store) ||
       !sameGuides ||
       this.fontChanged() ||
       this.zoomChanged() ||
@@ -831,6 +882,11 @@ export class PageDialog {
       const problem = await store.saveDefault(fallback.width).catch((e: unknown) => String(e));
       if (problem) problems.push(`the default: ${problem}`);
     }
+    const defaultAlign = readTextAlign(this.fallbackAlign?.value);
+    if (defaultAlign !== savedDefaultAlign(store) && store.canSaveSettings) {
+      const problem = await store.saveDefaultAlign(defaultAlign).catch((e: unknown) => String(e));
+      if (problem) problems.push(`the alignment of all pages: ${problem}`);
+    }
     if (this.fontChanged() && store.canSaveSettings) {
       const problem = await store.saveFont({ fontSize: font.size, fontZoom: !!this.fontZoom?.checked, fontPinch: !!this.fontPinch?.checked, fontScaleFiles: !!this.fontScaleFiles?.checked }).catch((e: unknown) => String(e));
       if (problem) problems.push(`the font size: ${problem}`);
@@ -841,8 +897,9 @@ export class PageDialog {
       const problem = await tab.save().catch((e: unknown) => String(e));
       if (problem) problems.push(`${tab.title}: ${problem}`);
     }
-    if (!sameWidth(page.width, store.pageWidth)) {
-      const problem = await store.savePage(page.width).catch((e: unknown) => String(e));
+    const pageAlign = readTextAlign(this.pageAlign?.value);
+    if (!sameWidth(page.width, store.pageWidth) || pageAlign !== store.pageAlign) {
+      const problem = await store.savePage({ width: page.width, align: pageAlign }).catch((e: unknown) => String(e));
       if (problem) problems.push(`this page: ${problem}`);
     }
     if (problems.length) store.flash(`Silverware Layout could not save ${problems.join("; ")}`, "error");

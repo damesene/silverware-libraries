@@ -18,6 +18,8 @@ export type WidgetLayoutOptions = {
   readonly problem: (message: string) => void;
   // The user's default alignment of each kind of widget (by `<provider>/<kind>`; none set: each kind's own)
   readonly alignments?: () => Readonly<Record<string, LayoutAlign>>;
+  // Where the text starts where it stands at the pane's left (none said, or none: centred; docs/silverware-layout-text-align.md)
+  readonly textAtLeft?: () => { readonly x: number; readonly start: number } | undefined;
 };
 
 export type WidgetLayout = { readonly widgets: Widgets; readonly handle: WidthHandle<Widget> };
@@ -45,6 +47,7 @@ export function layOutWidgets(doc: Document, page: PageHost, registry: Registry,
     guideLayer: () => page.guideLayer(),
     seen: (widget) => widgets.seen(widget),
     enabled: options.enabled,
+    textAtLeft: () => options.textAtLeft?.(),
     anchor: (widget) => widgets.anchor(widget),
     resizable: (widget) => widgets.resizable(widget),
     unsized: (widget) => widget.provider.unsized ?? "text",

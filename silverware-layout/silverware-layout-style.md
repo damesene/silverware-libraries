@@ -38,6 +38,45 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   margin-left: calc(100% - var(--swl-end-shown)) !important;
   margin-right: 0 !important;
 }
+/* The text at the pane's left (data-swl-text-align, docs/silverware-layout-text-align.md): a widget wider than the text
+   grows from the text's start to the right alone, however it stands, as far as the pane's right edge less half the
+   gutter (--swl-text-start: where the text's lines start in the pane); one narrower stands within the text as it says.
+   Nothing written: centred again, it is laid out as above */
+:root[data-swl-text-align="left"]:not([data-swl-narrow]) [data-swl-content] [data-swl-width]:not([data-swl-in-room], [data-silverware-over-window], [data-silverware-over-window] *) {
+  --swl-left-shown: min(var(--swl-shown), var(--swl-pane-width, 100vw) - var(--swl-text-start, 0px) - 20px);
+  width: var(--swl-left-shown) !important;
+  margin-left: max(0px, (100% - var(--swl-left-shown)) / 2) !important;
+  margin-right: auto !important;
+}
+:root[data-swl-text-align="left"]:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-align="left"]:not([data-swl-in-room], [data-silverware-over-window], [data-silverware-over-window] *) {
+  margin-left: 0 !important;
+}
+:root[data-swl-text-align="left"]:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-align="right"]:not([data-swl-in-room], [data-silverware-over-window], [data-silverware-over-window] *) {
+  margin-left: max(0px, 100% - var(--swl-left-shown)) !important;
+  margin-right: 0 !important;
+}
+/* The text placed by Silverware Layout (data-swl-text-align: at the left, or centred where it may turn to the left): its
+   left margin a length, so it moves from one to the other (SilverBullet centres it by auto margins, which no
+   transition moves); what the host places by the text (data-swl-along-text: its title, its notifications) moved with it
+   by as much. Eased only while it moves (data-swl-text-moving), never as the window is resized */
+:root[data-swl-text-align]:not([data-swl-narrow]) [data-swl-content] {
+  margin-left: var(--swl-text-margin, auto) !important;
+  margin-right: auto !important;
+}
+:root[data-swl-text-align]:not([data-swl-narrow]) [data-swl-along-text] {
+  translate: var(--swl-text-shift, 0px) 0;
+}
+:root[data-swl-text-moving] :is([data-swl-content], [data-swl-along-text]) {
+  /* (Quick off, long to settle, as a thing pushed comes to rest: an ease-out, not the even pace of ease over so short a way) */
+  transition:
+    margin-left 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    translate 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-swl-text-moving] :is([data-swl-content], [data-swl-along-text]) {
+    transition: none;
+  }
+}
 /* A widget laid out in a room of its own, not the page's text (a medium in a grid's cell): within that room, no
    wider; at its start, centred or at its end as its provider says */
 :root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-in-room]:not([data-silverware-over-window], [data-silverware-over-window] *) {
@@ -1914,6 +1953,31 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
 }
 .swl-align-select {
   font: inherit;
+}
+/* The Page tab's sections (Width, Alignment), headed as the Markdown tab's; the text's alignment a pick list per row,
+   as wide as its longest choice, at most the row's */
+.swl-dialog-section {
+  margin: 0;
+  padding: 0;
+  font-size: inherit;
+}
+.swl-dialog-section + .swl-dialog-row {
+  margin-top: -6px;
+}
+.swl-dialog-section:not(:first-child) {
+  margin-top: 6px;
+}
+.swl-dialog-align {
+  max-width: 100%;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swl-dialog-line);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.swl-dialog-align:disabled {
+  opacity: 0.5;
 }
 /* The Markdown tab: a line on top, then a section a setting, each headed as the other tabs name their rows: what
    SilverBullet does, the box, what on and off give (quiet, as a row's note) */

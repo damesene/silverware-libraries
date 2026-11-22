@@ -3,6 +3,8 @@
 // or (the enlarged view) a click beside it; over the window, so the other plugins stand back.
 import { afterEach, describe, expect, it } from "vitest";
 import { type ActionContext, assetName } from "../../../shared/assets.ts";
+import { OVER_WINDOW_ATTRIBUTE } from "../../../shared/overwindow.ts";
+import { SIDE_PANEL_ATTRIBUTE, sidePanelOpen } from "../../../shared/sidepanel.ts";
 import { sidePanel, enlarged } from "./panels.ts";
 
 const context = (opened: string[] = []): ActionContext => ({
@@ -31,7 +33,9 @@ describe("the asset's panels", () => {
     sidePanel.run(context(opened));
     await flush();
     const panel = document.querySelector(".swa-side-panel")!;
-    expect(panel.hasAttribute("data-silverware-over-window")).toBe(true);
+    expect(panel.hasAttribute(OVER_WINDOW_ATTRIBUTE)).toBe(true);
+    // (A side panel: Silverware Layout may move the page's text to the left while it is open)
+    expect(panel.hasAttribute(SIDE_PANEL_ATTRIBUTE)).toBe(true);
     expect(panel.querySelector(".swa-panel-title")!.textContent).toBe("report.pdf");
     expect(panel.querySelector(".swa-panel-body .drawn")).not.toBeNull();
     panel.querySelector<HTMLButtonElement>(".swa-panel-button")!.click();
@@ -41,6 +45,7 @@ describe("the asset's panels", () => {
     expect(document.querySelectorAll(".swa-side-panel")).toHaveLength(1);
     esc();
     expect(document.querySelector(".swa-side-panel")).toBeNull();
+    expect(sidePanelOpen(document)).toBe(false);
   });
 
   it("the side panel: its width set by its left edge, kept on this device for the next panel; a double click its default again", async () => {
@@ -82,6 +87,9 @@ describe("the asset's panels", () => {
     enlarged.run(context());
     await flush();
     const root = document.querySelector<HTMLElement>(".swa-enlarged")!;
+    // (Over the whole window, no side panel: the page's text stays where it is)
+    expect(root.hasAttribute(OVER_WINDOW_ATTRIBUTE)).toBe(true);
+    expect(sidePanelOpen(document)).toBe(false);
     root.querySelector<HTMLElement>(".swa-enlarged-box")!.click();
     expect(document.querySelector(".swa-enlarged")).not.toBeNull();
     root.click();

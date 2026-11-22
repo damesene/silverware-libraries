@@ -1,19 +1,23 @@
 // Silverware Layout over a host's page, whatever the host: the page's text width (its own, the default setting's, none
-// in a narrow pane) and its font size (this device's zoom, the setting's, the host's) shown as pages open and change,
+// in a narrow pane), where its text stands (its own, the default's; at the left while a side panel is open, where so set:
+// docs/silverware-layout-text-align.md) and its font size (this device's zoom, the setting's, the host's) shown as pages open and change,
 // the widgets laid out with their handle (widgetlayout.ts), the font zoom, and the settings dialog. What it asks of
 // the page is a PageHost (host/page.ts); what it reads and saves (settings, a page's own width, this device's zoom) a
 // LayoutStore. SilverBullet's binding (index.ts) gives both; another host would give its own.
 import { fontSizeShown } from "./core/fontsize.ts";
 import type { Registry } from "./core/registry.ts";
+import { textAlignShown } from "./core/textalign.ts";
 import { textWidthShown } from "./core/textwidth.ts";
-import { snapTargets } from "./core/widgetwidth.ts";
+import { offsetAtLeft, snapTargets, widestAtLeft } from "./core/widgetwidth.ts";
 import { editorFontSize, inEditor, markNarrow, paneWidth, showFontSize, showPaneWidth, textWidthOf, themeFontSize, watchPaneWidth, watchStyles } from "./host/marks.ts";
+import { markAlongText, TextPlacement } from "./host/textplacement.ts";
 import type { PageHost } from "./host/page.ts";
-import { DEFAULT_GUIDES, type Guide, type Settings } from "./model/settings.ts";
+import { DEFAULT_GUIDES, type Guide, type Settings, type TextAlign } from "./model/settings.ts";
+import { sidePanelOpen, watchSidePanel } from "../../shared/sidepanel.ts";
 import type { Width } from "./model/width.ts";
 import { FontZoom } from "./ui/fontzoom.ts";
 import { showContentScale } from "../../shared/contentscale.ts";
-import { GuideLines } from "./ui/guidelines.ts";
+import { edgesFrom, GuideLines } from "./ui/guidelines.ts";
 import { type DialogTabPart, PageDialog, type Preview } from "./ui/pagedialog.ts";
 import { layOutWidgets, type WidgetLayout } from "./widgetlayout.ts";
 import type { LayoutAlign } from "../../shared/layout.ts";
@@ -32,11 +36,12 @@ export type LayoutStore = {
   // Whether settings can be saved (else only a page's own width)
   readonly canSaveSettings: boolean;
   readSettings(): Promise<Settings>;
-  /** The page open, read anew: its name and its own text width */
-  readPage(): Promise<{ readonly page: string; readonly width: Width | undefined }>;
-  /** Each saved; why not, as text (a page's width), or thrown */
-  savePageWidth(page: string, width: Width | undefined): Promise<string | undefined>;
+  /** The page open, read anew: its name and its own text width and alignment */
+  readPage(): Promise<{ readonly page: string; readonly width: Width | undefined; readonly align: TextAlign | undefined }>;
+  /** Each saved; why not, as text (a page's width and alignment, in one write), or thrown */
+  savePageLayout(page: string, layout: { readonly width: Width | undefined; readonly align: TextAlign | undefined }): Promise<string | undefined>;
   saveTextWidth(width: Width | undefined): Promise<void>;
+  saveTextAlign(align: TextAlign | undefined): Promise<void>;
   saveGuides(guides: readonly Guide[]): Promise<void>;
   saveAlignments(alignments: Readonly<Record<string, LayoutAlign>>): Promise<void>;
   saveFont(font: FontSettings): Promise<void>;
@@ -52,9 +57,10 @@ export type LayoutStore = {
 type State = {
   readonly store: LayoutStore;
   settings: Settings;
-  // The page open and its own text width, as last read
+  // The page open and its own text width and alignment, as last read
   page: string;
   pageWidth: Width | undefined;
+  pageAlign: TextAlign | undefined;
   // This device's font zoom (px); none: none
   zoom: number | undefined;
 };
@@ -77,7 +83,9 @@ export class LayoutApp {
     private readonly doc: Document,
     private readonly page: PageHost,
     private readonly registry: Registry,
-  ) {}
+  ) {
+    this.placement = new TextPlacement(doc, page);
+  }
 
   /** Tabs of other parts of Silverware Layout's for the settings dialog, made as it opens (the media's) */
   dialogTabs: (() => Promise<readonly DialogTabPart[]>) | undefined;
@@ -88,6 +96,15 @@ export class LayoutApp {
   private fontSizeShownLast: number | undefined | null = null;
   private fontDrawnLast: number | undefined;
   private stopStyles: (() => void) | undefined;
+  // Whether a side panel is open (the text at the left then, where so set), and its watching
+  private panelOpen = false;
+  private stopPanel: (() => void) | undefined;
+  private stopAlongText: (() => void) | undefined;
+  // Where the text is placed (made once, its watching living as long as the window)
+  private readonly placement: TextPlacement;
+  // What the page was last shown with (the dialog's preview or as saved): the text placed again with it as the styles or
+  // a panel change
+  private shownLast: Preview | undefined;
 
   /** Where the page's text is (x in the window, its padding left out); none before it is laid out */
   textEdges(): { readonly left: number; readonly right: number } | undefined {
@@ -121,11 +138,25 @@ export class LayoutApp {
     // (Started again on the same page, as another plugin's saved configuration loads the host's scripts again: the page
     // kept, so the dialog open over it is not taken for one of another page and closed)
     const was = this.state;
-    this.state = { store, settings: await store.readSettings(), page: was?.page ?? "", pageWidth: was?.pageWidth, zoom: store.readZoom() };
+    this.state = { store, settings: await store.readSettings(), page: was?.page ?? "", pageWidth: was?.pageWidth, pageAlign: was?.pageAlign, zoom: store.readZoom() };
     // (The host's styles loaded after its scripts, a size of ours shown by its rule only then: what read the page's look
     // before reads it again)
     this.stopStyles?.();
-    this.stopStyles = watchStyles(this.doc, () => this.tellFontShown(false));
+    this.stopStyles = watchStyles(this.doc, () => {
+      this.tellFontShown(false);
+      // (The text's width the host's styles give may have come with them: the text placed again by it)
+      this.showAlign();
+    });
+    // A side panel opened or closed: the text placed again (at the left while one is open, where so set)
+    this.stopPanel?.();
+    this.panelOpen = sidePanelOpen(this.doc);
+    this.stopPanel = watchSidePanel(this.doc, (open) => {
+      this.panelOpen = open;
+      this.showAlign();
+    });
+    // The host's elements placed by the text (its title, its notifications), marked to move with it
+    this.stopAlongText?.();
+    this.stopAlongText = this.page.watchAlongText?.(markAlongText);
     this.stopWatching?.();
     this.stopWatching = watchPaneWidth(this.page, (width) => {
       showPaneWidth(this.doc, width);
@@ -137,6 +168,7 @@ export class LayoutApp {
       enabled: () => !!this.state && paneWidth(this.page) >= this.state.settings.minPaneWidth,
       problem: (message) => this.problem(message),
       alignments: () => this.state?.settings.alignments ?? {},
+      textAtLeft: () => this.placement.atLeft(),
     });
     this.widgetLayout.widgets.layOutAll();
     // While the settings dialog is open, the zoom is its This device's (set as its slider sets it, kept on Save, its
@@ -172,8 +204,8 @@ export class LayoutApp {
     await this.pageOpened();
   }
 
-  /** A page opened, its own width known at once (the host read it as it opened): shown before it is painted */
-  pageLoaded(page: string, width: Width | undefined): void {
+  /** A page opened, its own width and alignment known at once (the host read them as it opened): shown before it is painted */
+  pageLoaded(page: string, width: Width | undefined, align?: TextAlign): void {
     const state = this.state;
     if (!state) return;
     ++this.reading;
@@ -181,6 +213,7 @@ export class LayoutApp {
     if (this.dialog?.isOpen && page !== state.page) this.dialog.close();
     state.page = page;
     state.pageWidth = width;
+    state.pageAlign = align;
     this.show();
     // (What the host knew may lag behind a write a moment ago: the page read too, a moment later)
     void this.pageOpened();
@@ -191,12 +224,13 @@ export class LayoutApp {
     const state = this.state;
     if (!state) return;
     const mine = ++this.reading;
-    const { page, width } = await state.store.readPage();
+    const { page, width, align } = await state.store.readPage();
     if (mine !== this.reading || state !== this.state) return;
     const same = page === state.page;
     if (this.dialog?.isOpen && !same) this.dialog.close();
     state.page = page;
     state.pageWidth = width;
+    state.pageAlign = align;
     // (The dialog open over the same page shows what it sets: not undone)
     if (!(this.dialog?.isOpen && same)) this.show();
   }
@@ -212,7 +246,7 @@ export class LayoutApp {
   /** The text shown at the width and the font size that apply now */
   private show(): void {
     const state = this.state;
-    if (state) this.showWith({ pageWidth: state.pageWidth, defaultWidth: state.settings.textWidth, fontSize: state.settings.fontSize, fontZoom: state.settings.fontZoom, scaleFiles: state.settings.fontScaleFiles, zoom: state.zoom });
+    if (state) this.showWith({ pageWidth: state.pageWidth, defaultWidth: state.settings.textWidth, pageAlign: state.pageAlign, defaultAlign: state.settings.textAlign, fontSize: state.settings.fontSize, fontZoom: state.settings.fontZoom, scaleFiles: state.settings.fontScaleFiles, zoom: state.zoom });
   }
 
   /** The text shown as it would be with these (the page's own width, the default; the font size, the zoom; none: none) */
@@ -226,6 +260,7 @@ export class LayoutApp {
     // (Widgets laid out where the pane is wide enough: the style page's rule reads it)
     markNarrow(this.doc, pane < state.settings.minPaneWidth);
     this.page.showTextWidth(textWidthShown({ page: shown.pageWidth, fallback: shown.defaultWidth, paneWidth: pane, minPaneWidth: state.settings.minPaneWidth }));
+    this.shownLast = shown;
     // (Font zoom off: this device's zoom not shown, still kept)
     const zoomed = shown.fontZoom ? shown.zoom : undefined;
     const size = fontSizeShown(zoomed, shown.fontSize);
@@ -238,6 +273,17 @@ export class LayoutApp {
     // The files grown or shrunk with this device's zoom, where asked: by its share of the size of all pages (the
     // theme's where none), so a page at its default shows them at theirs
     showContentScale(this.doc, shown.scaleFiles && zoomed !== undefined ? zoomed / (shown.fontSize ?? (this.themeSizeKept ??= this.themeSize())) : 1);
+    // (Placed last, its width and font set: centred, it is centred at the width they give it)
+    this.showAlign();
+  }
+
+  /** The text placed as the page was last shown with (its alignment, a side panel open or not), its width as it is */
+  private showAlign(): void {
+    const state = this.state;
+    const shown = this.shownLast;
+    if (!state || !shown) return;
+    const align = textAlignShown({ page: shown.pageAlign, fallback: shown.defaultAlign, panelOpen: this.panelOpen, paneWidth: paneWidth(this.page), minPaneWidth: state.settings.minPaneWidth });
+    this.placement.show(align);
   }
 
   /** What reads the page's look told it shows otherwise: `changed` (a size of ours), or the editor's font drawn at another size */
@@ -285,6 +331,8 @@ export class LayoutApp {
       page: state.page,
       pageWidth: state.pageWidth,
       defaultWidth: state.settings.textWidth,
+      pageAlign: state.pageAlign,
+      defaultAlign: state.settings.textAlign,
       guides: state.settings.guides,
       canSaveSettings: store.canSaveSettings,
       minPaneWidth: state.settings.minPaneWidth,
@@ -296,25 +344,44 @@ export class LayoutApp {
       fontScaleFiles: state.settings.fontScaleFiles,
       zoom: state.zoom,
       themeFontSize: () => themeFontSize(this.doc, this.page) ?? FALLBACK_FONT_SIZE,
-      // The guides as a drag shows them: the page's width and each guide the pane can hold, by the text's middle
+      // The guides as a drag of a centred widget shows them: the page's width and each guide the pane can hold, by the
+      // text's middle, or from its start where it stands at the left
       previewGuides: (guides) => {
         const content = this.page.content();
         if (!content) return () => undefined;
         const box = content.getBoundingClientRect();
+        const text = textWidthOf(content);
+        const left = this.placement.atLeft();
         const lines = new GuideLines(this.doc, this.page);
-        lines.show(snapTargets(textWidthOf(content), guides, paneWidth(this.page)), box.left + box.width / 2);
+        const edges = left
+          ? (width: number) => {
+              const from = left.x + offsetAtLeft(width, text, "center");
+              return [from, from + width] as const;
+            }
+          : edgesFrom(box.left + box.width / 2);
+        // (With the text at the left, only those a drag reaches: none past the pane's right edge, as the handle's)
+        const widest = left ? widestAtLeft(paneWidth(this.page), left.start) : Infinity;
+        lines.show(snapTargets(text, guides, paneWidth(this.page)).filter((target) => target.width <= widest + 0.5), edges);
         return () => lines.clear();
       },
       preview: (shown) => this.showWith(shown),
       restore: () => this.show(),
-      savePage: async (width) => {
-        const problem = await store.savePageWidth(state.page, width);
-        if (!problem) state.pageWidth = width;
+      savePage: async (layout) => {
+        const problem = await store.savePageLayout(state.page, layout);
+        if (!problem) {
+          state.pageWidth = layout.width;
+          state.pageAlign = layout.align;
+        }
         return problem;
       },
       saveDefault: async (width) => {
         await store.saveTextWidth(width);
         state.settings = { ...state.settings, textWidth: width };
+        return undefined;
+      },
+      saveDefaultAlign: async (align) => {
+        await store.saveTextAlign(align);
+        state.settings = { ...state.settings, textAlign: align };
         return undefined;
       },
       saveGuides: async (guides) => {

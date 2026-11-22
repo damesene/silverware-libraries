@@ -178,3 +178,32 @@ test("a grid at the right wider than the text, the text at the left: dragged nar
   await page.mouse.up();
   await expect.poll(() => space.saved("Page")).toContain('<grid width="690" align="right">');
 });
+
+test("a centred grid narrower than the text, the text at the left: dragged, its guides where it would stand, the page's width on the text's edges", async ({ page, space }) => {
+  const grid = '<grid width="500">\n<cell>\n\nLeft text\n\n</cell>\n<cell>\n\nRight text\n\n</cell>\n</grid>\n';
+  await space.open({ Page: `---\n_layout:\n  align: left\n---\n# Page\n\nAbove\n\n${grid}\nBelow\n` }, "Page");
+  await gridsDrawn(page);
+  await expect.poll(() => atLeft(page)).toBe(true);
+  const drawn = page.locator("#sb-main .swl-grid");
+  await drawn.hover();
+  const bar = page.locator(".swl-handle-bar");
+  await expect(bar).toBeVisible();
+  const handle = await boxOf(bar);
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2 + 10, handle.y + handle.height / 2, { steps: 4 });
+  await expect(page.locator(".swl-handle-guide").first()).toBeAttached();
+  const text = await page.evaluate(() => {
+    const line = document.querySelector("#sb-main .cm-line")!.getBoundingClientRect();
+    return { left: Math.round(line.left), right: Math.round(line.right) };
+  });
+  const lines = await page.locator(".swl-handle-guide").evaluateAll((all) => all.map((line) => Math.round(line.getBoundingClientRect().left)));
+  // (The page's width: a widget as wide as the text stands on its edges, not from where the narrow one starts)
+  expect(lines.some((x) => Math.abs(x - text.left) <= 2)).toBe(true);
+  expect(lines.some((x) => Math.abs(x - text.right) <= 2)).toBe(true);
+  // (The grid itself centred in the text meanwhile: its middle the text's)
+  const box = await boxOf(drawn);
+  expect(Math.abs(box.x + box.width / 2 - (text.left + text.right) / 2)).toBeLessThanOrEqual(2);
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+});

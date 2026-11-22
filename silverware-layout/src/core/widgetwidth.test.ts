@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Guide } from "../model/settings.ts";
-import { cssWidgetWidth, draggedRoomWidth, draggedWidth, keptWidgetWidth, readWidgetWidth, roomTargets, shownWidgetWidth, snapped, snapTargets, widestWidth, widthName, anchorOf, readAlign, draggedAtLeft, widestAtLeft } from "./widgetwidth.ts";
+import { cssWidgetWidth, draggedRoomWidth, draggedWidth, keptWidgetWidth, readWidgetWidth, roomTargets, shownWidgetWidth, snapped, snapTargets, widestWidth, widthName, anchorOf, readAlign, draggedAtLeft, offsetAtLeft, widestAtLeft } from "./widgetwidth.ts";
 
 const guides: Guide[] = [1200, "80%", "full"];
 
@@ -121,5 +121,12 @@ describe("a widget's alignment", () => {
     expect(draggedAtLeft(1000, 900, "center", 800, 1532)).toBe(1532);
     expect(draggedAtLeft(600, 100, "start", 800, 1532)).toBe(700);
     expect(draggedAtLeft(300, -500, "start", 800, 1532)).toBe(200);
+  });
+
+  it("with the text at the left: where a widget of a width stands from the text's start, within the text while narrower, from its start once wider", () => {
+    expect(offsetAtLeft(600, 800, "center")).toBe(100);
+    expect(offsetAtLeft(600, 800, "end")).toBe(200);
+    expect(offsetAtLeft(600, 800, "start")).toBe(0);
+    for (const anchor of ["start", "center", "end"] as const) expect(offsetAtLeft(1000, 800, anchor)).toBe(0);
   });
 });

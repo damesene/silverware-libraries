@@ -78,6 +78,13 @@ export const widestWidth = (pane: number, anchor: LayoutAnchor = "center", text?
 export const widestAtLeft = (pane: number, start: number): number => Math.floor(pane - start - PANE_GUTTER / 2);
 
 /**
+ * With the text at the left: where a widget of a width stands, px from the text's start: within the text as it stands
+ * (centred, at the end) while it is narrower, from the text's start once it is wider (as the style page lays it out)
+ */
+export const offsetAtLeft = (width: number, text: number, anchor: LayoutAnchor): number =>
+  anchor === "start" ? 0 : Math.max(0, anchor === "center" ? (text - width) / 2 : text - width);
+
+/**
  * With the text at the left: where a drag of a widget's right edge by `moved` takes its width. Centred, it grows on both
  * sides while it is narrower than the text (its right edge moves half its growth), from the text's start alone once it
  * is wider; at the start, by the move. Not narrower than the least, nor wider than `widest` (`widestAtLeft`)

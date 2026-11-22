@@ -8,15 +8,16 @@ import { fontSizeShown } from "./core/fontsize.ts";
 import type { Registry } from "./core/registry.ts";
 import { textAlignShown } from "./core/textalign.ts";
 import { textWidthShown } from "./core/textwidth.ts";
-import { snapTargets } from "./core/widgetwidth.ts";
-import { editorFontSize, inEditor, markAlongText, markNarrow, paneWidth, showFontSize, showPaneWidth, showTextAlign, textWidthOf, themeFontSize, watchPaneWidth, watchStyles } from "./host/marks.ts";
+import { offsetAtLeft, snapTargets, widestAtLeft } from "./core/widgetwidth.ts";
+import { editorFontSize, inEditor, markNarrow, paneWidth, showFontSize, showPaneWidth, textWidthOf, themeFontSize, watchPaneWidth, watchStyles } from "./host/marks.ts";
+import { markAlongText, TextPlacement } from "./host/textplacement.ts";
 import type { PageHost } from "./host/page.ts";
 import { DEFAULT_GUIDES, type Guide, type Settings, type TextAlign } from "./model/settings.ts";
 import { sidePanelOpen, watchSidePanel } from "../../shared/sidepanel.ts";
 import type { Width } from "./model/width.ts";
 import { FontZoom } from "./ui/fontzoom.ts";
 import { showContentScale } from "../../shared/contentscale.ts";
-import { GuideLines } from "./ui/guidelines.ts";
+import { edgesFrom, GuideLines } from "./ui/guidelines.ts";
 import { type DialogTabPart, PageDialog, type Preview } from "./ui/pagedialog.ts";
 import { layOutWidgets, type WidgetLayout } from "./widgetlayout.ts";
 import type { LayoutAlign } from "../../shared/layout.ts";
@@ -82,7 +83,9 @@ export class LayoutApp {
     private readonly doc: Document,
     private readonly page: PageHost,
     private readonly registry: Registry,
-  ) {}
+  ) {
+    this.placement = new TextPlacement(doc, page);
+  }
 
   /** Tabs of other parts of Silverware Layout's for the settings dialog, made as it opens (the media's) */
   dialogTabs: (() => Promise<readonly DialogTabPart[]>) | undefined;
@@ -97,6 +100,8 @@ export class LayoutApp {
   private panelOpen = false;
   private stopPanel: (() => void) | undefined;
   private stopAlongText: (() => void) | undefined;
+  // Where the text is placed (made once, its watching living as long as the window)
+  private readonly placement: TextPlacement;
   // What the page was last shown with (the dialog's preview or as saved): the text placed again with it as the styles or
   // a panel change
   private shownLast: Preview | undefined;
@@ -163,6 +168,7 @@ export class LayoutApp {
       enabled: () => !!this.state && paneWidth(this.page) >= this.state.settings.minPaneWidth,
       problem: (message) => this.problem(message),
       alignments: () => this.state?.settings.alignments ?? {},
+      textAtLeft: () => this.placement.atLeft(),
     });
     this.widgetLayout.widgets.layOutAll();
     // While the settings dialog is open, the zoom is its This device's (set as its slider sets it, kept on Save, its
@@ -277,7 +283,7 @@ export class LayoutApp {
     const shown = this.shownLast;
     if (!state || !shown) return;
     const align = textAlignShown({ page: shown.pageAlign, fallback: shown.defaultAlign, panelOpen: this.panelOpen, paneWidth: paneWidth(this.page), minPaneWidth: state.settings.minPaneWidth });
-    showTextAlign(this.doc, this.page, align);
+    this.placement.show(align);
   }
 
   /** What reads the page's look told it shows otherwise: `changed` (a size of ours), or the editor's font drawn at another size */
@@ -338,13 +344,24 @@ export class LayoutApp {
       fontScaleFiles: state.settings.fontScaleFiles,
       zoom: state.zoom,
       themeFontSize: () => themeFontSize(this.doc, this.page) ?? FALLBACK_FONT_SIZE,
-      // The guides as a drag shows them: the page's width and each guide the pane can hold, by the text's middle
+      // The guides as a drag of a centred widget shows them: the page's width and each guide the pane can hold, by the
+      // text's middle, or from its start where it stands at the left
       previewGuides: (guides) => {
         const content = this.page.content();
         if (!content) return () => undefined;
         const box = content.getBoundingClientRect();
+        const text = textWidthOf(content);
+        const left = this.placement.atLeft();
         const lines = new GuideLines(this.doc, this.page);
-        lines.show(snapTargets(textWidthOf(content), guides, paneWidth(this.page)), box.left + box.width / 2);
+        const edges = left
+          ? (width: number) => {
+              const from = left.x + offsetAtLeft(width, text, "center");
+              return [from, from + width] as const;
+            }
+          : edgesFrom(box.left + box.width / 2);
+        // (With the text at the left, only those a drag reaches: none past the pane's right edge, as the handle's)
+        const widest = left ? widestAtLeft(paneWidth(this.page), left.start) : Infinity;
+        lines.show(snapTargets(text, guides, paneWidth(this.page)).filter((target) => target.width <= widest + 0.5), edges);
         return () => lines.clear();
       },
       preview: (shown) => this.showWith(shown),

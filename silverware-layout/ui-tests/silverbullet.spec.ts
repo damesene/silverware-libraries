@@ -137,3 +137,29 @@ test("the box SilverBullet draws a grid in lets out what lies outside the grid: 
     return document.elementFromPoint(box.left + box.width / 2, box.top + 1) === element;
   })).toBe(true);
 });
+
+test("what SilverBullet places by the text, moved with it at the left (src/host/silverbullet/dom.ts' ALONG_TEXT): its title's box starts where the text does, its notifications' box ends where the text ends", async ({ page, space }) => {
+  await space.open({ Page: "---\n_layout:\n  align: left\n---\n# Page\n\nSome text.\n" }, "Page");
+  type Client = { ui: { flashNotification(message: string, type: string, options: { timeout: number }): void } };
+  // (Found and marked: the title now, the notifications as one shows)
+  await expect(page.locator("#sb-top .main .inner")).toHaveAttribute("data-swl-along-text", "");
+  await page.evaluate(() => (window as unknown as { client: Client }).client.ui.flashNotification("Placed by the text", "info", { timeout: 0 }));
+  await expect(page.locator(".sb-notifications")).toHaveAttribute("data-swl-along-text", "");
+  const edges = () =>
+    page.evaluate(() => {
+      const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
+      const text = box("#sb-main .cm-content");
+      return { textLeft: Math.round(text.left), textRight: Math.round(text.right), title: Math.round(box("#sb-top .main .inner").left), notifications: Math.round(box(".sb-notifications").right) };
+    });
+  // (Its pane wider than the text: at the left, the text is not where SilverBullet centres it)
+  await expect.poll(async () => (await edges()).textLeft).toBeLessThan(40);
+  await expect.poll(async () => {
+    const at = await edges();
+    return Math.abs(at.title - at.textLeft);
+  }).toBeLessThan(2);
+  // (SilverBullet keeps its notifications 20 px within the text's edges)
+  await expect.poll(async () => {
+    const at = await edges();
+    return Math.abs(at.notifications - (at.textRight - 20));
+  }).toBeLessThan(20);
+});

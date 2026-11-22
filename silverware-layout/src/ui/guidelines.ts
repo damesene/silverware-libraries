@@ -1,6 +1,6 @@
-// The guides' lines over the page: for each target (the page's width, each guide the pane can hold) a quiet line each
-// side of a middle (a widget is centred on the text, so its edges meet both), the right one named, the names in rows
-// where they would touch. Drawn by a widget's handle while it is dragged (its target snapped to lit) and by the Page
+// The guides' lines over the page: for each target (the page's width, each guide the pane can hold) a quiet line at
+// each edge a widget of that width would have (`GuideEdges`: centred on the text, both sides; at its start or end,
+// one side), the right one named, the names in rows where they would touch. Drawn by a widget's handle while it is dragged (its target snapped to lit) and by the Page
 // layout dialog's Preview while it is held. Class names `swl-handle-guide*` (the style page's).
 import { el } from "../../../shared/elements.ts";
 import type { LayoutAnchor } from "../core/widgetwidth.ts";
@@ -19,6 +19,15 @@ export type GuideLayer = {
 /** A line's target: its width and its name */
 export type GuideTarget = { readonly width: number; readonly name: string };
 
+/** Where a widget of a width would stand (x in the window): its left and right edges, each target's lines drawn there */
+export type GuideEdges = (width: number) => readonly [number, number];
+
+/** A widget's edges by the place it stays at as it widens: `at` its middle (centred), its left edge (at the start), its right (at the end) */
+export const edgesFrom =
+  (at: number, anchor: LayoutAnchor = "center"): GuideEdges =>
+  (width) =>
+    anchor === "start" ? [at, at + width] : anchor === "end" ? [at - width, at] : [at - width / 2, at + width / 2];
+
 export class GuideLines {
   private guides: { readonly name: string; readonly width: number; readonly lines: readonly HTMLElement[] }[] = [];
 
@@ -31,8 +40,8 @@ export class GuideLines {
     return this.guides.length > 0;
   }
 
-  /** The lines of these targets drawn, placed by `middle` (x in the window), their names in rows */
-  show(targets: readonly GuideTarget[], middle: number, anchor: LayoutAnchor = "center"): void {
+  /** The lines of these targets drawn where a widget of each width would stand, their names in rows */
+  show(targets: readonly GuideTarget[], edges: GuideEdges): void {
     this.clear();
     for (const target of targets) {
       const width = Math.round(target.width);
@@ -41,15 +50,15 @@ export class GuideLines {
       (this.host.guideLayer() ?? this.doc.body).append(left, right);
       this.guides.push({ name: target.name, width, lines: [left, right] });
     }
-    this.place(middle, undefined, anchor);
+    this.place(edges);
     this.rowLabels();
   }
 
   /**
-   * The lines placed by `middle`, over the whole height the page is seen in: in the box it scrolls in, by its scroll
+   * The lines placed where a widget of each width would stand, over the whole height the page is seen in: in the box it scrolls in, by its scroll
    * (under its widgets, as Confluence's); else over the window. The one named `near` lit
    */
-  place(middle: number, near?: string, anchor: LayoutAnchor = "center"): void {
+  place(edges: GuideEdges, near?: string): void {
     if (!this.guides.length) return;
     const layer = this.host.guideLayer();
     const box = layer?.getBoundingClientRect();
@@ -60,10 +69,10 @@ export class GuideLines {
     const height = `${Math.round(layer ? layer.clientHeight : view.bottom - view.top)}px`;
     for (const guide of this.guides) {
       const [left, right] = guide.lines;
+      const [from, to] = edges(guide.width);
       for (const [line, x] of [
-        // (A widget at the start: `middle` is its left edge, the guides from there; at the end its right edge)
-        [left!, anchor === "start" ? middle : anchor === "end" ? middle - guide.width : middle - guide.width / 2],
-        [right!, anchor === "start" ? middle + guide.width : anchor === "end" ? middle : middle + guide.width / 2],
+        [left!, from],
+        [right!, to],
       ] as const) {
         line.classList.toggle(`${BASE}-guide-fixed`, !layer);
         Object.assign(line.style, { left: `${Math.round(x + dx)}px`, top: `${Math.round(top)}px`, height });

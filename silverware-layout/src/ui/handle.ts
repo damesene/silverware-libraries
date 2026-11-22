@@ -17,8 +17,8 @@ import { type PopupMenu, showPopup } from "../../../shared/popupmenu.ts";
 import { COMPANION_ATTRIBUTE } from "../../../shared/editor.ts";
 import { composedTarget, deepElementFromPoint, inShadow } from "../../../shared/shadow.ts";
 import { ALIGN_NAMES, ALIGNS, type Guide } from "../model/settings.ts";
-import { draggedAtLeft, draggedRoomWidth, draggedWidth, type LayoutAnchor, MIN_ROOM_WIDTH, MIN_WIDGET_WIDTH, PANE_GUTTER, roomTargets, type SnapTarget, snapped, snapTargets, type WidgetWidth, widestAtLeft, widestWidth, widthName } from "../core/widgetwidth.ts";
-import { GuideLines } from "./guidelines.ts";
+import { draggedAtLeft, offsetAtLeft, draggedRoomWidth, draggedWidth, type LayoutAnchor, MIN_ROOM_WIDTH, MIN_WIDGET_WIDTH, PANE_GUTTER, roomTargets, type SnapTarget, snapped, snapTargets, type WidgetWidth, widestAtLeft, widestWidth, widthName } from "../core/widgetwidth.ts";
+import { edgesFrom, type GuideEdges, GuideLines } from "./guidelines.ts";
 
 const BASE = "swl-handle";
 // A widget whose width is dragged, marked (its look may say so)
@@ -95,7 +95,7 @@ export class WidthHandle<W> {
   private leaveTimer: ReturnType<typeof setTimeout> | undefined;
   private keysTimer: ReturnType<typeof setTimeout> | undefined;
   private keyed: { readonly widget: W; width: number } | undefined;
-  // While a drag goes on: a guide for each width it snaps to, a quiet line each side of the text's middle
+  // While a drag goes on: a guide for each width it snaps to, a quiet line at each edge the widget would have at it
   private readonly lines: GuideLines;
   // The menu shown (a click on the bar): what closes it; and the click waiting for a second (a double click), the menu's after it
   private closeMenu: (() => void) | undefined;
@@ -396,17 +396,16 @@ export class WidthHandle<W> {
     this.bar.setAttribute("aria-expanded", "true");
   }
 
-  /** The guides of a drag: the targets it can snap to, placed by its widget's middle */
+  /** The guides of a drag: the targets it can snap to, each where the widget would stand at its width */
   private showGuides(): void {
-    const from = this.guideAnchor();
-    if (!from) return;
-    this.lines.show(this.targets(), from.x, from.anchor);
+    const edges = this.guideEdges();
+    if (edges) this.lines.show(this.targets(), edges);
   }
 
-  /** The guides placed again by the widget's middle (the page scrolled, the widget wider), the one of `near` lit */
+  /** The guides placed again (the page scrolled, the widget wider), the one of `near` lit */
   private placeGuides(near: string | undefined): void {
-    const from = this.guideAnchor();
-    if (from) this.lines.place(from.x, near, from.anchor);
+    const edges = this.guideEdges();
+    if (edges) this.lines.place(edges, near);
   }
 
   /** The width of the room the widget is in, where it is not the page's text */
@@ -448,14 +447,27 @@ export class WidthHandle<W> {
     return anchor;
   }
 
-  /** Where the guides are drawn from: the text's start where it stands at the left (a widget not at its end), else the widget's middle or edge */
-  private guideAnchor(): { readonly x: number; readonly anchor: LayoutAnchor } | undefined {
-    // (Not in a room of its own, a grid's cell: its guides are the room's quarters, placed by the widget)
-    const left = this.roomOf() === undefined ? this.host.textAtLeft?.() : undefined;
-    const anchor = this.anchorOf();
-    if (left && anchor !== "end") return { x: left.x, anchor: "start" };
+  /**
+   * Where the guides are drawn: where the widget would stand at each width. With the text at the left (not in a room of
+   * its own, a grid's cell, whose quarters are placed by the widget), from the start of the box it is laid out in (the
+   * line, indented in a list item or a quote) as the style page lays it out: within it while narrower, from its start
+   * once wider; else by the widget's middle or the edge it stays at
+   */
+  private guideEdges(): GuideEdges | undefined {
+    const element = this.widget && this.host.element(this.widget);
+    const box = element?.isConnected ? element.parentElement : null;
+    if (box && this.roomOf() === undefined && this.host.textAtLeft?.()) {
+      const anchor = this.anchorOf();
+      const style = this.doc.defaultView?.getComputedStyle(box);
+      const start = box.getBoundingClientRect().left + box.clientLeft + (parseFloat(style?.paddingLeft ?? "") || 0);
+      const room = box.clientWidth - (parseFloat(style?.paddingLeft ?? "") || 0) - (parseFloat(style?.paddingRight ?? "") || 0);
+      return (width) => {
+        const from = start + offsetAtLeft(width, room, anchor);
+        return [from, from + width];
+      };
+    }
     const middle = this.middleOf();
-    return middle === undefined ? undefined : { x: middle, anchor };
+    return middle === undefined ? undefined : edgesFrom(middle, this.anchorOf());
   }
 
   /** Where the guides are placed from (x in the window): the widget's middle, or the edge it stays at (its left at the start, its right at the end); none where it is not in the page */

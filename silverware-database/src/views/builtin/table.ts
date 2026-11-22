@@ -15,7 +15,9 @@ import type { Item, Property } from "../../model/database.ts";
 import { editValue, NAME, toggle } from "../editors.ts";
 import { FLOAT_HOME_SELECTOR } from "../float.ts";
 import { createInGroup, foldedOf, groupHead, setFolded } from "../groups.ts";
-import { ownIcon, VIEW_ICONS } from "../icons.ts";
+import { ownIcon, typeIcon, VIEW_ICONS } from "../icons.ts";
+import { formulaOf, isFormula } from "../../domain/formulas/model.ts";
+import { formulaProblemOf } from "../../domain/formulas/calculate.ts";
 import { rowGrip } from "../order.ts";
 import { missing, problemOf, valueNodes } from "../values.ts";
 import { takeFiles, uploadInto } from "../takefiles.ts";
@@ -48,12 +50,13 @@ function draw(host: ViewHost, element: HTMLElement, editing: Editing): void {
         doc,
         "th",
         { attrs: { scope: "col", "aria-sort": sorted?.key === column.key ? (sorted.direction === "asc" ? "ascending" : "descending") : undefined } },
-        // (A property's own icon before its name; its type's left out here, a header of every column's would be busy)
+        // (A property's own icon before its name; its type's left out here, a header of every column's would be busy, but
+        // a formula's ƒ: its values are calculated, its formula over it)
         el(
           doc,
           "button",
-          { class: "swd-table-sort", title: `Sort by ${column.label}`, run: () => void host.listing.setSort(nextSort(host, column.key)) },
-          ...((own) => (own ? [host.look.ownIcon(own, "swd-table-head-icon")] : []))(column.property && ownIcon(column.property)),
+          { class: "swd-table-sort", title: headTitle(column), run: () => void host.listing.setSort(nextSort(host, column.key)) },
+          ...((own) => (own ? [host.look.ownIcon(own, "swd-table-head-icon")] : column.property && isFormula(column.property) ? [el(doc, "span", { class: "swd-table-head-icon swd-table-head-formula", html: typeIcon("formula") })] : []))(column.property && ownIcon(column.property)),
           ...headLabel(doc, column.label, sorted?.key === column.key ? (sorted.direction === "asc" ? "↑" : "↓") : undefined),
         ),
       ),
@@ -100,6 +103,12 @@ function draw(host: ViewHost, element: HTMLElement, editing: Editing): void {
   element.replaceChildren(el(doc, "div", "swd-table-box", el(doc, "table", "swd-table", ...parts)), ...(count || add ? [el(doc, "div", "swd-table-foot", add, count)] : []));
 }
 
+/** A column's header's title: what a press does; a formula's formula first */
+function headTitle(column: Column): string {
+  const formula = column.property && isFormula(column.property) ? formulaOf(column.property.params) : undefined;
+  return formula === undefined ? `Sort by ${column.label}` : `${column.label} = ${formula.replace(/^\s*=\s*/, "")}\nSort by ${column.label}`;
+}
+
 /**
  * A value's cell: as its type shows it (invalid: marked, its reason the title), edited by a click (a checkbox turned);
  * `lead` kept first in it however its content is drawn again (the row's grip, in the name's cell)
@@ -125,6 +134,8 @@ function cell(host: ViewHost, item: Item, column: Column, editing: Editing, lead
   const problem = property ? problemOf(host, item, property) : undefined;
   if (problem) {
     td.classList.add("swd-invalid");
+    // (A formula's error: its code shown, muted)
+    if (formulaProblemOf(item, column.key)) td.classList.add("swd-formula-error");
     td.title = problem;
   }
   // A required value missing: its cell says so (the style page's word in it)

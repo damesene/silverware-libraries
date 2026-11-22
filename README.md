@@ -32,7 +32,8 @@ Then install a plugin with `Library: Install`.
   Mermaid renderers can draw them too), drawn in SilverBullet with Chart.js; their data from the block or from any markdown table, followed live.
 - **Silverware Database** ([`silverware-database/`](silverware-database/silverware-database.md)): databases of pages, in
   the spirit of Notion's: each item a page, its properties the page's frontmatter, shown as a table, a list, a board, a
-  calendar or a timeline; every change reviewed where it touches many pages, and undoable.
+  calendar or a timeline, with properties calculated by a formula; every change reviewed where it touches many pages,
+  and undoable.
 - **Silverware Layout** ([`silverware-layout/`](silverware-layout/silverware-layout.md)): columns in a page (`/grid`),
   the width of a page's text (its own or a default for every page) and of its tables, databases, charts and grids, wider
   or narrower than the text by a handle beside them that snaps to guides of your own; the editor's font size, and font

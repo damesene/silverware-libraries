@@ -13,7 +13,7 @@ const PROPERTIES_ICON = svg('<path d="M5.5 4h8M5.5 8h8M5.5 12h8"/><circle cx="2.
  */
 export type PropertiesOffer = {
   /** Its dialog opened; told once it is closed (the caller then puts the focus back on what opened it) */
-  open(database: string, at?: { readonly property?: string; readonly add?: boolean }): Promise<void>;
+  open(database: string, at?: { readonly property?: string; readonly add?: boolean; readonly item?: string }): Promise<void>;
 };
 
 export const PROPERTIES_MODULE: ModuleDefinition = {

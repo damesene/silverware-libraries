@@ -181,6 +181,9 @@ describe("The tasks converter", () => {
     const done: Property = { key: "done", label: "Done", type: "checkbox", params: {}, readonly: false };
     expect(TASKS_CONVERTER.write!([item("B", { done: true }), item("C", { done: false })], [done])).toBe("- [x] B\n- [ ] C\n");
     expect(TASKS_CONVERTER.write!([], properties)).toBe("");
+    // A formula's value, calculated, written as none of the task's own
+    const total: Property = { key: "total", label: "Total", type: "formula", params: { formula: "=1" }, readonly: true };
+    expect(TASKS_CONVERTER.write!([item("D", { total: 1 })], [total])).toBe("- [ ] D\n");
   });
 
   it("writes what a task cannot hold so it still reads back: a status as an attribute, a person no mention can name, a name of syntax", () => {

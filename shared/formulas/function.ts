@@ -19,6 +19,9 @@ export type FormulaFunction = {
   // How many arguments it takes; no maxArgs: any number
   readonly minArgs: number;
   readonly maxArgs?: number;
+  // True where its result depends on the cell it is calculated in (`context`: ROW()), not on its arguments alone: a
+  // part of a formula calling it is calculated in every row, never once for all (evaluate.ts, rowFree)
+  readonly readsPlace?: true;
   /**
    * Gets the evaluated arguments: a range or a cell reference (A1:B3, [Qty], A1)
    * is the list of its cells' values, an empty cell is null, an error is a

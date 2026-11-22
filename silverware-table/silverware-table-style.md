@@ -4786,7 +4786,10 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
   gap: 8px;
   min-width: 0;
 }
-/* A formula's field (src/formulafield.ts, any module's dialog): the choices for the name typed in a list under it, the syntax of the function the caret is in */
+/* A formula's field (shared/formulafield.ts): its look the shared block's, its lines the dialog's */
+.swt-formulafield {
+  --swt-formulafield-line: var(--swt-dialog-line);
+}
 /* A formula's name by its field, not by the middle of its help under it */
 .swt-cf-param:has(> .swt-formulafield) {
   align-items: flex-start;
@@ -4794,6 +4797,8 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
 .swt-cf-param:has(> .swt-formulafield) > .swt-cf-param-name {
   padding-top: 6px;
 }
+/* <shared-formulafield> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* A formula's field (shared/formulafield.ts, any plugin's dialog): the choices for the name typed in a list under it, the syntax of the function the caret is in. `--swt-formulafield-line` its lines' color, where the plugin's differ */
 .swt-formulafield {
   display: inline-flex;
   flex-direction: column;
@@ -4814,7 +4819,7 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
   font-family: var(--editor-font, monospace);
   color: inherit;
   background: var(--root-background-color);
-  border: 1px solid var(--swt-dialog-line);
+  border: 1px solid var(--swt-formulafield-line, var(--button-border-color, rgba(128, 128, 128, 0.3)));
   border-radius: 6px;
   min-width: 0;
 }
@@ -4828,7 +4833,7 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
   overflow: auto;
   padding: 3px;
   background: var(--root-background-color);
-  border: 1px solid var(--swt-dialog-line);
+  border: 1px solid var(--swt-formulafield-line, var(--button-border-color, rgba(128, 128, 128, 0.3)));
   border-radius: 6px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
 }
@@ -4881,6 +4886,7 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
   font-size: 12px;
   opacity: 0.7;
 }
+/* </shared-formulafield> */
 /* A rule's preview: its cells across their values, a line for each range (a column), each cell in its look */
 .swt-cf-preview {
   display: flex;

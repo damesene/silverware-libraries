@@ -636,12 +636,21 @@ describe("the core", () => {
     expect((await named("Fix login")).values.estimate).toBe("3");
   });
 
-  it("keeps a property's params where its type changes without new ones, the new type taking them", async () => {
+  it("keeps a property's params where its type changes without new ones only where the new type takes them as its own", async () => {
     const { core, store } = setup();
+    const params = async () => (await store.database("tasks"))!.value.properties[0]!.params;
+    // (A person's options are a select's)
+    await applied(core, await core.retypeProperty("tasks", "status", "person"));
+    expect(await params()).toEqual({ options: ["Todo", "Done"] });
+    // (A text or a number has no params: a select's options are not kept for it)
     await applied(core, await core.retypeProperty("tasks", "status", "text"));
-    expect((await store.database("tasks"))!.value.properties[0]!.params).toEqual({ options: ["Todo", "Done"] });
-    await applied(core, await core.retypeProperty("tasks", "status", "select"));
-    expect((await store.database("tasks"))!.value.properties[0]!.params).toEqual({ options: ["Todo", "Done"] });
+    expect(await params()).toEqual({});
+    await applied(core, await core.retypeProperty("tasks", "status", "select", { options: ["Todo", "Done"] }));
+    // (The schema's edit alike, no params given)
+    const { value, revision } = (await store.database("tasks"))!;
+    const properties = value.properties.map((one, at) => ({ from: one.key, label: one.label, type: at === 0 ? "number" : one.type, ...(at === 0 ? {} : { params: one.params }), readonly: one.readonly }));
+    await applied(core, await core.editSchema("tasks", { revision, properties }));
+    expect(await params()).toEqual({});
   });
 
   it("makes a select's values lists as Multiple is turned on, and one option again as it is turned off, a list of several kept", async () => {

@@ -14,7 +14,7 @@ export { type CalculatedBy, type CalculatedRead, type HeldFormulas, type CellNam
 
 export { type Area, areaText, callsCustomFunctions, callsPureFunctionsOnly, columnIdText, formulaPages, formulaTableNames, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, formulaSources, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredSources, referredTableNames, type SourceRef, type TableRef, withColumnKeys } from "./references.ts";
 export { autofixFormula, type FormulaFix, qualifyCellNames } from "./autofix.ts";
-export { type Calculation, cellWholeResult, evaluateFormula, formulaErrors, givesList, listResult, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows, calculatedNow, viewGrid, viewResult } from "./evaluate.ts";
+export { type Calculation, cellWholeResult, evaluateFormula, formulaErrors, formulaResults, givesList, type OwnReading, listResult, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows, calculatedNow, viewGrid, viewResult } from "./evaluate.ts";
 export { type Node as FormulaNode, parse as parseFormula } from "./parser.ts";
 export { parseDate, toUnit, type Unit } from "./dates.ts";
 export { asGrid, ERROR_CODES, type ErrorCode, FormulaError, Grid, parseClock, type Result, type Scalar, type Value } from "./values.ts";

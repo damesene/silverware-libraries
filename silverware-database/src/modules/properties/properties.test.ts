@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { editorsOf } from "../../../../shared/editor.ts";
 import { iconsOf } from "../../../../shared/icons.ts";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DatabaseCore, type ItemConflict } from "../../core/core.ts";
 import { type ModuleDefinition, Modules } from "../../core/module.ts";
 import { TypeRegistry } from "../../domain/types/registry.ts";
 import type { Database } from "../../model/database.ts";
 import { MemoryStore } from "../../store/memory.ts";
+import { calculatingStore } from "../../core/calculating.ts";
 import { PROPERTIES_MODULE } from "./index.ts";
 import { menuBuilder } from "../../../../shared/menuslots.ts";
 import { PLACE_MENU_SLOTS } from "../../core/placemenu.ts";
@@ -34,7 +35,9 @@ async function setup(answer = false, configured: Record<string, unknown> = {}, a
   const ui = { notify: (message: string) => void told.push(message), ask: () => (asked++, answer) };
   const core = new DatabaseCore(store, types, ui);
   let refreshed = 0;
-  const modules = new Modules(all, { document, icons: iconsOf(undefined), editors: editorsOf(undefined), core, types, ui, database: (id) => store.database(id), items: async (id) => (await store.items(id)).value, itemBodies: true, body: (id, item) => store.body(id, item.key), openDocument: async () => {}, documents: async () => [], validateDocumentName: () => undefined, openByName: async () => {}, noun: { one: "page", many: "pages" }, editorArea: () => undefined, onChanged: (listener) => store.onChanged((one) => listener(one.database)), onDocumentOpened: () => () => {}, refreshPlaces: () => void refreshed++, ...(showConflict ? { showConflict } : {}) }, { get: (path, fallback) => (path in configured ? configured[path] : fallback) });
+  // (The modules' items calculated, as the entry gives them: a formula's values; the core on the store itself)
+  const calculated = calculatingStore(store);
+  const modules = new Modules(all, { document, icons: iconsOf(undefined), editors: editorsOf(undefined), core, types, ui, database: (id) => store.database(id), items: async (id) => (await calculated.items(id)).value, itemBodies: true, body: (id, item) => store.body(id, item.key), openDocument: async () => {}, documents: async () => [], validateDocumentName: () => undefined, openByName: async () => {}, noun: { one: "page", many: "pages" }, editorArea: () => undefined, onChanged: (listener) => store.onChanged((one) => listener(one.database)), onDocumentOpened: () => () => {}, refreshPlaces: () => void refreshed++, ...(showConflict ? { showConflict } : {}) }, { get: (path, fallback) => (path in configured ? configured[path] : fallback) });
   await modules.start();
   const schema = async () => (await store.database("tasks"))!.value.properties;
   const named = async (name: string) => (await store.items("tasks")).value.find((one) => one.name === name)!;
@@ -306,6 +309,154 @@ describe("the properties' dialog", () => {
     expect((await schema())[1]!.type).toBe("number");
     expect((await named("Fix login")).values.estimate).toBe(3);
     expect((await named("Write docs")).values.estimate).toBe("a lot");
+  });
+
+  it("offers a formula last, apart under Calculated, for a new property and as a property's type", async () => {
+    const { open, q } = await setup();
+    await open();
+    const groups = (select: HTMLSelectElement) => [...select.querySelectorAll("optgroup")].map((group) => [group.label, [...group.querySelectorAll("option")].map((one) => one.value)]);
+    expect(groups(q<HTMLSelectElement>(".swd-property-new-type"))[0]).toEqual(["Calculated", ["formula"]]);
+    expand("estimate");
+    const type = q<HTMLSelectElement>('[data-property="estimate"] .swd-property-type');
+    expect(groups(type)).toEqual([["Calculated", ["formula"]]]);
+    expect(type.options[type.options.length - 1]!.value).toBe("formula");
+  });
+
+  it("makes a formula: its field focused, a property's button putting it in, its result for an item as typed, its type to show as", async () => {
+    const { open, q, schema } = await setup();
+    await open();
+    change(q<HTMLInputElement>(".swd-property-new-label"), "Shout");
+    q<HTMLSelectElement>(".swd-property-new-type").value = "formula";
+    q<HTMLButtonElement>(".swd-property-add").click();
+    const field = () => q<HTMLInputElement>('[data-property="new:1"] [data-focus="formula"]');
+    expect(document.activeElement).toBe(field());
+    // (An example of the database's own properties while it is empty)
+    expect(field().placeholder).toBe("=UPPER([@name])");
+    expect([...document.querySelectorAll(".swd-formula-property")].map((one) => one.textContent)).toEqual(["Name", "Status", "Estimate"]);
+    field().value = "=";
+    field().setSelectionRange(1, 1);
+    [...document.querySelectorAll<HTMLButtonElement>(".swd-formula-property")].find((one) => one.textContent === "Estimate")!.click();
+    expect(field().value).toBe("=[@estimate]");
+    field().value = '=[@estimate]&"!"';
+    field().dispatchEvent(new Event("input"));
+    // (Calculated after a pause in typing, for the first item)
+    await vi.waitFor(() => expect(q(".swd-formula-result").textContent).toBe("3!"), { timeout: 5_000 });
+    // (Another item: its name typed, the one offered taken)
+    const which = q<HTMLInputElement>(".swd-formula-result-item");
+    expect(which.value).toBe("Fix login");
+    which.focus();
+    which.value = "docs";
+    which.dispatchEvent(new Event("input"));
+    q<HTMLElement>(".swd-formula-result-item-box .swd-suggest-item").click();
+    expect(which.value).toBe("Write docs");
+    expect(q(".swd-formula-result").textContent).toBe("a lot!");
+    change(q<HTMLSelectElement>(".swd-formula-shown-as"), "text");
+    expect(q('[data-property="new:1"] .swd-prop-formula-shown-as').textContent).toContain("as text");
+    // (Read only always: no Required, no Locked)
+    expect(document.querySelector('[data-property="new:1"] .swd-property-required, [data-property="new:1"] .swd-property-locked')).toBeNull();
+    await save();
+    expect(document.querySelector(".swd-properties")).toBeNull();
+    expect((await schema()).at(-1)).toMatchObject({ key: "shout", type: "formula", params: { formula: '=[@estimate]&"!"', resultType: "text" }, readonly: true });
+  });
+
+  it("offers a formula no property added in the same edit (its key is made on Save), only those saved", async () => {
+    const { open, q } = await setup();
+    await open();
+    change(q<HTMLInputElement>(".swd-property-new-label"), "Price");
+    q<HTMLSelectElement>(".swd-property-new-type").value = "number";
+    q<HTMLButtonElement>(".swd-property-add").click();
+    change(q<HTMLInputElement>(".swd-property-new-label"), "Total");
+    q<HTMLSelectElement>(".swd-property-new-type").value = "formula";
+    q<HTMLButtonElement>(".swd-property-add").click();
+    expect([...document.querySelectorAll(".swd-formula-property")].map((one) => one.textContent)).toEqual(["Name", "Status", "Estimate"]);
+  });
+
+  it("makes a property turned into a formula read only and not required, and one turned back no longer read only, as Save writes them", async () => {
+    const { open, q, schema } = await setup();
+    await open();
+    expand("estimate");
+    q<HTMLInputElement>('[data-property="estimate"] .swd-property-required input').click();
+    change(q<HTMLSelectElement>('[data-property="estimate"] .swd-property-type'), "formula");
+    const head = () => q('[data-property="estimate"] .swd-prop-head');
+    // (No * nor lock: a formula is read only as calculated, never required)
+    expect(head().getAttribute("aria-label")).not.toMatch(/required|locked/);
+    expect(head().querySelector(".swd-prop-required, .swd-prop-lock")).toBeNull();
+    const field = q<HTMLInputElement>('[data-property="estimate"] [data-focus="formula"]');
+    field.value = "=1";
+    field.dispatchEvent(new Event("input"));
+    // (No value converted nor written: the schema alone, at once)
+    await save();
+    const estimate = (await schema()).find((one) => one.key === "estimate")!;
+    expect([estimate.type, estimate.readonly, estimate.required ?? false]).toEqual(["formula", true, false]);
+    // Back to a number: its Locked off, as written
+    await open();
+    expand("estimate");
+    change(q<HTMLSelectElement>('[data-property="estimate"] .swd-property-type'), "number");
+    q<HTMLDetailsElement>('[data-property="estimate"] .swd-prop-advanced').open = true;
+    expect(q<HTMLInputElement>('[data-property="estimate"] .swd-property-locked input').checked).toBe(false);
+  });
+
+  it("says after Save how many items a formula saved gives an error for, the save standing", async () => {
+    const { open, q, schema, told } = await setup();
+    await open();
+    change(q<HTMLInputElement>(".swd-property-new-label"), "Half");
+    q<HTMLSelectElement>(".swd-property-new-type").value = "formula";
+    q<HTMLButtonElement>(".swd-property-add").click();
+    const field = q<HTMLInputElement>('[data-property="new:1"] [data-focus="formula"]');
+    field.value = "=[@estimate]/2";
+    field.dispatchEvent(new Event("input"));
+    await save();
+    expect(document.querySelector(".swd-properties")).toBeNull();
+    expect((await schema()).at(-1)?.type).toBe("formula");
+    // ("a lot" / 2)
+    await vi.waitFor(() => expect(told.at(-1)).toMatch(/^Half: 1 of 2 items gives an error: /), { timeout: 5_000 });
+  });
+
+  it("says nothing after Save of a formula it did not change: one renamed, its key changed, is the one it was", async () => {
+    const { open, q, schema, told, core } = await setup();
+    await core.addProperty("tasks", { label: "Half", type: "formula", params: { formula: "=[@estimate]/2" } });
+    await open();
+    expand("half");
+    change(q<HTMLInputElement>('[data-property="half"] .swd-property-label'), "Ratio");
+    change(q<HTMLInputElement>('[data-property="half"] .swd-property-key'), "ratio");
+    await save();
+    expect((await schema()).at(-1)).toMatchObject({ key: "ratio", label: "Ratio" });
+    await settle();
+    expect(told.filter((one) => one.startsWith("Ratio:"))).toEqual([]);
+  });
+
+  it("saves no formula that does not read, its field shown and why said", async () => {
+    const { open, q, schema, told } = await setup();
+    await open();
+    change(q<HTMLInputElement>(".swd-property-new-label"), "Broken");
+    q<HTMLSelectElement>(".swd-property-new-type").value = "formula";
+    q<HTMLButtonElement>(".swd-property-add").click();
+    const field = q<HTMLInputElement>('[data-property="new:1"] [data-focus="formula"]');
+    field.value = "=SUM(";
+    field.dispatchEvent(new Event("input"));
+    expect(q('[data-property="new:1"] .swd-formulafield-problem').textContent).not.toBe("");
+    // (Its row closed: Save opens it again)
+    q<HTMLButtonElement>('[data-property="new:1"] .swd-prop-head').click();
+    await save();
+    expect(document.querySelector(".swd-properties")).not.toBeNull();
+    expect(told.at(-1)).toMatch(/^Broken: the formula/);
+    expect(document.activeElement).toBe(q('[data-property="new:1"] [data-focus="formula"]'));
+    expect((await schema()).some((one) => one.type === "formula")).toBe(false);
+  });
+
+  it("keeps a select's options for a select again in the same edit, and none for a number saved", async () => {
+    const { open, q, schema } = await setup();
+    await open();
+    expand("status");
+    const type = () => q<HTMLSelectElement>('[data-property="status"] .swd-property-type');
+    change(type(), "number");
+    change(type(), "select");
+    change(type(), "number");
+    // (No value changes, none reading as a number: written at once)
+    await save();
+    expect(document.querySelector(".swd-properties")).toBeNull();
+    const status = (await schema()).find((one) => one.key === "status")!;
+    expect([status.type, status.params]).toEqual(["number", {}]);
   });
 
   it("edits a select's options as a list: one added, one renamed keeping its color, written with the rest on Save", async () => {

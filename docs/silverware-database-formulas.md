@@ -51,7 +51,8 @@ items with their calculated values readable from Space Lua.
    tables)` as `withSystemValues(items, database, …)`). It is applied by a store over the store (`core/` file, a
    `DatabaseStore` whose `items(id)` reads `database(id)` itself and gives the items calculated, the rest passed
    through: `onChanged`, `body`, the writes), made by the entry (`index.ts`) and handed to everything that shows or
-   reads items: the places, the modules' hosts, the media host, the Space Lua API. **The core keeps the raw store for
+   reads items: the places, the modules' hosts, the Space Lua API (the media host reads no item, only the files'
+   folder, and keeps the store). **The core keeps the raw store for
    every read a write is made from** (`editSchema` writes the values it read under a new key or type; `newProperty`'s
    keys taken; `validateKeptValues`), so a calculated value can never be written. The stores calculate nothing; system
    values stay theirs (they need the store's facts).
@@ -80,7 +81,9 @@ items with their calculated values readable from Space Lua.
   written in one place both ways: a number with a dot (the calculation told so, not guessing a decimal comma from the
   cells, which a text property holding `1,5` would flip), a checkbox `TRUE`/`FALSE` (as the engine compares logical
   values), a date as ISO text, a date and time without milliseconds (`Created` keeps them, the engine reads none), a
-  list as a multi-select is shown (a comma and a space between). Out: each formula cell's result as the engine's value (a new,
+  list as a multi-select is shown (a comma and a space between), each given to the engine as it is
+  (`FormulaCells.plainValue`, a generic hook of `shared/formulas`: a text `007` stays a text, a checkbox a logical
+  value), not read back from that text. Out: each formula cell's result as the engine's value (a new,
   generic call of `shared/formulas` giving every formula cell's `Scalar` of one calculation, beside `recalculate`,
   which writes text), turned into a `Value` by the property's type (Auto: by its kind; a date and time with `T`); an
   error kept with its code and message (`formulaErrors`), not as escaped text (`\#REF!`).
@@ -89,8 +92,9 @@ items with their calculated values readable from Space Lua.
   total rows), not the database refusing what a table allows.
 - **Calculated again** whenever what it read changed: the key of the last calculation is a list of (what was read,
   its revision): the database's record and items revisions now, other sources added later without changing the key's
-  shape; with the registry of types. A formula calling `TODAY()` or `NOW()` makes the calculation the day's (its key
-  takes the date, `NOW()` none kept), so a view shows today's result.
+  shape. A formula giving another value as time goes or as Space Lua's definitions change (`TODAY()`, `NOW()`, a
+  function of the user's: what `callsPureFunctionsOnly` does not call pure) keeps its calculation for its minute only
+  (its key takes the minute), so a view shows today's result and a value and its error are one calculation.
 - **Isolation** (`isolation.test.ts`): a rule of its own: `shared/formulas/` and `shared/table/` in the domain, the
   core and the entry only (pure, as `shared/filter.ts`); refused in views, modules, converters and stores, which today
   may import any other `shared/` path. No layer below the domain's users calculates.
@@ -125,6 +129,32 @@ user:
 What comes out is written here (decided, with the user) before step 4 starts; step 4 then builds that, not the
 first idea.
 
+### Decided (2026-11-22, with the user)
+
+1. **Making one**: Formula is a type in Properties' list of types, last, apart from the others under *Calculated*;
+   from a table view's + alike. A new one opens with its formula field focused, an example made of this database's
+   own properties as its placeholder (`=[@Qty] * [@Price]`).
+2. **Writing it**: one formula field for Silverware Table and Silverware Database: the table's (`formulafield.ts`:
+   names offered as typed, the syntax of the function the caret is in, why a formula does not read) moved into
+   `shared/` and used by both. The database's properties under it as buttons, a press writing `[@Label]` as it must
+   be written. The result shown live for one item (the one the dialog was opened from, else the first; `Result for:
+   Pear ▾ → 7.5`), calculated in memory after a pause in typing, the whole-database parts once.
+3. **Errors**: a formula that does not read (or reads outside the database) is said under its field, where it is,
+   and not saved; errors only some items give when calculated (`#DIV/0!`) never stop a save: said after it from the
+   calculation the views make anyway (`2 of 40 items give an error: division by zero`), no calculation of its own.
+4. **The result's type**: `Show as: Auto · Number · Date · Date & time · Text · Checkbox`, Auto by default, a line
+   saying what the one picked changes (`Number: sorted and filtered as numbers`).
+5. **Reading it**: an ƒ in its column's header (in place of its type's icon) and in the item's panel, not in every
+   cell; its formula shown over the header; its values not editable (no editor, no field's look); an error's cell
+   its code, muted red, why over it; in the item's panel a press on ƒ shows the formula and *Edit formula*
+   (Properties). Sorted, filtered and grouped by its result's type.
+6. **Options by a formula** (step 6): in Options, `Fixed list / From a formula`; from a formula the same field and
+   the list it gives.
+7. **Phones**: a property's dialog over the whole screen, the formula field at its top, the names offered as a strip
+   over the keyboard, the result under the field.
+8. **Large databases**: a database of tens of thousands of items stays usable (measured, *Steps* 3b and 3c); while a
+   calculation takes long, *Calculating…* instead of a frozen page.
+
 ## Steps
 
 Ordered by the code (each step's tests passing before the next; UI tests where a step changes what a user does).
@@ -143,12 +173,30 @@ Ordered by the code (each step's tests passing before the next; UI tests where a
    chosen type, a value of each type in and back, `[#Data]`, a reference outside the database refused with why.
 3. **The core and the entry.** A property's formula set, changed and removed through the schema's changes
    (its params validated with the formula's parsing); a type changed to or from formula converting and writing no
-   value (decided 8); the calculating store (`core/`, its key of revisions,
-   `TODAY()`) made by the entry and handed to the places, the modules, the media host; the core on the raw store for
-   every read a write is made from, a test that a schema edit of a formula property's key or type writes nothing of
-   its values, nor a type changed to or from formula.
-4. **The design, then the views.** First *How it is used* designed and agreed with the user. Then what it decided:
-   making and editing a formula; values read only in tables, lists, boards, calendars, timelines and the item's panel;
+   value (decided 8), nor keeping the params of the type it was; one changed away from formula no longer read only
+   (its read only was the formula's, forced as read, and Properties gives back the one it read: the core cannot tell a
+   lock asked in the same edit, so that lock is dropped and the user locks it again after); a formula read only for the core whatever a store keeps
+   (`writable`), its unlocking refused; the calculating store (over the store's items, so after the system's values:
+   a formula reads Created and Modified; `core/calculating.ts`, its key of revisions and the minute) made by the entry
+   and handed to the places and the modules; the core on the raw store for every read a write is made from; tests
+   that a schema edit of a formula property's key or type, or both at once, writes nothing of its values, and that the
+   tasks converter writes none.
+3b. **The engine: a formula's parts reading nothing of its row calculated once** (measured 2026-11-22: a database of
+   50,000 items with `=[@hours]/SUM([hours])` took 63 s, SUM read once a row). `shared/formulas`: a part with no
+   `[@column]`, no function reading its cell (`readsPlace`: ROW()) and no custom function is calculated once in a
+   calculation; Silverware Table's tables alike. Its tests with the table's rules (total rows, ROW(), cycles).
+3c. **Large databases measured**: the calculation and the views with tens of thousands of items; where an edit still
+   takes long, only what it changes calculated anew (the items changed; the whole-database parts once). Measured
+   2026-11-22 (playground, a table view, `=[@qty]*[@price]` and `=[@hours]/SUM([hours])`): 2,000 items shown in
+   0.35 s, a change in 0.1 s; 10,000 in 1.9 s and 0.5 s; 20,000 in 3.9 s and 1.0 s. The formulas' share is small
+   (all of 50,000 items' formulas calculated in 0.7 s, 3b): the table view draws every row (26 elements each, 520,000
+   at 20,000 items), so incremental calculation is not done; drawing only the rows in sight is the views' work, a
+   plan of its own (docs/silverware-database.md, *Left open after the UI work*).
+3d. **A type changed keeps none of the old type's params** (found on the way: a select turned into a number kept its
+   options), its own commit.
+4. **The views.** What *How it is used* decided:
+   making and editing a formula; its icon (the formula type's, or its result's type's: today the views draw a type's
+   icon by its name); values read only in tables, lists, boards, calendars, timelines and the item's panel;
    errors shown as decided. UI tests for making, editing and reading one, a phone's too.
 5. **Space Lua's read.** `silverware.database.items(id)` (the entry's export over the calculating store, the API
    page's function with its `---` docs).
@@ -175,7 +223,11 @@ Ordered by the code (each step's tests passing before the next; UI tests where a
 
 ## Risks
 
-- **Cost on large databases**: every reading calculates every item's formulas; whole-column functions read every
-  item. Kept by its key of revisions; measured on a database of 2000 items before step 4 is done.
+- **The name `formula` is the built-in type's from step 1**: a type of the user's of that name (`defineTypes`) is
+  refused from then on (as any built-in name is), and its properties become formula properties, their values unseen
+  though still in the pages. Said in the release's changelog entry.
+- **Cost on large databases**: every reading calculates every item's formulas. Kept by its key of revisions;
+  measured with 50,000 items (3b, 3c): own values only 0.4 s, a whole column 63 s before 3b, 0.4 s after it. A large
+  table view's cost is its drawing, not the formulas (3c).
 - **Writing a calculated value by mistake**: only the raw store is written from (decided 5), and a test per write path
   that reads items (schema edits, a converter, Apply to all).

@@ -14,6 +14,7 @@ import { mediaHost, type MediaSource } from "../silverware-database/src/core/med
 import { mentionsHost } from "../silverware-database/src/core/mentions.ts";
 import { ViewRegistry } from "../silverware-database/src/core/views.ts";
 import { TypeRegistry } from "../silverware-database/src/domain/types/registry.ts";
+import { calculatingStore, type CalculatingStore } from "../silverware-database/src/core/calculating.ts";
 import { MemoryStore } from "../silverware-database/src/store/memory.ts";
 import { MemoryViewState } from "../silverware-database/src/store/viewstate.ts";
 
@@ -64,6 +65,8 @@ const ui = {
 const settings = { get: (_path: string, fallback: unknown) => fallback };
 
 let store: MemoryStore;
+// Its items with their formulas' values: what the places and the modules read, as in SilverBullet
+let calculated: CalculatingStore;
 // The pages a reference may name: the playground has no space of its own
 const PAGES: DocumentsSource = { list: () => ["Projects/Alpha", "Projects/Beta", "People/Ada", "People/Linus", "Notes/Weekly"], open: (name) => flash(`Open ${name}`), folderSeparator: "/" };
 // The files as the playground has them: a few of the space's (images drawn by their address here), one opened said,
@@ -89,6 +92,7 @@ function start(): void {
   applyLayers(document);
   for (const place of places) place.destroy();
   store = new MemoryStore(SAMPLE_DATABASES);
+  calculated = calculatingStore(store);
   const types = new TypeRegistry();
   // (The playground's items stand for pages, as SilverBullet's)
   const core = new DatabaseCore(store, types, ui, { one: "page", many: "pages" });
@@ -103,7 +107,7 @@ function start(): void {
       types,
       ui,
       database: (id) => store.database(id),
-      items: async (id) => (await store.items(id)).value,
+      items: async (id) => (await calculated.items(id)).value,
       itemBodies: store.capabilities.itemBody,
       body: (id, item) => store.body(id, item.key),
       openDocument: async (item) => flash(`Open ${store.documentOf(item.key) ?? item.name}`),
@@ -128,7 +132,7 @@ function start(): void {
     element.className = "swd-place";
     section.append(element);
     main.append(section);
-    const place = new DatabasePlace({ element, database: database.id, state: new StoredViewState(`silverware-playground.database.state.${database.id}`), store, core, types, views, settings, ui, editor: EDITOR, documents: PAGES, media: MEDIA, moduleMenu: (where, menu) => modules.placeMenu(where, menu), moduleTools: (where) => modules.placeTools(where), placeDrawn: (where) => modules.placeDrawn(where), openItem: (item, database, from) => modules.openItem(item, database, from), deleteDatabase: (id, name) => openDeleteDatabase({ document, core, noun: core.noun, notify: (message) => flash(message), written: () => places.forEach((one) => void one.render()) }, id, name) });
+    const place = new DatabasePlace({ element, database: database.id, state: new StoredViewState(`silverware-playground.database.state.${database.id}`), store: calculated, core, types, views, settings, ui, editor: EDITOR, documents: PAGES, media: MEDIA, moduleMenu: (where, menu) => modules.placeMenu(where, menu), moduleTools: (where) => modules.placeTools(where), placeDrawn: (where) => modules.placeDrawn(where), openItem: (item, database, from) => modules.openItem(item, database, from), deleteDatabase: (id, name) => openDeleteDatabase({ document, core, noun: core.noun, notify: (message) => flash(message), written: () => places.forEach((one) => void one.render()) }, id, name) });
     return place;
   });
   void modules.start().then(() => places.forEach((place) => void place.render()));

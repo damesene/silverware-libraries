@@ -37,7 +37,7 @@ import { cellName, columnChoicesOf, columnIdText, FormulaError, functionHelp, ty
 import { type FormulaErrorAt } from "../formulas/offers.ts";
 import { addAffected, affectedBy, type Elsewhere, isAffected, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../../../shared/formulas/page.ts";
 import { functionNamed } from "../../../shared/formulas/registry.ts";
-import type { FormulaHelpers } from "../formulafield.ts";
+import type { FormulaHelpers } from "../../../shared/formulafield.ts";
 import { FunctionDialog } from "./functiondialog.ts";
 import { ResultView } from "./resultview.ts";
 import { el } from "../../../shared/elements.ts";

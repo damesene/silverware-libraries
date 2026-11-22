@@ -40,7 +40,7 @@ import { type FormulasOffer } from "../formulas/offers.ts";
 import { ICONS } from "../icons.ts";
 import type { TableModel } from "../../../shared/table/model.ts";
 import type { MenuEntry } from "../menu.ts";
-import type { FormulaHelpers } from "../formulafield.ts";
+import type { FormulaHelpers } from "../../../shared/formulafield.ts";
 import { openConditionsDialog, type RuleSample, type ScopeColumn } from "./conditionsdialog.ts";
 
 // How a formula condition refers to cells, under its field out of a function: one line

@@ -24,9 +24,10 @@ import type { Database, Item, ItemLook, Property, Value } from "../../model/data
 import { type EditorHost, editValue, toggle } from "../../views/editors.ts";
 import { reorder } from "../../../../shared/drag.ts";
 import { propertyIcon, typeIcon, VIEW_ICONS } from "../../views/icons.ts";
+import { formulaOf, isFormula } from "../../domain/formulas/model.ts";
 import type { PropertiesOffer } from "../properties/index.ts";
 import { type LookControls, lookControls } from "./look.ts";
-import { missing, valueNodes } from "../../views/values.ts";
+import { missing, problemOf, valueNodes } from "../../views/values.ts";
 import { takeFiles, uploadInto } from "../../views/takefiles.ts";
 
 // The panel's width where none is set (the module's setting `width`), the narrowest it may be set to, and its share of the
@@ -679,6 +680,11 @@ export class PeekPanel {
       // only a pointer's way, the value itself being the button the keys edit (Enter, F2), its press reaching it
       const pencil = !property.readonly && shownNodes.some((node) => node instanceof Element && node.matches("a, .swd-media-strip")) ? [el(doc, "span", { class: "swd-peek-edit", html: VIEW_ICONS.edit, title: `Edit ${property.label}`, attrs: { "aria-hidden": "true" } })] : [];
       value.replaceChildren(...(shownNodes.length ? shownNodes : [el(doc, "span", { class: `swd-peek-empty${lacking ? " swd-peek-missing" : ""}`, text: lacking ? "Required" : "Empty" })]), ...pencil);
+      // (A formula's error: its code shown, why over it, as a table's cell has it)
+      const problem = shownNodes.length ? problemOf(editor, now, property) : undefined;
+      value.classList.toggle("swd-invalid", !!problem);
+      if (problem) value.title = problem;
+      else value.removeAttribute("title");
     };
     show();
     if (!property.readonly) {
@@ -710,9 +716,9 @@ export class PeekPanel {
           "button",
           {
             class: "swd-peek-label",
-            title: `Edit ${property.label} (name, type, options…)`,
+            title: isFormula(property) ? `${property.label} = ${(formulaOf(property.params) ?? "(no formula yet)").replace(/^\s*=\s*/, "")}\nEdit its formula` : `Edit ${property.label} (name, type, options…)`,
             attrs: { "aria-label": `Edit the property ${property.label}${hiddenSaid}` },
-            run: () => void properties.open(shown.database, { property: property.key }).then(() => this.refocus(`.swd-peek-row[data-property="${CSS.escape(property.key)}"] .swd-peek-label`)),
+            run: () => void properties.open(shown.database, { property: property.key, item: shown.item.key }).then(() => this.refocus(`.swd-peek-row[data-property="${CSS.escape(property.key)}"] .swd-peek-label`)),
           },
           ...labelParts,
         )

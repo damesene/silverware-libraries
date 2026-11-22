@@ -54,6 +54,8 @@ function wrong(layer: Layer, file: string, one: Import): string | undefined {
   if (one.path.startsWith("shared/")) {
     // Pure data: a filter's and a comparison's rules, an icon's reference, YAML's forms
     if (/^shared\/(filter|compare|iconref)\.ts$/.test(one.path) || one.path.startsWith("shared/yaml/")) return undefined;
+    // (Formulas are calculated in the domain, pure; the core and the entry hand them over, nothing below calculates)
+    if (/^shared\/(formulas|table)\//.test(one.path)) return ["domain", "core", "root"].includes(layer) ? undefined : `${one.path}: formulas are the domain's (the core and the entry hand them over)`;
     if (one.path.startsWith("shared/pages/")) return file.startsWith("store/pages/") || layer === "host" || layer === "root" ? undefined : `${one.path}: the page writer is the pages store's and the host's`;
     if (one.path.startsWith("shared/markdown/")) return ["converters", "host", "root"].includes(layer) ? undefined : `${one.path}: markdown is the converters' and the host's`;
     if (one.path === "shared/platform.ts") return ["core", "store", "host", "root"].includes(layer) ? undefined : `${one.path}: the platform is the core's, the stores' and the host's`;

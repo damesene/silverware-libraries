@@ -7,7 +7,7 @@
 import { el, type ElementChild } from "../../../shared/elements.ts";
 import type { Calculated } from "../calculated/index.ts";
 import type { Dialog, ModelHost } from "../core/feature.ts";
-import { formulaField, type FormulaHelpers } from "../formulafield.ts";
+import { formulaField, type FormulaHelpers } from "../../../shared/formulafield.ts";
 
 export type ViewDialogOptions = {
   readonly formula: string;
@@ -50,7 +50,7 @@ export function openViewDialog(host: ModelHost, options: ViewDialogOptions): Dia
     ? formulaField(doc, options.helpers, formula, (v) => {
         formula = v;
         previewSoon();
-      }, { label: "Formula", focus: "formula", placeholder: "=SORT(FILTER(tasks![#Data], tasks![done] = FALSE))" })
+      }, { base: "swt", label: "Formula", focus: "formula", placeholder: "=SORT(FILTER(tasks![#Data], tasks![done] = FALSE))" })
     : (() => {
         const input = e("input", { class: "swt-formulafield-text", attrs: { type: "text", "aria-label": "Formula", "data-focus": "formula", spellcheck: "false", autocomplete: "off" } });
         input.value = formula;

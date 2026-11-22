@@ -11,6 +11,10 @@
 // changes. The values outside the database have a screen of their own.
 import { typeOf } from "../../domain/listing.ts";
 import { systemKind, systemProperties } from "../../domain/system.ts";
+import { calculated, paramsKept } from "../../domain/calculated.ts";
+import { formulaTypedProblem } from "../../domain/formulas/help.ts";
+import { formulaErrorsSaid } from "../../domain/formulas/calculate.ts";
+import { formulaDetails } from "./formula.ts";
 import { switchControl } from "../../../../shared/controls.ts";
 import { Dialogs } from "../../../../shared/dialog.ts";
 import { reorder } from "../../../../shared/drag.ts";
@@ -20,7 +24,7 @@ import { labelOfKey } from "../../domain/loose.ts";
 import type { ModuleHost } from "../../core/module.ts";
 import { colorsOf, OPTION_COLORS, type OptionColor } from "../../domain/types/options.ts";
 import type { PropertyType } from "../../domain/types/type.ts";
-import type { Database, Property } from "../../model/database.ts";
+import type { Database, Item, Property } from "../../model/database.ts";
 import { ownIcon, propertyIcon } from "../../views/icons.ts";
 import { iconChoice, type Popovers, popovers } from "../../views/popover.ts";
 import { optionPill, pill } from "../../views/values.ts";
@@ -31,6 +35,14 @@ const SYSTEM_PREFIX = "system:";
 
 /** The types offered for a property of the user's (not those only the system's properties have) */
 const offered = (all: readonly PropertyType[]) => all.filter((one) => one.offered !== false);
+
+/** A list of types to pick from: those of typed values, then apart under Calculated those whose values are calculated (a formula) */
+function typeChoices(doc: Document, all: readonly PropertyType[], selected: string): (HTMLOptionElement | HTMLOptGroupElement)[] {
+  const option = (one: PropertyType) => new Option(one.label, one.name, false, one.name === selected);
+  const typed = offered(all).filter((one) => !calculated({ type: one.name }));
+  const calculatedOnes = offered(all).filter((one) => calculated({ type: one.name }));
+  return [...typed.map(option), ...(calculatedOnes.length ? [el(doc, "optgroup", { attrs: { label: "Calculated" } }, ...calculatedOnes.map(option))] : [])];
+}
 
 // The settings dialog's look: the same rows, cards and switches
 const BASE = "swd-settings";
@@ -133,6 +145,9 @@ export class PropertiesDialog {
   private readonly advancedOpen = new Set<string>();
   // A change being planned or written: nothing else offered meanwhile (Apply twice wrote nothing the second time and said so)
   private busy = false;
+  // The items, read once a formula's result is shown while the dialog is open; the item it is shown for
+  private items: Promise<readonly Item[]> | undefined;
+  private readonly shownFor: { item: string | undefined } = { item: undefined };
 
   constructor(
     private readonly host: ModuleHost,
@@ -146,8 +161,12 @@ export class PropertiesDialog {
     return this.dialogs.isOpen;
   }
 
-  /** Opened (at a property, its details shown; or at the field adding one); open already: shown there. Resolved as it closes */
-  async open(at?: { readonly property?: string; readonly add?: boolean }): Promise<void> {
+  /**
+   * Opened (at a property, its details shown; or at the field adding one; `item`, the item it was opened from: a formula's
+   * result shown for it); open already: shown there. Resolved as it closes
+   */
+  async open(at?: { readonly property?: string; readonly add?: boolean; readonly item?: string }): Promise<void> {
+    if (at?.item !== undefined) this.shownFor.item = at.item;
     if (this.dialogs.isOpen) {
       // (A change being written: its review and progress stay as they are)
       if (this.busy) return this.whenClosed;
@@ -169,6 +188,7 @@ export class PropertiesDialog {
     this.loose = undefined;
     this.adding = { label: "", type: "" };
     this.opened = at?.property;
+    this.items = undefined;
     const doc = this.host.document;
     this.body = el(doc, "div", "swd-properties");
     this.note = el(doc, "span", { class: `${BASE}-note swd-properties-note`, attrs: { "aria-live": "polite" } });
@@ -320,6 +340,17 @@ export class PropertiesDialog {
       for (const input of this.body?.querySelectorAll<HTMLInputElement>(`[data-property="${CSS.escape(entry.id)}"] .swd-option-name`) ?? []) input.classList.toggle("swd-invalid", input.value.trim() === twice);
       return this.host.ui.notify(`${entry.property.label}: "${twice}" is two options: give each a name of its own`, { type: "error" });
     }
+    // A formula that does not read (or reads outside the database): not saved, its field shown, why said
+    for (const entry of this.entries) {
+      if (entry.removed || entry.property.system !== undefined || !calculated({ type: entry.property.type })) continue;
+      const formula = entry.property.params.formula;
+      const problem = typeof formula === "string" ? formulaTypedProblem(formula) : undefined;
+      if (!problem) continue;
+      this.opened = entry.id;
+      this.draw();
+      this.body?.querySelector<HTMLElement>(`[data-property="${CSS.escape(entry.id)}"] [data-focus="formula"]`)?.focus();
+      return this.host.ui.notify(`${entry.property.label}: ${problem}`, { type: "error" });
+    }
     this.busy = true;
     this.drawFoot();
     let result: Proposal | Refused;
@@ -363,7 +394,12 @@ export class PropertiesDialog {
       this.proposal = undefined;
     }
     this.changed();
-    if (saving && !isRefused(result)) return this.close();
+    if (saving && !isRefused(result)) {
+      // (Each property as it was saved before, by the key the draft gave it: one renamed is still the one it was)
+      const before = new Map(this.entries.filter((one) => one.saved && !one.removed).map((one) => [one.property.key || one.saved!.key, one.saved!]));
+      this.close();
+      return this.sayFormulaErrors(before);
+    }
     // (Values outside the database taken off, or the draft not written: the database read again, the draft kept, made of what
     // it was made of)
     const read = await this.host.database(this.id);
@@ -373,6 +409,23 @@ export class PropertiesDialog {
     }
     if (this.loose) await this.readLoose();
     this.draw();
+  }
+
+  /**
+   * A formula saved (added, or its params changed since it was as `before` has it, by its key now) that some items give
+   * an error for (`#DIV/0!`): said, from the items as the views calculate them; the save stands (decided 3)
+   */
+  private async sayFormulaErrors(before: ReadonlyMap<string, Property>): Promise<void> {
+    const read = await this.host.database(this.id);
+    if (!read) return;
+    const params = (property: Property | undefined) => JSON.stringify(sortedKeys(property?.params));
+    const changed = read.value.properties.filter((one) => one.system === undefined && calculated(one) && params(before.get(one.key)) !== params(one));
+    if (!changed.length) return;
+    const items = await this.host.items(this.id);
+    for (const property of changed) {
+      const said = formulaErrorsSaid(items, property.key);
+      if (said) this.host.ui.notify(`${property.label}: ${said}`, { type: "info" });
+    }
   }
 
   private say(text: string): void {
@@ -462,12 +515,14 @@ export class PropertiesDialog {
     const type = typeOf(types, property);
     const kind = systemKind(property.system, this.host.noun);
     const mark = entry.removed ? "Removed" : !entry.saved ? "New" : this.changedEntry(entry) ? "Changed" : undefined;
-    head.setAttribute("aria-label", `${property.label}, ${type?.label ?? property.type}${property.required ? ", required" : ""}${property.system ? ", given by the system" : property.readonly ? ", locked in views" : ""}${mark ? `, ${mark.toLowerCase()} (on Save)` : ""}`);
+    // (A formula's values are read only as calculated, not locked by the user: no lock, its type says it)
+    const locked = property.readonly && (property.system !== undefined || !calculated(property));
+    head.setAttribute("aria-label", `${property.label}, ${type?.label ?? property.type}${property.required ? ", required" : ""}${property.system ? ", given by the system" : locked ? ", locked in views" : ""}${mark ? `, ${mark.toLowerCase()} (on Save)` : ""}`);
     head.replaceChildren(
       propertyIcon(doc, this.host.look, property, type, "swd-prop-icon"),
       el(doc, "span", { class: "swd-prop-name", text: property.label || "(no name)" }, ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", title: "Required", attrs: { "aria-hidden": "true" } })] : [])),
       ...(mark ? [el(doc, "span", { class: `swd-prop-mark swd-prop-mark-${mark.toLowerCase()}`, text: mark, title: `${mark}: written on Save` })] : []),
-      ...(property.readonly ? [el(doc, "span", { class: "swd-prop-lock", html: LOCK, title: property.system ? "Given by the system" : "Locked in views" })] : []),
+      ...(locked ? [el(doc, "span", { class: "swd-prop-lock", html: LOCK, title: property.system ? "Given by the system" : "Locked in views" })] : []),
       el(doc, "span", { class: "swd-prop-type", text: kind?.label ? `System: ${kind.label}` : (type?.label ?? property.type) }),
     );
   }
@@ -639,15 +694,17 @@ export class PropertiesDialog {
         el(doc, "div", "swd-prop-actions", remove),
       );
     }
-    const type = el(doc, "select", { class: "swd-property-type", attrs: { "aria-label": `Type of ${property.label}` } }, ...offered(types.all()).map((one) => new Option(one.label, one.name, false, one.name === property.type)));
+    const type = el(doc, "select", { class: "swd-property-type", attrs: { "aria-label": `Type of ${property.label}` } }, ...typeChoices(doc, types.all(), property.type));
     // (A type not defined now, or not offered, kept as it is)
     if (!offered(types.all()).some((one) => one.name === property.type)) type.append(new Option(types.named(property.type)?.label ?? property.type, property.type, false, true));
     type.addEventListener("change", () =>
       this.edited(() => {
-        // (Its params kept where the new type takes them, else none, as the core keeps them; its options as edited, where it has some)
-        const to = types.named(type.value);
-        const params = to?.validateParams?.(property.params) === undefined ? property.params : {};
-        entry.property = { ...entry.property, type: type.value, params };
+        // (Its params kept as the core keeps them; its options as edited, where it has some. A formula read only and never
+        // required; one turned from a formula not read only, its read only the formula's: as the core saves them)
+        const { required: _required, ...rest } = entry.property;
+        const toFormula = calculated({ type: type.value });
+        const readonly = toFormula ? true : calculated({ type: entry.saved?.type ?? "" }) ? false : entry.property.readonly;
+        entry.property = { ...(toFormula ? rest : entry.property), type: type.value, params: paramsKept(property, types.named(type.value)), readonly };
         if (this.hasOptions(type.value)) entry.options ??= optionDrafts(entry.property);
       }),
     );
@@ -661,6 +718,8 @@ export class PropertiesDialog {
       entry.property = { ...entry.property, key: key.value.trim() || (entry.saved?.key ?? "") };
       this.typed(entry);
     });
+    // (A formula's values are calculated: read only always, none missing to require)
+    const formula = calculated({ type: property.type });
     return el(
       doc,
       "div",
@@ -668,12 +727,13 @@ export class PropertiesDialog {
       field("Name", label),
       iconField,
       field("Type", type),
+      ...(formula ? this.formula(entry) : []),
       // (Options where its values are picked from them: a select's, a type of the user's so)
       ...(this.hasOptions(property.type) ? [this.options(entry)] : []),
       // (Its type's switches: a select's Multiple)
-      ...this.switches(entry),
+      ...(formula ? [] : this.switches(entry)),
       // (A value turned by a press has no empty one to require)
-      ...(typeOf(types, property).editor === "toggle"
+      ...(formula || typeOf(types, property).editor === "toggle"
         ? []
         : [
             el(
@@ -688,17 +748,44 @@ export class PropertiesDialog {
       ...(typeOf(types, property).look === "check" ? [] : [nameShown]),
       // What is seldom set, folded away: open while a property is (kept so as it is drawn anew)
       this.advanced(entry, [
-        el(
-          doc,
-          "label",
-          { class: "swd-prop-field swd-prop-switch-row swd-property-locked", title: `Locked: no view offers to change it (its ${this.host.noun.one} can still be edited by hand, a script can still write it)` },
-          el(doc, "span", "swd-prop-field-name", "Locked in views", el(doc, "span", { class: `${BASE}-hint`, text: "For values a script or another tool keeps" })),
-          locked,
-        ),
+        ...(formula
+          ? []
+          : [
+              el(
+                doc,
+                "label",
+                { class: "swd-prop-field swd-prop-switch-row swd-property-locked", title: `Locked: no view offers to change it (its ${this.host.noun.one} can still be edited by hand, a script can still write it)` },
+                el(doc, "span", "swd-prop-field-name", "Locked in views", el(doc, "span", { class: `${BASE}-hint`, text: "For values a script or another tool keeps" })),
+                locked,
+              ),
+            ]),
         field("Key", key, `How ${this.host.noun.many} and queries name it`),
       ]),
       el(doc, "div", "swd-prop-actions", remove),
     );
+  }
+
+  /** A formula property's formula, its result for an item, the type it is shown as (formula.ts) */
+  private formula(entry: Entry): HTMLElement[] {
+    const property = this.built(entry);
+    const key = entry.saved?.key ?? entry.id;
+    // (The properties a formula offers and reads: those saved, by their keys as saved, as the items hold their values; one
+    // added now has its key made on Save, so a reference to it could not be written yet; the formula's own as edited)
+    const properties = this.entries.filter((one) => !one.removed && (one.saved || one === entry)).map((one) => ({ ...this.built(one), key: one.saved?.key ?? key }));
+    return formulaDetails({
+      doc: this.host.document,
+      types: this.host.types,
+      property,
+      key,
+      database: { ...this.database!, properties },
+      items: () => (this.items ??= this.host.items(this.id)),
+      shownFor: this.shownFor,
+      typed: (params) => {
+        entry.property = { ...entry.property, params };
+        this.typed(entry);
+      },
+      picked: (params) => this.edited(() => (entry.property = { ...entry.property, params })),
+    });
   }
 
   /** A property's type's switches (a select's Multiple), each a logical param: on, true; off, left out */
@@ -882,7 +969,7 @@ export class PropertiesDialog {
         return option;
       }),
     );
-    const type = el(doc, "select", { class: "swd-property-new-type", attrs: { "aria-label": "New property's type" } }, ...offered(types.all()).map((one) => new Option(one.label, one.name, false, one.name === this.adding.type)), system);
+    const type = el(doc, "select", { class: "swd-property-new-type", attrs: { "aria-label": "New property's type" } }, ...typeChoices(doc, types.all(), this.adding.type), system);
     // A system property picked: its own name offered, which may be changed
     type.addEventListener("change", () => {
       this.adding.type = type.value;
@@ -897,10 +984,16 @@ export class PropertiesDialog {
         if (!label.value.trim() && !kind) return label.focus();
         const property: Property = kind
           ? { key: "", label: label.value.trim() || kind.label, type: kind.type, params: {}, readonly: true, system: kind.kind }
-          : { key: "", label: label.value.trim(), type: type.value, params: {}, readonly: false };
+          : { key: "", label: label.value.trim(), type: type.value, params: {}, readonly: calculated({ type: type.value }) };
         this.adding = { label: "", type: "" };
-        this.edited(() => this.entries.push({ id: `new:${++this.added}`, saved: undefined, property, options: this.hasOptions(property.type) ? [] : undefined }));
-        this.body?.querySelector<HTMLElement>(".swd-property-new-label")?.focus();
+        const id = `new:${++this.added}`;
+        // (A formula opened, its field focused: what it is for is written there)
+        const formula = !kind && calculated({ type: property.type });
+        this.edited(() => {
+          this.entries.push({ id, saved: undefined, property, options: this.hasOptions(property.type) ? [] : undefined });
+          if (formula) this.opened = id;
+        });
+        this.body?.querySelector<HTMLElement>(formula ? `[data-property="${CSS.escape(id)}"] [data-focus="formula"]` : ".swd-property-new-label")?.focus();
       },
     });
     label.addEventListener("keydown", (event) => {

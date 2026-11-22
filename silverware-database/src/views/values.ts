@@ -14,11 +14,17 @@ import { type FileEntry, fileLabel, readFiles } from "../domain/types/files.ts";
 import type { Media, MediaBox } from "../core/media.ts";
 import type { ViewHost } from "../core/view.ts";
 import { colorsOf, optionColor } from "../domain/types/options.ts";
+import { formulaProblemOf } from "../domain/formulas/calculate.ts";
 import type { PropertyType } from "../domain/types/type.ts";
 import { isEmpty, type Item, type Property, type Value } from "../model/database.ts";
 
-/** Why an item's value of a property is wrong, as the views mark it: none where it is required, else its type's reason; none where it is right */
+/**
+ * Why an item's value of a property is wrong, as the views mark it: a formula's error (its value its code) why it is one;
+ * none where it is required, else its type's reason; none where it is right
+ */
 export function problemOf(host: Pick<ViewHost, "type">, item: Item, property: Property): string | undefined {
+  const failed = formulaProblemOf(item, property.key);
+  if (failed) return `${failed.code}: ${failed.detail}`;
   const value = item.values[property.key];
   if (value === undefined || isEmpty(value)) return missing(host, item, property) ? `${property.label} is required` : undefined;
   return host.type(property).validate(value, property.params);

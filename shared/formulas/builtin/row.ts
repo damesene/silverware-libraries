@@ -8,5 +8,6 @@ export default {
   example: "=ROW()",
   minArgs: 0,
   maxArgs: 0,
+  readsPlace: true,
   call: (_args, { row }) => row,
 } satisfies FormulaFunction;

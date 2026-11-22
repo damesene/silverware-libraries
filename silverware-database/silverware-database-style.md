@@ -2836,6 +2836,97 @@ tr:focus-within .swd-open {
   font-size: 12px;
   cursor: pointer;
 }
+/* A formula's field (shared/formulafield.ts): a formula property's in the properties' dialog */
+/* <shared-formulafield> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* A formula's field (shared/formulafield.ts, any plugin's dialog): the choices for the name typed in a list under it, the syntax of the function the caret is in. `--swd-formulafield-line` its lines' color, where the plugin's differ */
+.swd-formulafield {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 100%;
+}
+/* The field and its list, the list right under the field */
+.swd-formulafield-input {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+}
+.swd-formulafield-input input.swd-formulafield-text {
+  width: 28em;
+  max-width: 100%;
+  padding: 4px 6px;
+  font: inherit;
+  font-family: var(--editor-font, monospace);
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swd-formulafield-line, var(--button-border-color, rgba(128, 128, 128, 0.3)));
+  border-radius: 6px;
+  min-width: 0;
+}
+/* Over the dialog (fixed: its body scrolls and would cut it), placed under the field by the script */
+.swd-formulafield-choices {
+  position: fixed;
+  z-index: 2;
+  min-width: 16em;
+  max-width: min(32em, calc(100vw - 24px));
+  max-height: 14em;
+  overflow: auto;
+  padding: 3px;
+  background: var(--root-background-color);
+  border: 1px solid var(--swd-formulafield-line, var(--button-border-color, rgba(128, 128, 128, 0.3)));
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+}
+.swd-formulafield-choices[hidden] {
+  display: none;
+}
+.swd-formulafield-choice {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swd-formulafield-choice:hover,
+.swd-formulafield-choice-active {
+  background: color-mix(in srgb, var(--ui-accent-color) 18%, transparent);
+}
+.swd-formulafield-choice-name {
+  font-family: var(--editor-font, monospace);
+}
+.swd-formulafield-choice-kind {
+  font-size: 11px;
+  opacity: 0.6;
+}
+.swd-formulafield-problem {
+  font-size: 12px;
+  color: var(--danger-color, #c62828);
+}
+.swd-formulafield-problem:empty {
+  display: none;
+}
+.swd-formulafield-help {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 34em;
+}
+.swd-formulafield-help:empty {
+  display: none;
+}
+.swd-formulafield-syntax {
+  font-size: 12px;
+}
+.swd-formulafield-syntax b {
+  color: var(--ui-accent-color);
+}
+.swd-formulafield-description {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.7;
+}
+/* </shared-formulafield> */
 /* <shared-diff> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
 /* A document's change as a review shows it (shared/diffview.ts): its runs of lines, each its first line's number, the
    lines removed and added */
@@ -3102,6 +3193,20 @@ tr:focus-within .swd-open {
 .swd-table-head-icon {
   margin-right: 0.35em;
   font-weight: normal;
+}
+/* A formula's column: its ƒ before its name (its values calculated); an error's cell its code, muted */
+.swd-table-head-formula {
+  display: inline-flex;
+  vertical-align: -0.15em;
+  color: var(--swd-quiet);
+}
+.swd-table-head-formula svg {
+  width: 1em;
+  height: 1em;
+}
+.swd-table td.swd-formula-error {
+  color: color-mix(in srgb, var(--danger-color, #c62828) 70%, transparent);
+  font-size: 0.9em;
 }
 /* A link (URL): opened in a tab of its own; its address without what says nothing, its path a little quieter */
 .swd-link {
@@ -3548,6 +3653,95 @@ button.swd-editor-document-folder:hover,
 }
 .swd-prop-field-name .swd-settings-hint {
   font-size: 0.85em;
+}
+/* A formula property's details (src/modules/properties/formula.ts): its field across the width, its properties' buttons
+   under it, its result for an item */
+.swd-prop-field.swd-prop-formula {
+  align-items: start;
+}
+.swd-prop-formula > .swd-prop-field-name {
+  padding-top: 5px;
+}
+.swd-formula-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.swd-formula-box .swd-formulafield {
+  --swd-formulafield-line: var(--swd-settings-line);
+  display: flex;
+}
+.swd-formula-box .swd-formulafield-input,
+.swd-formula-box .swd-formulafield-input input.swd-formulafield-text {
+  width: 100%;
+}
+.swd-formula-properties {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.swd-formula-properties {
+  align-items: center;
+}
+.swd-formula-properties-title,
+.swd-formula-references {
+  color: var(--swd-quiet);
+  font-size: 0.85em;
+}
+.swd-formula-references {
+  margin: 0;
+}
+.swd-formula-references code {
+  font-size: 0.95em;
+}
+.swd-formula-property {
+  padding: 1px 8px;
+  font: inherit;
+  font-size: 0.85em;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--swd-settings-line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.swd-formula-property:hover {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+}
+.swd-formula-result-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.swd-formula-result-arrow {
+  color: var(--swd-quiet);
+}
+.swd-prop-field.swd-prop-formula-result {
+  align-items: start;
+}
+.swd-prop-formula-result > .swd-prop-field-name {
+  padding-top: 5px;
+}
+/* Its items' list over the dialog (fixed: the dialog's body scrolls and would cut it), placed under the field by the script */
+.swd-formula-result-item-box .swd-suggest {
+  position: fixed;
+  z-index: 2;
+}
+.swd-formula-result-item {
+  width: 12em;
+  max-width: 100%;
+}
+.swd-formula-result-item[hidden] {
+  display: none;
+}
+.swd-formula-result {
+  font-family: var(--editor-font, monospace);
+  overflow-wrap: anywhere;
+}
+.swd-formula-result-error {
+  color: var(--danger-color, #c62828);
 }
 /* A setting turned by a switch (Required, Name in views, Locked in views): its name and hint across the width, the switch
    at the right, on a phone too (in the names' narrow column the hint broke every few words) */

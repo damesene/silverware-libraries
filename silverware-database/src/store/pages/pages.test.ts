@@ -58,6 +58,16 @@ const SEED: readonly ContractSeed[] = [{ database: TASKS, items: [{ name: "Fix l
 const changes = (database: string, ...list: Changes["changes"]): Changes => ({ database, changes: list });
 
 describe("the pages store", () => {
+  it("writes a formula property as its type and params, its read only not written (forced as it is read)", async () => {
+    const { memory, store } = harness([]);
+    const total = { key: "total", label: "Total", type: "formula", params: { formula: "=[@qty]*2", resultType: "number" }, readonly: true };
+    await store.apply(await store.plan(changes("tasks", { kind: "createDatabase", name: "Tasks" }, { kind: "setSchema", properties: [total] })));
+    expect(memory.pages.get("db-tasks")).toBe(
+      '---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    total: { type: formula, label: Total, formula: "=[@qty]*2", resultType: number }\n---\n',
+    );
+    expect((await store.database("tasks"))!.value.properties).toEqual([total]);
+  });
+
   it("keeps a database as its root page and an item a page of its folder, in the page's own form", async () => {
     const { memory, store } = harness([]);
     const made = await store.apply(

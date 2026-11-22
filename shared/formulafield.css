@@ -1,0 +1,88 @@
+/* A formula's field (shared/formulafield.ts, any plugin's dialog): the choices for the name typed in a list under it, the syntax of the function the caret is in. `--__base__-formulafield-line` its lines' color, where the plugin's differ */
+.__base__-formulafield {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 100%;
+}
+/* The field and its list, the list right under the field */
+.__base__-formulafield-input {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+}
+.__base__-formulafield-input input.__base__-formulafield-text {
+  width: 28em;
+  max-width: 100%;
+  padding: 4px 6px;
+  font: inherit;
+  font-family: var(--editor-font, monospace);
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--__base__-formulafield-line, var(--button-border-color, rgba(128, 128, 128, 0.3)));
+  border-radius: 6px;
+  min-width: 0;
+}
+/* Over the dialog (fixed: its body scrolls and would cut it), placed under the field by the script */
+.__base__-formulafield-choices {
+  position: fixed;
+  z-index: 2;
+  min-width: 16em;
+  max-width: min(32em, calc(100vw - 24px));
+  max-height: 14em;
+  overflow: auto;
+  padding: 3px;
+  background: var(--root-background-color);
+  border: 1px solid var(--__base__-formulafield-line, var(--button-border-color, rgba(128, 128, 128, 0.3)));
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+}
+.__base__-formulafield-choices[hidden] {
+  display: none;
+}
+.__base__-formulafield-choice {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.__base__-formulafield-choice:hover,
+.__base__-formulafield-choice-active {
+  background: color-mix(in srgb, var(--ui-accent-color) 18%, transparent);
+}
+.__base__-formulafield-choice-name {
+  font-family: var(--editor-font, monospace);
+}
+.__base__-formulafield-choice-kind {
+  font-size: 11px;
+  opacity: 0.6;
+}
+.__base__-formulafield-problem {
+  font-size: 12px;
+  color: var(--danger-color, #c62828);
+}
+.__base__-formulafield-problem:empty {
+  display: none;
+}
+.__base__-formulafield-help {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 34em;
+}
+.__base__-formulafield-help:empty {
+  display: none;
+}
+.__base__-formulafield-syntax {
+  font-size: 12px;
+}
+.__base__-formulafield-syntax b {
+  color: var(--ui-accent-color);
+}
+.__base__-formulafield-description {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.7;
+}

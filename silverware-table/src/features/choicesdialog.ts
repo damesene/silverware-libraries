@@ -24,7 +24,7 @@ import {
   writeChoiceList,
 } from "../columntypes/index.ts";
 import type { Dialog, ModelHost, TableInfo } from "../core/feature.ts";
-import { formulaField } from "../formulafield.ts";
+import { formulaField } from "../../../shared/formulafield.ts";
 import { type FormulasOffer } from "../formulas/offers.ts";
 import { withEquals } from "../../../shared/formulas/index.ts";
 import { ICONS } from "../icons.ts";
@@ -179,7 +179,7 @@ export class ChoicesDialog {
       ? formulaField(doc, formulas.fieldHelpers(() => table), formula, (v) => {
           formula = v;
           showPreview();
-        }, { label: "Formula", focus: "formula", placeholder: "=@projects" })
+        }, { base: "swt", label: "Formula", focus: "formula", placeholder: "=@projects" })
       : el(doc, "span");
     const formulaInput = formulaPart.querySelector<HTMLInputElement>('[data-focus="formula"]');
 

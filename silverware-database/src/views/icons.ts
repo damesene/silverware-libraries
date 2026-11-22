@@ -27,6 +27,8 @@ const TYPE_ICONS: Readonly<Record<string, string>> = {
   files: svg('<path d="m13 7.5-5.3 5.3a3.25 3.25 0 0 1-4.6-4.6l5.6-5.6a2.1 2.1 0 0 1 3 3l-5.6 5.6a1 1 0 0 1-1.4-1.4L9.9 4.6"/>'),
   tags: svg('<path d="M2.5 8.25V3.5a1 1 0 0 1 1-1h4.75l5.25 5.25-5.75 5.75z"/><circle cx="5.5" cy="5.5" r=".9" fill="currentColor"/>'),
   url: svg('<path d="M6.75 9.25a2.75 2.75 0 0 0 3.9 0l2-2a2.75 2.75 0 0 0-3.9-3.9l-.75.75"/><path d="M9.25 6.75a2.75 2.75 0 0 0-3.9 0l-2 2a2.75 2.75 0 0 0 3.9 3.9l.75-.75"/>'),
+  // An italic f, a formula's: its values calculated
+  formula: svg('<path d="M11.5 2.75c-1.6-.55-2.85.1-3.2 1.75L6.6 11.9c-.35 1.65-1.6 2.3-3.1 1.75M5 6.75h5.25"/>'),
 };
 
 /** A property's own icon (an emoji, `lucide:house`, as its schema keeps it) where it is one, else none: its type's then (`typeIcon`) */

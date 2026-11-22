@@ -1,5 +1,9 @@
 # Silverware Layout: changelog
 
+## 2.0.4 (2026-11-22)
+
+- Fixed: a grid drawn before the page's styles were loaded takes the page's look (its text zoomed) once they are, instead of keeping the look it read first.
+
 ## 2.0.3 (2026-11-21)
 
 - Fixed: grids take the page's look again when its text size changes after they are drawn (a zoom), and a grid added to the page after a zoom takes the page's look then.

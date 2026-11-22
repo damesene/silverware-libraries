@@ -71,7 +71,8 @@ export const test = base.extend<{ space: Space }>({
       },
       kept: async (name) => {
         const path = await keptPath(join(server().space, "_silverware-assets-previews", folder), name);
-        return path ? readFile(path, "utf8") : undefined;
+        // (Taken away between found and read: a preview regenerated is deleted, then kept again; none kept that moment)
+        return path ? readFile(path, "utf8").catch(() => undefined) : undefined;
       },
       writeKept: async (name, text) => {
         const path = await keptPath(join(server().space, "_silverware-assets-previews", folder), name);

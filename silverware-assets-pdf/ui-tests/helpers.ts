@@ -70,7 +70,8 @@ export const test = base.extend<{ space: Space }>({
       },
       kept: async (name) => {
         const path = await keptPath(join(server().space, PREVIEWS, folder), name);
-        return path ? (await stat(path)).mtimeMs : undefined;
+        // (Taken away between found and read: a preview regenerated is deleted, then kept again; none kept that moment)
+        return path ? await stat(path).then((one) => one.mtimeMs, () => undefined) : undefined;
       },
     });
     await page.close();

@@ -8,7 +8,7 @@
 | Silverware Toolbar | `silverware-toolbar/` | `swb-` | `silverware-toolbar/CLAUDE.md`, docs/silverware-toolbar.md |
 | Silverware Tags | `silverware-tags/` | `swg-` | `silverware-tags/CLAUDE.md`, docs/silverware-tags.md |
 | Silverware Chart | `silverware-chart/` | `swc-` | `silverware-chart/CLAUDE.md`, docs/silverware-chart.md |
-| Silverware Database | `silverware-database/` | `swd-` | `silverware-database/CLAUDE.md`, docs/silverware-database.md, docs/silverware-database-formulas.md (formula properties), docs/silverware-database-load-more.md (a view's first items and Load more, planned) |
+| Silverware Database | `silverware-database/` | `swd-` | `silverware-database/CLAUDE.md`, docs/silverware-database.md, docs/silverware-database-formulas.md (formula properties), docs/silverware-database-load-more.md (a view's first items and Load more, planned), docs/silverware-database-selection.md (items selected, edited and removed together, planned) |
 | Silverware Icons | `silverware-icons/` | `swi-` | `silverware-icons/CLAUDE.md`, docs/silverware-icons.md (a library for the other plugins, nothing on its own) |
 | Silverware Assets | `silverware-assets/` | `swa-` | `silverware-assets/CLAUDE.md`, docs/silverware-assets.md, docs/silverware-assets-split.md (split out of Layout), docs/silverware-layout-assets-next.md (what is left before the merge), docs/silverware-assets-stored-previews.md (previews kept in the space; files drawn in a grid's cell editor) |
 | Silverware Assets PDF | `silverware-assets-pdf/` | `swa-pdf-` | `silverware-assets-pdf/CLAUDE.md`, docs/silverware-assets-pdf.md (a PDF's preview, its first page, through Silverware Assets' API), docs/silverware-viewers.md (with DOCX and XLSX) |

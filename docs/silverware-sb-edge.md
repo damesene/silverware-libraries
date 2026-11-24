@@ -25,6 +25,7 @@ Every plugin works on SilverBullet 2.12.1 (the latest release, the user's Docker
 | --- | --- |
 | `96540c35` | tool pages (the new name of meta pages) told by location (`Library/*`), not by tags |
 | `d9b44893` | "meta" renamed "tool" in the UI and the APIs (`index.toolPages`; `index.metaPages` kept as an alias) |
+| `2106cce3` | "tool pages" renamed "library pages" (2026-11-23: `index.libraryPages`, `index.toolPages` gone, `index.metaPages` its alias; `isLibraryPage`), before 3.0.0 |
 | `f342459d` | scripts and styles loaded from `/.tooling` (one request), not from the index |
 | `02066207` | libraries install under `Library/`, repositories under `Library/Repository/` |
 | `33629a72` | Std drops its bare `meta` tags |
@@ -50,7 +51,7 @@ Every plugin works on SilverBullet 2.12.1 (the latest release, the user's Docker
 What the edge UI tests and probes showed, each with its fix (or why there is none). Filled as found. Edge build probed: `2.12.0-324-g84c9542f` (2026-11-16).
 
 - **First run, before any fix (2026-11-17)**: Silverware Database's tests all failed (their views' `space-lua` page outside `Library/`, never run nor indexed), Silverware Assets' settings tests (saved into `CONFIG`, a content page there). Fixed by the settings page and the tests' pages under `Library/` (below); with them, 36 of 553 failed, against 0 of 553 on 2.12.1.
-- **`index.toolPages` exists on edge** (a probe's `${index.toolPages and "yes" or "no"}`), so the init pages choose `Library/Config` there. The server renames `CONFIG.md` to `Library/Config.md` as it starts (its log says so).
+- **`index.libraryPages` exists on edge and 3.0.0** (`index.toolPages` until `2106cce3`, 2026-11-23, which no release had), so the init pages choose `Library/Config` there. Told by `index.toolPages` before, every plugin wrote its settings into `CONFIG` after the rename, a content page, and SilverBullet read none of them back (every settings test failed on edge from 2026-11-23). The server renames `CONFIG.md` to `Library/Config.md` as it starts (its log says so).
 - **Writing `Library/Config` and `editor.reloadConfigAndCommands()` applies a setting at once** on edge (probe: `config.get` gives the new value; `/.tooling` has it): `reloadConfigAndCommands` is `reloadTooling` there, scripts fetched anew from the server.
 - **The text's width**: edge pads `.cm-content` 28 px left and 20 px right (2.12.1: 20 and 20), so the text is 752 px at `--editor-width: 800px` (2.12.1: 760), a table widget 754 px with its 1 px border. Silverware Layout's tests had 760 fixed: they measure it now (`textWidthOf` in its `ui-tests/helpers.ts`, checked against the text's line).
 - **A file deleted or renamed**: edge's index plug indexes it after it is gone (`indexDocument` fails reading it, logged as an error). SilverBullet's own; Silverware Assets' tests let that error pass.
@@ -77,7 +78,7 @@ What the edge UI tests and probes showed, each with its fix (or why there is non
 
 ### Settings page
 
-- **Which page**: one place decides, shared by every plugin: `Library/Config` where SilverBullet has tool pages, else `CONFIG`. Told by a capability, not by which page exists (a fresh edge space has neither): `index.toolPages` exists only where SilverBullet tells tool pages by location (`d9b44893`, the same day as `5555c196`). The init page's Lua decides it once and hands it to the bridge (`configPage`), so `src/` holds no test of SilverBullet's version.
+- **Which page**: one place decides, shared by every plugin: `Library/Config` where SilverBullet has tool pages, else `CONFIG`. Told by a capability, not by which page exists (a fresh edge space has neither): `index.libraryPages` exists only where SilverBullet tells library pages by location (`index.toolPages` from `d9b44893`, the same day as `5555c196`, renamed in `2106cce3`). The init page's Lua decides it once and hands it to the bridge (`configPage`), so `src/` holds no test of SilverBullet's version.
 - `shared/configpage.ts`: the name from the bridge instead of `CONFIG_PAGE`; messages say "the configuration page" or its name.
 - The init pages' `saveConfigPage` (Table, Toolbar, Tags, Database, Layout, Assets): the page and its file (`<page>.md`) from that one value; the notification names it.
 - **A `CONFIG` left on edge**: not read, not written.

@@ -7,8 +7,8 @@ What starts [Silverware Assets](silverware-assets.md) in SilverBullet: its setti
 
 ```space-lua
 -- SB-2.12-COMPAT: the configuration page, CONFIG in SilverBullet 2.12.1 and older, Library/Config from its 3.0 (edge),
--- told by index.toolPages (tool pages under Library/ came with the move); once 2.12.1 is dropped, "Library/Config" alone
-local configPage = index.toolPages and "Library/Config" or "CONFIG"
+-- told by index.libraryPages (library pages under Library/ came with the move); once 2.12.1 is dropped, "Library/Config" alone
+local configPage = index.libraryPages and "Library/Config" or "CONFIG"
 
 -- Settings: how files are shown (tables, kept in Silverware Assets' own block of the configuration page: the Configuration Manager
 -- would lose them), and the markdown as written (shown in the Configuration Manager)

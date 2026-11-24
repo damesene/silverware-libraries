@@ -44,6 +44,7 @@ import {
   NATIVE_ACTION_SELECTOR,
   renderedTable,
   UI_CLASS,
+  watchNavPanels,
   WIDGET_SELECTOR,
 } from "./dom.ts";
 import { ICONS } from "./icons.ts";
@@ -213,6 +214,8 @@ export class Controller implements TableHost {
   // When a press was last taken (a cell menu a touch opened, a feature's: takePress): its mouse events after it are no click on the cell
   private pressTakenAt = 0;
   private stopLongPress: (() => void) | undefined;
+  // The watch of SilverBullet's panels over the page, which the controls stay out of (viewBounds)
+  private stopNavPanels: (() => void) | undefined;
   private readonly metadata: Metadata;
   // Each table's rows as SilverBullet rendered them, in the document or not
   private readonly rows = new TableRows();
@@ -415,6 +418,9 @@ export class Controller implements TableHost {
       this.queueScan();
     });
     this.observer.observe(this.doc.body, { childList: true, subtree: true });
+    // A panel of SilverBullet's opened over the page (its space tree) scrolls and resizes nothing: the controls placed
+    // again, out of it
+    this.stopNavPanels = watchNavPanels(this.doc, this.queueStickyUpdate);
     this.featuresStarted = this.startFeatures();
     void this.scan();
     void this.refreshSettings();
@@ -466,6 +472,7 @@ export class Controller implements TableHost {
     win.removeEventListener("contextmenu", this.onContextMenu, true);
     win.removeEventListener("pointerdown", this.onPointerDown, true);
     this.stopLongPress?.();
+    this.stopNavPanels?.();
     delete this.doc.documentElement.dataset.swtPointer;
     win.removeEventListener("dblclick", this.onDoubleClick, true);
     win.removeEventListener("scroll", this.onScroll, true);
@@ -1812,7 +1819,7 @@ export class Controller implements TableHost {
     return info.table.closest<HTMLElement>(WIDGET_SELECTOR) ?? info.table;
   }
 
-  rectOf(info: WidgetInfo, part: { readonly row: number; readonly column: number } | { readonly row: number } | { readonly column: number } | "table"): Rect | undefined {
+  rectOf(info: WidgetInfo, part: { readonly row: number; readonly column: number } | { readonly row: number } | { readonly column: number } | "table" | "view"): Rect | undefined {
     return this.adapter.rectOf(info, part);
   }
 
@@ -2414,8 +2421,8 @@ export class Controller implements TableHost {
     return scrollParentOf(element);
   }
 
-  viewBounds(element: HTMLElement): Rect {
-    return viewBounds(element);
+  viewBounds(element: HTMLElement, besidePanels?: boolean): Rect {
+    return viewBounds(element, besidePanels);
   }
 
   heldBounds(info: WidgetInfo): Rect {

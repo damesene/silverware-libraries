@@ -730,9 +730,10 @@ export interface ModelHost {
   /**
    * Where a part of a table shown is in the window (for a feature's own UI by
    * it: a grip, a menu): a cell, a row (across its cells), a column (its header
-   * cell), the table (as far as its box shows it); undefined: not rendered
+   * cell), the table (as far as its box and the page's view show it), the page's view around it (not under a
+   * panel of the host's); undefined: not rendered, or (the table) none of it in view across
    */
-  rectOf(info: TableInfo, part: { readonly row: number; readonly column: number } | { readonly row: number } | { readonly column: number } | "table"): Rect | undefined;
+  rectOf(info: TableInfo, part: { readonly row: number; readonly column: number } | { readonly row: number } | { readonly column: number } | "table" | "view"): Rect | undefined;
   /**
    * A block of rows (columns) dragged from a press `pressedAt` (its y, x): a
    * copy of them follows the pointer, the others make room where they would
@@ -1036,9 +1037,10 @@ export interface TableHost extends ModelHost {
   /**
    * Where the page is in view around an element: its scroller (below the
    * editor's top bar, also while the page is too short to scroll), or the
-   * window, cut to what an on-screen keyboard leaves visible
+   * window, cut to what an on-screen keyboard leaves visible, and (with
+   * `besidePanels`, the default) less the host's panels lying over the page
    */
-  viewBounds(element: HTMLElement): Rect;
+  viewBounds(element: HTMLElement, besidePanels?: boolean): Rect;
   /**
    * The part of a cell in view: cut to the table's box, the page in view and,
    * for a body cell, what is held over the body (the header, pinned rows and

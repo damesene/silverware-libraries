@@ -1,6 +1,6 @@
 // On a touch screen (the "touch" project: a phone's viewport, touch events)
 import type { Locator, Page } from "@playwright/test";
-import { cell, expect, longPress, markdown, menu, menuTitle, setPage, startingOn, table, tableIcon, tap, test } from "./helpers.ts";
+import { cell, expect, longPress, markdown, menu, menuTitle, setPage, startingOn, table, runSilverBulletCommand, tableIcon, tap, target, test } from "./helpers.ts";
 
 test.describe("Touch", () => {
   test("a long press on a cell opens its menu", async ({ page }) => {
@@ -162,5 +162,32 @@ test.describe("Touch: a dialog taller than the screen", () => {
     const dialog = page.locator(".swt-pivot-dialog");
     await expect(dialog.locator(".swt-pivot-table")).toBeVisible();
     await fitsTheScreen(page, dialog);
+  });
+});
+
+test.describe("SilverBullet's space tree over the page", () => {
+  test("opened over a table on a phone: the table's toolbar and grips, where the tree then lies, gone from over it, none taking a tap meant for the tree; closed, the toolbar and grips back", startingOn("# Test\n\n| Header A | Header B |\n|---|---|\n| Cell A | Cell B |\n| Cell C | Cell D |\n\nAfter\n"), async ({ page }) => {
+    test.skip(target !== "silverbullet", "SilverBullet's own panel");
+    await tap(page, cell(page, 1, 0));
+    const shown = page.locator(".swt-floating.swt-visible:not(.swt-out-of-view)");
+    await expect(page.locator(".swt-bar.swt-visible")).toBeVisible();
+    await expect(page.locator(".swt-grip.swt-visible").first()).toBeVisible();
+    const boxesOf = () => shown.evaluateAll((all) => all.map((one) => one.getBoundingClientRect()).map((r) => ({ left: r.left, right: r.right, top: r.top, bottom: r.bottom })));
+    const before = await boxesOf();
+    test.skip(!(await runSilverBulletCommand(page, "Navigate: Tree")), "a SilverBullet without the space tree (2.12.1)");
+    const tree = page.locator(".sb-nav-root");
+    await expect(tree).toBeVisible();
+    const panel = (await tree.boundingBox())!;
+    const over = (boxes: readonly { left: number; right: number; top: number; bottom: number }[]) =>
+      boxes.filter((r) => r.left < panel.x + panel.width && r.right > panel.x && r.top < panel.y + panel.height && r.bottom > panel.y).length;
+    // (Where the tree lies now the controls were: else this test tests nothing)
+    expect(over(before)).toBeGreaterThan(0);
+    // Nothing of the table's floating over the tree: each control shown lies beside it
+    await expect.poll(async () => over(await boxesOf())).toBe(0);
+    // Closed by its own ×: the toolbar back over its table
+    await tap(page, tree.getByRole("button", { name: "Close", exact: true }));
+    await expect(tree).toBeHidden();
+    await expect(page.locator(".swt-bar.swt-visible:not(.swt-out-of-view)")).toBeVisible();
+    await expect(page.locator(".swt-grip.swt-visible").first()).toBeVisible();
   });
 });

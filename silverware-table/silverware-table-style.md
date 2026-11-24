@@ -2655,6 +2655,11 @@ html[data-theme="dark"] .swt-excel-error {
 .swt-floating.swt-visible {
   display: flex !important;
 }
+/* Shown for its table while none of the table is in view across (a panel of SilverBullet's over it: its space tree on
+   a phone): hidden until it is again, never over that panel */
+.swt-floating.swt-visible.swt-out-of-view {
+  display: none !important;
+}
 /* Two boxes, each as wide as what it holds, at the toolbar's right edge: the
    names left of how the table is shown and the icons where both fit in the
    table's width (the toolbar's max-width, set as it is placed), else above

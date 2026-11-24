@@ -14,6 +14,7 @@
 import { cssWidth, type Width } from "../../model/width.ts";
 import { textWidthOf } from "../marks.ts";
 import type { PageHost } from "../page.ts";
+import { besideNavPanels, watchNavPanels } from "../../../../shared/silverbullet/navpanels.ts";
 
 const TEXT_WIDTH = "--editor-width";
 const CONTENT_SELECTOR = ".cm-content";
@@ -31,8 +32,14 @@ export function silverBulletPage(doc: Document): PageHost {
     view: () => {
       const height = doc.defaultView?.innerHeight ?? 0;
       const scroller = doc.querySelector(SCROLLER_SELECTOR)?.getBoundingClientRect();
-      return scroller ? { top: Math.max(0, scroller.top), bottom: Math.min(height, scroller.bottom) } : { top: 0, bottom: height };
+      if (!scroller) return { top: 0, bottom: height };
+      const view = { top: Math.max(0, scroller.top), bottom: Math.min(height, scroller.bottom) };
+      // Narrowed by SilverBullet's panels lying over the page (its space tree on a narrow screen, from 3.0): its edges
+      // then, none where nothing narrows it
+      const beside = besideNavPanels({ ...view, left: scroller.left, right: scroller.right }, doc);
+      return beside.left > scroller.left || beside.right < scroller.right ? { ...view, left: beside.left, right: beside.right } : view;
     },
+    watchView: (listener) => watchNavPanels(doc, listener),
     guideLayer: () => doc.querySelector<HTMLElement>(SCROLLER_SELECTOR) ?? undefined,
     showTextWidth: (width) => showTextWidth(doc, width),
     themeTextWidth: () => themeTextWidth(doc),

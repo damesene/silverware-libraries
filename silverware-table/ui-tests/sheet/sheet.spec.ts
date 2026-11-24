@@ -1272,3 +1272,30 @@ test.describe("A sheet's table drawn anew", () => {
     expect(await page.evaluate(() => (window as unknown as { unplaced: string[] }).unplaced)).toEqual([]);
   });
 });
+
+test.describe("The sheet's grid through its tables", () => {
+  test("a theme without lines between columns (slate): each cell's right edge the sheet's column line, a striped row's too", startingOn(`# Test\n\n| Name | Qty | Note |\n|---|---|---|\n| One | 1 | a |\n| Two | 2 | b |\n| Three | 3 | c |\n`), async ({ page }) => {
+    await setSettings(page, { "silverware.table.modules.themes.theme": "slate" });
+    await expect(table(page)).toHaveAttribute("data-swt-theme", "slate");
+    await openSheet(page);
+    // (The pointer away: no row under it, tinted)
+    await page.mouse.move(1, 1);
+    for (const row of [1, 2]) {
+      const target = sheetCell(page, row, 0);
+      const box = await stableBox(target);
+      const shot = await page.screenshot({ clip: { x: Math.round(box.x + box.width) - 5, y: Math.round(box.y + box.height / 2), width: 5, height: 1 } });
+      const [fill, line] = await page.evaluate(async (data) => {
+        const image = new Image();
+        image.src = `data:image/png;base64,${data}`;
+        await image.decode();
+        const canvas = document.createElement("canvas");
+        [canvas.width, canvas.height] = [image.width, image.height];
+        const context = canvas.getContext("2d")!;
+        context.drawImage(image, 0, 0);
+        const at = (x: number) => Array.from(context.getImageData(x, 0, 1, 1).data.slice(0, 3)).join(",");
+        return [at(1), at(image.width - 1)];
+      }, shot.toString("base64"));
+      expect(line, `row ${row}: its line at the cell's right edge`).not.toBe(fill);
+    }
+  });
+});

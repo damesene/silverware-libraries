@@ -629,6 +629,14 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
   padding-top: 0 !important;
   padding-bottom: 0 !important;
 }
+/* The sheet's column lines through its tables too, whatever their theme: drawn by each cell at its right edge, where the
+   board draws them (a theme without lines between columns showed the board's through its cells alone, and a row with a
+   ground of its own, striped or filled, hid them); a theme's own lines between columns left out, the grid's in their
+   place. Of more weight than a theme's rule (:is(#sb-main, html) … [data-swt-theme] tr > td + td) */
+:is(#sb-main, html) .sb-table-widget.swt-table.swt-sheet-table tr > td {
+  border-left: 0;
+  border-right: 1px solid var(--swt-sheet-line);
+}
 /* The cell is not clipped itself (what sits on its edges stays reachable: the
    fill handle, the pin mark, the selection's handles); its content is, at the
    cell's width (not as wide as its text: the sheet's columns have theirs) and

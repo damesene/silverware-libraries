@@ -260,6 +260,23 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
 .sb-table-widget.swt-table {
   overflow: auto !important;
 }
+/* SilverBullet from 3.0 draws its table in a frame (.sb-table-frame: an inline flex box centring a table wider than the
+   text, as wide as its content up to the editor's): a table of ours keeps the line's width, or the one Silverware Layout
+   gives it, and scrolls sideways in it, its columns' widths its own (the frame a block; Silverware Layout may still make
+   it an inline block as wide as the line, where it places the table) */
+:is(#sb-main, html) .cm-content > .sb-table-frame:has(> .sb-table-widget.swt-table) {
+  display: block;
+  width: 100%;
+}
+/* (Its frame named by the table in it too: of more weight than SilverBullet's rule for any table in a frame, whatever the
+   order the pages' styles load in) */
+:is(#sb-main, html) .cm-content > .sb-table-frame:has(> .swt-table) > .sb-table-widget.swt-table {
+  display: block;
+  flex: initial;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+}
 .sb-table-widget tfoot.swt-stuck {
   position: relative;
   z-index: 3;

@@ -72,6 +72,16 @@ export function dateText(time: string | number, locale?: string): string | undef
   return Number.isNaN(date.getTime()) ? undefined : date.toLocaleDateString(locale, { year: "numeric", month: "short", day: "numeric" });
 }
 
+/**
+ * What stands in a picture's place where its file could not be loaded (not in the space, or not reached): a box of the
+ * view's size with the type's icon, the file's name and why, so the file keeps its place, its size and its menu
+ */
+export function drawMissing(doc: Document, icon: string, name: string): HTMLElement {
+  const missing = el(doc, "div", { class: "swa-missing", title: `${name}: the file was not found`, attrs: { role: "img", "aria-label": `${name}: the file was not found` } });
+  missing.append(iconElement(doc, icon), el(doc, "span", { class: "swa-missing-name", text: name }), el(doc, "span", { class: "swa-missing-note", text: "File not found" }));
+  return missing;
+}
+
 /** An asset marked as failed to render: an icon over it, the message its tooltip */
 export function markFailed(doc: Document, element: HTMLElement, message: string): void {
   element.querySelector(":scope > .swa-failed")?.remove();

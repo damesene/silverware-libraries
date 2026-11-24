@@ -362,6 +362,30 @@ test("a PDF's preview clicked runs the click the settings give (its viewer under
   await expect.poll(() => page.evaluate(() => (window as unknown as { opened: string[] }).opened.join(" "))).toContain("doc.pdf");
 });
 
+test("an image whose file is not in the space: a box of a preview's size in its place, shown full as a smaller picture, saying so; its \"…\" opens its menu", async ({ page, space }) => {
+  const missing = (name: string, view: string) => `![[${space.folder}/!blobs/${name}.png|||{ view: ${view} }]]`;
+  await space.open({ Page: `# Page\n\nA preview:\n\n${missing("gone", "preview")}\n\nFull:\n\n${missing("away", "full")}\n\nThere:\n\n![[${space.folder}/photo.png|||{ view: preview }]]\n` }, "Page", { "photo.png": PIXEL_PNG });
+  const preview = page.locator('#sb-main [data-swa-type="image"][data-swa-view="preview"][data-swa-missing]');
+  const full = page.locator('#sb-main [data-swa-type="image"][data-swa-view="full"][data-swa-missing]');
+  await expect(preview.locator(".swa-missing")).toContainText("File not found");
+  await expect(full.locator(".swa-missing")).toContainText("away.png");
+  // (A preview's size: its height the setting's, 160 px; its label above it, the file's name, not in the box again)
+  const box = (await preview.locator(".swa-missing").boundingBox())!;
+  expect(Math.round(box.height)).toBe(160);
+  expect(box.width).toBeGreaterThan(150);
+  await expect(preview.locator(".swa-missing-name")).toBeHidden();
+  expect((await full.locator(".swa-missing").boundingBox())!.height).toBeGreaterThan(150);
+  // The file there drawn as ever
+  await expect(page.locator('#sb-main [data-swa-type="image"]:not([data-swa-missing]) img.swa-medium')).toBeVisible();
+  await preview.hover();
+  await preview.locator(".swa-more").click();
+  await expect(showAs(page, "Card")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await full.hover();
+  await full.locator(".swa-more").click();
+  await expect(showAs(page, "Preview")).toBeVisible();
+});
+
 test("a preview's label: its alt text above by default (else its name), then the name dragged under it and the size on, in the settings", async ({ page, space }) => {
   await space.open(
     { Page: `# Page\n\n![[${space.folder}/photo.png|Photo||{ view: preview }]]\n\nBetween\n\n![[${space.folder}/doc.pdf|||{ view: preview }]]\n` },

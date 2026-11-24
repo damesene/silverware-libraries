@@ -12,7 +12,7 @@ import { metadataOf } from "./core/metadata.ts";
 import { forgetPreviews, hasStoredPreview, type PreviewFiles, storedPreview } from "./core/stored.ts";
 import type { AssetRegistry } from "./core/registry.ts";
 import { type AssetSettings, fullHeight, type Gesture, insertAsFor, labelFor, previewSize, type View, VIEWS } from "./model/settings.ts";
-import { addCardFields, dateText, drawCard, iconElement, markFailed, menuMarker, sizeText } from "./ui/card.ts";
+import { addCardFields, dateText, drawCard, drawMissing, iconElement, markFailed, menuMarker, sizeText } from "./ui/card.ts";
 import { drawLabelLine, labelTexts, type LabelValues } from "./ui/label.ts";
 import { opensMenu } from "../../shared/popupmenu.ts";
 import { writeClipboard, writeClipboardLater } from "../../shared/clipboard.ts";
@@ -1019,9 +1019,12 @@ export class AssetDecorator {
     readOnly?.addEventListener("abort", () => control.abort(), { once: true, signal: control.signal });
     const { frame, native } = drawn;
     native?.classList.add(MEDIUM);
-    frame.querySelectorAll(":scope > .swa-own, :scope > .swa-failed").forEach((own) => own.remove());
+    frame.querySelectorAll(":scope > .swa-own, :scope > .swa-failed, .swa-missing").forEach((own) => own.remove());
+    frame.removeAttribute("data-swa-missing");
+    native?.classList.remove(NATIVE_HIDDEN);
     frame.classList.remove("swa-has-error");
     frame.removeAttribute("data-swa-label-above");
+    frame.removeAttribute("data-swa-label-named");
     // The host's own drawing (its medium, or its words that it could not draw one): hidden where ours is drawn instead
     const hostOwn = [...frame.children].filter((child) => !child.classList.contains("swa-own"));
     for (const child of hostOwn) child.classList.remove(NATIVE_HIDDEN);
@@ -1072,11 +1075,23 @@ export class AssetDecorator {
       ...(stored ? { stored } : {}),
     };
     const capabilities = { views: (["card", "preview", "full"] as const).filter(can) };
-    // The asset drawn into a container of an action's (a panel): its type's view, else a copy of the host's drawing, else its card
+    // What stands in the host's medium's place while its file could not be loaded (none: it loaded, or is loading), and
+    // the file's name it says (not its alt text, which a label may show)
+    let missingFace: HTMLElement | undefined;
+    const fileName = assetName({ ...asset, alt: undefined } as Asset);
+    // The asset drawn into a container of an action's (a panel): its type's view, else a copy of the host's drawing (or
+    // of what stands in its place), else its card
     const renderInto = async (as: "preview" | "full", container: HTMLElement, ends?: AbortSignal) => {
       const signal = eitherEnds(control.signal, ends);
       const element = await type.views?.[as]?.({ ...context, viewport: viewportOf(container, found.embed, as, settings, signal), signal, fills: true });
-      container.replaceChildren(element ?? shownCopy(native) ?? this.card(type, asset, settings));
+      container.replaceChildren(element ?? (missingFace ? missingIn(container) : undefined) ?? shownCopy(native) ?? this.card(type, asset, settings));
+    };
+    // What stands in a missing picture's place in an action's container (a panel), as large as the container, which the
+    // frame's sizes do not reach
+    const missingIn = (container: HTMLElement) => {
+      const face = drawMissing(this.doc, type.icon, fileName);
+      Object.assign(face.style, { width: "100%", height: container.clientHeight ? "100%" : "", minHeight: "160px" });
+      return face;
     };
     const runAction = (gesture: Gesture) => {
       const action = actionFor(gesture, type.name, settings, (name) => this.registry.actions.get(name), asset, capabilities);
@@ -1181,6 +1196,8 @@ export class AssetDecorator {
           frame.append(below);
         }
         frame.toggleAttribute("data-swa-label-above", !!above);
+        // (Whether it names the file: what stands in a missing picture's place says its name only where it does not)
+        frame.toggleAttribute("data-swa-label-named", [...texts.above, ...texts.below].some((one) => one.text === values.name));
       };
       draw(known);
       const wanted = [...label.above, ...label.below].some((part) => part.on && (part.field === "size" || part.field === "modified"));
@@ -1234,11 +1251,35 @@ export class AssetDecorator {
       return;
     }
     if (acts) addMoreButton(this.doc, frame, menu, control.signal);
-    const renderer = type.views?.[view];
-    if (!renderer) {
-      // The host's own drawing: a preview of it is the same, smaller (the style page's rule by the view's mark)
+    // The host's medium that could not be loaded (its file not in the space: a picture of no size, which drew the file as
+    // a sliver, its menu out of reach) hidden, a box of the view's size in its place (the type's icon, the file's name,
+    // why); shown again as it loads after all
+    const missingShown = (missing: boolean) => {
+      if (!native || missing === !!missingFace) return;
+      frame.toggleAttribute("data-swa-missing", missing);
+      native.classList.toggle(NATIVE_HIDDEN, missing);
+      if (missing) {
+        missingFace = drawMissing(this.doc, type.icon, fileName);
+        // (Shown full, of the size its embed gives, as the picture would have been: `|300x200`)
+        if (view === "full") {
+          if (Number(found.embed.width)) missingFace.style.width = scaledPx(Number(found.embed.width));
+          if (Number(found.embed.height)) missingFace.style.height = scaledPx(Number(found.embed.height));
+        }
+        native.after(missingFace);
+      } else {
+        missingFace?.remove();
+        missingFace = undefined;
+      }
+    };
+    // The host's own drawing: a preview of it is the same, smaller (the style page's rule by the view's mark)
+    const hostDrawn = () => {
+      if (native) watchLoaded(native, control.signal, (loaded) => missingShown(!loaded));
       if (view === "preview") previewDone();
       else labelled("full");
+    };
+    const renderer = type.views?.[view];
+    if (!renderer) {
+      hostDrawn();
       return;
     }
     void Promise.resolve()
@@ -1246,8 +1287,7 @@ export class AssetDecorator {
       .then((element) => {
         if (control.signal.aborted) return;
         if (!element) {
-          if (view === "preview") previewDone();
-          else labelled("full");
+          hostDrawn();
           return;
         }
         element.classList.add("swa-own");
@@ -1265,7 +1305,7 @@ export class AssetDecorator {
           card.classList.add("swa-own");
           clicked(card);
           frame.append(card);
-        }
+        } else hostDrawn();
         markFailed(this.doc, frame, message(error));
       });
   }
@@ -1306,6 +1346,34 @@ function shownCopy(native: HTMLElement | undefined): HTMLElement | undefined {
   const copy = native.cloneNode(true) as HTMLElement;
   for (const one of [copy, ...copy.querySelectorAll<HTMLElement>(`.${NATIVE_HIDDEN}`)]) one.classList.remove(NATIVE_HIDDEN);
   return copy;
+}
+
+/**
+ * Whether the host's medium (an image, a video, audio) loaded: told where it is known already, and again as it loads or
+ * fails. Nothing told of another element, nor after `signal` ends
+ */
+function watchLoaded(medium: HTMLElement, signal: AbortSignal, told: (loaded: boolean) => void): void {
+  const tell = (loaded: boolean) => !signal.aborted && told(loaded);
+  if (medium.tagName === "IMG") {
+    const image = medium as HTMLImageElement;
+    image.addEventListener("error", () => tell(false), { signal });
+    image.addEventListener("load", () => tell(true), { signal });
+    // (Done already: one of no size decoded to tell whether it failed, as an SVG of no size of its own loads so too)
+    if (image.complete && image.naturalWidth === 0 && image.getAttribute("src") && typeof image.decode === "function")
+      void image.decode().then(
+        () => tell(true),
+        () => tell(false),
+      );
+    return;
+  }
+  if (medium.tagName === "VIDEO" || medium.tagName === "AUDIO") {
+    const media = medium as HTMLMediaElement;
+    // (Its own error alone: a <source> failing, the next one may still load; its network state is no proof either, as it
+    // tells no source for a moment before a load starts)
+    media.addEventListener("error", () => media.error && tell(false), { signal });
+    media.addEventListener("loadedmetadata", () => tell(true), { signal });
+    if (media.error) tell(false);
+  }
 }
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));

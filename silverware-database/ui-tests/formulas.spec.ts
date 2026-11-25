@@ -1,4 +1,4 @@
-import { expect, item, root, test, waitForIndex } from "./helpers.ts";
+import { boxOf, expect, item, root, test, waitForIndex } from "./helpers.ts";
 
 // A database's formula properties (docs/silverware-database-formulas.md): made in Properties, kept in the root page
 // alone, their values calculated in the views
@@ -41,7 +41,7 @@ test("a formula on a phone's width: its field and panel first, a property found 
   const field = page.locator('[data-focus="formula"]');
   await expect(field).toBeFocused();
   // (The formula above the name in the details, its panel under it)
-  const top = async (selector: string) => (await page.locator(`[data-property="new:1"] ${selector}`).boundingBox())!.y;
+  const top = async (selector: string) => (await boxOf(page.locator(`[data-property="new:1"] ${selector}`))).y;
   expect(await top(".swd-prop-formula")).toBeLessThan(await top(".swd-property-label"));
   await expect(page.locator(".swd-formula-panel")).toBeVisible();
   // A property found by its name typed, offered in the list as typed and in the panel

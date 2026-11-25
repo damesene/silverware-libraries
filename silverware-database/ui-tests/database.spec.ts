@@ -52,7 +52,7 @@ ${BLOCK}`, ...TASKS }, "Page");
   const place = page.locator(".swd-place");
   await page.locator('.swd-tool[data-tool="fullscreen"]').click();
   await expect(place).toHaveClass(/swd-over-window/);
-  const box = (await place.boundingBox())!;
+  const box = await boxOf(place);
   const view = page.viewportSize()!;
   expect([box.x, box.y, box.width, box.height]).toEqual([0, 0, view.width, view.height]);
   // (On top: the point at the window's top left corner, where SilverBullet's top bar is, is the place's)
@@ -88,11 +88,20 @@ test("the calendar: items on their days, one dragged to another day keeping its 
   // Dragged onto another day: its date that day, its time kept
   await bar("Sync").dragTo(cell(12));
   await expect.poll(() => space.saved("Page/db-tasks/Sync")).toMatch(/due: "?.*-12T10:00"?/);
+  // (Drawn anew by the write, in the 12th's week and column, before the next drag: a drawing coming during it ends it)
+  const onDay = (d: number) =>
+    page.locator(".swd-cal-week", { has: cell(d) }).evaluate((week, at) => {
+      const column = (week.querySelector(`.swd-cal-day[data-day="${at}"]`) as HTMLElement).style.gridColumn;
+      const shown = [...week.querySelectorAll<HTMLElement>(".swd-cal-item")].find((one) => one.textContent?.includes("Sync"));
+      return shown?.style.gridColumn.split("/")[0]?.trim() === column;
+    }, day(d));
+  await expect.poll(() => onDay(12)).toBe(true);
   await expect(bar("Sync")).toHaveText("10:00 Sync");
   await expect(bar("Sync").locator(".swd-cal-name")).toBeVisible();
   // One without a date dragged onto a day: given it
   await page.locator(".swd-cal-undated .swd-cal-item").dragTo(cell(13));
   await expect.poll(() => space.saved("Page/db-tasks/Someday")).toContain(day(13));
+  await expect(page.locator(".swd-cal-undated .swd-cal-item")).toHaveCount(0);
   // A day's +: an item added on it, opened in the peek with its name selected, typed over there; Esc closes it
   await cell(20).hover({ position: { x: 10, y: 10 } });
   await cell(20).locator(".swd-cal-add").click();
@@ -126,7 +135,7 @@ test("the calendar's spans: an item from its start to its end a bar across its d
   await expect(page.locator(".swd-cal-by")).toHaveText("by Start → End");
   // Across its days: as wide as the days it lasts (one bar, or one a week where it crosses one)
   const width = async () => (await bars.evaluateAll((all) => all.map((one) => one.getBoundingClientRect().width))).reduce((sum, one) => sum + one, 0);
-  const dayWidth = (await cell(3).boundingBox())!.width;
+  const dayWidth = (await boxOf(cell(3))).width;
   expect(await width()).toBeGreaterThan(dayWidth * 2.5);
   // Moved whole: taken by its first day, dropped on the 10th: the 10th to the 12th
   await bars.first().dragTo(cell(10), { sourcePosition: { x: 12, y: 8 } });
@@ -152,9 +161,9 @@ test("the timeline: a row an item, its bar from its start to its end, moved by a
   await expect(page.locator(".swd-tl-name-text")).toHaveText(["Trip", "Someday"]);
   // Today in view, the bar three days wide (40px a day)
   await expect(page.locator(".swd-tl-unit.swd-tl-now")).toBeInViewport();
-  expect(Math.round((await bar.boundingBox())!.width)).toBe(120);
+  expect(Math.round((await boxOf(bar)).width)).toBe(120);
   // Dragged two days and a little right: moved two days whole
-  const box = (await bar.boundingBox())!;
+  const box = await boxOf(bar);
   await page.mouse.move(box.x + 60, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + 60 + 30, box.y + box.height / 2, { steps: 4 });
@@ -164,7 +173,7 @@ test("the timeline: a row an item, its bar from its start to its end, moved by a
   expect(await space.saved("Page/db-tasks/Trip")).toContain(`end: "${at(5)}"`);
   // Its end's handle a day right
   await bar.hover();
-  const handle = (await bar.locator(".swd-tl-handle-end").boundingBox())!;
+  const handle = await boxOf(bar.locator(".swd-tl-handle-end"));
   await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
   await page.mouse.down();
   await page.mouse.move(handle.x + handle.width / 2 + 42, handle.y + handle.height / 2, { steps: 5 });
@@ -181,8 +190,8 @@ test("a tool's menu shows whole over a short block, not cut by it, scrolled in i
   await page.locator(".swd-view-picker").click();
   const menu = page.locator(".swd-menu:not([hidden])");
   await expect(menu.locator(".swd-menu-item")).toHaveCount(7);
-  const widget = (await page.locator(".swd-widget").boundingBox())!;
-  const box = (await menu.boundingBox())!;
+  const widget = await boxOf(page.locator(".swd-widget"));
+  const box = await boxOf(menu);
   expect(box.y + box.height).toBeGreaterThan(widget.y + widget.height);
   // Its last item pressed where it shows (on top of whatever is under it)
   await menu.locator(".swd-menu-item").last().scrollIntoViewIfNeeded();
@@ -325,7 +334,7 @@ test("a press in the block on what takes no focus, after a field or a menu of it
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\nAfter\n", ...TASKS }, "Page");
   const fence = page.locator(".cm-line", { hasText: "```silverware-database" });
   await expect(page.locator(".swd-place table")).toBeVisible();
-  const head = (await page.locator(".swd-place-head").boundingBox())!;
+  const head = await boxOf(page.locator(".swd-place-head"));
   // ⋯ opened, then a press beside its menu, in the block's head
   await page.locator(".swd-more").click();
   await page.mouse.click(head.x + head.width - 40, head.y + head.height / 2);
@@ -334,7 +343,7 @@ test("a press in the block on what takes no focus, after a field or a menu of it
   // A cell edited, then a press on the table's header
   await page.locator('td[data-key="status"]').first().click();
   await expect(page.locator(".swd-place td :is(input, select)")).toHaveCount(1);
-  const header = (await page.locator(".swd-place thead th").last().boundingBox())!;
+  const header = await boxOf(page.locator(".swd-place thead th").last());
   await page.mouse.click(header.x + header.width - 5, header.y + header.height / 2);
   await expect(page.locator(".swd-place")).toBeVisible();
   await expect(fence).toHaveCount(0);
@@ -390,8 +399,8 @@ test("a timeline's bar dragged to its right edge scrolls it, as a board's card d
   const bar = page.locator(".swd-tl-bar", { hasText: "Trip" });
   const scroller = page.locator(".swd-tl-box");
   const before = await scroller.evaluate((one) => one.scrollLeft);
-  const from = (await bar.boundingBox())!;
-  const edge = (await scroller.boundingBox())!;
+  const from = await boxOf(bar);
+  const edge = await boxOf(scroller);
   const [start, end] = [from.x + from.width / 2, edge.x + edge.width - 6];
   await page.mouse.move(start, from.y + from.height / 2);
   await page.mouse.down();
@@ -412,14 +421,14 @@ test("a timeline's names folded to a strip by its corner's button, its rows as h
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: timeline\n```\n", "Page/db-tasks": root, "Page/db-tasks/Someday": "---\ntags: [db]\n_database:\n  rank: a0\n---\n" }, "Page");
   const name = page.locator(".swd-tl-name-text", { hasText: "Someday" });
   await expect(name).toBeVisible();
-  const before = (await page.locator(".swd-tl-corner").boundingBox())!.width;
-  const high = (await page.locator(".swd-tl-row").first().boundingBox())!.height;
+  const before = (await boxOf(page.locator(".swd-tl-corner"))).width;
+  const high = (await boxOf(page.locator(".swd-tl-row").first())).height;
   // (The row without a bar names its item only where the names are folded)
   await expect(page.locator(".swd-tl-hint-name")).toBeHidden();
   await page.locator(".swd-tl-fold").click();
   await expect(name).toBeHidden();
-  expect((await page.locator(".swd-tl-corner").boundingBox())!.width).toBeLessThan(before / 3);
-  expect((await page.locator(".swd-tl-row").first().boundingBox())!.height).toBe(high);
+  expect((await boxOf(page.locator(".swd-tl-corner"))).width).toBeLessThan(before / 3);
+  expect((await boxOf(page.locator(".swd-tl-row").first())).height).toBe(high);
   await expect(page.locator(".swd-tl-hint-name")).toBeVisible();
   await expect(page.locator(".swd-tl-hint")).toHaveText("Someday · No Due: press a day");
   // (No icon: its name's first three letters in the strip)
@@ -569,9 +578,9 @@ test("long text wraps: a table's cell at most its maximum width, a board's colum
   await expect(cell).toBeVisible();
   // (Its content at most 24em, its padding beside it)
   const maximum = await cell.evaluate((td) => 24 * parseFloat(getComputedStyle(td).fontSize) + parseFloat(getComputedStyle(td).paddingLeft) + parseFloat(getComputedStyle(td).paddingRight) + 1);
-  expect((await cell.boundingBox())!.width).toBeLessThanOrEqual(maximum);
+  expect((await boxOf(cell)).width).toBeLessThanOrEqual(maximum);
   // Wrapped: several lines tall
-  expect((await cell.boundingBox())!.height).toBeGreaterThan(3 * (await cell.evaluate((td) => parseFloat(getComputedStyle(td).lineHeight) || 20)));
+  expect((await boxOf(cell)).height).toBeGreaterThan(3 * (await cell.evaluate((td) => parseFloat(getComputedStyle(td).lineHeight) || 20)));
   await pickView(page, "Board");
   await expect(page.locator(".swd-board-column")).toHaveCount(2);
   const widths = await page.locator(".swd-board-column").evaluateAll((all) => all.map((one) => Math.round(one.getBoundingClientRect().width)));
@@ -585,7 +594,7 @@ test("an item's long name wraps on a card and in a list, never out of it", async
   const card = page.locator(".swd-board-card").filter({ hasText: "1794061029592" });
   await expect(card).toBeVisible();
   const inside = async (inner: import("@playwright/test").Locator, outer: import("@playwright/test").Locator) => {
-    const [a, b] = [(await inner.boundingBox())!, (await outer.boundingBox())!];
+    const [a, b] = [await boxOf(inner), await boxOf(outer)];
     return a.x >= b.x - 1 && a.x + a.width <= b.x + b.width + 1;
   };
   expect(await inside(card.locator(".swd-board-name"), card)).toBe(true);
@@ -594,7 +603,7 @@ test("an item's long name wraps on a card and in a list, never out of it", async
   await expect(line).toBeVisible();
   expect(await inside(line.locator(".swd-list-name"), line)).toBe(true);
   // Beside its grip, on its line: not pushed under it
-  const [grip, title] = [(await line.locator(".swd-row-grip").boundingBox())!, (await line.locator(".swd-list-name").boundingBox())!];
+  const [grip, title] = [await boxOf(line.locator(".swd-row-grip")), await boxOf(line.locator(".swd-list-name"))];
   expect(title.y).toBeLessThan(grip.y + grip.height);
 });
 
@@ -755,8 +764,8 @@ test("the board moves a card to another column, its value written", async ({ pag
   // (Todo and Done: no column of none, every item has a value)
   await expect(page.locator(".swd-board-column")).toHaveCount(2);
   // Dragged by the mouse below the Done column's last card
-  const card = (await page.locator('.swd-board-column[data-value="Todo"] .swd-board-card').boundingBox())!;
-  const last = (await page.locator('.swd-board-column[data-value="Done"] .swd-board-card').last().boundingBox())!;
+  const card = await boxOf(page.locator('.swd-board-column[data-value="Todo"] .swd-board-card'));
+  const last = await boxOf(page.locator('.swd-board-column[data-value="Done"] .swd-board-card').last());
   await page.mouse.move(card.x + 20, card.y + 10);
   await page.mouse.down();
   await page.mouse.move(last.x + 20, last.y + last.height - 2, { steps: 10 });
@@ -822,7 +831,7 @@ test("a time, a date and time and a link: edited in their own fields, written an
   await expect(page.locator(".cm-line", { hasText: "```silverware-database" })).toHaveCount(0);
   await expect(linkEditor).toHaveCount(0);
   // Its text, pressed beside the link
-  const box = (await cell("web").boundingBox())!;
+  const box = await boxOf(cell("web"));
   await page.mouse.click(box.x + box.width - 4, box.y + box.height / 2);
   await linkEditor.locator(".swd-link-text").fill("Docs");
   await linkEditor.locator(".swd-link-text").press("Enter");
@@ -838,7 +847,7 @@ test("a time, a date and time and a link: edited in their own fields, written an
   // The link in the peek: its pencil edits it, on the link's line
   const web = page.locator('.swd-peek .swd-peek-value[data-key="web"]');
   await expect(web.locator("a.swd-link")).toHaveText("Docs");
-  const [link, pencil] = [(await web.locator("a.swd-link").boundingBox())!, (await web.locator(".swd-peek-edit").boundingBox())!];
+  const [link, pencil] = [await boxOf(web.locator("a.swd-link")), await boxOf(web.locator(".swd-peek-edit"))];
   expect(Math.abs(link.y + link.height / 2 - (pencil.y + pencil.height / 2))).toBeLessThan(6);
   await web.locator(".swd-peek-edit").click();
   await expect(web.locator(".swd-link-text")).toHaveValue("Docs");
@@ -1054,9 +1063,9 @@ test("the peek is 600px wide by default, its left edge dragged setting its width
   await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
   const peek = page.locator(".swd-peek");
   await expect(peek).toBeVisible();
-  const before = (await peek.boundingBox())!;
+  const before = await boxOf(peek);
   // (600px, or most of the editor's area where it has less room)
-  const area = (await page.locator("#sb-editor").boundingBox())!;
+  const area = await boxOf(page.locator("#sb-editor"));
   expect(Math.round(before.width)).toBe(Math.round(Math.min(600, area.width * 0.8)));
   const edge = { x: before.x + 2, y: before.y + 200 };
   await page.mouse.move(edge.x, edge.y);
@@ -1643,8 +1652,8 @@ test("a card dragged to the board's right edge scrolls it, and is dropped in a c
   const root = "---\ntags: [db-root]\n_database:\n  id: board\n  name: Board\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [" + states.join(", ") + "] }\n---\n";
   await space.open({ Page: "# Page\n\n```silverware-database\nid: board\nview: board\n```\n", "Page/db-board": root, "Page/db-board/One": "---\ntags: [db]\nstatus: Todo\n_database:\n  rank: a0\n---\n" }, "Page");
   const board = page.locator(".swd-board");
-  const card = (await page.locator(".swd-board-card").boundingBox())!;
-  const box = (await board.boundingBox())!;
+  const card = await boxOf(page.locator(".swd-board-card"));
+  const box = await boxOf(board);
   await page.mouse.move(card.x + 20, card.y + 10);
   await page.mouse.down();
   // Held at the right edge until the board has scrolled to its end
@@ -1655,7 +1664,7 @@ test("a card dragged to the board's right edge scrolls it, and is dropped in a c
       return board.evaluate((one) => one.scrollWidth - one.clientWidth - one.scrollLeft);
     })
     .toBeLessThan(2);
-  const later = (await page.locator('.swd-board-column[data-value="Later"]').boundingBox())!;
+  const later = await boxOf(page.locator('.swd-board-column[data-value="Later"]'));
   await page.mouse.move(later.x + later.width / 2, later.y + 60, { steps: 5 });
   await page.mouse.up();
   await expect.poll(() => space.saved("Page/db-board/One")).toContain("status: Later");

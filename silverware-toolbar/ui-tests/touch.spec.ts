@@ -1,6 +1,7 @@
 // The toolbar on a phone (the "touch" project: a Pixel 7): text selected by touch docks it at the bottom, over the keyboard
 import type { Page } from "@playwright/test";
-import { addGesture, bar, barButton, caret, expect, gestureButton, lineBox, popup, ready, select, selected, test, text } from "./helpers.ts";
+import { runSilverBulletCommand } from "../../scripts/ui-test-helpers.ts";
+import { addGesture, bar, barButton, caret, expect, gestureButton, lineBox, onSilverBullet, popup, ready, select, selected, test, text } from "./helpers.ts";
 
 /** A finger moved from one point to another and lifted, as Chrome gets it (Playwright's touchscreen only taps) */
 async function swipe(page: Page, x: number, y: number, toX: number, toY: number, steps = 10): Promise<void> {
@@ -105,6 +106,27 @@ test.describe("The toolbar on a phone", () => {
     await expect(bar(page)).toBeVisible();
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await expect(bar(page)).toBeHidden();
+  });
+
+  test("SilverBullet's space tree opened over the page: the docked toolbar, which lay over its last items, gone while it is open; closed, back as the text is written in", async ({ page }) => {
+    test.skip(!onSilverBullet, "SilverBullet's own panel");
+    const line = await lineBox(page, "Select some text");
+    await page.touchscreen.tap(line.x + 4, line.y + line.height / 2);
+    await expect(bar(page)).toHaveClass(/swb-docked/);
+    const docked = (await bar(page).boundingBox())!;
+    test.skip(!(await runSilverBulletCommand(page, "Navigate: Tree")), "a SilverBullet without the space tree (2.12.1)");
+    const tree = page.locator(".sb-nav-root");
+    await expect(tree).toBeVisible();
+    // (Where the toolbar was the tree lies now: else this test tests nothing)
+    const panel = (await tree.boundingBox())!;
+    expect(docked.x < panel.x + panel.width && docked.y < panel.y + panel.height && docked.y + docked.height > panel.y).toBe(true);
+    await expect(bar(page)).toHaveCount(0);
+    const close = (await tree.getByRole("button", { name: "Close", exact: true }).boundingBox())!;
+    await page.touchscreen.tap(close.x + close.width / 2, close.y + close.height / 2);
+    await expect(tree).toBeHidden();
+    const again = await lineBox(page, "Select some text");
+    await page.touchscreen.tap(again.x + 4, again.y + again.height / 2);
+    await expect(bar(page)).toHaveClass(/swb-docked/);
   });
 
   test("Turn into opens its choices in the popup over it, its search focused (the keyboard stays, the system's menu goes); a choice turns the lines", async ({ page }) => {

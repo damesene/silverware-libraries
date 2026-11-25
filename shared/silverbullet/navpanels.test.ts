@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { besideNavPanels, watchNavPanels } from "./navpanels.ts";
+import { besideNavPanels, navPanelOverPage, watchNavPanels } from "./navpanels.ts";
 
 /** A panel as SilverBullet's navigator, at a place on screen (jsdom lays nothing out), put in the document or `into` */
 function panel(left: number, right: number, side = "lhs", into: Element = document.body): HTMLElement {
@@ -14,6 +14,35 @@ function panel(left: number, right: number, side = "lhs", into: Element = docume
 const VIEW = { left: 0, right: 412, top: 56, bottom: 794 };
 
 afterEach(() => document.body.replaceChildren());
+
+describe("a panel over the page's editor", () => {
+  /** SilverBullet's editor where it is on screen */
+  function editor(left: number, right: number): void {
+    const main = Object.assign(document.createElement("div"), { id: "sb-main" });
+    const element = document.createElement("div");
+    element.className = "cm-editor";
+    element.getBoundingClientRect = () => new DOMRect(left, 56, right - left, 738);
+    main.append(element);
+    document.body.append(main);
+  }
+
+  it("is told where one lies over part of the editor (a phone's space tree), not where it is docked beside it", () => {
+    editor(0, 412);
+    expect(navPanelOverPage(document)).toBe(false);
+    panel(0, 368);
+    expect(navPanelOverPage(document)).toBe(true);
+    document.body.replaceChildren();
+    // (A wider window: the tree docked, the editor beside it)
+    editor(300, 1400);
+    panel(0, 300);
+    expect(navPanelOverPage(document)).toBe(false);
+  });
+
+  it("is none without an editor laid out", () => {
+    panel(0, 368);
+    expect(navPanelOverPage(document)).toBe(false);
+  });
+});
 
 describe("the page's view beside SilverBullet's panels", () => {
   it("is the view where no panel lies over it, one beside it (docked, the editor beside it) too", () => {

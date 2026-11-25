@@ -1,6 +1,9 @@
 // Everything Silverware Toolbar assumes about SilverBullet's DOM lives here, so
 // a SilverBullet update that changes it has one place to fix.
 
+// SilverBullet's panels over the page (its space tree on a phone): the toolbar stands back while one lies over it
+export { navPanelOverPage, watchNavPanels } from "../../shared/silverbullet/navpanels.ts";
+
 // CodeMirror's editable area of a page
 export const CONTENT_SELECTOR = ".cm-content";
 

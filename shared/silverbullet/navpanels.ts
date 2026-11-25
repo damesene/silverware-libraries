@@ -54,6 +54,24 @@ export function watchNavPanels(doc: Document, listener: () => void): () => void 
   };
 }
 
+/** The page's editor, what a panel lies over or stands beside */
+const EDITOR_SELECTOR = "#sb-main .cm-editor";
+
+/**
+ * Whether one of SilverBullet's panels lies over part of the page's editor now (the space tree over a phone's page), not
+ * beside it (docked beside the editor in a wider window): what belongs to the page and not to a place in it (a toolbar
+ * docked at the window's edge) stands back then
+ */
+export function navPanelOverPage(doc: Document): boolean {
+  // (None in the page, SilverBullet 2.12.1's always: nothing measured)
+  if (!doc.querySelector(NAV_PANEL_SELECTOR)) return false;
+  const box = doc.querySelector(EDITOR_SELECTOR)?.getBoundingClientRect();
+  if (!box || box.width <= 0 || box.height <= 0) return false;
+  const view = { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
+  const beside = besideNavPanels(view, doc);
+  return beside.left > view.left || beside.right < view.right;
+}
+
 /** A rectangle of the screen, as the plugins' geometry has it */
 export type ScreenRect = { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number };
 

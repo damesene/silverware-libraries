@@ -43,10 +43,20 @@ where the work is, what to do next and what done means. **What** is built and
   plan's *Decided* with its date, in the same commit; a step's scope that
   turned out different is corrected in its section here. Nothing is kept only
   in a conversation.
+- **CLAUDE.md follows the code, in the same commit.** A step that moves,
+  adds or removes what a CLAUDE.md describes (the root's shared/ section names
+  its modules one by one: formulas, navpanels, widgetmenu, editorsample, room,
+  contentscale, watchmark, dialog, popupmenu…) updates that text with it, so
+  no CLAUDE.md describes code that is gone. Step 11 only checks.
+- **A test's list of exceptions only shrinks.** The checks of this work
+  (module state, SilverBullet's markers, page writes, UI islands) start with
+  today's exceptions listed, each with the step that removes it; an entry is
+  added only by the user's decision, with why.
 - **Stop and ask the user** (do not decide alone):
   - at a checkpoint (A, B, C): measure, write the result here, wait;
   - a change of anything a space has: settings, the Space Lua API, a class,
-    `data-*` or structure a theme may select (a DOM snapshot that changed),
+    `data-*` or structure a theme may select (a rendering baseline that
+    changed),
     stored markdown;
   - keeping a test from the parallel run (a lock), a test given a time of its
     own;
@@ -65,7 +75,7 @@ where the work is, what to do next and what done means. **What** is built and
 | 2 | Preact in the core, `.tsx` everywhere | not started |
 | A | Checkpoint A | |
 | 3 | The formulas' registries (G), P1 | not started |
-| 4 | SilverBullet bridge and events (B) | not started |
+| 4 | SilverBullet bridge and events (B), every plugin's binding, settings and page writes | not started |
 | 5 | Geometry and editing surfaces (D, E) | not started |
 | 6 | Overlays in the core (C) | not started |
 | 7 | The plugins onto the overlays | not started |
@@ -85,7 +95,7 @@ P1 to P3 and I1 to I6 its *API changes*.
 
 ## Steps
 
-Estimates are rough; checkpoints correct them. About 6 to 7 months in all.
+Estimates are rough; checkpoints correct them. About 6 to 8 months in all.
 
 ### S. The safety net (2 to 3 weeks)
 
@@ -149,8 +159,9 @@ Editor 3). The rest of the plan leans on this step.
 ### 1. The core's skeleton (1 week)
 
 - **Scope**: `silverware-core/` as a plugin (library page, API page at
-  priority 60, style page, `src/api.ts`, `VERSION`, `CLAUDE.md`, changelog
-  1.0.0 unreleased); the gate's Lua block written into each plugin's API page
+  priority 60, style page, `src/api.ts`, `VERSION`, `CLAUDE.md`; its version
+  and the changelog's first entry, which check-build needs, drafted and
+  confirmed by the user as the root CLAUDE.md's *Versions* says); the gate's Lua block written into each plugin's API page
   by a script with the plugin's need, checked by check-build; the stubs of a
   refused plugin's API, the init pages doing nothing for it; `requires:` in
   every library page; the build's external and aliases; vitest, tsconfig
@@ -167,9 +178,12 @@ Editor 3). The rest of the plan leans on this step.
   scripts/hostisolation.test.ts (docs/silverware-core.md, *SilverBullet kept
   apart*) with today's leaks listed, each with the step that moves it
   (step 4 for the plugins' entries and shared/configpage.ts);
-  scripts/pagewrites.test.ts (docs/silverware-core.md, *Storage*) with today's
-  writes outside the writer listed (Chart's and Layout's: step 4; the
-  settings' `CONFIG_PAGE`: step 4).
+  scripts/pagewrites.test.ts (docs/silverware-core.md, *Storage*: SilverBullet's
+  write functions named outside a binding, the writer and the editing tools)
+  with today's places listed (Chart's, Layout's and the settings'
+  `CONFIG_PAGE`: step 4); scripts/uiislands.test.ts (docs/silverware-preact.md,
+  *Two ways, one rule*) with today's `el()` islands listed (steps 7 and 10);
+  the `@since` test of the core's exports against each plugin's need.
 - **Not in it**: any service. The core only loads and says its version.
 - **Done when**: the module-state test fails on a new `let` at a shared/
   file's top level and the host test on a new `.sb-` selector outside a
@@ -186,8 +200,10 @@ Editor 3). The rest of the plan leans on this step.
   `@preact/signals` pinned and re-exported by the core; `.tsx` in tsconfig,
   vitest's include, every scanner of src/ (the isolation tests,
   shared/imports.test.ts, scripts/ui-test-locks.test.ts, playwright.config.ts,
-  scripts/playground.mjs); the rule that only drawing layers import Preact.
-  A component of the core's own, with its test (`act`), proving the chain.
+  scripts/playground.mjs); the rule that only drawing layers import Preact;
+  the root CLAUDE.md gets the rule of *Two ways, one rule*
+  (docs/silverware-preact.md). A component of the core's own, with its test
+  (`act`), proving the chain.
 - **Done when**: bundles measured before and after (written here); verify and
   UI tests green.
 - **Checkpoint A**: every plugin runs on the core, nothing changed for a user.
@@ -195,16 +211,21 @@ Editor 3). The rest of the plan leans on this step.
 
 ### 3. The formulas' registries (1 week)
 
-- **Scope**: shared/formulas into the core's file beside it
-  (`silverware-core-formulas.js`, loaded on first use); Silverware Table and
-  Database take the formulas from the core only (isolation rule); the registries
-  reset once per load by the core's API page, the plugins' resets of them gone;
-  `silverware.formulas.defineFunctions` / `defineSource`, the table's names as
-  aliases (P1); the library pages say so.
+- **Scope**: docs/silverware-core.md, *Services* G: the definitions and their
+  reset in the core's main file; shared/formulas into
+  `silverware-core-formulas.js` beside it, reading them; Silverware Table and
+  Database import it statically (its public module `src/formulas.ts`, the
+  isolation tests allowing it beside `api.ts`, forbidding shared/formulas);
+  the plugins' `resetDefinitions` reset no formulas' definitions any more;
+  `silverware.formulas.defineFunctions` / `defineSource`, the table's names
+  as aliases said deprecated (P1); the library pages say so.
 - **Done when**: a function defined once is calculated in a table and in a
   database (unit and UI test); the instanceof classes come from one copy (a
   test of a value made by one plugin read by the other); a user with only
-  Silverware Toolbar loads no formulas' file (UI test of requests).
+  Silverware Toolbar loads no formulas' file (UI test of requests); no
+  plugin's API page resets the formulas' definitions (a test reading them);
+  the engine is synchronous for Table and Database as before (their tests
+  unchanged).
 
 ### 4. SilverBullet bridge and events, every plugin's binding (2 to 3 weeks)
 
@@ -216,16 +237,20 @@ Editor 3). The rest of the plan leans on this step.
   viewers keep of SilverBullet in their entry files (and Tags'
   `space/silverbullet.ts`) moves there, the entry only composing; the leaks
   of *SilverBullet kept apart* move into bindings; shared/configpage.ts into
-  shared/silverbullet/. Storage at the same boundary (docs/silverware-core.md,
+  the core's binding. Storage at the same boundary (docs/silverware-core.md,
   *Storage*): every plugin's settings through `Platform.settings`, with a
   `save` of the plugin's own block for settings that are tables (the
-  toolbar's favourites), no plugin touching `Library/Config`; Silverware Chart
+  toolbar's favourites), no plugin touching `Library/Config`; page writes by
+  type (I7: `Platform`'s `Editor` and `Space` without `replace` and `write`,
+  `DocumentWriter` to the page writer and the editing tools); Silverware Chart
   writes its block by the `codeBlocks` part (its formats' codec unchanged);
-  Silverware Layout's `/grid` by the `grids` part.
+  Silverware Layout's `/grid` by the `grids` part; Silverware Database's
+  conversion inserts its block by the `codeBlocks` part.
 - **Done when**: no plugin's Lua hands a function the core hands; the host
-  test's list holds no plugin entry, leak or shared/ file any more; the page
-  writes test's list holds editing tools only (the toolbar, editors' fields)
-  and Silverware Tags' UI (step 10); a chart's block written while the page is
+  test's list holds no plugin entry, leak or shared/ file any more; tsc keeps
+  `replace` and `write` from every module but the page writer and the editing
+  tools; the page writes test's list holds editing tools only (the toolbar,
+  editors' fields) and Silverware Tags' UI (step 10); a chart's block written while the page is
   edited elsewhere, and two charts' blocks written alike, each a UI test;
   every plugin's UI tests green, on `test:ui:sb` and `test:ui:sb:edge` too.
 
@@ -239,9 +264,12 @@ Editor 3). The rest of the plan leans on this step.
 ### 6. Overlays in the core (2 to 3 weeks)
 
 - **Scope**: the rendering baselines of every dialog, menu and side panel
-  (step S) checked to be in place. Then, in Preact in the core: the stack and its layers, dialogs, menus (from shared/popupmenu.ts),
-  side panels (a second on top of the first), `useFloating`, `useKeptFocus`;
-  the marks written by the host, their watchers as signals.
+  (step S) checked to be in place. Then, in Preact in the core: the stack and
+  its layers, dialogs, menus (from shared/popupmenu.ts), side panels (a second
+  on top of the first), `useFloating`, `useKeptFocus`; the marks written by
+  the host, their watchers as signals; the layers' variables set by the core
+  as it starts; the frames' CSS as templates (shared/dialog.css,
+  shared/sidepanel.css, by scripts/sharedstyles.mjs with each page's base).
 - **Not in it**: moving the plugins onto them (step 7).
 - **Done when**: the core's own tests: two plugins' overlays one over
   another (keys, focus back, press beside), a holder leaving the page,
@@ -253,10 +281,12 @@ Editor 3). The rest of the plan leans on this step.
   through shared/menu.ts; Assets and Layout through popupmenu.ts; the toolbar's
   popup) and side panel (Assets' file panel, the peek's frame) through the
   core, their content as it is (DOM nodes); shared/dialog.ts, popupmenu.ts,
-  watchmark.ts go; `NOT_BESIDE` keeps SilverBullet's elements only; the two
-  side panels' frames made one (a look change: their snapshots, the user's
-  decision).
-- **Done when**: the snapshots unchanged (or changed by decision); every
+  watchmark.ts go; `NOT_BESIDE` keeps SilverBullet's elements only;
+  `applyLayers` leaves the plugins; each style page takes the frames'
+  templates in place of its hand-written frame rules (selectors unchanged);
+  the two side panels' frames made one (a look change: their rendering
+  baselines change, the user's decision).
+- **Done when**: the rendering baselines hold (or changed by decision); every
   plugin's UI tests green in parallel.
 - **Checkpoint B**: one stack across plugins. Stop for the user.
 
@@ -265,8 +295,13 @@ Editor 3). The rest of the plan leans on this step.
 - **Scope**: F; Silverware Icons, Editor, Assets, Layout, Table's `tables` and
   `onWrite` offered and taken through it; the Lua handovers `*.api` removed
   (P3: breaking, the user decides the release).
-- **Done when**: no plugin reads another's API from Lua; a plugin offered late
-  (its page loading after) is taken as it comes (unit test).
+- **Done when**: no plugin reads another's API from Lua, and the Lua bridges
+  that handed `*.api` are deleted, not left unused; a plugin offered late (its
+  page loading after) is taken as it comes, and an offer after a Space Lua
+  reload replaces the first (unit tests); the library pages and the
+  changelog drafts say what breaks and what to do; the major that removes the
+  handovers removes the table's formulas aliases with them (P1), the user
+  deciding its release.
 
 ### 9. The settled index and the page's look (1 week)
 
@@ -274,7 +309,7 @@ Editor 3). The rest of the plan leans on this step.
 - **Done when**: one sample of the look per load (test); the database's index
   tests green from the core.
 
-### 10. Preact conversions (8 to 12 weeks)
+### 10. Preact conversions (10 to 14 weeks)
 
 - **Scope**: docs/silverware-preact.md, *Steps* 2 to 7, in order: the
   database's state layers (still `el()`), the table's conditions dialog, the
@@ -283,10 +318,12 @@ Editor 3). The rest of the plan leans on this step.
   views, place, peek, Properties, editors and helpers (P2); then the toolbar's
   settings, the tags workspace (its page changes planned by Silverware Tags'
   modules alone, the UI calling them: *Storage*, the page writes test's last
-  entries but the editing tools gone), the table's other dialogs, the formula
-  field. Each part its own commits, its snapshot first.
-- **Done when**: each part: its snapshot unchanged, its hand-kept state gone,
-  its tests green in parallel.
+  entries but the editing tools gone), every other island
+  (docs/silverware-preact.md, *Steps* 7). Each part its own commits, its
+  rendering baselines (step S) checked in place first.
+- **Done when**: each part: its rendering baselines hold and its recorded
+  blinks are gone, its hand-kept state gone, its tests green in parallel; the
+  UI islands test's list holds decorations of SilverBullet's DOM only.
 
 ### 11. Cleanup and release
 
@@ -296,8 +333,17 @@ Editor 3). The rest of the plan leans on this step.
   kept apart* and *Storage*: the two kinds of plugins and their abstraction);
   shared/ modules left unused removed; the lists of the module-state, host
   and page writes tests hold only what is each plugin's own by design or an
-  editing tool; docs/ui-without-framework.md marked replaced; the releases
+  editing tool; the overlays' content takes a vnode alone (I2: the DOM node's
+  path removed); docs/ui-without-framework.md marked replaced; the
+  playground's pages show the overlays of two plugins together; the core's
+  library page tells a user what the gate's message means; the releases
   drafted (docs/silverware-core.md, *Releases*) and proposed to the user.
+- **Done when**: the four tests' lists hold only entries marked "by design"
+  (each plugin's own state, decorations of SilverBullet's DOM, editing tools);
+  nothing imports a removed module; no deprecated alias left without its
+  removal decided; every CLAUDE.md read against the code (each section's
+  files exist, nothing it names is gone); verify, the UI tests on the
+  release and edge, and the safety net (step S) green.
 
 ## Apart from this branch
 

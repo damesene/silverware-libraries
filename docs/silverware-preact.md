@@ -4,8 +4,7 @@ Status: planned, nothing built. On branch `silverware-core`, after Silverware
 Core's first steps: Preact comes from Silverware Core (docs/silverware-core.md,
 *Services* A). The work's order and progress: docs/silverware-core-work.md.
 Below, "core/" is Silverware Database's src/core/; Silverware Core is named
-in full.
-Revisits docs/ui-without-framework.md (2026-11-02), whose condition for looking
+in full. Revisits docs/ui-without-framework.md (2026-11-02), whose condition for looking
 again ("a plugin's own UI has a large part that changes often with its state,
 and redrawing it loses focus, a field's text or a scroll") Silverware Database
 now meets.
@@ -37,10 +36,32 @@ lines for their own sake.
 
 ## What it does not cover
 
-- SilverBullet's DOM, decorated: tables, CodeMirror (Silverware Layout's
-  grids, the toolbar at the caret), embeds (Silverware Assets). `el()` stays
-  for it.
+- SilverBullet's DOM, decorated: tables, CodeMirror's lines (Silverware
+  Layout's grids), embeds (Silverware Assets). `el()` stays for it (*Two
+  ways, one rule*). Silverware Toolbar's bar is an island of its own, placed
+  by the caret: Preact.
 - Pure code: shared/pages, markdown, yaml, table, formulas; the stores.
+
+## Two ways, one rule
+
+At the end there are two ways to make DOM, each for its own kind, never both
+for one:
+
+- **Preact for every island of a plugin's own**: what is inside one of
+  Silverware Core's overlays (a dialog, a menu, a side panel, a floating
+  panel), a database's views and place, the toolbar's bar and settings, the
+  tags workspace, a chart's settings, a plain confirmation. A new one is
+  Preact.
+- **`el()` for what is put into or onto SilverBullet's DOM**: marks and small
+  nodes in its rendered tables, embeds and lines, and the controls laid on its
+  widgets and measured with them at once (a table's toolbar, grips and +, a
+  chart's toolbar, a grid's handles). These live by SilverBullet's rendering,
+  not by a state of ours.
+- **Checked**: a test (scripts/uiislands.test.ts, in `verify`) fails on a file
+  that imports an element builder (shared/elements.ts, a plugin's own `e`
+  helper over it) or calls `createElement`, outside the modules it lists as
+  decorating SilverBullet's DOM; today's islands listed with the step that
+  converts each, the list holding only decorations at the end.
 
 ## Choice
 
@@ -190,16 +211,19 @@ The conversions, in their order; each is a step of docs/silverware-core-work.md
    database's hard parts.
 5. **The board** through `preactView`, with the drag snapshot.
    *Checkpoint C*: the board's and calendar's drag tests `--repeat-each 10`,
-   the whole database suite in parallel, the snapshots; hand-kept state of the
+   the whole database suite in parallel, the rendering baselines; hand-kept state of the
    converted parts gone, not moved. Decided there: `update(snapshot)` (P2),
    and the rest of this list adjusted.
 6. **The database**: list, table, calendar, timeline (grouped: several roots),
    the place's chrome (core/place.ts: switcher, filter, toolbar), the peek's
    content, the Properties dialog, the editors (views/editors.ts) through
    Silverware Core's floating, the helpers.
-7. **The others**: the toolbar's settings dialog, the tags workspace, the
-   table's pivot, choices, view and function dialogs, shared/formulafield.ts.
-   The chart's settings and plain confirmations where touched anyway.
+7. **The others**, every island left (*Two ways, one rule*): the toolbar's
+   bar, popup and settings, the tags workspace, the table's conditions'
+   siblings (pivot, choices, view, function dialogs), the chart's settings,
+   Silverware Assets' panels and dialogs, the viewers' readers, the plain
+   confirmations, shared/formulafield.ts; until the islands test's list holds
+   only decorations.
 
 ## Risks
 
@@ -210,13 +234,13 @@ The conversions, in their order; each is a step of docs/silverware-core-work.md
   baselines' look, geometry and stability tests are the guard, unit tests
   alone are not.
 - **Unit tests written for synchronous drawing** (about 1300 `querySelector`
-  in the tests of database, table, toolbar, tags): a part's tests change with
-  it.
-- **Two ways to build UI** for good (`el()` for SilverBullet's DOM and the
-  plugins' decorations of it); which where goes into CLAUDE.md as Preact
-  comes (docs/silverware-core-work.md).
+  in the tests of database, table, toolbar, tags): rewritten with their part,
+  only after a UI scenario covers what they checked (the runbook's rule).
+- **Two ways to make DOM**, each for its kind (*Two ways, one rule*), kept
+  apart by the islands test; the rule goes into the root CLAUDE.md with
+  step 2 of the runbook.
 - **Effort.** The database's UI code is about 7,000 lines (place.ts 1265,
-  peek 1019, Properties 1230), its tests about 10,000; steps 1 to 7 about 8 to
-  12 weeks.
+  peek 1019, Properties 1230), its tests about 10,000; steps 2 to 7 about 10
+  to 14 weeks, every island converted.
 - **Releases.** Converted parts change no settings, API or stored markdown:
-  a minor where a snapshot did not change.
+  a minor where the rendering baselines hold.

@@ -141,7 +141,10 @@ definition of done.
   writes the CSS blocks with each page's base), checked by check-build.
 - **A plugin's need** is the core's version it is built against, in one place
   per plugin, read by the gate's block; check-build fails where the
-  repository's core is older.
+  repository's core is older. Kept true by a test, not by memory: every export
+  of the core's public modules carries `@since X.Y`, and the test fails where a
+  plugin imports an export newer than its need (a need bumped by hand is
+  forgotten; one set to the newest core refuses older cores for nothing).
 - Each library page `requires:` `../silverware-core/silverware-core.md`.
 - **Space Lua loaded again**: Lua pages run again, modules do not. The core
   takes SilverBullet's API again (the new functions replace the old), and every
@@ -180,8 +183,11 @@ One rule, checked by a test, so the line between the two does not blur:
   shared/ read line by line; a declaration at the module's top level that holds
   mutable state fails it (`let` or `var`; a `const` made by `new Map`, `Set`,
   `WeakMap`, `WeakSet`, `MutationObserver`, or an array, not typed
-  `ReadonlyMap`, `ReadonlySet` or `readonly …[]`), unless the test's list names
-  it with why it is each plugin's own. Constants are typed readonly.
+  `ReadonlyMap`, `ReadonlySet` or `readonly …[]`; a class's `static` field
+  not `readonly`), unless the test's list names it with why it is each
+  plugin's own. Constants are typed readonly. Its blind spot, said where the
+  rule is written: state made by a call (`const cache = makeCache()`), which a
+  line cannot tell from a constant; a reviewer's to catch.
 
 shared/ today (2026-11-25), by that rule:
 
@@ -189,7 +195,9 @@ shared/ today (2026-11-25), by that rule:
   cache (shared/formulas/registry.ts `custom`, `anew`; parser.ts `parsed`),
   with the engine (G); SilverBullet's widget menu's watcher
   (silverbullet/widgetmenu.ts `watched`, B); the menus' counter of ids
-  (menu.ts `problemIds`) goes with the menus (C).
+  (menu.ts `problemIds`) goes with the menus (C); the layers' variables, set on
+  the root by each of 7 plugins (layers.ts `applyLayers`), set once by the
+  core (C), `LAYERS` staying a constant.
 - **Each plugin's own, listed**: the page writer's parts (pages/parts.ts
   `parts`, `partOf`: a plugin's parts are its own, no other plugin's types see
   them), the copy command's guard (clipboard.ts `copying`), caches of a
@@ -227,17 +235,28 @@ plugin's few own pieces.
   `bridge.ts`, `dom.ts`, and Tags in `space/silverbullet.ts`). The entry
   composes the binding with the rest and holds no SilverBullet code itself.
   Leaks today, to move into bindings: the peek's `NOT_BESIDE` with
-  SilverBullet's classes (Database, modules/peek/panel.ts), the toolbar's
-  commands module (modules/commands.ts), the table's and toolbar's `dom.ts`.
+  SilverBullet's classes (Database, modules/peek/panel.ts), the database's
+  entry reading SilverBullet's line classes (src/index.ts `blockLine`:
+  `sb-fenced-code-hide`), the toolbar's commands module (modules/commands.ts),
+  the table's and toolbar's `dom.ts` (`sb-root`, `sb-viewport-tracked`).
+- **Two homes, one rule**: SilverBullet's knowledge that must be one per
+  window (the bridge, events, watchers of its DOM, settings) is the core's
+  binding; what each plugin reads for itself (following a link as SilverBullet
+  does, its commands' keys, an image drawn) is shared/silverbullet/, read by
+  the plugins' bindings.
 - **shared/**: what knows SilverBullet is in shared/silverbullet/ only, imported
-  by bindings only; shared/configpage.ts (`Library/Config`) moves there. Most of
-  shared/silverbullet/ moves into the core's binding with its service
-  (navpanels, widgetmenu, editorsample, platform, position).
+  by bindings only. Most of it moves into the core's binding with its service
+  (navpanels, widgetmenu, editorsample, platform, position), and so does
+  shared/configpage.ts (`Library/Config`: the settings are the core's binding's,
+  *Storage*); what stays (keptkeys, links, embedimage, commands) is read by the
+  plugins' bindings.
 - **The test** (scripts/hostisolation.test.ts, in `verify`): every plugin's and
   the core's src/ outside `host/`, entry files included, and shared/ outside
   shared/silverbullet/, read for SilverBullet's markers
-  (imports of shared/silverbullet/ or of a `host/silverbullet/`, `.sb-`
-  selectors, `Library/`, `js.importFromSpace`, `posAtDOM`, its event names);
+  (imports of shared/silverbullet/ or of a `host/silverbullet/`; a string
+  literal starting with `sb-` or holding `.sb-` or `#sb-`, so a class or an
+  id given bare is caught as a selector is; `Library/`, `js.importFromSpace`,
+  `posAtDOM`, its event names);
   each hit fails it unless the test's list names it, the list naming today's
   leaks with the step that moves each (docs/silverware-core-work.md) and empty
   at the end. Comments saying what SilverBullet does (the markdown read "as
@@ -278,17 +297,21 @@ in the surface being edited, as the user would; so are a field's own edits
 ### Rules
 
 - **Every write of a page's text goes through the page writer** (shared/pages/),
-  never a range written by a plugin (`replaceRange`, `writePage` of a page's
-  text): the writer reads the page as it is, tells blocks written alike apart
-  by their place, and leaves a page changed since it was read. Editing tools
-  (the toolbar, an editor's field) are the exception, listed by the test.
+  never a range written by a plugin: the writer reads the page as it is, tells
+  blocks written alike apart by their place, and leaves a page changed since it
+  was read. **Kept by types, not by a comment**: `Platform`'s `Editor` and
+  `Space` lose `replace` and `write` (shared/platform.ts says today they are
+  "for the page writer alone", and nothing keeps it); those two go to a port of
+  their own, `DocumentWriter`, which the binding hands to the page writer and
+  to the editing tools alone (the toolbar's surfaces, an editor's field), so a
+  plugin's domain or UI has nothing to write a range with, and tsc says so.
 - **A plugin over the document works on structure, not on places in the
   text**: it reads through the reader and writes through a part's changes,
   never by offsets of its own.
 - **The domain plans writes; the UI calls the domain.** No dialog or panel
   composes page changes itself.
 - **Settings through `Platform.settings`** (shared/platform.ts: `get`, `save`),
-  made by the binding; a plugin's settings that are tables (the toolbar's
+  made by the core's binding (B); a plugin's settings that are tables (the toolbar's
   favourites), kept in its own block of the configuration page today
   (shared/configpage.ts), go through it too (a `save` of the plugin's own
   block). No plugin reads or writes `Library/Config` itself: where settings
@@ -309,15 +332,20 @@ in the surface being edited, as the user would; so are a field's own edits
   `runSlashCommand`): to go through the `grids` part.
 - **Silverware Tags** composes page changes in its UI (src/ui/chips.ts,
   workspace.ts) beside its modules: the UI to call its modules alone.
+- **Silverware Database**'s conversion puts the database's block in after the
+  converted lines by `editor.replace` (src/index.ts, after `range.to`): to go
+  through the `codeBlocks` part (an insertion).
 - **Settings**: every plugin reads them through its bridge and writes its block
   of `Library/Config` through shared/configpage.ts; Silverware Database alone
   through `Platform.settings`.
-- Silverware Database, Table and Assets keep to the rules already.
+- Silverware Table and Assets keep to the rules already.
 
-**The test** (scripts/pagewrites.test.ts, in `verify`): `replaceRange`,
-`writePage`, `writeFile` of a page and `CONFIG_PAGE` outside the page writer,
-the bindings and the listed editing tools fail it; today's places listed with
-the step that moves each.
+**The checks**: the `DocumentWriter` split (tsc) for what goes through
+`Platform`; and scripts/pagewrites.test.ts (in `verify`) for the functions a
+binding could hand on past it: SilverBullet's write functions (`replaceRange`,
+`writePage`, `writeFile`, `CONFIG_PAGE`) named outside a binding, the page
+writer and the listed editing tools fail it, today's places listed with the
+step that moves each.
 
 ## Services
 
@@ -337,8 +365,8 @@ What goes into the core, each a service the plugins call in TypeScript.
   the `Platform` of shared/platform.ts (`editor`, `space`, `index`, `ui`,
   `settings`) and the few beyond it (`posAtDOM`, `listCommands`,
   `renderMarkdown`, `moveCursor`). A plugin's binding keeps what is its own
-  (its settings, its commands, its widgets); a rename in SilverBullet is met
-  in one place.
+  (its settings' definitions, `config.define`; its commands; its widgets); a
+  rename in SilverBullet is met in one place.
 - **Events once**: the core's Lua listens to `editor:pageLoaded`,
   `editor:pageModified`, `page:index`, `page:deleted`,
   `mq:emptyQueue:indexQueue`, `system:ready`, and the plugins subscribe in JS.
@@ -359,11 +387,18 @@ One stack of what is laid over the page and closed again, across plugins:
   of shared/layers.ts by their place in it (a menu opened from a dialog over
   it, a dialog from a menu over that). `lifted`, `overWindow`, `control` and
   `dragged` stay layers of their own: a widget over the window lies under the
-  plugins' controls on purpose (its own toolbar over it, layers.ts).
+  plugins' controls on purpose (its own toolbar over it, layers.ts). The core
+  sets every `--sw-layer-*` variable once as it starts; `LAYERS` stays a
+  constant the CSS and the stack read; no plugin calls `applyLayers`.
 - **Dialogs** (from shared/dialog.ts): the same frame and classes by the
-  plugin's base (`swt-dialog`, `swb-dialog`), so each plugin's style page,
-  written by hand for its dialogs, keeps working; `peek` (put aside, out of
-  the stack meanwhile), `above` (now any plugin's), `dismiss`.
+  plugin's base (`swt-dialog`, `swb-dialog`), so themes and users' styles keep
+  working; `peek` (put aside, out of the stack meanwhile), `above` (now any
+  plugin's), `dismiss`. **The frame's CSS becomes a template**
+  (shared/dialog.css, written into each style page by scripts/sharedstyles.mjs
+  with its `__base__`, as menu.css is): today 10 style pages style the frame
+  by hand; one frame drawn by the core is styled once, its selectors as they
+  are (no major), check-build keeping the copies equal. What a plugin's
+  dialogs look like beyond the frame stays its page's.
 - **Menus** (from shared/popupmenu.ts, which already places and closes
   Silverware Assets' and Layout's menus): open at an anchor, flipped at the
   window's edges, a sheet on a phone, submenus, one menu open across plugins,
@@ -375,7 +410,9 @@ One stack of what is laid over the page and closed again, across plugins:
   kept by its kind, Esc and a press beside. **A second panel goes on top of
   the first** (decided 2026-11-25), Esc or its back takes it off, the first as
   it was. The two panels' frames differ today (classes, structure): one frame
-  for both is a change of their look, made with their snapshots (step 6).
+  for both is a change of their look, the user's decision with their
+  rendering baselines (docs/silverware-core-work.md, step 7), its CSS a
+  template as the dialog's (shared/sidepanel.css).
 - **Floating** (`useFloating`): what a part lays over the page while it is its
   own (an editor's panel, the names offered under a field): `liftOut` and
   `floatPanel` (views/float.ts) with all they do (a mark where it came from,
@@ -410,8 +447,9 @@ One stack of what is laid over the page and closed again, across plugins:
 ### F. Services of the plugins to each other
 
 - A registry: a plugin offers its API under its name (`offer("icons", api)`),
-  another asks for it and is told as it comes and goes (`watch("icons", …)`).
-  Typed by the offering plugin's public types. Replaces the Lua handovers
+  another takes it now or when it comes (`whenOffered("icons", …)`); a module
+  is never unloaded (probe 2), so nothing goes, and a Space Lua reload's offer
+  again replaces the first. Typed by the offering plugin's public types. Replaces the Lua handovers
   between our plugins: Silverware Icons, Editor, Assets, Layout, Table's
   `tables` and `onWrite` (*API changes* P3).
 
@@ -420,9 +458,17 @@ One stack of what is laid over the page and closed again, across plugins:
 - **Custom functions and sources, one registry**: the formulas' engine
   (shared/formulas/) moves into the core, its registries with it, so a
   function defined once is every plugin's and meets one engine of one version.
-  **In a file beside the core's** (`silverware-core-formulas.js`, imported on
-  first use, as Chart.js beside the chart's): 6,300 lines a user with only the
-  toolbar never loads; one URL, so still one instance.
+- **Its two files**, so a user with only the toolbar loads none of its 6,300
+  lines while the engine stays synchronous for those who use it:
+  - **the core's main file** holds the definitions as given (the user's
+    modules, data, not yet read) and their reset once per load; the core's
+    API page defines `silverware.formulas.*` on it, loading nothing more;
+  - **`silverware-core-formulas.js`** beside it holds the engine and reads the
+    definitions as it loads and as they change; Silverware Table and Database
+    import it statically (their gate passed, so it is there), the engine as
+    synchronous as today; one URL, so one instance;
+  - its public module (`silverware-core/src/formulas.ts`) is the second one
+    the plugins may import, beside `api.ts` (the isolation tests).
 - **The plugins take the formulas from the core alone**, never from
   shared/formulas: the engine tells its values by class (`FormulaError`,
   `TimeValue`, shared/formulas/values.ts; `instanceof` in custom.ts,
@@ -431,9 +477,10 @@ One stack of what is laid over the page and closed again, across plugins:
   and in the formulas' file; the isolation tests forbid importing
   shared/formulas once it moved.
 - **Definitions anew once per load**: the core's API page resets the
-  registries as Space Lua loads (`customFunctionsAnew`), before the plugins'
-  pages; a plugin's API page stops resetting them (each of six resets its own
-  today, `resetDefinitions`).
+  formulas' definitions as Space Lua loads (`customFunctionsAnew`), before the
+  plugins' pages; a plugin's `resetDefinitions` (six API pages call one) keeps
+  resetting its own definitions (views, types, conditions) and no longer the
+  formulas'.
 - Conditional formatting's conditions join it when the database shares them
   (docs/silverware-database-conditional-formatting.md).
 
@@ -454,8 +501,9 @@ One stack of what is laid over the page and closed again, across plugins:
 - **A write queue across plugins** (every page write through the core):
   `replanOpenPage` covers the open page, and no race between two plugins'
   writes is known. Taken up only if one is reproduced.
-- **The configuration page's writes** (shared/configpage.ts, 6 plugins, each
-  its own block): the same; each plugin writes only its block.
+- **A queue for the configuration page's writes**: every plugin's settings go
+  through `Platform.settings` (*Storage*), each its own block, made by one
+  binding; nothing more is needed unless a race is reproduced.
 - **Pure code** stays in shared/ and bundled: markdown and its parser
   (lezer), yaml, the page writer, the table model, elements, clipboard,
   shadow DOM helpers, keys, kept keys, menu slots, the formula field's
@@ -478,8 +526,11 @@ Weighed for what they bring; each changes only with the step that needs it.
 
 - **P1. `silverware.formulas`** (the core's API page): `defineFunctions` and
   `defineSource`, one registry for Silverware Table's and Database's formulas,
-  defined once. `silverware.table.defineFunctions` and `defineSource` stay,
-  as aliases. Brings: a user's function works in a database (`#NAME?` today).
+  defined once. Brings: a user's function works in a database (`#NAME?`
+  today). `silverware.table.defineFunctions` and `defineSource` become
+  aliases, said deprecated in the table's library page from then, and are
+  removed in the major that removes P3's handovers: one public way to define
+  a function, not two kept for good (consistency over compatibility).
 - **P2. Custom views (Silverware Database)** keep `render(host, element)` and
   `update()` / `destroy()`: framework-free on purpose (a user writes a view in
   plain JS or any framework; only DOM elements and callbacks cross the
@@ -500,21 +551,27 @@ Weighed for what they bring; each changes only with the step that needs it.
 
 - **I1. One binding of SilverBullet** (B): `Platform` made once; the plugins'
   `host/silverbullet/` keep what is theirs.
-- **I2. Dialogs** `dialogs.open({ look, title, content, … })` with `content` a
-  vnode or a node, a handle to close it; shared/dialog.ts goes.
+- **I2. Dialogs** `dialogs.open({ look, title, content, … })`, a handle to
+  close it; shared/dialog.ts goes. `content` takes a DOM node too only while
+  the plugins' content is still `el()` (steps 7 to 10); once every island is
+  Preact (docs/silverware-preact.md, *Two ways, one rule*), a vnode alone, the
+  node's path removed (step 11). The same for menus' and panels' content.
 - **I3. Menus** `menus.open({ anchor, look, entries })`, from
   shared/popupmenu.ts; the callers' own placing and closing goes.
 - **I4. Side panels** `panels.open({ look, kind, content })`.
 - **I5. Watchers to signals**: watchmark.ts, `watchOverWindow`,
-  `watchSidePanel` go; the attributes stay. `applyLayers` keeps the layers
-  that are no overlay.
+  `watchSidePanel` go; the attributes stay. `applyLayers` leaves the plugins:
+  the core sets the layers' variables once.
+- **I7. Page writes by type**: `Platform`'s `Editor` and `Space` without
+  `replace` and `write`; `DocumentWriter` for the page writer and the editing
+  tools (*Storage*).
 - **I6. The settled index** read from the core (H).
 
 ## Releases
 
 - The first release with the core: the core 1.0.0, each plugin a minor (it
   needs the core, installed with its update: probe 4; nothing of a space
-  changes), except where P3 or a snapshot makes it a major.
+  changes), except where P3 or a changed rendering baseline makes it a major.
 - **Formula features become the core's releases**: a formula function added
   is a minor of the core, and a plugin needing it refuses until the core is
   updated. Releases of the core and the plugins go together.
@@ -530,7 +587,8 @@ Weighed for what they bring; each changes only with the step that needs it.
 - **The branch is long**: kept green at each step; `main` meanwhile gets only
   what is apart (the offline note).
 - **Themes**: overlays drawn with the plugins' classes and structure, kept by
-  DOM snapshots; a change of a class or of structure is a decision and a major.
+  the rendering baselines (docs/silverware-core-work.md, step S); a change of
+  a class or of structure is a decision and a major.
 
 ## Decided
 
@@ -558,6 +616,13 @@ Weighed for what they bring; each changes only with the step that needs it.
   write of a page's text goes through the writer (editing tools apart);
   settings through `Platform.settings`. No store added where the text is the
   model (*Storage*).
+- 2026-11-25 (the end state's review): page writes kept by types
+  (`DocumentWriter`), not by a scan alone; the formulas in two files of the
+  core (definitions in its main file, the engine beside it, synchronous for
+  Table and Database); one way to build a plugin's own UI (Preact; `el()` only
+  for SilverBullet's DOM); the overlays' frames styled by templates; a
+  plugin's need of the core checked by `@since`; the layers' variables set by
+  the core alone; the table's formulas aliases removed with P3's major.
 - 2026-11-25: Safari is not tested; it is met when a user reports a problem.
 - 2026-11-25: custom views stay framework-free (only DOM and callbacks cross
   their contract).

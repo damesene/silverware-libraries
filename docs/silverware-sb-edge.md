@@ -2,7 +2,7 @@
 
 Plan, started 2026-11-17 (branch `fix/sb-edge`). Takes in the earlier plan for tool pages under `Library/` (2026-11-13, `docs/silverware-library-prefix.md`, removed).
 
-> **For an agent reading this plan:** the fix keeps code for SilverBullet 2.12.1 and older beside the new, each piece marked `SB-2.12-COMPAT` (see *Cleanup*). Once the cleanup's condition holds (a SilverBullet release with these changes is out and Silverware stops supporting the ones before), tell the user that the cleanup is due and what it removes, before or alongside any other work on these files. Do not do it unasked: dropping support for a SilverBullet version is the user's decision.
+> **Done** (2026-11-25, branch `drop-silverbullet-2.12`): SilverBullet 3.0 was released on 2026-11-24 and Silverware now needs it; the cleanup below is done (*Cleanup* > *Done*), the versions for 2.12 kept in the branch `silverbullet-2.12`. What follows is the record of what 3.0 changed and how it was met.
 
 ## Goal
 
@@ -121,6 +121,11 @@ What the edge UI tests and probes showed, each with its fix (or why there is non
 
 **How to find it:** every piece of code, test, style or doc kept only for 2.12.1 carries the mark `SB-2.12-COMPAT` in a comment (in a library page, where a comment would show, the item below names it instead). `git grep -n SB-2.12-COMPAT` lists them all; each file holding one is named in the list below (`scripts/sb-compat.test.ts`, in `verify`, fails where one is not). Remove the code each mark covers, then the mark, then its item here.
 
+**Before it: a version kept for SilverBullet 2.12** (decided with the user, 2026-11-25). SilverBullet installs a library from the `uri` its repository page lists and keeps that `uri` as the installed page's `share.uri`; an update reads it again. Both 2.12.1 and 3.0 read `https://github.com/<owner>/<repo>/blob/<ref>/<path>` from that ref (`raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>`: a branch, a tag or a commit), and take the library's `files:` from the same folder of the same ref (2.12.1's `plugs/configuration-manager/libraries.ts` `installLibrary`, `urlDir(uri)`; 3.0's `Library/Std/Infrastructure/Github.md`). So:
+
+- Just before the cleanup is merged, a branch `silverbullet-2.12` is made from `main` (the last state that runs on 2.12.1), with one commit of its own: `REPO.md`'s `uri`s and `website`s pointing at `blob/silverbullet-2.12/…` and `tree/silverbullet-2.12/…`, and a line saying it is the version for SilverBullet 2.12. It is pushed and never deleted; fixes for 2.12 may go into it later, released there by their own versions. Not tags: one branch is one repository for every plugin, where tags would be a `uri` per plugin and version.
+- A space on 2.12 adds that repository (Library Manager: *Add Repository*, `https://github.com/damesene/silverware-libraries/blob/silverbullet-2.12/REPO.md`). A library installed before from `main` keeps `share.uri` on `main`, so its next update would take the version for 3.0 alone: it is switched first, by removing the library and installing it again from that repository (or by changing its page's `share.uri` from `blob/main/` to `blob/silverbullet-2.12/`). No detection in the plugins (the user's decision: those who use them read the forum): the changelogs, `README.md` and the forum post say it.
+
 **What it removes** (one item per piece, added with its fix):
 
 - **The choice of the configuration page** (settings saved where SilverBullet keeps them): in each init page, `local configPage = index.toolPages and "Library/Config" or "CONFIG"` becomes `"Library/Config"` (or the bridge's `configPage` goes, the name fixed in `shared/configpage.ts`): `silverware-assets/silverware-assets-init.md`, `silverware-database/silverware-database-init.md`, `silverware-layout/silverware-layout-init.md`, `silverware-table/silverware-table-init.md`, `silverware-tags/silverware-tags-init.md`, `silverware-toolbar/silverware-toolbar-init.md`. In `shared/configpage.ts` `CONFIG_PAGE` becomes `"Library/Config"`; in `shared/configpage.test.ts` the test of the default page reads `Library/Config`.
@@ -134,4 +139,18 @@ What the edge UI tests and probes showed, each with its fix (or why there is non
 - **Silverware Toolbar's host selection bar**: `silverware-toolbar/silverware-toolbar-init.md` hands `hostSelectionBar` over without `config.persist and` (always there then).
 - **This plan's own scaffolding**: `scripts/sb-compat.test.ts` and the mark's rule in the root CLAUDE.md.
 
-**After it:** `test:ui:sb` moved to a release with these changes, the 2.12.1 scenarios dropped; a release per plugin, MINOR or PATCH (nothing a space has breaks: a space on the newer SilverBullet is already on `Library/Config`), each changelog saying SilverBullet 2.12 and older are no longer supported; this plan marked done, its decisions moved to the plugins' CLAUDE.md where they still hold.
+**Done** (2026-11-25): the branch `silverbullet-2.12` made from `main` (its `REPO.md` and `README.md` pointing at it), then every item above removed in `drop-silverbullet-2.12`, the mark and `scripts/sb-compat.test.ts` with them. Beyond the list:
+
+- The configuration page's name is no longer handed over by the init pages (`configPage` went from every bridge): `shared/configpage.ts`' `CONFIG_PAGE` is `Library/Config`, the init pages write the same page. Code, tests and CLAUDE.md say `Library/Config` (or "the configuration page") where they said `CONFIG`.
+- The init pages' save no longer calls `editor.rebuildEditorState` after `editor.reloadConfigAndCommands` (3.0's builds the editor's state anew itself), nor guards `sync.performFileSync`; Silverware Tags' panel no longer asks whether `view.define` exists (it did in 2.12.1 too).
+- SilverBullet 2.12.1's widget button bar (`.button-bar`) is gone from the style pages and the code that hid it (Chart, Database, Layout's grid, Assets): 3.0 draws `.sb-widget-menu-bar` alone. The ⋮ beside a widget is 3.0's release's too: its tests run on every SilverBullet target, not on edge alone; the space tree's tests expect its command there.
+- Silverware Tags names SilverBullet's own pages "library pages" where a user sees it (*Hide and protect library pages*; the setting's key `protectMeta` stays), as 3.0's tree has them under *Library*.
+- The UI tests' servers serve a data folder always and write `Library/Config.md`; the first-index wait is `afterIndexCompleted` alone.
+
+Weighed and left (2026-11-25, from a survey of what 3.0 offers):
+
+- `config.persist(path, value)` in place of our writer for the Configuration Manager's block: it loads the configuration again once per value (a dialog saving many would reload as many times) and writes no table, so `shared/configpage.ts` stays.
+- `markdown.renderToDom` in place of `markdownToHtml` for a grid's cells and the sheet view: it takes no options, so no `annotationPositions`, which a cell's clicks and its tasks need (`data-pos`).
+- `editor.posAtDOM` (public in 3.0) in place of Silverware Assets' `editorposition.ts` reading `client.editorView`: it is asynchronous where the decorator asks synchronously, and `posAtCoords` (a drop's place) has no public call, so the internal access would stay for it anyway.
+
+**After it:** `test:ui:sb` moved to a release with these changes, the 2.12.1 scenarios dropped (merged with Dependabot's PR #56, which moves CI's SilverBullet to 3.0); a release per plugin, MAJOR (a space on 2.12 stops working), each changelog's first line a **Breaking:** one (needs SilverBullet 3.0 or later; on SilverBullet 2.12, the branch `silverbullet-2.12`, and how to switch to it: *Before it*); `README.md` saying the same; a forum post drafted for the user; this plan marked done, its decisions moved to the plugins' CLAUDE.md where they still hold.

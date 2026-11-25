@@ -18,15 +18,14 @@ import { documentUrl } from "../../../../shared/silverbullet/platform.ts";
 import { withImages } from "../../../../shared/silverbullet/embedimage.ts";
 import { editorSampleLook } from "../../../../shared/silverbullet/editorsample.ts";
 import { highlightCodeIn } from "./codeblocks.ts";
-import { afterPress, handsAltPressToField, SILVERBULLET_EDITORS, textForDrawing } from "./behaviour.ts";
+import { afterPress, HANDS_ALT_PRESS_TO_FIELD, SILVERBULLET_EDITORS, textForDrawing } from "./behaviour.ts";
 import { focusPage, isPageText, pressBesideGrid } from "./dom.ts";
 import { ownTasks } from "./tasks.ts";
 import { keepUndrawn } from "./undrawn.ts";
 
-// SilverBullet's frame of a grid (its custom syntax's, the class the init page gives it), and its button bar in it
-// (2.12.1: .button-bar, in a div of the frame beside the widget's content, probed 2026-11-13; its main: .sb-widget-menu-bar)
+// SilverBullet's frame of a grid (its custom syntax's, the class the init page gives it), and its widget menu's bar in it
 const GRID_FRAME = ".swl-grid-widget";
-const GRID_BARS = ".swl-grid-widget .button-bar, .swl-grid-widget .sb-widget-menu-bar";
+const GRID_BARS = ".swl-grid-widget .sb-widget-menu-bar";
 // A task's box in a grid's cell
 const TASK_BOXES = '.swl-grid-cell .sb-task > input[type="checkbox"]';
 
@@ -89,7 +88,7 @@ export function silverBulletGridHost(bridge: Bridge, writer: PageWriter, drawer:
     // How SilverBullet behaves, allowed for (./behaviour.ts)
     textForDrawing: (body: string): Promise<string> => textForDrawing(async () => String(await bridge.getText()), body),
     afterPress,
-    handsAltPressToField: handsAltPressToField(bridge.widgetTakesAltPress),
+    handsAltPressToField: HANDS_ALT_PRESS_TO_FIELD,
     focusPage,
     isPageText,
     pressBesideGrid,

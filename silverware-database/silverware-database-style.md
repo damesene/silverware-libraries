@@ -7,19 +7,13 @@ The look of [Silverware Database](silverware-database.md): a database's place (i
 
 ```space-style
 /* What Silverware Database assumes about SilverBullet's DOM, all of it here: its own controls of a database's block
-   (its widget menu: Reload, Copy, Edit; .button-bar in the widget in the release 2.12.1, .sb-widget-menu-bar in main;
-   the block's Copy buttons in the block's first line, .cm-line > .sb-actions) left out, as Silverware Chart leaves them
+   (its widget menu: Reload, Copy, Edit, .sb-widget-menu-bar; the block's Copy buttons in the block's first line, .cm-line > .sb-actions) left out, as Silverware Chart leaves them
    out of a chart's: the database's own tools are its controls; .swd-widget is the class the init page gives the widget */
-/* (On a touch screen SilverBullet shows its widget menu always, `display: block !important` by
-   #sb-main .cm-editor .sb-lua-directive-block .button-bar in (hover: none) and (pointer: coarse), seen on a phone
-   2026-11-09: its id and three classes outweigh two, so this names the same path, the widget's own class beside it) */
 /* (SilverBullet's frame of a widget, #sb-main .cm-editor .sb-lua-directive-block { border: 1px solid … }: none round a
    database, which draws its own; the same path, the widget's own class beside it, outweighs it) */
 #sb-main .cm-editor .swd-widget.sb-lua-directive-block {
   border: none;
 }
-.swd-widget .button-bar,
-#sb-main .cm-editor .swd-widget.sb-lua-directive-block .button-bar,
 .swd-widget .sb-widget-menu-bar,
 .cm-line:has(.swd-widget) > .sb-actions {
   display: none !important;

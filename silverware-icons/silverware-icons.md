@@ -19,7 +19,7 @@ It comes with [Lucide](https://lucide.dev)'s icons (over 2,000, in categories) a
 
 ## How an icon is written
 
-An icon of a set is written as the set's name and the icon's: `lucide:house`. An emoji is written as itself: `🏠`. So in your configuration page (`Library/Config`; `CONFIG` in SilverBullet 2.12 and before):
+An icon of a set is written as the set's name and the icon's: `lucide:house`. An emoji is written as itself: `🏠`. So in your configuration page (`Library/Config`):
 
 ```lua
 { id = "formats.bold", icon = "lucide:bold" }

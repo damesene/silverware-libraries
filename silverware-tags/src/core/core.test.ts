@@ -30,17 +30,11 @@ describe("catalog", () => {
 });
 
 describe("meta", () => {
-  it("tells SilverBullet's own pages by their meta tags", async () => {
-    const space = memorySpace({ Lib: "---\ntags: meta/library\n---\n", Mine: "#meta-notes\n\n#metal", Tpl: "#meta" });
-    expect([...metaPages(await readCatalog(space))].sort()).toEqual(["Lib", "Tpl"]);
-  });
-  it("tells them by their place where SilverBullet does (after 2.12.1): a page under Library/ without a tag, not a template outside it", async () => {
-    const space = memorySpace({ "Library/Config": "Settings", "Library/Std/Thing": "#auto", Car: "#auto", "Templates/Note": "#meta/template" });
-    expect([...metaPages(await readCatalog(space, { byPlace: true }))].sort()).toEqual(["Library/Config", "Library/Std/Thing"]);
-    // SB-2.12-COMPAT: by a meta tag in 2.12.1, a page under Library/ without one content
-    expect([...metaPages(await readCatalog(space))].sort()).toEqual(["Templates/Note"]);
-    const catalog = await readCatalog(space, { hideMeta: true, byPlace: true });
-    expect(catalog.pages).toEqual(["Car", "Templates/Note"]);
+  it("tells SilverBullet's own pages by their place: a page under Library/ without a tag, not a template or a meta tag outside it", async () => {
+    const space = memorySpace({ "Library/Config": "Settings", "Library/Std/Thing": "#auto", Car: "#auto", "Templates/Note": "#meta/template", Mine: "#meta-notes\n\n#metal" });
+    expect([...metaPages(await readCatalog(space))].sort()).toEqual(["Library/Config", "Library/Std/Thing"]);
+    const catalog = await readCatalog(space, { hideMeta: true });
+    expect(catalog.pages).toEqual(["Car", "Mine", "Templates/Note"]);
     expect([...catalog.tags.get("auto")!.pages]).toEqual(["Car"]);
   });
 });
@@ -145,15 +139,15 @@ describe("operations", () => {
 });
 
 describe("meta pages protected", () => {
-  it("leaves meta pages out of the catalog, and a plan's guard leaves one alone as read", async () => {
-    const space = memorySpace({ Lib: "---\ntags: meta/library\n---\nWrites #auto.", Car: "#auto" });
+  it("leaves library pages out of the catalog, and a plan's guard leaves one alone", async () => {
+    const space = memorySpace({ "Library/Lib": "---\ntags: meta/library\n---\nWrites #auto.", Car: "#auto" });
     const catalog = await readCatalog(space, { hideMeta: true });
     expect([...catalog.tags.keys()]).toEqual(["auto"]);
     expect(catalog.pages).toEqual(["Car"]);
-    // A page the index had as no meta page, made one since: the guard reads its text
-    const plan = await makePlan(writerOf(space), await readCatalog(space), renameOperation("auto", "automobile", false), undefined, (page) => (page.tagUses().some((use) => use.name === "meta/library") ? "a meta page" : undefined));
+    // A plan of every page (the catalog not hiding them): the guard leaves SilverBullet's own alone
+    const plan = await makePlan(writerOf(space), await readCatalog(space), renameOperation("auto", "automobile", false), undefined, (page) => (page.name.startsWith("Library/") ? "a library page" : undefined));
     expect(plan.pages.map((c) => c.page)).toEqual(["Car"]);
-    expect(plan.skipped).toEqual([{ page: "Lib", cause: "refused", reason: "a meta page" }]);
+    expect(plan.skipped).toEqual([{ page: "Library/Lib", cause: "refused", reason: "a library page" }]);
   });
 });
 

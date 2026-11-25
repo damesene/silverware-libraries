@@ -3,7 +3,7 @@
 // bridge is SilverBullet's editor API in short, over this editor; the
 // style page's space-style block is applied as SilverBullet would, and the
 // command's key bound as SilverBullet binds a command's (a keymap of the editor).
-// Settings are the playground's own store (no CONFIG page here), which the
+// Settings are the playground's own store (no configuration page here), which the
 // settings dialog writes through `saveSettings`.
 import { autocompletion, type CompletionContext, startCompletion } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";

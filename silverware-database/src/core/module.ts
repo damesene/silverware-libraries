@@ -129,7 +129,7 @@ export type ModuleHost = DocumentsHost & MentionsHost & MediaHost & {
   setting(key: string): unknown;
   /**
    * One of the module's settings saved where the user keeps them (SilverBullet's
-   * CONFIG: for every database), `undefined` back to its default; false where
+   * Library/Config: for every database), `undefined` back to its default; false where
    * settings cannot be saved here (said to no one: the value then holds for this
    * session alone)
    */

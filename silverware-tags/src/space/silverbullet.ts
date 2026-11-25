@@ -7,22 +7,14 @@ import { type Bridge, listOf } from "../bridge.ts";
 import type { Notifier, Space, TagRecord, WritingPlatform } from "./space.ts";
 
 /**
- * The tags' records as the init page reads them (the index's `tag` objects, and its tables' and headings' tags): a
- * paragraph's hashtag counted on the page (SilverBullet after 2.12.1 says `paragraph` where 2.12.1 said `page`),
- * each record once (after 2.12.1 a heading's tags are `tag` objects too, which the init page reads of headings as well)
- * SB-2.12-COMPAT: each record once only for the headings read twice (the init page's "header"); once 2.12.1 is
- * dropped and the init page reads tables alone, `seen` goes, the paragraph's context kept
+ * The tags' records as the init page reads them (the index's `tag` objects, and its tables' tags): a paragraph's
+ * hashtag counted on the page (SilverBullet says `paragraph`)
  */
 export function tagRecordsOf(records: readonly unknown[]): TagRecord[] {
-  const seen = new Set<string>();
   return records.flatMap((record): TagRecord[] => {
     const { name, page, parent } = (record ?? {}) as { name?: unknown; page?: unknown; parent?: unknown };
     if (typeof name !== "string" || typeof page !== "string") return [];
-    const context = typeof parent !== "string" || parent === "paragraph" ? "page" : parent;
-    const key = JSON.stringify([name, page, context]);
-    if (seen.has(key)) return [];
-    seen.add(key);
-    return [{ name, page, parent: context }];
+    return [{ name, page, parent: typeof parent !== "string" || parent === "paragraph" ? "page" : parent }];
   });
 }
 

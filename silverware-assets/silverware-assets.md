@@ -92,7 +92,7 @@ SilverBullet reads only the alt text and the size, so without Silverware Assets 
 
 **A preview's label**: by default a preview shows its type's icon and its alt text above it (its file's name where it has none). On the **Appearance** tab, under **Preview** and **Label**, a sample preview shows what you set as you set it: the label above and below it is made of the properties shown (the type's icon, the alt text, the name, the size, the date changed), as a preview shows them; those not shown are in a row over it. Point at a property (or tap it) for its name and a × that hides it; drag it above or below the preview, in the order you want, or up to the row to hide it (or move it by Alt+arrows). Click a property in the row, or drag it into the label, to show it. Set it for all files, or open a kind of file's row and change it there (a PDF's apart from an image's). With both the alt text and the name on, a file without alt text shows its name once.
 
-Saved into your configuration page (`Library/Config`; `CONFIG` in SilverBullet 2.12 and before), in a block of Silverware Assets' own.
+Saved into your configuration page (`Library/Config`), in a block of Silverware Assets' own.
 
 Files in a grid's cells (Silverware Layout's) are shown the same way, and their bar makes them wider or narrower within their cell: it snaps to a quarter, a half, three quarters and the whole of the cell's width. A width snapped to one is saved as that share, `![[photo.png|Photo|50%]]`, so the file follows its cell as the cell grows or shrinks; one not snapped is saved in pixels.
 

@@ -10,7 +10,7 @@
 // - silverbullet: a real SilverBullet with the committed silverware-toolbar.js
 //   deployed: each test a page of its own in its worker's space, the sample
 //   written into it; SilverBullet's editor is the same CodeMirror
-//   (`client.editorView`). The settings dialog saves into the space's CONFIG
+//   (`client.editorView`). The settings dialog saves into the space's Library/Config
 //   page, which is put back once the test is done.
 import { readFileSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
@@ -55,7 +55,7 @@ export const TEST_FAVORITES: Favorites = [
   [{ id: "formats.bold" }, { id: "formats.italic" }, { id: "formats.code" }, { type: "separator" }, { id: "formats.link" }, { id: "formats.highlight" }, { type: "separator" }, { id: "actions.more" }],
 ];
 
-// The settings that give a test its favourites, by path (the playground's store, SilverBullet's CONFIG), in the
+// The settings that give a test its favourites, by path (the playground's store, SilverBullet's Library/Config), in the
 // model's version now (else migrated as the toolbar starts: migrations/)
 const favoriteSettings = (favorites: Favorites) => ({
   // The same rows for a mouse (by the selection, after selecting text) and a finger (docked at the bottom while

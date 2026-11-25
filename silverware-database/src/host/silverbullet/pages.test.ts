@@ -24,12 +24,8 @@ describe("what SilverBullet says of a page, in the platform's terms", () => {
 });
 
 describe("the pages a reference may name", () => {
-  it("are the index's pages by name, meta ones (a tag meta or under it) left out", () => {
-    const pages = [{ name: "Zeta" }, { name: "CONFIG", tags: ["meta"] }, { name: "Library/x", tags: ["meta/library"] }, { name: "Alpha", tags: ["project", "metal"] }, { tags: ["x"] }];
-    // SB-2.12-COMPAT: SilverBullet 2.12.1 tells them by a meta tag (a page under Library/ without one offered)
-    expect(referablePages(pages, false)).toEqual(["Alpha", "Zeta"]);
-    expect(referablePages([{ name: "Library/Books" }, { name: "Alpha" }], false)).toEqual(["Alpha", "Library/Books"]);
-    // After it: by their place, without tags; a template outside Library/ is content
-    expect(referablePages([{ name: "Library/Config" }, { name: "Library/Std/Index" }, { name: "Templates/Note", tags: ["meta/template"] }, { name: "Alpha" }], true)).toEqual(["Alpha", "Templates/Note"]);
+  it("are the index's pages by name, SilverBullet's own (under Library/) left out, a template elsewhere content", () => {
+    const pages = [{ name: "Zeta" }, { name: "Library/Config" }, { name: "Library/Std/Index" }, { name: "Templates/Note", tags: ["meta/template"] }, { name: "Alpha", tags: ["project", "metal"] }, { tags: ["x"] }];
+    expect(referablePages(pages)).toEqual(["Alpha", "Templates/Note", "Zeta"]);
   });
 });

@@ -3,7 +3,7 @@
 // table, from the table's ⋯ menu or the "Silverware Table: Settings" command. It
 // reads them from SilverBullet's configuration when it opens (one source: what
 // Ctrl-, shows, too) and changes nothing until Save: then they are written
-// where SilverBullet keeps them (the CONFIG page's managed block,
+// where SilverBullet keeps them (the configuration page's managed block,
 // configpage.ts) and the configuration is loaded again. Modules are created
 // when Silverware Table starts, so turning one on or off saves and reloads the page.
 import { settingRow, switchControl } from "../../shared/controls.ts";

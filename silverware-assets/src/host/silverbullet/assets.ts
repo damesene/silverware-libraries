@@ -23,7 +23,7 @@ const OWN_FRAME = "swa-frame";
 // A frame of ours its medium was decorated in (decorate.ts marks the type it was drawn as)
 const DECORATED = `.${OWN_FRAME}[data-swa-type]`;
 const MEDIA = "img, video, audio, object";
-const BARS = ".button-bar, .sb-widget-menu-bar";
+const BARS = ".sb-widget-menu-bar";
 // (The frame's whole text: a page embedded there whose own embed failed says it deeper, after its words)
 const UNSUPPORTED = /^(?:Error:\s*)?Unsupported content:\s*(.+)$/;
 // Links as SilverBullet draws them in the editor (2.12.1, probed 2026-11-13): a wiki link's widget `a.sb-wiki-link`

@@ -1,6 +1,6 @@
 // Silverware Layout in SilverBullet: the API the widget plugins register their providers with (shared/layout.ts), and
 // the app (app.ts) over SilverBullet's page (host/silverbullet/dom.ts), its store SilverBullet's: the settings in its
-// configuration (saved into CONFIG), a page's own width in its frontmatter (through the page writer), this device's
+// configuration (saved into Library/Config), a page's own width in its frontmatter (through the page writer), this device's
 // zoom in the browser. Its init page hands over SilverBullet's API (bridge.ts) and calls `pageLoaded`, `pageOpened`
 // and `pageEdited`.
 import { keepFromWidgetMenu } from "../../shared/silverbullet/widgetmenu.ts";
@@ -37,7 +37,7 @@ import { cssWidth, readTextWidth } from "./model/width.ts";
 const LAYOUT_SETTINGS = "Silverware Layout: Settings";
 const WRAP_IN_GRID = "Silverware Layout: Wrap in grid";
 const MOVE_TO_GRID = "Silverware Layout: Move to grid";
-// Silverware Layout's own block of CONFIG: the guides, a list, which the Configuration Manager's block would lose
+// Silverware Layout's own block of Library/Config: the guides, a list, which the Configuration Manager's block would lose
 // (shared/configpage.ts)
 const OWN_MARKER = "-- managed-by: silverware-layout";
 
@@ -130,7 +130,7 @@ export async function init(bridge: Bridge): Promise<void> {
   // The Markdown tab of the settings dialog, made as it opens
   app.dialogTabs = async () => [
     syntaxTab(document, await readSyntaxSettings(bridge), async (saved) => {
-      await saveConfigPage({ configPage: bridge.configPage, readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) =>
+      await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) =>
         withConfigSettings(text, { [PATHS.syntaxHides]: saved.hideGrids ? undefined : false, [PATHS.linkClicks]: saved.clickPlacesCursor ? undefined : false }),
       );
       markdownSettings = saved;
@@ -303,9 +303,9 @@ export function toolbarActions(): unknown[] {
 
 /** What Silverware Layout reads and saves, SilverBullet's way */
 function silverBulletStore(bridge: Bridge, writer: PageWriter): LayoutStore {
-  // A setting saved into CONFIG as SilverBullet's Configuration Manager saves it (indexed, the configuration loaded again)
+  // A setting saved into Library/Config as SilverBullet's Configuration Manager saves it (indexed, the configuration loaded again)
   const saveConfig = (values: Readonly<Record<string, unknown>>, marker?: string) =>
-    saveConfigPage({ configPage: bridge.configPage, readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values, marker));
+    saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values, marker));
   return {
     canSaveSettings: !!bridge.saveConfigPage,
     readSettings: () => settingsOf(bridge),
@@ -315,7 +315,7 @@ function silverBulletStore(bridge: Bridge, writer: PageWriter): LayoutStore {
       return { page: String(page), width, align };
     },
     savePageLayout: async (page, layout) => writePageLayout(writer, page, String(await bridge.getText()), layout),
-    // In the Configuration Manager's block of CONFIG (it shows it, Ctrl-,), as the other plugins save theirs
+    // In the Configuration Manager's block of Library/Config (it shows it, Ctrl-,), as the other plugins save theirs
     saveTextWidth: (width) => saveConfig({ [PATHS.textWidth]: width ? cssWidth(width) : undefined }),
     // (Centred, the default, written as none)
     saveTextAlign: (align) => saveConfig({ [PATHS.textAlign]: align && align !== "center" ? align : undefined }),

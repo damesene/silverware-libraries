@@ -1,5 +1,5 @@
 // The settings dialog: the command "Silverware Tags: Settings" and the gear in
-// the window's foot. Tabs General (Hide and protect meta pages) and Modules
+// the window's foot. Tabs General (Hide and protect library pages) and Modules
 // (each one's switch, with what it does). It reads the configuration when it
 // opens and writes nothing until Save, then reloads (Save and reload): modules
 // are created, and the init page defines their commands and the panel (its
@@ -90,8 +90,8 @@ export class SettingsDialog {
     const protectRow = settingRow(
       doc,
       BASE,
-      "Hide and protect meta pages",
-      "SilverBullet's own pages (a page tagged meta or a tag under it, as libraries, templates and its API are) are left out: their tags show nowhere, and no change touches them (a rename of a tag they use too renames it everywhere else). Off: they show, their tags apart (Meta), and changes reach them.",
+      "Hide and protect library pages",
+      "SilverBullet's own pages (under Library/: libraries, the configuration, its API) are left out: their tags show nowhere, and no change touches them (a rename of a tag they use too renames it everywhere else); tags meta and under it (what SilverBullet tells templates and libraries by) are left out of the view too. Off: they show, the meta tags apart (Meta), and changes reach them.",
       protect,
     );
     protectRow.dataset.swgSetting = PATHS.protectMeta;

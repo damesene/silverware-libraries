@@ -62,7 +62,7 @@ function settingsOf(bridge: Bridge): Settings {
     ? async (values: Readonly<Record<string, unknown>>) => void (await saveSettings(values))
     : saveConfig && readPage
       ? (values: Readonly<Record<string, unknown>>) =>
-          saveConfigPage({ configPage: bridge.configPage, readPage: (name) => readPage(name), saveConfigPage: (text) => saveConfig(text) }, (text) => withConfigSettings(text, values))
+          saveConfigPage({ readPage: (name) => readPage(name), saveConfigPage: (text) => saveConfig(text) }, (text) => withConfigSettings(text, values))
       : undefined;
   return {
     // Without getConfig every setting keeps its default

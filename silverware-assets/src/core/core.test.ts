@@ -67,7 +67,7 @@ describe("the settings", () => {
     expect(readAssetSettings(storedAssetSettings(settings)).settings.preview).toEqual(settings.preview);
   });
 
-  it("write the former settings as none, so a save takes their lines out of CONFIG: where a file stands, a view's before they were kept by view", () => {
+  it("write the former settings as none, so a save takes their lines out of Library/Config: where a file stands, a view's before they were kept by view", () => {
     const stored = storedAssetSettings(readAssetSettings({}).settings);
     for (const key of ["originals", "anchor", "heights", "previews", "labels", "originalLabels", "linkIcons"]) expect(key in stored && stored[key] === undefined, key).toBe(true);
   });
@@ -80,7 +80,7 @@ describe("the settings", () => {
     // (None given: a link shows its icon, a card its icon and name)
     expect([DEFAULT_ASSET_SETTINGS.link.fields, DEFAULT_ASSET_SETTINGS.card.fields]).toEqual([["icon"], ["icon", "name"]]);
     expect(readAssetSettings(storedAssetSettings(settings)).settings).toEqual(settings);
-    // None shown, as CONFIG gives it back: an empty Lua table is an object, not a list
+    // None shown, as Library/Config gives it back: an empty Lua table is an object, not a list
     const back = readAssetSettings({ card: { fields: {} }, link: { fields: {} } }).settings;
     expect([back.card.fields, back.link.fields]).toEqual([[], []]);
   });

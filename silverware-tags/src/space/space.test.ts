@@ -56,11 +56,9 @@ describe("SilverBullet's space", () => {
 });
 
 describe("the index's tag records", () => {
-  it("count a paragraph's hashtag on the page, each record once (SilverBullet after 2.12.1: 'paragraph', headings' tags as tag objects too)", () => {
+  it("count a paragraph's hashtag on the page, a record without a name or a page left out", () => {
     const records = [
       { name: "a", page: "P", parent: "paragraph" },
-      { name: "a", page: "P", parent: "page" },
-      { name: "h", page: "P", parent: "header" },
       { name: "h", page: "P", parent: "header" },
       { name: "t", page: "P", parent: "task" },
       { name: "x", page: "P" },

@@ -2,7 +2,7 @@
 // (shared/platform.ts): a page object's own keys, its dates, its tasks, what
 // a page's name cannot be. The one place that knows SilverBullet's names for
 // them; the store asks the platform.
-import { isSilverBulletPage } from "../../../../shared/pages/tags/names.ts";
+import { isToolPage } from "../../../../shared/pages/tags/names.ts";
 import type { DocumentDates, IndexedObject, TaskCount } from "../../../../shared/platform.ts";
 
 /** Keys SilverBullet's page objects have beside a page's frontmatter (probe 1, plugs/index/page.ts): none can be a property's */
@@ -38,11 +38,8 @@ export function validatePageName(name: string): string | undefined {
   return undefined;
 }
 
-/**
- * The pages a reference may name, by name in order: the index's pages but SilverBullet's own (a library, the
- * configuration), told as the SilverBullet running tells them (`byPlace`: under Library/, else a tag `meta` or under it)
- */
-export function referablePages(objects: readonly IndexedObject[], byPlace: boolean): string[] {
-  const pages = objects.filter((page) => typeof page.name === "string" && !isSilverBulletPage(page.name, Array.isArray(page.tags) ? page.tags.filter((tag): tag is string => typeof tag === "string") : [], byPlace));
+/** The pages a reference may name, by name in order: the index's pages but SilverBullet's own (under Library/: a library, the configuration) */
+export function referablePages(objects: readonly IndexedObject[]): string[] {
+  const pages = objects.filter((page) => typeof page.name === "string" && !isToolPage(page.name));
   return pages.map((page) => page.name as string).sort((a, b) => a.localeCompare(b));
 }

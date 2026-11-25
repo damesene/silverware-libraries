@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { addPageTags, pageTags, removePageTags, removeTags, renameTags, tagUses } from "./edit.ts";
 import { readFrontmatter, writeTags } from "./frontmatter.ts";
 import { hashtagOf } from "../../markdown/inline.ts";
-import { cleanName, isMetaTag, isSilverBulletPage, isToolPage, isWithin, validateName, renamedTag } from "./names.ts";
+import { cleanName, isMetaTag, isToolPage, isWithin, validateName, renamedTag } from "./names.ts";
 import { scanHashtags } from "./scan.ts";
 
 const names = (text: string) => scanHashtags(text, readFrontmatter(text).bodyStart).map((t) => `${t.name}:${t.context}`);
@@ -24,15 +24,8 @@ describe("names", () => {
   it("tells SilverBullet's own tags", () => {
     expect([isMetaTag("meta"), isMetaTag("meta/library"), isMetaTag("metal"), isMetaTag("meta-notes")]).toEqual([true, true, false, false]);
   });
-  it("tells SilverBullet's own pages as the SilverBullet running does: by their place, else by a meta tag of their own", () => {
-    expect([isToolPage("Library/Config"), isToolPage("Library/Std/Pages/Index"), isToolPage("Library"), isToolPage("LibraryNotes/x"), isToolPage("CONFIG")]).toEqual([true, true, false, false, false]);
-    // By place (after 2.12.1): under Library/ whatever its tags, a template outside it content
-    expect(isSilverBulletPage("Library/Config", [], true)).toBe(true);
-    expect(isSilverBulletPage("Templates/Note", ["meta/template"], true)).toBe(false);
-    // SB-2.12-COMPAT: by a meta tag in SilverBullet 2.12.1, a page under Library/ without one content
-    expect(isSilverBulletPage("CONFIG", ["meta"], false)).toBe(true);
-    expect(isSilverBulletPage("Library/Books", [], false)).toBe(false);
-    expect(isSilverBulletPage("Notes", ["metal", "project"], false)).toBe(false);
+  it("tells SilverBullet's own pages by their place, under Library/", () => {
+    expect([isToolPage("Library/Config"), isToolPage("Library/Std/Pages/Index"), isToolPage("Library"), isToolPage("LibraryNotes/x"), isToolPage("Templates/Note")]).toEqual([true, true, false, false, false]);
   });
   it("reads a typed name and says what is wrong with one", () => {
     expect(cleanName(" #todo ")).toBe("todo");

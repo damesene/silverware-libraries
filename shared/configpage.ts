@@ -1,5 +1,4 @@
-// The plugins' settings in the space's configuration page (Library/Config; CONFIG
-// in SilverBullet 2.12.1 and older, the name from the init page's Lua), in a
+// The plugins' settings in the space's configuration page (Library/Config), in a
 // space-lua block starting with a marker, one `config.set(path, value)` line
 // per setting. A plugin edits only its own lines there, every other line
 // (other libraries, shortcuts) is kept as written. Verified in SilverBullet's
@@ -13,9 +12,8 @@
 // (`parseLuaLiteral`), and on any save it writes its block anew from what it
 // read, so a table in its block would be lost. It leaves other blocks alone.
 
-// SB-2.12-COMPAT: the page where no name is handed over (the playground, a bridge without `configPage`); "Library/Config"
-// once SilverBullet 2.12.1 is no longer supported
-export const CONFIG_PAGE = "CONFIG";
+/** The configuration page, where SilverBullet keeps the space's settings (the init pages name it alike) */
+export const CONFIG_PAGE = "Library/Config";
 export const MANAGED_MARKER = "-- managed-by: configuration-manager";
 
 const LUA_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -96,9 +94,6 @@ export function withConfigSettings(text: string, values: Readonly<Record<string,
 
 /** What saving into the configuration page needs of SilverBullet (the init page's Lua hands it over) */
 export type ConfigPageAccess = {
-  // The configuration page's name, as the init page's Lua tells it (`Library/Config`, or `CONFIG` before SilverBullet's
-  // tool pages); CONFIG_PAGE where none is given
-  configPage?: string;
   readPage(name: string): string | undefined | Promise<string | undefined>;
   // Written, synced and indexed, the configuration loaded again (as the Configuration Manager saves)
   saveConfigPage(text: string): unknown;
@@ -111,7 +106,7 @@ export type ConfigPageAccess = {
  * it (its markers) neither: its Lua is broken, written over it would be worse.
  */
 export async function saveConfigPage(access: ConfigPageAccess, update: (text: string) => string): Promise<void> {
-  const page = access.configPage ?? CONFIG_PAGE;
+  const page = CONFIG_PAGE;
   let text = "";
   try {
     text = (await access.readPage(page)) ?? "";

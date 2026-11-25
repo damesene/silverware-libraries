@@ -114,7 +114,7 @@ test("Cancel puts the page back as it was, writing nothing", async ({ page, spac
   expect(await space.saved("Page")).toBe(wide("Some text."));
 });
 
-test("the default text width saved into CONFIG, applying to a page without its own", async ({ page, space }) => {
+test("the default text width saved into Library/Config, applying to a page without its own", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
   await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");
@@ -128,7 +128,7 @@ test("the default text width saved into CONFIG, applying to a page without its o
   expect(await space.saved("Page")).toBe("# Page\n\nSome text.\n");
 });
 
-test("the guides typed straight in their rows, saved into Silverware Layout's own block of CONFIG, ascending as the tab shows again", async ({ page, space }) => {
+test("the guides typed straight in their rows, saved into Silverware Layout's own block of Library/Config, ascending as the tab shows again", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
   await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");

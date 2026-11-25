@@ -37,7 +37,7 @@ Charts written in a format other tools draw (Mermaid's `xychart-beta` and `pie` 
 
 - A code widget is not rendered anew when what it read changes (unlike `${…}`): charts follow their tables through `editor:pageModified` (the init page hands the page's text to `pageModified`).
 - SilverBullet renders each code widget twice, one element never attached.
-- A click on a chart does not open its markdown; SilverBullet's widget menu shows at its top right (`.button-bar` in 2.12.1, verified 2026-11-03; `.sb-widget-menu-bar` in main; always shown on a touch screen, seen on a phone 2026-11-09).
+- A click on a chart does not open its markdown; SilverBullet's widget menu shows at its top right (`.sb-widget-menu-bar`).
 - A page's cursor starts at its first line, so a block there shows its markdown (the UI tests start pages with a heading).
 - A JS function handed to Lua and back to JS (`onWrite` through the bridge) is called as it was; a table's edit with the charts' blocks written in it is one Ctrl+Z.
 

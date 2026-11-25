@@ -15,7 +15,7 @@ export type Bridge = {
   readonly getText: () => string | Promise<string>;
   readonly replaceRange: (from: number, to: number, text: string) => unknown;
   readonly navigate: (page: string) => unknown;
-  // A notification; `options` as SilverBullet's main has them (buttons: actions), a release before them ignores them
+  // A notification; `options` as SilverBullet has them (`timeout`, buttons: `actions`)
   readonly flash: (message: string, type?: "info" | "error", options?: unknown) => unknown;
   // Optional: waits until the index has caught up (mq.awaitEmptyQueue("indexQueue"))
   readonly awaitIndex?: () => unknown;
@@ -23,11 +23,7 @@ export type Bridge = {
   readonly getConfig?: (path: string, defaultValue: unknown) => unknown;
   // Optional, for the settings dialog: asks before closing it with changes (else the browser's confirm)
   readonly confirm?: (message: string) => boolean | Promise<boolean>;
-  // The configuration page's name (Library/Config, or CONFIG before SilverBullet's tool pages), told by the init page
-  readonly configPage?: string;
-  // Whether SilverBullet tells its own pages by their place (under Library/) rather than by a meta tag, told by the init page
-  readonly toolPagesByPlace?: boolean;
-  // Optional, for the settings dialog: the CONFIG page saved as SilverBullet's Configuration Manager saves it (readPage reads it)
+  // Optional, for the settings dialog: the configuration page saved as SilverBullet's Configuration Manager saves it (readPage reads it)
   readonly saveConfigPage?: (text: string) => unknown;
   // Optional: the page loaded anew, as a module turned on or off needs (else the window reloaded)
   readonly reloadUI?: () => unknown;
@@ -64,7 +60,7 @@ export const PATHS = {
 /** Silverware Tags' settings, read as it starts (the settings dialog starts it anew; modules apply on reload) */
 export type Settings = {
   readonly modules: ReadonlySet<ModuleName>;
-  // SilverBullet's meta pages (a page tagged meta or under it) left out of everything and never changed
+  // SilverBullet's own pages (under Library/) left out of everything and never changed
   readonly protectMeta: boolean;
   // The Tags panel: the page open's tags first (else as SilverBullet's tree sorts: by name, folders first)
   readonly pageFirst: boolean;

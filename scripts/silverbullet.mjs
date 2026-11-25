@@ -15,10 +15,9 @@
 //   SW_SB_LOGS  a folder each server's output is written to as well, server-<port>.log
 // Stopped (Ctrl+C, or Playwright when the tests end), it stops them and
 // removes their spaces.
-// A SilverBullet that serves one folder as one space (`--single`, 2.12.1) is
-// started on the space; one that serves spaces of a data folder alone (after
-// 2.12.1) on a data folder beside it naming the space, at the root, written to,
-// no accounts (as SilverBullet's own `make edit-docs` does).
+// SilverBullet serves spaces of a data folder: each server is started on a data
+// folder beside its space naming it, at the root, written to, no accounts (as
+// SilverBullet's own `make edit-docs` does).
 import { execFile, execFileSync, spawn } from "node:child_process";
 import { createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -53,15 +52,11 @@ function silverbullet(args) {
     : execFileSync("docker", ["run", "--rm", "--entrypoint", "/silverbullet", image, ...args], { encoding: "utf8" });
 }
 out(`SilverBullet: ${binary ? "" : `${image}, `}${silverbullet(["--version"]).trim()}\n`);
-// SB-2.12-COMPAT: whether it serves one folder as one space (`--single`, 2.12.1: its help names it); after it, spaces of a
-// data folder alone. Once 2.12.1 is dropped: a data folder always, `single` and its branches go
-const single = /--single\b/.test(silverbullet(["--help"]));
-
 // The service worker off: no sync, every load and save goes straight to the
 // server, so each test's browser starts from the space as it is on disk.
 // The runtime API off: it needs a Chromium in the server, which the tests do not use (a server of a data folder
 // takes it from its server.json alone, off where it finds no Chromium, and warns of the variable: not given it).
-const env = { SB_DISABLE_SERVICE_WORKER: "1", ...(single ? { SB_RUNTIME_API: "0" } : {}) };
+const env = { SB_DISABLE_SERVICE_WORKER: "1" };
 const container = (port) => `silverware-ui-tests-${port}`;
 
 let stopping = false;
@@ -81,20 +76,18 @@ function start({ port, space }) {
   rmSync(space, { recursive: true, force: true });
   mkdirSync(space, { recursive: true });
   execFileSync(process.execPath, [join(import.meta.dirname, "deploy.mjs"), space], { stdio: "ignore" });
-  // SilverBullet loads CONFIG when it boots: missing, it is answered 404, which the page logs as an error.
-  // SB-2.12-COMPAT: CONFIG.md for SilverBullet 2.12.1; its edge (3.0) renames it to Library/Config.md as it starts (which
-  // configFile in silverbullet-servers.ts tells by). Once 2.12.1 is dropped: Library/Config.md written here
-  if (!existsSync(join(space, "CONFIG.md"))) writeFileSync(join(space, "CONFIG.md"), "");
+  // SilverBullet loads its configuration page as it boots: missing, it is answered 404, which the page logs as an error
+  const config = join(space, "Library", "Config.md");
+  mkdirSync(join(space, "Library"), { recursive: true });
+  if (!existsSync(config)) writeFileSync(config, "");
   // A data folder beside the space naming it, where SilverBullet serves spaces of one alone (the space's folder as the
   // server sees it: in Docker, mounted at /space)
   const root = `${space}.data`;
   rmSync(root, { recursive: true, force: true });
-  if (!single) dataFolder(root, binary ? space : "/space");
+  dataFolder(root, binary ? space : "/space");
   let server;
   if (binary) {
-    // --single: one folder as one space, without the setup wizard a fresh folder gets
-    const served = single ? [space, "--single"] : [root];
-    server = spawn(binary, [...served, "-p", String(port), "-L", "127.0.0.1"], { env: { ...process.env, ...env } });
+    server = spawn(binary, [root, "-p", String(port), "-L", "127.0.0.1"], { env: { ...process.env, ...env } });
   } else {
     execFileSync("docker", ["rm", "-f", container(port)], { stdio: "ignore" });
     const user = process.getuid ? ["-e", `PUID=${process.getuid()}`, "-e", `PGID=${process.getgid()}`] : [];
@@ -106,10 +99,10 @@ function start({ port, space }) {
     server = spawn("docker", [
       "run", "--rm", "--name", container(port),
       ...network,
-      ...(single ? ["-v", `${space}:/data`] : ["-v", `${root}:/data`, "-v", `${space}:/space`]),
+      "-v", `${root}:/data`, "-v", `${space}:/space`,
       ...Object.entries(env).flatMap(([key, value]) => ["-e", `${key}=${value}`]),
       ...user,
-      image, ...(single ? ["--single"] : []), ...listen,
+      image, ...listen,
     ]);
   }
   const log = logs ? createWriteStream(join(logs, `server-${port}.log`)) : undefined;

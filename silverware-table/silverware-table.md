@@ -164,7 +164,7 @@ export default () => [
 ];
 ```
 
-and in a `space-lua` block on a page under `Library/` (any page in SilverBullet 2.12 and before) (with a priority of its own, one below 50):
+and in a `space-lua` block on a page under `Library/` (with a priority of its own, one below 50):
 
 ```lua
 silverware.table.defineSeries(js.importFromSpace("Library/me/series.js"))
@@ -563,7 +563,7 @@ export default ({ toNumber, isError }) => [
 ];
 ```
 
-and in a `space-lua` block on a page under `Library/` (any page in SilverBullet 2.12 and before) (your configuration page, say; a block with a priority of its own must have one below 50, Silverware Table's own):
+and in a `space-lua` block on a page under `Library/` (your configuration page, say; a block with a priority of its own must have one below 50, Silverware Table's own):
 
 ```lua
 silverware.table.defineFunctions(js.importFromSpace("Library/me/functions.js"))
@@ -606,7 +606,7 @@ end)()}
 * `evaluateText`: one value as its text (`21`), several (a range, a column, an operator over one) joined by a comma: `Pear, Fig`. An error shows as its code, `#REF!`, written so that SilverBullet does not take it for a hashtag.
 * `evaluate`: one value as a number, `true` or `false`, or text (a date or a time as written: `2026-11-05`, `14:30`); an empty cell `nil`. A range (`fruit!B1:B3`, a column, an operator over one) is always a list, also of one value; an empty cell in it is `""`, and a cell with an error is `{ code = "#DIV/0!", detail = "…" }` in its place (a table, so `type(v) == "table"` tells it). An error of the whole formula gives `nil` and the error: `local value, err = silverware.table.evaluate("=nope!A1")`, then `err.code` is `#REF!` and `err.detail` says why.
 * It reads the page as it is now, and calculates the formulas it reaches anew; your own functions work too. Nothing is written. A script that has a page's text may give it: `silverware.table.evaluate(formula, text, page)` (and `evaluateText`) calculates on that text, as the page `page`.
-* A `${…}` showing it follows the tables: SilverBullet shows it anew when the page is edited (a cell changed in a table too) or another page it reads changes. (From SilverBullet's next release: 2.12.1 shows it anew when the page is opened again.)
+* A `${…}` showing it follows the tables: SilverBullet shows it anew when the page is edited (a cell changed in a table too) or another page it reads changes.
 * While you type the formula, names complete as in a cell: the functions (with their syntax and what they do), the page's named tables, and after `table!` that table's named cells.
 * Its references follow the tables as a cell's do: rename a column or the table, insert, move or delete rows and columns with Silverware Table, and the formula in the page's text is written anew with them, in the same edit (one Ctrl+Z undoes both). That holds for a formula written whole in one string, in quotes or apostrophes, without escapes (`\"`): one put together in Lua (`"=SUM(" .. name .. ")"`) is left as it is. Edits made in the markdown are not followed, as for tables.
 * It needs the formulas module (else `evaluateText` shows `#N/A`, and `evaluate` gives `nil` and the error `#N/A`), and `[[Page]]` references the pageLinks module (else they are not read).
@@ -781,7 +781,7 @@ export default ({ numberOf, notANumber, formatNumber, lineIcon }) => [
 ];
 ```
 
-and in a `space-lua` block on a page under `Library/` (any page in SilverBullet 2.12 and before) (with a priority of its own, one below 50):
+and in a `space-lua` block on a page under `Library/` (with a priority of its own, one below 50):
 
 ```lua
 silverware.table.defineTypes(js.importFromSpace("Library/me/types.js"))
@@ -879,7 +879,7 @@ Hover a cell to show two grips: ⠿ left of its row, and ⠿ above its column; m
 
 ### Custom menu entries
 
-Your own entries in a row's or a column's menu (or another plugin's) are written in JavaScript in a file of your space and given in a `space-lua` block on a page under `Library/` (any page in SilverBullet 2.12 and before):
+Your own entries in a row's or a column's menu (or another plugin's) are written in JavaScript in a file of your space and given in a `space-lua` block on a page under `Library/`:
 
 ```js
 // Library/me/menus.js
@@ -1033,7 +1033,7 @@ A rule as the table stores it (in its metadata row), here a column's rule colori
 
 ### Custom conditions and formats
 
-Your own conditions and formats are written in JavaScript in a file of your space, in the form the built-in ones are written in (each built-in one could be copied into your file as it is), and given in a `space-lua` block on a page under `Library/` (any page in SilverBullet 2.12 and before):
+Your own conditions and formats are written in JavaScript in a file of your space, in the form the built-in ones are written in (each built-in one could be copied into your file as it is), and given in a `space-lua` block on a page under `Library/`:
 
 ```js
 // Library/me/formats.js
@@ -1105,7 +1105,7 @@ A theme sets how tables look: their header, the lines between rows and columns, 
 
 ### Your own theme
 
-A theme is a `space-style` block on a page under `Library/` (any page in SilverBullet 2.12 and before); Silverware Table finds it there and offers it in the setting and in a table's menu by its name. Set the variables you want, in a block for the light look and one for the dark; any you leave out stay as SilverBullet has them:
+A theme is a `space-style` block on a page under `Library/`; Silverware Table finds it there and offers it in the setting and in a table's menu by its name. Set the variables you want, in a block for the light look and one for the dark; any you leave out stay as SilverBullet has them:
 
 ```css
 .sb-table-widget[data-swt-theme="sand"] {
@@ -1209,7 +1209,7 @@ Everything else works as in the page: editing, selecting, menus, formulas. A tab
 
 These settings are for every table in the space (a table's own sorting, filters, widths and names are in its menus).
 
-**Silverware Table settings** (*Silverware Table settings…* in a table's ⋯ menu, or the *Silverware Table: Settings* command) shows them all in one dialog: *General*, then the modules by kind (*Editing*, *Data*, *Look*, *View*, *Export*), each with its switch and its own settings under it. Nothing changes until *Save*: then they are written into SilverBullet's configuration, where the Configuration Manager keeps its settings (the managed block of your configuration page (`Library/Config`; `CONFIG` in SilverBullet 2.12 and before)), so both always show the same. Turning a module on or off saves and reloads the page (*Save and reload*), as modules start with Silverware Table. *Cancel* (or Esc) closes it unsaved.
+**Silverware Table settings** (*Silverware Table settings…* in a table's ⋯ menu, or the *Silverware Table: Settings* command) shows them all in one dialog: *General*, then the modules by kind (*Editing*, *Data*, *Look*, *View*, *Export*), each with its switch and its own settings under it. Nothing changes until *Save*: then they are written into SilverBullet's configuration, where the Configuration Manager keeps its settings (the managed block of your configuration page (`Library/Config`)), so both always show the same. Turning a module on or off saves and reloads the page (*Save and reload*), as modules start with Silverware Table. *Cancel* (or Esc) closes it unsaved.
 
 You can also open *Configuration: Open* (Ctrl+, / Cmd+,) and find the *Silverware Table* and *Silverware Table: Modules* categories, or set them in your configuration page. Settings of whole tables are `silverware.table.<setting>`, those of a part of Silverware Table `silverware.table.<part>.<setting>`, and those of a module (a part that can be turned off) `silverware.table.modules.<module>.<setting>`. A part is set in one go, with only what you change (the rest keeps its default):
 

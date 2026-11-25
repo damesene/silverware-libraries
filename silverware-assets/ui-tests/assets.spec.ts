@@ -717,7 +717,7 @@ test("a link's icon hidden in the settings: the small arrow after the link still
   await marker.click();
   await expect(showAs(page, "Full")).toBeVisible();
   expect(page.url()).toBe(url);
-  // Read again from CONFIG as the page loads anew (an empty list comes back from it as an empty table): still hidden
+  // Read again from Library/Config as the page loads anew (an empty list comes back from it as an empty table): still hidden
   await page.reload();
   await expect(link.locator(":scope > .swa-link-marker:last-child")).toBeVisible();
   await expect(link.locator(".swa-link-icon")).toHaveCount(0);
@@ -996,7 +996,7 @@ test("Download in a file's menu saves the file under its own name", async ({ pag
   expect(file.suggestedFilename()).toBe("archive.zip");
 });
 
-test("the settings: the previews' folder renamed, the previews kept moved into it, written in CONFIG; one SilverBullet cannot read refused", async ({ page, space }) => {
+test("the settings: the previews' folder renamed, the previews kept moved into it, written in Library/Config; one SilverBullet cannot read refused", async ({ page, space }) => {
   // (Written before the page is opened: SilverBullet lists the files it knows as it starts, as it knows those it writes)
   await space.writeKept("doc.pdf.1731500000000-9.webp", "kept");
   await space.open({ Page: `# Page\n\n![[${space.folder}/doc.pdf]]\n` }, "Page", { "doc.pdf": "%PDF-1.4\n" });

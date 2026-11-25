@@ -24,12 +24,10 @@ export type Bridge = {
   readonly getConfig?: (path: string, defaultValue: unknown) => unknown;
   // Optional, for the settings dialog: asks before closing it with changes (else the browser's confirm)
   readonly confirm?: (message: string) => boolean | Promise<boolean>;
-  // Optional, for the settings dialog: the CONFIG page read and saved (as SilverBullet's Configuration Manager saves it)
+  // Optional, for the settings dialog: the configuration page read and saved (as SilverBullet's Configuration Manager saves it)
   readonly readPage?: (name: string) => string | Promise<string>;
-  // The configuration page's name (Library/Config, or CONFIG before SilverBullet's tool pages), told by the init page
-  readonly configPage?: string;
   readonly saveConfigPage?: (text: string) => unknown;
-  // Optional: a store of its own instead of the CONFIG page (the playground's); values by path, undefined removes one
+  // Optional: a store of its own instead of the configuration page (the playground's); values by path, undefined removes one
   readonly saveSettings?: (values: Readonly<Record<string, unknown>>) => unknown;
   // Optional: the page loaded anew, as a module turned on or off and the key need (else the window reloaded)
   readonly reloadUI?: () => unknown;
@@ -76,7 +74,7 @@ export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
 export const DEFAULT_SHORTCUT = "Ctrl-Shift-q";
 
 
-// The toolbar's own block of the CONFIG page, for tables (the favourites): the Configuration Manager's block
+// The toolbar's own block of the configuration page, for tables (the favourites): the Configuration Manager's block
 // would lose them on its next save (shared/configpage.ts)
 export const OWN_MARKER = "-- managed-by: silverware-toolbar";
 

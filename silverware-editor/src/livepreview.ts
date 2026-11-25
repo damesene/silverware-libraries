@@ -190,8 +190,8 @@ export function linkAt(state: EditorState, tree: { resolveInner(at: number, side
 }
 
 /**
- * A list's marks and indent laid out in the page's columns, as SilverBullet's editor does (`--editor-column`, after
- * 2.12.1; else a character's width): each mark the columns its source takes, the space after it among them (a bullet's
+ * A list's marks and indent laid out in the page's columns, as SilverBullet's editor does (`--editor-column`; else,
+ * outside it, a character's width): each mark the columns its source takes, the space after it among them (a bullet's
  * `- ` 2, a number's `1. ` 3, a task's box `[ ] ` 4), an indent its own; a rendered list's of Silverware Layout's grid
  * the same
  */

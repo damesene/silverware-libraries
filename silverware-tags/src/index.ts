@@ -30,8 +30,8 @@ export async function init(bridge: Bridge): Promise<void> {
   const store: SettingsStore = {
     read: () => readSettings(bridge),
     canSave: !!bridge.saveConfigPage,
-    // In the Configuration Manager's block of CONFIG (it shows them, Ctrl-,), as the other plugins save theirs
-    save: (values) => saveConfigPage({ configPage: bridge.configPage, readPage: (name) => bridge.readPage(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values)),
+    // In the Configuration Manager's block of Library/Config (it shows them, Ctrl-,), as the other plugins save theirs
+    save: (values) => saveConfigPage({ readPage: (name) => bridge.readPage(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values)),
     reload: async () => {
       if (bridge.reloadUI) await bridge.reloadUI();
       else globalThis.location?.reload();
@@ -39,18 +39,18 @@ export async function init(bridge: Bridge): Promise<void> {
     confirm: async (question) => (bridge.confirm ? !!(await bridge.confirm(question)) : globalThis.confirm(question)),
     flash: (message, type) => notifier.flash(message, type),
   };
-  await start(space, silverBulletPlatform(bridge), notifier, await readSettings(bridge), store, bridge.toolPagesByPlace === true);
+  await start(space, silverBulletPlatform(bridge), notifier, await readSettings(bridge), store);
 }
 
 /**
  * The core and the modules on, over a space (SilverBullet's, or the playground's); the settings dialog where a store is
- * given; `toolPagesByPlace`: SilverBullet's own pages told by their place, not by a meta tag (isSilverBulletPage)
+ * given
  */
-export async function start(space: Space, platform: WritingPlatform, notifier: Notifier, settings: Settings, store?: SettingsStore, toolPagesByPlace = false): Promise<Controller> {
+export async function start(space: Space, platform: WritingPlatform, notifier: Notifier, settings: Settings, store?: SettingsStore): Promise<Controller> {
   // The layers its style page lays its elements in (shared/layers.ts)
   applyLayers(document);
   const dialog = store ? new SettingsDialog(document, store) : undefined;
-  const controller = new Controller(document, space, platform, notifier, { protectMeta: settings.protectMeta, newTagsForm: settings.newTagsForm, toolPagesByPlace, settings: dialog ? () => dialog.open() : undefined });
+  const controller = new Controller(document, space, platform, notifier, { protectMeta: settings.protectMeta, newTagsForm: settings.newTagsForm, settings: dialog ? () => dialog.open() : undefined });
   setNewTagsForm(settings.newTagsForm);
   controller.setModules(createModules(settings, (name) => controller.hostFor(name)));
   slot[GLOBAL_KEY] = controller;

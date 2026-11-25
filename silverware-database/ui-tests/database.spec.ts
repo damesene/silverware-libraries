@@ -1,4 +1,4 @@
-import { embedOf, expectWidgetMenuKept, onSilverBulletEdge } from "../../scripts/silverbullet-widgetmenu.ts";
+import { embedOf, expectWidgetMenuKept } from "../../scripts/silverbullet-widgetmenu.ts";
 import { boxOf, caretAtEnd, editorText, expect, fieldReady, fieldText, item, root, runCommand, test, waitForIndex } from "./helpers.ts";
 
 // (The test's own view named: the built-in ones come first in the switcher)
@@ -246,7 +246,7 @@ ${BLOCK}`, ...TASKS }, "Page");
   await pickView(page, "List");
   await expect.poll(() => space.saved("Page")).toContain("view: list");
   await expect(page.locator(".swd-place")).toHaveCount(1);
-  for (const control of await page.locator(".swd-widget .button-bar button, .swd-widget .sb-widget-menu-bar button, .sb-code-copy-button").all()) await expect(control).toBeHidden();
+  for (const control of await page.locator(".swd-widget .sb-widget-menu-bar button, .sb-code-copy-button").all()) await expect(control).toBeHidden();
 });
 
 test("a press beside the block, on its lines, does not show its markdown", async ({ page, space }) => {
@@ -684,18 +684,15 @@ test("a block in a list item is not written, said why, the page as it was", asyn
   expect(await space.saved("Page")).toBe(listed);
 });
 
-// SilverBullet 2.12.1 renders blocks written alike on a page as one element: its widget cache shares a widget's result by
-// its language, page and text (client/codemirror/fenced_code.ts cacheKey, client/widget_cache.ts prewarmResult, since
-// its commit 1dd7556f of 2026-10-10), so only one of them is in the page. Which block a pick is written into is covered
-// by index.test.ts; this waits for a SilverBullet that renders each block apart, or for places drawn from HTML text
-test.fixme("of two blocks written alike, the one a view is picked in is written", async ({ page, space }) => {
+// SilverBullet 3.0 renders blocks written alike on a page apart (its widget cache keys each occurrence on its own)
+test("of two blocks written alike, the one a view is picked in is written", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${BLOCK}\ntext between\n\n${BLOCK}`, ...TASKS }, "Page");
   await expect(page.locator(".swd-place")).toHaveCount(2);
   await pickView(page, "Count", page.locator(".swd-place").nth(1));
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n${BLOCK}\ntext between\n\n\`\`\`silverware-database\nid: tasks\nview: count\n\`\`\`\n`);
 });
 
-test("the settings turn a view off: saved in CONFIG, the picker without it at once", async ({ page, space }) => {
+test("the settings turn a view off: saved in Library/Config, the picker without it at once", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${BLOCK}`, ...TASKS }, "Page");
   await page.locator(".swd-view-picker").click();
   await expect(page.locator(".swd-menu .swd-menu-item")).toHaveCount(7);
@@ -1039,7 +1036,7 @@ test("system properties added in Properties show the pages' dates, the order by 
   await expect(page.locator(".swd-table tbody tr", { hasText: "Write docs" }).locator('[data-key="task_progress"]')).toHaveText("100%");
 });
 
-test("the peek is 600px wide by default, its left edge dragged setting its width in CONFIG, for every database", async ({ page, space }) => {
+test("the peek is 600px wide by default, its left edge dragged setting its width in Library/Config, for every database", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS }, "Page");
   await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
   const peek = page.locator(".swd-peek");
@@ -1830,6 +1827,8 @@ test("a person shows as a mention, kept by the name alone, picked from its peopl
   await field.fill("zoe");
   await field.press("Enter");
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("owner: zoe\n");
+  // (The place drawn with it first: a press on the cell before that opened an editor its drawing anew took away)
+  await expect(cell(1).locator(".swd-pill")).toHaveText("@zoe");
   // A name clicked in the list: written, the editor closed, not opened anew by the click
   await cell(1).click();
   await page.locator(".swd-suggest.swd-floated .swd-suggest-item", { hasText: "ada" }).click();
@@ -1858,7 +1857,6 @@ test("a person pressed opens SilverBullet's Mention Inbox on that name, editing 
 });
 
 test("SilverBullet's ⋮ beside a widget (its edge): kept from a database's place, shown beside a widget not ours (shared/silverbullet/widgetmenu.ts)", async ({ page, space }) => {
-  test.skip(!onSilverBulletEdge, "the ⋮ beside a widget is SilverBullet's edge's (after 2.12.1)");
   await space.open({ Page: `# Page\n\n${embedOf(`${space.folder}/Other`)}\n\nBetween\n\n${BLOCK}`, Other: "# Other\n\nEmbedded.\n", ...TASKS }, "Page");
   await expectWidgetMenuKept(page, page.locator("#sb-main [data-sb-widget-menu]").first(), "Embed", page.locator(".swd-place").first());
 });

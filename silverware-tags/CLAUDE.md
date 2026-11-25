@@ -18,12 +18,12 @@ A manager of the space's tags (prefix `swg-`, settings and API under `silverware
 
 ## Meta pages
 
-- `silverware.tags.protectMeta` (on by default, decided 2026-10-31): a meta page (under `Library/`, SilverBullet's tool page from its 3.0, or with an own tag `meta` or under it, as 2.12.1 tells them: `isSilverBulletPage` in shared/pages/tags/names.ts; docs/silverware-sb-edge.md) is out of the catalog (`catalogOf`'s `hideMeta`), and the plan's `Guard` (core/plan.ts, the writer's `leaveAlone`) leaves one alone as read, since the index may lag. So renaming `#auto` skips meta pages.
-- Off: meta tags are shown apart, as SilverBullet's own tree does (its 2.12.1 segments: All and Pages without meta pages, Meta with them alone): panel segments All, Page tags, Tasks without them and Meta; the window's Tags | Meta; By page without meta pages.
+- `silverware.tags.protectMeta` (on by default, decided 2026-10-31; shown as *Hide and protect library pages* from 2026-11-25): a library page (under `Library/`: `isToolPage` in shared/pages/tags/names.ts) is out of the catalog (`catalogOf`'s `hideMeta`), and the controller's `Guard` (core/plan.ts, the writer's `leaveAlone`) leaves one alone by its name. So renaming `#auto` skips library pages. The tags `meta` and under it (`isMetaTag`: what SilverBullet tells templates and libraries by) are left out of the window's view and the panel too, on whatever page.
+- Off: meta tags are shown apart: panel segments All, Page tags, Tasks without them and Meta; the window's Tags | Meta; By page without library pages.
 
 ## Gotchas
 
-- **Table rows' and headings' hashtags are in no `tag` object** (`plugs/index/tags.ts` takes paragraphs, items and tasks only): the init page also reads `index.tag "table"` and `index.tag "header"` and their `tags`, else a rename missed them.
+- **Table rows' hashtags are in no `tag` object** (SilverBullet 3.0 makes them of paragraphs, items, tasks and headings, probed 2026-11-25): the init page also reads `index.tag "table"` and its rows' `tags`, else a rename missed them.
 - **Hashtags are found in the blocks lezer's parser reads** (shared/pages/tags/scan.ts on shared/markdown/parse.ts, since 2026-11-11), so the bundle carries lezer (about 60 kB). A difference from what SilverBullet finds is a bug of `parse.ts` (its blocks) or `inline.ts` (a line's marks), not of the scanner: fix it there, with a test.
 - Page tags are written into the frontmatter in the page's own form (a list of dash lines stays one, `a, b` a string); a page whose tags cannot be read safely is left alone and said in the review.
 - F2 in the panel: the navigator focuses its own filter field after the key is handled, so the window takes the focus back for a moment (`keepFocus` in ui/workspace.ts).

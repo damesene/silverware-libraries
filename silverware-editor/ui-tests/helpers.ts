@@ -2,7 +2,7 @@
 // What Silverware Editor's interaction tests share. Its editor is no surface of its own: it is used in Silverware
 // Layout's grid cells and Silverware Database's peek, so these tests run against a real SilverBullet only (npm run
 // test:ui:sb, every plugin deployed in the test servers' spaces) and are skipped on the playground. A test's pages are
-// written into its worker's space (UiEditor/<test>/<name>), the first opened, and removed after; CONFIG is put back as
+// written into its worker's space (UiEditor/<test>/<name>), the first opened, and removed after; Library/Config is put back as
 // it was.
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -81,7 +81,7 @@ export const test = base.extend<{ space: Space }>({
       },
       goTo,
     });
-    // (The page closed first: an open client would take CONFIG written under it for a change of its own)
+    // (The page closed first: an open client would take Library/Config written under it for a change of its own)
     await page.close();
     await rm(join(server().space, folder), { recursive: true, force: true });
     // (Previews Silverware Assets kept of its files: silverware-assets/src/core/stored.ts)

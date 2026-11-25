@@ -73,7 +73,6 @@ describe("A plugin's settings in the configuration page", () => {
     expect(withConfigSettings(next, { "silverware.toolbar.favorites": undefined }, own)).toBe(`${page}\n`);
   });
 
-  // SB-2.12-COMPAT: the default page, CONFIG, where the init page names none
   it("saves into the page read (none yet: made), writing nothing when it cannot be read or has a sync conflict", async () => {
     const saved: string[] = [];
     const access = (read: () => string | undefined) => ({ readPage: (name: string) => (expect(name).toBe(CONFIG_PAGE), read()), saveConfigPage: (text: string) => void saved.push(text) });
@@ -85,17 +84,11 @@ describe("A plugin's settings in the configuration page", () => {
     expect(saved).toHaveLength(2);
   });
 
-  it("reads the page the init page names (Library/Config where SilverBullet keeps it there), saying its name in a conflict", async () => {
+  it("reads Library/Config, where SilverBullet keeps the configuration, saying its name in a conflict", async () => {
     const read: string[] = [];
-    const saved: string[] = [];
-    const access = (text: string) => ({
-      configPage: "Library/Config",
-      readPage: (name: string) => (read.push(name), text),
-      saveConfigPage: (next: string) => void saved.push(next),
-    });
-    await saveConfigPage(access("Intro\n"), (text) => `${text}more\n`);
+    const access = (text: string) => ({ readPage: (name: string) => (read.push(name), text), saveConfigPage: () => undefined });
+    await saveConfigPage(access("Intro\n"), (text) => text);
     expect(read).toEqual(["Library/Config"]);
-    expect(saved).toEqual(["Intro\nmore\n"]);
     await expect(saveConfigPage(access("<<<<<<< SB sha256:1\nx\n"), (t) => t)).rejects.toThrow("the Library/Config page has a sync conflict");
   });
 });

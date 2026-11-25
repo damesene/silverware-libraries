@@ -24,11 +24,7 @@ export type Bridge = {
   // Optional, for a value asked (a grid's min width in px): SilverBullet's prompt, `value` its field's text; none where
   // it is cancelled (`editor.prompt`)
   readonly prompt?: (message: string, value: string) => string | undefined | null | Promise<string | undefined | null>;
-  // The configuration page's name (Library/Config, or CONFIG before SilverBullet's tool pages), told by the init page
-  readonly configPage?: string;
-  // Whether SilverBullet takes an Alt+press in a widget before what is in it (after 2.12.1), told by the init page
-  readonly widgetTakesAltPress?: boolean;
-  // Optional, for the dialog's default text width: the CONFIG page saved as SilverBullet's Configuration Manager saves
+  // Optional, for the dialog's default text width: the configuration page saved as SilverBullet's Configuration Manager saves
   // it, the configuration loaded again (readPage reads it)
   readonly saveConfigPage?: (text: string) => unknown;
   // Optional, for the grids: markdown rendered to HTML as SilverBullet renders a page, its embeds expanded, each

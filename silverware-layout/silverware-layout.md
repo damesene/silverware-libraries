@@ -129,7 +129,7 @@ What you should know:
 
 Both settings below change how SilverBullet itself behaves; turn one off to get SilverBullet's own behaviour back. They are in the **Markdown** tab of **Silverware Layout: Settings**.
 
-**Links shown as markdown** (the cursor in a link, so you see its `[[`, `]]` or `](…)`, and every link in the plain markdown view): SilverBullet opens such a link on a click too, which makes it hard to edit. With *A click only places the cursor; Ctrl+click opens the link* on, a click places the cursor there and Ctrl+click opens it; off, a click opens it. A link drawn as a link opens on a click as ever (or `silverware.layout.links.clickPlacesCursor` in your configuration page (`Library/Config`; `CONFIG` in SilverBullet 2.12 and before)).
+**Links shown as markdown** (the cursor in a link, so you see its `[[`, `]]` or `](…)`, and every link in the plain markdown view): SilverBullet opens such a link on a click too, which makes it hard to edit. With *A click only places the cursor; Ctrl+click opens the link* on, a click places the cursor there and Ctrl+click opens it; off, a click opens it. A link drawn as a link opens on a click as ever (or `silverware.layout.links.clickPlacesCursor` in your configuration page (`Library/Config`)).
 
 **Plain markdown view** (SilverBullet shows a page as plain markdown, without formatting: *Editor: Toggle Markdown Syntax Rendering*): SilverBullet still draws grids there, under their markdown. With *Hide grids in this view* on, `<grid>` and `<cell>` stay plain text, like the rest of the page; off, the grid is drawn under its markdown (or `silverware.layout.syntaxMode.hideGrids` in your configuration page).
 

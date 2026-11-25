@@ -38,7 +38,7 @@ export async function init(bridge: Bridge): Promise<void> {
   // (A switch being written: the configuration read may not have it yet, the switch's toolbars count)
   const settings = pendingSwitch ? { ...read, toolbars: pendingSwitch } : read;
   const running = slot[GLOBAL_KEY];
-  // SilverBullet loads its configuration again (CONFIG saved) and hands a new bridge over: with the same settings
+  // SilverBullet loads its configuration again (Library/Config saved) and hands a new bridge over: with the same settings
   // the toolbar as it is takes it, a popup open staying open
   if (running && current && sameSettings(running, settings)) {
     running.bridge = bridge;
@@ -117,7 +117,7 @@ function queued<T>(write: () => Promise<T>): Promise<T> {
   return done;
 }
 
-// The migrated settings being written (init may be called again meanwhile: Space Lua loaded twice, CONFIG saved)
+// The migrated settings being written (init may be called again meanwhile: Space Lua loaded twice, Library/Config saved)
 let migrating = false;
 
 /**
@@ -130,7 +130,7 @@ async function writeMigrated(bridge: Bridge, values: Readonly<Record<string, unk
   migrating = true;
   try {
     await queued(() => saveSettings(bridge, values));
-    void bridge.flash(`Silverware Toolbar: your settings were updated to its version ${String(values[PATHS.version])} (CONFIG)`, "info");
+    void bridge.flash(`Silverware Toolbar: your settings were updated to its version ${String(values[PATHS.version])} (Library/Config)`, "info");
   } catch (e) {
     console.error("Silverware Toolbar: the settings migrated could not be written", e);
   } finally {
@@ -143,7 +143,7 @@ function touchScreen(): boolean {
   return !!globalThis.matchMedia?.("(pointer: coarse)").matches || (globalThis.navigator?.maxTouchPoints ?? 0) > 0;
 }
 
-/** Whether settings can be saved through the bridge (the CONFIG page, or a store of its own) */
+/** Whether settings can be saved through the bridge (the configuration page, or a store of its own) */
 function canSaveIn(bridge: Bridge): boolean {
   return !!bridge.saveSettings || (!!bridge.readPage && !!bridge.saveConfigPage);
 }
@@ -197,7 +197,7 @@ export async function openSettings(): Promise<void> {
 }
 
 /**
- * Settings saved where SilverBullet keeps them: the CONFIG page, values in the
+ * Settings saved where SilverBullet keeps them: the configuration page, values in the
  * Configuration Manager's block (it shows them, Ctrl-,), the favourites in the
  * toolbar's own; or the bridge's own store (the playground's)
  */
@@ -213,7 +213,7 @@ async function saveSettings(bridge: Bridge, values: Readonly<Record<string, unkn
   const gone = Object.fromEntries(Object.entries(values).filter(([, value]) => value === undefined));
   const tables = { ...gone, ...(PATHS.favorites in values ? { [PATHS.favorites]: favorites } : {}) };
   await saveConfigPage(
-    { configPage: bridge.configPage, readPage: (name) => bridge.readPage!(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) },
+    { readPage: (name) => bridge.readPage!(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) },
     (text) => withConfigSettings(withConfigSettings(text, scalars), tables, OWN_MARKER),
   );
 }

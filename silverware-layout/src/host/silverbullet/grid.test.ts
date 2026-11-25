@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 // SilverBullet's side of a grid: a cell rendered and written through what the init page hands over, the cursor moved,
-// and the frame's button bar as SilverBullet 2.12.1 draws a custom syntax's widget (seen in the probe of 2026-11-13:
-// .sb-lua-directive-block, a .button-bar of Reload, Copy, Edit in it) hidden.
+// and the frame's widget menu (.sb-lua-directive-block, a .sb-widget-menu-bar of Reload, Copy, Edit in it) hidden.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { pageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
@@ -50,11 +49,11 @@ describe("SilverBullet's grid host", () => {
   it("hides the frame's button bar once the grid is in the page", async () => {
     const frame = document.createElement("div");
     frame.className = "sb-lua-directive-block swl-grid-widget";
-    const bar = Object.assign(document.createElement("div"), { className: "button-bar" });
+    const bar = Object.assign(document.createElement("div"), { className: "sb-widget-menu-bar" });
     const grid = document.createElement("div");
     bridgeOf("").host.settle(grid);
     // In the page a frame later, as SilverBullet puts a widget's content in after its renderer returns: its bar in a
-    // div of the frame, beside the content (2.12.1)
+    // div of the frame, beside the content
     const inner = document.createElement("div");
     const content = Object.assign(document.createElement("div"), { className: "content" });
     content.append(grid);

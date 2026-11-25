@@ -533,7 +533,7 @@ test("a grid aligned right from its handle's menu: written as its attribute, at 
   await expect.poll(() => space.saved("Page")).toContain('<grid width="460">');
 });
 
-test("the settings dialog's Alignment tab: every grid at the right where it says nothing itself, saved in CONFIG; its own from its menu wins", async ({ page, space }) => {
+test("the settings dialog's Alignment tab: every grid at the right where it says nothing itself, saved in Library/Config; its own from its menu wins", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\nAbove\n\n${GRID.replace("<grid>", '<grid width="400">')}\nBelow\n` }, "Page");
   await gridsDrawn(page);
   const grid = page.locator("#sb-main .swl-grid");
@@ -1275,7 +1275,7 @@ test("SilverBullet's button bar of a grid's frame stays hidden as the pointer is
   await space.open({ Page: `# Page\n\n${GRID}` }, "Page");
   await gridsDrawn(page);
   await page.locator("#sb-main .swl-grid-cell").first().hover();
-  await expect(page.locator("#sb-main .swl-grid-widget :is(.button-bar, .sb-widget-menu-bar)")).toBeHidden();
+  await expect(page.locator("#sb-main .swl-grid-widget .sb-widget-menu-bar")).toBeHidden();
 });
 
 test("a click on a word of a cell edits it with the cursor in that word", async ({ page, space }) => {
@@ -1338,7 +1338,7 @@ test("a selection by a drag carried into the field to the character: the user's 
     [5, 7], // "is"
     [8, text.length], // "my note!"
   ] as const) {
-    // (SilverBullet may draw the page anew as another test's CONFIG is put back: the grid drawn again first)
+    // (SilverBullet may draw the page anew as another test's Library/Config is put back: the grid drawn again first)
     await gridsDrawn(page);
     const a = await at(from);
     const b = await at(to);
@@ -1362,7 +1362,7 @@ test("a cell left by Esc, then a drag in a cell: the grid stays drawn, the field
   await expect.poll(async () => (await fieldState(page)).focused).toBe(true);
   await page.keyboard.press("Escape");
   await expect(field).toHaveCount(0);
-  // (SilverBullet may draw the page anew as another test's CONFIG is put back: the grid drawn again first)
+  // (SilverBullet may draw the page anew as another test's Library/Config is put back: the grid drawn again first)
   await gridsDrawn(page);
   const words = page.locator("#sb-main .swl-grid-cell").nth(1).getByText("Right text");
   const box = await boxOf(words);

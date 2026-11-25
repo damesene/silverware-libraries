@@ -8,7 +8,7 @@ export type Bridge = {
   readonly replaceRange: (from: number, to: number, text: string) => unknown;
   readonly moveCursor: (pos: number, center?: boolean) => unknown;
   readonly getCurrentPage: () => string | Promise<string>;
-  // `timeout` 0: shown until closed (SilverBullet's main; a release before it closes it as any other)
+  // `timeout` 0: shown until closed
   readonly flash: (message: string, type?: "info" | "error", options?: { readonly timeout?: number }) => unknown;
   // Optional: without it, settings keep their defaults
   readonly getConfig?: (path: string, defaultValue: unknown) => unknown;
@@ -28,10 +28,8 @@ export type Bridge = {
   readonly listPages?: () => unknown;
   // Optional: writes a page's markdown (with readPage), e.g. edits held for a page no longer in the editor
   readonly writePage?: (name: string, text: string) => unknown;
-  // The configuration page's name (Library/Config, or CONFIG before SilverBullet's tool pages), told by the init page
-  readonly configPage?: string;
   // Optional, for the settings dialog: writes the space's configuration page
-  // (CONFIG) and loads the configuration again (as SilverBullet's
+  // (Library/Config) and loads the configuration again (as SilverBullet's
   // Configuration Manager does); with readPage. Without it (and without
   // saveSettings) the dialog only shows the settings.
   readonly saveConfigPage?: (text: string) => unknown;

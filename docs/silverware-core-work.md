@@ -94,10 +94,15 @@ Estimates are rough; checkpoints correct them. About 5 to 6 months in all.
   goes: docs/silverware-core.md, *Where code goes*), its table, the prefix
   `swk-`, the scope `core`; shared/modulestate.test.ts with today's state
   listed (what moves to the core listed as "until step N", each entry leaving
-  the list as its step moves it), the constants typed readonly.
+  the list as its step moves it), the constants typed readonly; the core's own
+  layers (host-free `src/`, `src/host/silverbullet/`) and its isolation test;
+  scripts/hostisolation.test.ts (docs/silverware-core.md, *SilverBullet kept
+  apart*) with today's leaks listed, each with the step that moves it
+  (step 4 for the plugins' entries and shared/configpage.ts).
 - **Not in it**: any service. The core only loads and says its version.
 - **Done when**: the module-state test fails on a new `let` at a shared/
-  file's top level (its own unit test) and passes on today's listed state;
+  file's top level and the host test on a new `.sb-` selector outside a
+  binding (their own unit tests), both passing on today's listed state;
   every plugin starts through the gate on the UI test servers;
   UI tests: no core, an older core (each: the notification, no plugin start,
   the API stubs' message); unit tests of the gate's script; verify green.
@@ -130,13 +135,19 @@ Estimates are rough; checkpoints correct them. About 5 to 6 months in all.
   test of a value made by one plugin read by the other); a user with only
   Silverware Toolbar loads no formulas' file (UI test of requests).
 
-### 4. SilverBullet bridge and events (1 to 2 weeks)
+### 4. SilverBullet bridge and events, every plugin's binding (2 to 3 weeks)
 
 - **Scope**: the core's API page hands SilverBullet's API once (`Platform` and
   the functions beyond it); the core's Lua listens to the shared events; each
   plugin's Lua and `host/silverbullet/` slimmed to what is its own (I1);
-  SilverBullet's widget menu taken off by one watcher.
-- **Done when**: no plugin's Lua hands a function the core hands; every
+  SilverBullet's widget menu taken off by one watcher. Every plugin gets its
+  `src/host/silverbullet/`: what Chart, Toolbar, Tags, Icons, Editor and the
+  viewers keep of SilverBullet in their entry files (and Tags'
+  `space/silverbullet.ts`) moves there, the entry only composing; the leaks
+  of *SilverBullet kept apart* move into bindings; shared/configpage.ts into
+  shared/silverbullet/.
+- **Done when**: no plugin's Lua hands a function the core hands; the host
+  test's list holds no plugin entry, leak or shared/ file any more; every
   plugin's UI tests green, on `test:ui:sb` and `test:ui:sb:edge` too.
 
 ### 5. Geometry and editing surfaces (1 week)
@@ -201,7 +212,9 @@ Estimates are rough; checkpoints correct them. About 5 to 6 months in all.
 
 - **Scope**: CLAUDE.md files say what the code now is (the plans' content that
   became code moves there, as each CLAUDE.md says what is, not what is to be
-  built); shared/ modules left unused removed; docs/ui-without-framework.md
+  built); shared/ modules left unused removed; the lists of the module-state
+  and host tests hold only what is each plugin's own by design;
+  docs/ui-without-framework.md
   marked replaced; the releases drafted (docs/silverware-core.md, *Releases*)
   and proposed to the user.
 

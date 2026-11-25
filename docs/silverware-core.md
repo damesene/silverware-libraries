@@ -200,6 +200,67 @@ shared/ today (2026-11-25), by that rule:
   silverbullet/editorsample.ts `EM`, pages/parts.ts `BODY`, table/model.ts
   `NO_ATTRIBUTES`.
 
+## SilverBullet kept apart
+
+SilverBullet is the host, one of possible hosts: what knows it is a binding,
+in one place per plugin and one in the core, never spread through them. The
+core concentrates it: one binding of SilverBullet's API (B) instead of one
+per plugin, so a host of another kind would need one binding and each
+plugin's few own pieces.
+
+- **What "knows SilverBullet" means**: its API and Lua (syscalls,
+  `js.importFromSpace`, `posAtDOM`, events, Space Lua's reload), its DOM
+  (`.sb-*` classes, its navigator, widget menu, modal and notifications), its
+  index's names and its pages' places (`Library/`, `Library/Config`, the index
+  queue). Markdown is not SilverBullet's (*Storage*); CodeMirror is the
+  editor's, met by Silverware Editor and Layout as today.
+- **The core's own layers**: `silverware-core/src/` holds what is host-free
+  (the stack, the registry, signals, the formulas, the geometry's and the
+  surfaces' interfaces) and `src/host/silverbullet/` the binding (the Lua
+  bridge, events, SilverBullet's panels as geometry, its widget menu, the
+  look's sample, the settled index). The core's public API names no
+  SilverBullet concept; its isolation test keeps the layers, as Silverware
+  Database's does (src/isolation.test.ts).
+- **Each plugin**: `src/host/silverbullet/` its binding (Silverware Assets,
+  Database, Layout and Table have one today; Chart, Toolbar, Tags, Icons,
+  Editor and the viewers keep SilverBullet in their entry files, `index.ts`,
+  `bridge.ts`, `dom.ts`, and Tags in `space/silverbullet.ts`). The entry
+  composes the binding with the rest and holds no SilverBullet code itself.
+  Leaks today, to move into bindings: the peek's `NOT_BESIDE` with
+  SilverBullet's classes (Database, modules/peek/panel.ts), the toolbar's
+  commands module (modules/commands.ts), the table's and toolbar's `dom.ts`.
+- **shared/**: what knows SilverBullet is in shared/silverbullet/ only, imported
+  by bindings only; shared/configpage.ts (`Library/Config`) moves there. Most of
+  shared/silverbullet/ moves into the core's binding with its service
+  (navpanels, widgetmenu, editorsample, platform, position).
+- **The test** (scripts/hostisolation.test.ts, in `verify`): every plugin's and
+  the core's src/ outside `host/`, entry files included, and shared/ outside
+  shared/silverbullet/, read for SilverBullet's markers
+  (imports of shared/silverbullet/ or of a `host/silverbullet/`, `.sb-`
+  selectors, `Library/`, `js.importFromSpace`, `posAtDOM`, its event names);
+  each hit fails it unless the test's list names it, the list naming today's
+  leaks with the step that moves each (docs/silverware-core-work.md) and empty
+  at the end. Comments saying what SilverBullet does (the markdown read "as
+  SilverBullet's parser does") are no hit: the test reads code, not comments.
+
+## Storage
+
+Nothing in these plans changes how data is kept. Markdown is the format;
+the stores are the abstraction, as today:
+
+- Silverware Database's store (`DatabaseStore`, src/store/: the pages store and
+  the memory store, both passing src/store/contract.ts), its items opaque
+  `ItemKey`s.
+- Silverware Table's markdown store over the table model (shared/table/).
+- The page writer (shared/pages/), the one place writing a page's text.
+- The formulas read through `TableSource` and `FormulaCells` (shared/formulas/),
+  never a store or a page: moving them into the core takes no knowledge of
+  storage with them.
+
+The core holds no storage: its index (H) is the binding's reading of
+SilverBullet's index, handed to the stores through the `Index` of
+`Platform` as today.
+
 ## Services
 
 What goes into the core, each a service the plugins call in TypeScript.
@@ -430,6 +491,10 @@ Weighed for what they bring; each changes only with the step that needs it.
   goes*). The measure of the plan is the cleanest code to maintain at its end,
   not how soon Preact comes: the services stay as planned, the formulas'
   engine in the core.
+- 2026-11-25: SilverBullet is a host kept apart: its knowledge in bindings
+  (`host/silverbullet/` of each plugin and of the core, shared/silverbullet/),
+  checked by a test of markers; the core is host-free outside its binding.
+  Storage stays as it is: markdown the format, the stores the abstraction.
 - 2026-11-25: Safari is not tested; it is met when a user reports a problem.
 - 2026-11-25: custom views stay framework-free (only DOM and callbacks cross
   their contract).

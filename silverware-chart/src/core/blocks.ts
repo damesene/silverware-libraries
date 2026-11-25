@@ -41,7 +41,17 @@ export function blocksOf(text: string): Block[] {
   return blocks;
 }
 
+/** The blocks of that language and text, in order (several where the page has it written alike) */
+export function blocksAlike(text: string, language: string, body: string): Block[] {
+  return blocksOf(text).filter((block) => block.language === language && sameBody(block.body, body));
+}
+
+/** Whether two blocks' texts are the same (line ends of either kind alike) */
+export function sameBody(a: string, b: string): boolean {
+  return a.replace(/\r/g, "") === b.replace(/\r/g, "");
+}
+
 /** The block of that language and text (the first where several are the same), if the text has it */
 export function blockOf(text: string, language: string, body: string): Block | undefined {
-  return blocksOf(text).find((block) => block.language === language && block.body.replace(/\r/g, "") === body.replace(/\r/g, ""));
+  return blocksAlike(text, language, body)[0];
 }

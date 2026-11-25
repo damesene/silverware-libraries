@@ -7,6 +7,7 @@ import { tablesOf } from "../sources/markdown.ts";
 import type { Controller } from "./controller.ts";
 import type { NamedTable, TableApi, TextEdit, WriteContext, WrittenTable } from "./module.ts";
 import type { ChartConfig } from "./type.ts";
+import type { LayoutProvider } from "../../../shared/layout.ts";
 
 // Chart.js stood in for: what it was made with, and each update
 type Made = { canvas: HTMLCanvasElement; config: ChartConfig; updates: number; destroyed: boolean; data: unknown };
@@ -135,6 +136,60 @@ describe("the core", () => {
     await vi.advanceTimersByTimeAsync(200);
     expect(made[2]?.updates).toBe(1);
     shown!.remove();
+  });
+
+  it("two charts written alike: each written as its own block by its place among them, none guessed where one is out of the page", async () => {
+    const block = 'pie title Pets\n  "Dogs" : 3\n  "Cats" : 1';
+    const text = `# Pets\n\n\`\`\`mermaid\n${block}\n\`\`\`\n\nBetween\n\n\`\`\`mermaid\n${block}\n\`\`\`\n`;
+    let provider: LayoutProvider | undefined;
+    const core = start(
+      document,
+      { modules: new Set(MODULE_NAMES), height: "300px" },
+      {
+        getText: async () => text,
+        getCurrentPage: async () => "Pets",
+        readPage: async () => text,
+        replaceRange: async (from, to, inserted) => void writes.push({ from, to, text: inserted }),
+        loadChart: async () => FakeChart as never,
+        layout: { register: (one: LayoutProvider) => void (provider = one) } as never,
+      },
+    );
+    const widgets = await Promise.all(
+      [0, 1].map(async () => {
+        const widget = document.body.appendChild(document.createElement("div"));
+        widget.className = "swc-widget";
+        widget.append((await core.render("mermaid", block, "Pets"))!);
+        return widget;
+      }),
+    );
+    expect(await provider!.write(widgets[1]!, { width: "900" })).toBeUndefined();
+    const second = text.lastIndexOf("```mermaid\n") + "```mermaid\n".length;
+    expect(writes.at(-1)).toMatchObject({ from: second });
+    expect(writes.at(-1)?.text).toContain("%% layout.width: 900");
+    // The first out of the page (CodeMirror keeps it out, far above): which one the second is cannot be told
+    widgets[0]!.remove();
+    const count = writes.length;
+    expect(await provider!.write(widgets[1]!, { width: "900" })).toContain("written the same as another");
+    expect(writes).toHaveLength(count);
+  });
+
+  it("two charts written alike, each under a table of its own: each draws its own table's once it is in the page", async () => {
+    const block = chart("above");
+    const other = SALES.replace("| 120 |", "| 7 |").replace("| 140 |", "| 9 |").replace("'sales'", "'other'");
+    const text = `# Sales\n\n${SALES}\n\n\`\`\`mermaid\n${block}\n\`\`\`\n\n${other}\n\n\`\`\`mermaid\n${block}\n\`\`\`\n`;
+    const core = controller(text);
+    const boxes = [(await core.render("mermaid", block, "Sales"))!, (await core.render("mermaid", block, "Sales"))!];
+    // (Drawn before either is in the page: both by the first such block's place, the table above it)
+    expect(made.map((m) => m.config.data.datasets[0]?.data)).toEqual([[120, 140], [120, 140]]);
+    // In the page one after another, the second first (SilverBullet's renders resolve each on its own): its place told
+    // only once the first is in too
+    const holders = boxes.map(() => document.body.appendChild(document.createElement("div")));
+    holders[1]!.append(boxes[1]!);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(made[1]?.updates).toBe(0);
+    holders[0]!.append(boxes[0]!);
+    await vi.waitFor(() => expect((made[1]?.data as { datasets: { data: unknown }[] }).datasets[0]?.data).toEqual([7, 9]), { timeout: 5_000 });
+    expect(made[0]?.updates).toBe(0);
   });
 
   it("Space Lua loaded again: the charts the one before drew, in the page or put back later, drawn anew by the new one in their place, not animated", async () => {

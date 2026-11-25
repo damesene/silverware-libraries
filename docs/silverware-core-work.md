@@ -90,10 +90,15 @@ Estimates are rough; checkpoints correct them. About 5 to 6 months in all.
   memory bridge for tests and the playground; scripts/deploy.mjs, the UI test
   servers, REPO.md, versions.mjs, the isolation tests (plugins import the core's
   `api.ts` only); the root CLAUDE.md's rules ("a plugin needs no other
-  installed", "nothing is shared at run time"), its table, the prefix `swk-`,
-  the scope `core`.
+  installed", "nothing is shared at run time", and the rule of where code
+  goes: docs/silverware-core.md, *Where code goes*), its table, the prefix
+  `swk-`, the scope `core`; shared/modulestate.test.ts with today's state
+  listed (what moves to the core listed as "until step N", each entry leaving
+  the list as its step moves it), the constants typed readonly.
 - **Not in it**: any service. The core only loads and says its version.
-- **Done when**: every plugin starts through the gate on the UI test servers;
+- **Done when**: the module-state test fails on a new `let` at a shared/
+  file's top level (its own unit test) and passes on today's listed state;
+  every plugin starts through the gate on the UI test servers;
   UI tests: no core, an older core (each: the notification, no plugin start,
   the API stubs' message); unit tests of the gate's script; verify green.
   Checked by hand once (written here): Library: Install of a plugin from the

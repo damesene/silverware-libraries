@@ -165,6 +165,41 @@ definition of done.
   lists it). UI tests of the gate: a plugin with no core, with an older core,
   says so, starts nothing, and its API's stubs say so.
 
+## Where code goes: the core or shared/
+
+One rule, checked by a test, so the line between the two does not blur:
+
+- **Silverware Core**: what must be **one per window** (a registry every
+  plugin reads, the overlay stack, a watcher of the document, a signal every
+  plugin follows) or **one version for every plugin** (the formulas' engine,
+  whose values are told by class).
+- **shared/**: code bundled into each plugin. Pure, or with state that is
+  **meant to be each plugin's own** (each bundle its copy on purpose), and
+  then only listed.
+- **The test** (shared/modulestate.test.ts, in `verify`): every file of
+  shared/ read line by line; a declaration at the module's top level that holds
+  mutable state fails it (`let` or `var`; a `const` made by `new Map`, `Set`,
+  `WeakMap`, `WeakSet`, `MutationObserver`, or an array, not typed
+  `ReadonlyMap`, `ReadonlySet` or `readonly …[]`), unless the test's list names
+  it with why it is each plugin's own. Constants are typed readonly.
+
+shared/ today (2026-11-25), by that rule:
+
+- **To the core** (one per window): the formulas' registry and its parse
+  cache (shared/formulas/registry.ts `custom`, `anew`; parser.ts `parsed`),
+  with the engine (G); SilverBullet's widget menu's watcher
+  (silverbullet/widgetmenu.ts `watched`, B); the menus' counter of ids
+  (menu.ts `problemIds`) goes with the menus (C).
+- **Each plugin's own, listed**: the page writer's parts (pages/parts.ts
+  `parts`, `partOf`: a plugin's parts are its own, no other plugin's types see
+  them), the copy command's guard (clipboard.ts `copying`), caches of a
+  bundle's own (intl.ts `numberFormats`, `dateFormats`; table/model.ts
+  `madeFrom`).
+- **Constants, typed readonly**: formulas/help.ts `BEFORE_OPERAND`,
+  formulas/references.ts `VOLATILE`, safehtml.ts `DOCUMENT_ATTRIBUTES`,
+  silverbullet/editorsample.ts `EM`, pages/parts.ts `BODY`, table/model.ts
+  `NO_ATTRIBUTES`.
+
 ## Services
 
 What goes into the core, each a service the plugins call in TypeScript.
@@ -389,6 +424,12 @@ Weighed for what they bring; each changes only with the step that needs it.
   dialogs and menus).
 - 2026-11-25: the DOM marks stay (CSS and users' styles select them); only
   their watchers move to the core's signals.
+- 2026-11-25: what must be one per window or one version for every plugin is
+  the core's; shared/ holds pure code and state meant to be each plugin's own,
+  listed; a test of shared/'s module-level state keeps the line (*Where code
+  goes*). The measure of the plan is the cleanest code to maintain at its end,
+  not how soon Preact comes: the services stay as planned, the formulas'
+  engine in the core.
 - 2026-11-25: Safari is not tested; it is met when a user reports a problem.
 - 2026-11-25: custom views stay framework-free (only DOM and callbacks cross
   their contract).

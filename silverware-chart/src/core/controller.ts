@@ -47,6 +47,9 @@ export type ControllerEnv = {
 // The edits of a page come one per key: the charts read their sources once they pause
 const FOLLOW_MS = 120;
 
+/** A block as an element was rendered for: drawn anew from it */
+export type RenderedBlock = { readonly language: string; readonly body: string; readonly page: string };
+
 /** The model with a source's data in place of its block's: the series named and drawn as the block has them, else by their columns */
 function withData(model: ChartModel, data: SourceData): ChartModel {
   const names = model.source?.series ?? [];
@@ -136,6 +139,13 @@ export class Controller {
   // What shows where a chart's source could not be read, with its block: drawn in its place once it can be
   private readonly waiting = new IterableWeakSet<HTMLElement>();
   private readonly waitingFor = new WeakMap<HTMLElement, { readonly language: string; readonly body: string }>();
+  // Every element it drew a block as (its chart, or why it is none), with the block: once another controller starts in
+  // its place (Space Lua loaded again) they are drawn anew by that one (`stop`), else its toolbar, its layout and its
+  // following know nothing of them
+  private readonly rendered = new IterableWeakSet<HTMLElement>();
+  private readonly blocks = new WeakMap<HTMLElement, RenderedBlock>();
+  // Stopped: what is to draw anew what of its charts comes back into the page
+  private drawAnewBy: ((element: HTMLElement, block: RenderedBlock) => void) | undefined;
 
   constructor(
     private readonly doc: Document,
@@ -188,11 +198,21 @@ export class Controller {
     };
   }
 
-  /** Gone from the page (another started in its place, Space Lua loaded again): its watching ended, its toolbar out */
-  stop(): void {
+  /**
+   * Gone from the page (another started in its place, Space Lua loaded again): its watching ended, its toolbar out; what
+   * it drew still in the page handed to `drawAnew` now, and what comes back into it later as it does (SilverBullet may
+   * keep a widget's element and show it again, not rendering it anew)
+   */
+  stop(drawAnew?: (element: HTMLElement, block: RenderedBlock) => void): void {
     this.unwatchTheme();
     this.toolbar?.stop();
     clearTimeout(this.following);
+    this.drawAnewBy = drawAnew;
+    if (!drawAnew) return;
+    for (const element of this.rendered) {
+      const block = this.blocks.get(element);
+      if (block && element.isConnected) drawAnew(element, block);
+    }
   }
 
   /** The host a module gets: the core's, with what it offers kept under its name */
@@ -297,7 +317,17 @@ export class Controller {
    * it on to what drew such blocks before); `pageText` the page's text where
    * it is known (an edit followed), else read
    */
-  async render(language: string, text: string, page: string, pageText?: string): Promise<HTMLElement | undefined> {
+  async render(language: string, text: string, page: string, pageText?: string, still = false): Promise<HTMLElement | undefined> {
+    const element = await this.draw(language, text, page, pageText, still);
+    if (element) {
+      this.rendered.add(element);
+      this.blocks.set(element, { language, body: text, page });
+    }
+    return element;
+  }
+
+  /** `render`'s element; `still`: its chart drawn at once, not animated (one drawn anew where it was shown already) */
+  private async draw(language: string, text: string, page: string, pageText: string | undefined, still: boolean): Promise<HTMLElement | undefined> {
     const read = this.read(language, text);
     if (!read) return undefined;
     if (isUnreadable(read.model)) return this.problem(read.model.problem);
@@ -329,11 +359,21 @@ export class Controller {
     let unwatchFont: (() => void) | undefined;
     this.boxes.set(box, entry);
     this.toolbar?.watch(box);
+    // (Not animated the first time where it is drawn anew in place of one shown)
+    let quiet = still;
     try {
       // Made now, and again where the box comes back after its chart was let go: with the data as last drawn
       box.setUp(
-        () => new Chart(canvas, type.config(entry.data ? withData(model, entry.data) : model, this.themeFor(entry))),
         () => {
+          const config = type.config(entry.data ? withData(model, entry.data) : model, this.themeFor(entry));
+          const made = new Chart(canvas, quiet ? { ...config, options: { ...config.options, animation: false } } : config);
+          quiet = false;
+          return made;
+        },
+        () => {
+          // Back in the page after another controller started in its place: drawn anew by that one
+          // (One drawn by it after that, never in the page: `render` of the new one draws it)
+          if (this.drawAnewBy) return void (box.isConnected && this.drawAnewBy(box, { language, body: text, page }));
           this.drawn.add(entry);
           // Its text's size followed (known as it is put in the page, the page's font set larger or smaller): drawn
           // anew where it is not the size it was drawn at (made before it was in the page: Chart.js's own)
@@ -359,6 +399,8 @@ export class Controller {
    * sources again, once the edits pause, and are drawn so in place
    */
   pageModified(text: string, page: string): void {
+          // (Its controller stopped: drawn anew by the one in its place as it comes back, no chart of its own made first)
+          if (this.drawAnewBy) return undefined;
     clearTimeout(this.following);
     this.following = setTimeout(() => void this.follow(text, page), FOLLOW_MS);
   }

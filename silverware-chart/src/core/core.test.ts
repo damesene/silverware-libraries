@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MODULE_NAMES, type ModuleName } from "../bridge.ts";
 import { customFormatsAnew, defineCustomFormats, formatsOf } from "../custom.ts";
-import { start } from "../index.ts";
+import { render, start } from "../index.ts";
 import { tablesOf } from "../sources/markdown.ts";
 import type { Controller } from "./controller.ts";
 import type { NamedTable, TableApi, TextEdit, WriteContext, WrittenTable } from "./module.ts";
@@ -84,6 +84,8 @@ beforeEach(() => {
   vi.useFakeTimers();
 });
 afterEach(() => {
+  // (What a test left in the page: the next test's controller would draw it anew, as charts of a load of Space Lua before)
+  document.body.replaceChildren();
   vi.useRealTimers();
   customFormatsAnew();
   defineCustomFormats([]);
@@ -133,6 +135,36 @@ describe("the core", () => {
     await vi.advanceTimersByTimeAsync(200);
     expect(made[2]?.updates).toBe(1);
     shown!.remove();
+  });
+
+  it("Space Lua loaded again: the charts the one before drew, in the page or put back later, drawn anew by the new one in their place, not animated", async () => {
+    const block = chart("above");
+    controller(page(block));
+    const shown = (await render("mermaid", block, "Sales"))!;
+    const kept = (await render("mermaid", block, "Sales"))!;
+    // (Each in a widget's element, as SilverBullet holds one; the second out of the page, its element kept)
+    const widget = document.body.appendChild(document.createElement("div"));
+    widget.append(shown);
+    const away = document.createElement("div");
+    away.append(kept);
+    const after = controller(page(block));
+    await vi.advanceTimersByTimeAsync(0);
+    const anew = widget.firstElementChild as HTMLElement;
+    expect(anew).not.toBe(shown);
+    expect(anew.className).toBe("swc-chart");
+    expect(made.at(-1)?.config.options?.animation).toBe(false);
+    // Followed by the new one
+    after.pageModified(page(block, SALES.replace("| 140 |", "| 300 |")), "Sales");
+    await vi.advanceTimersByTimeAsync(200);
+    expect(made.at(-1)?.updates).toBe(1);
+    // The one kept, put back: drawn anew too
+    const count = made.length;
+    document.body.append(away);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(away.firstElementChild).not.toBe(kept);
+    expect(made).toHaveLength(count + 1);
+    widget.remove();
+    away.remove();
   });
 });
 

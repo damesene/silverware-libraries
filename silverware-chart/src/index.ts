@@ -67,11 +67,17 @@ function tableApi(bridge: Bridge): TableApi | undefined {
 export function start(doc: Document, settings: Settings, env: Omit<ConstructorParameters<typeof Controller>[1], "height">): Controller {
   // The layers its style page lays its elements in (shared/layers.ts)
   applyLayers(doc);
-  // (The one before it, of a load of Space Lua before, let go)
-  slot[GLOBAL_KEY]?.stop();
+  const before = slot[GLOBAL_KEY];
   const controller = new Controller(doc, { ...env, height: settings.height });
   controller.setModules(createModules(settings, (name) => controller.hostFor(name)));
   slot[GLOBAL_KEY] = controller;
+  // The one of a load of Space Lua before let go: the charts it drew drawn anew by this one, in their place (SilverBullet
+  // may keep showing a widget's element, not rendering it anew: its layout, toolbar and following were the old one's)
+  before?.stop((element, block) =>
+    void render(block.language, block.body, block.page, true).then((shown) => {
+      if (shown && element.parentElement) element.replaceWith(shown);
+    }),
+  );
   return controller;
 }
 
@@ -81,9 +87,12 @@ export function languages(): string[] {
 }
 
 /** A code block's element: its chart (or why it cannot be drawn); undefined where it is no chart (handed on) */
-export function render(language: string, text: string, page: string): Promise<HTMLElement | undefined> {
-  // (SilverBullet's ⋮ beside a widget offers nothing that fits a chart: shared/silverbullet/widgetmenu.ts)
-  return (slot[GLOBAL_KEY]?.render(String(language), String(text), String(page)) ?? Promise.resolve(undefined)).then((element) => {
+export function render(language: string, text: string, page: string, still = false): Promise<HTMLElement | undefined> {
+  const controller = slot[GLOBAL_KEY];
+  return (controller?.render(String(language), String(text), String(page), undefined, still) ?? Promise.resolve(undefined)).then((element) => {
+    // (Space Lua loaded again while it was drawn: drawn by the controller started since, the one the page's charts are)
+    if (slot[GLOBAL_KEY] !== controller) return render(language, text, page, still);
+    // (SilverBullet's ⋮ beside a widget offers nothing that fits a chart: shared/silverbullet/widgetmenu.ts)
     if (element) keepFromWidgetMenu(element);
     return element;
   });

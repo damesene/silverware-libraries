@@ -43,8 +43,11 @@ const OUT_MS = 10_000;
 /** The element a chart is drawn in: its chart made as it is, destroyed once out of the document a while, made again if it comes back */
 export interface ChartBox extends HTMLElement {
   readonly chart: ChartInstance | undefined;
-  /** Its chart made (now, and again as it comes back) by `make`; `entered`/`left` told as it is drawn or destroyed */
-  setUp(make: () => ChartInstance, entered: () => void, left: () => void): void;
+  /**
+   * Its chart made (now, and again as it comes back) by `make`, none where it gives none (its owner stopped: the box to
+   * be drawn anew by another); `entered` told as it is drawn and each time it comes back, `left` as its chart is destroyed
+   */
+  setUp(make: () => ChartInstance | undefined, entered: () => void, left: () => void): void;
   /** Its chart made anew (Reload) */
   remake(): void;
 }
@@ -62,7 +65,7 @@ export function chartBox(doc: Document): ChartBox {
         // Private fields, not properties: SilverBullet walks a widget's element to show it, and a Chart.js
         // instance on it (its references round to itself) overflowed the stack
         #chart: ChartInstance | undefined;
-        #make: (() => ChartInstance) | undefined;
+        #make: (() => ChartInstance | undefined) | undefined;
         #entered: (() => void) | undefined;
         #left: (() => void) | undefined;
         #timer: ReturnType<typeof setTimeout> | undefined;
@@ -71,7 +74,7 @@ export function chartBox(doc: Document): ChartBox {
           return this.#chart;
         }
 
-        setUp(make: () => ChartInstance, entered: () => void, left: () => void): void {
+        setUp(make: () => ChartInstance | undefined, entered: () => void, left: () => void): void {
           this.#make = make;
           this.#entered = entered;
           this.#left = left;
@@ -89,10 +92,10 @@ export function chartBox(doc: Document): ChartBox {
 
         connectedCallback(): void {
           clearTimeout(this.#timer);
-          if (!this.#chart && this.#make) {
-            this.#chart = this.#make();
-            this.#entered?.();
-          }
+          if (!this.#make) return;
+          this.#chart ??= this.#make();
+          // (Told each time it comes back, its chart kept or made again)
+          this.#entered?.();
         }
 
         disconnectedCallback(): void {

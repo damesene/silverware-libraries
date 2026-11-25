@@ -17,6 +17,8 @@ export type Bridge = {
   readonly filterBox?: (label: string, options: readonly Record<string, unknown>[]) => unknown;
   // Optional: without it, settings keep their defaults
   readonly getConfig?: (path: string, defaultValue: unknown) => unknown;
+  // Where an element of the editor is in the page's text (editor.posAtDOM, shared/silverbullet/position.ts)
+  readonly posAtDOM?: (element: Element) => unknown;
   // Optional, Silverware Table's (silverware.table.tables and onWrite), where it is installed
   readonly tables?: (text: string) => unknown;
   readonly onWrite?: (listener: (text: string, context: never) => unknown) => unknown;

@@ -3,6 +3,24 @@
 import { boxOf, cellField, cursorAt, editorText, expect, fieldState, fillField, gridsDrawn, LAYOUT_SETTINGS, PIXEL_PNG, runCommand, test } from "./helpers.ts";
 
 const GRID = "<grid>\n<cell>\n\nLeft text\n\n</cell>\n<cell>\n\nRight text\n\n</cell>\n</grid>\n";
+// Lines enough between two blocks alike that the first is out of the page (CodeMirror keeps what is far from view out)
+const FAR = Array.from({ length: 160 }, (_, i) => `Line ${i + 1} between.`).join("\n\n");
+
+test("of two grids written alike far apart, a cell of the second edited, the first out of the page: written into the second", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${GRID}\n${FAR}\n\n${GRID}\nBelow\n` }, "Page");
+  await gridsDrawn(page);
+  // (Scrolled to its end, and waited for it: the filler's first line gone from the page, its last shown)
+  await page.evaluate(() => document.querySelector(".cm-scroller")!.scrollTo(0, 1e9));
+  await expect(page.locator(".cm-line", { hasText: /^Line 1 between\.$/ })).toHaveCount(0);
+  await expect(page.locator(".cm-line", { hasText: "Line 160 between." })).toBeVisible();
+  // (The first grid gone from the page: its text far above the view)
+  await expect(page.locator("#sb-main .swl-grid")).toHaveCount(1);
+  await page.locator("#sb-main .swl-grid-cell").first().click();
+  await expect.poll(async () => (await fieldState(page)).text).toBe("Left text");
+  await fillField(page, "Left second");
+  await page.keyboard.press("Escape");
+  await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n${GRID}\n${FAR}\n\n${GRID.replace("Left text", "Left second")}\nBelow\n`);
+});
 
 test("/grid puts a grid of two columns at the cursor, the cursor in its first", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nAbove\n\n" }, "Page");

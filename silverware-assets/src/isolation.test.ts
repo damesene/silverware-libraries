@@ -55,7 +55,7 @@ describe("isolation", () => {
 
   it("names SilverBullet's page only in its host", () => {
     const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-    const sbNames = /\.cm-[a-z]|#sb-|\.sb-[a-z]|--editor-(width|font-size)|editorView|posAtDOM/;
+    const sbNames = /\.cm-[a-z]|#sb-|\.sb-[a-z]|--editor-(width|font-size)|editorView/;
     for (const [file] of of(".").filter(([file]) => !file.startsWith("host/silverbullet/"))) expect(code(readFileSync(join(SRC, file), "utf8")).match(sbNames)?.[0], file).toBeUndefined();
     const style = readFileSync(join(SRC, "..", "silverware-assets-style.md"), "utf8");
     const rules = /```space-style\r?\n([\s\S]*?)```/.exec(style)?.[1] ?? "";
@@ -69,10 +69,10 @@ describe("isolation", () => {
     for (const [file] of of(".")) expect(readFileSync(join(SRC, file), "utf8").replace(/^\s*\/\/.*$/gm, "").match(/swl-(?!embed\b)[a-z-]+/g) ?? [], file).toEqual([]);
   });
 
-  it("reaches into SilverBullet past its API in one file alone (SILVERBULLET-INTERNAL: host/silverbullet/editorposition.ts)", () => {
+  it("reaches into SilverBullet past its API in one file alone (SILVERBULLET-INTERNAL: host/silverbullet/editorposition.ts, a drop's point; an element's place is its public editor.posAtDOM)", () => {
     const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     for (const [file] of of(".").filter(([file]) => file !== "host/silverbullet/editorposition.ts")) {
-      expect(code(readFileSync(join(SRC, file), "utf8")).match(/\bclient\b\s*\?*\.|editorView|posAtDOM|posAtCoords/)?.[0], file).toBeUndefined();
+      expect(code(readFileSync(join(SRC, file), "utf8")).match(/\bclient\b\s*\?*\.|editorView|posAtCoords/)?.[0], file).toBeUndefined();
     }
   });
 

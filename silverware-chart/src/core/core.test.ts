@@ -8,6 +8,7 @@ import type { Controller } from "./controller.ts";
 import type { NamedTable, TableApi, TextEdit, WriteContext, WrittenTable } from "./module.ts";
 import type { ChartConfig } from "./type.ts";
 import type { LayoutProvider } from "../../../shared/layout.ts";
+import type { PositionOf } from "../../../shared/placed.ts";
 
 // Chart.js stood in for: what it was made with, and each update
 type Made = { canvas: HTMLCanvasElement; config: ChartConfig; updates: number; destroyed: boolean; data: unknown };
@@ -61,7 +62,7 @@ const TABLE_API: TableApi = {
 const NOTHING_RENAMED: WriteContext = { renamed: () => false, table: () => undefined, tableAt: () => undefined };
 
 const writes: TextEdit[] = [];
-function controller(text: string, modules: readonly ModuleName[] = MODULE_NAMES, table: TableApi | null = TABLE_API): Controller {
+function controller(text: string, modules: readonly ModuleName[] = MODULE_NAMES, table: TableApi | null = TABLE_API, positionOf?: PositionOf): Controller {
   return start(
     document,
     { modules: new Set(modules), height: "300px" },
@@ -72,8 +73,15 @@ function controller(text: string, modules: readonly ModuleName[] = MODULE_NAMES,
       replaceRange: async (from, to, inserted) => void writes.push({ from, to, text: inserted }),
       loadChart: async () => FakeChart as never,
       table: table ?? undefined,
+      ...(positionOf ? { positionOf } : {}),
     },
   );
+}
+
+/** Where each chart's element is in the page's text, as SilverBullet's editor would say: the block it was put in for */
+function placesOf(): { readonly positionOf: PositionOf; readonly place: (element: Element, at: number | undefined) => void } {
+  const places = new Map<Element, number | undefined>();
+  return { positionOf: async (element) => places.get(element), place: (element, at) => void places.set(element, at) };
 }
 
 const dataOf = (i = 0) => made[i]?.config.data.datasets.map((d) => d.data);
@@ -138,9 +146,10 @@ describe("the core", () => {
     shown!.remove();
   });
 
-  it("two charts written alike: each written as its own block by its place among them, none guessed where one is out of the page", async () => {
+  it("two charts written alike: each written as its own block by its place in the text, none guessed where its place is not told", async () => {
     const block = 'pie title Pets\n  "Dogs" : 3\n  "Cats" : 1';
     const text = `# Pets\n\n\`\`\`mermaid\n${block}\n\`\`\`\n\nBetween\n\n\`\`\`mermaid\n${block}\n\`\`\`\n`;
+    const { positionOf, place } = placesOf();
     let provider: LayoutProvider | undefined;
     const core = start(
       document,
@@ -152,22 +161,28 @@ describe("the core", () => {
         replaceRange: async (from, to, inserted) => void writes.push({ from, to, text: inserted }),
         loadChart: async () => FakeChart as never,
         layout: { register: (one: LayoutProvider) => void (provider = one) } as never,
+        positionOf,
       },
     );
+    const starts = [text.indexOf("```mermaid"), text.lastIndexOf("```mermaid")];
     const widgets = await Promise.all(
-      [0, 1].map(async () => {
+      starts.map(async (at) => {
         const widget = document.body.appendChild(document.createElement("div"));
         widget.className = "swc-widget";
-        widget.append((await core.render("mermaid", block, "Pets"))!);
+        const box = (await core.render("mermaid", block, "Pets"))!;
+        place(box, at);
+        widget.append(box);
         return widget;
       }),
     );
+    // The second, the first out of the page (CodeMirror keeps it out, far above): its own block all the same
+    widgets[0]!.remove();
     expect(await provider!.write(widgets[1]!, { width: "900" })).toBeUndefined();
     const second = text.lastIndexOf("```mermaid\n") + "```mermaid\n".length;
     expect(writes.at(-1)).toMatchObject({ from: second });
     expect(writes.at(-1)?.text).toContain("%% layout.width: 900");
-    // The first out of the page (CodeMirror keeps it out, far above): which one the second is cannot be told
-    widgets[0]!.remove();
+    // Its place not told (nor in either block): which one it is cannot be told, nothing written
+    place(widgets[1]!.firstElementChild!, undefined);
     const count = writes.length;
     expect(await provider!.write(widgets[1]!, { width: "900" })).toContain("written the same as another");
     expect(writes).toHaveLength(count);
@@ -177,17 +192,15 @@ describe("the core", () => {
     const block = chart("above");
     const other = SALES.replace("| 120 |", "| 7 |").replace("| 140 |", "| 9 |").replace("'sales'", "'other'");
     const text = `# Sales\n\n${SALES}\n\n\`\`\`mermaid\n${block}\n\`\`\`\n\n${other}\n\n\`\`\`mermaid\n${block}\n\`\`\`\n`;
-    const core = controller(text);
+    const { positionOf, place } = placesOf();
+    const core = controller(text, MODULE_NAMES, TABLE_API, positionOf);
     const boxes = [(await core.render("mermaid", block, "Sales"))!, (await core.render("mermaid", block, "Sales"))!];
+    place(boxes[0]!, text.indexOf("```mermaid"));
+    place(boxes[1]!, text.lastIndexOf("```mermaid"));
     // (Drawn before either is in the page: both by the first such block's place, the table above it)
     expect(made.map((m) => m.config.data.datasets[0]?.data)).toEqual([[120, 140], [120, 140]]);
-    // In the page one after another, the second first (SilverBullet's renders resolve each on its own): its place told
-    // only once the first is in too
-    const holders = boxes.map(() => document.body.appendChild(document.createElement("div")));
-    holders[1]!.append(boxes[1]!);
-    await vi.advanceTimersByTimeAsync(50);
-    expect(made[1]?.updates).toBe(0);
-    holders[0]!.append(boxes[0]!);
+    // The second in the page alone (the first never, far above): its own table read by its place
+    document.body.appendChild(document.createElement("div")).append(boxes[1]!);
     await vi.waitFor(() => expect((made[1]?.data as { datasets: { data: unknown }[] }).datasets[0]?.data).toEqual([7, 9]), { timeout: 5_000 });
     expect(made[0]?.updates).toBe(0);
   });

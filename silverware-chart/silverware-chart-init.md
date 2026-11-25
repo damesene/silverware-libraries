@@ -57,6 +57,8 @@ if js and js.window then
       return editor.filterBox(label, options, "", "Type to find a table")
     end,
     getConfig = config.get,
+    -- Where an element of the editor is in the page's text: which of two charts written alike a widget shows
+    posAtDOM = editor.posAtDOM,
   }
   -- Silverware Table's API, where it is installed (its API page has priority 50: defined before this block)
   if silverware.table and silverware.table.tables and silverware.table.onWrite then

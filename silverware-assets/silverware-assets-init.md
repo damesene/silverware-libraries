@@ -52,6 +52,8 @@ if js and js.window then
   silverwareAssetsJs.init({
     getCurrentPage = editor.getCurrentPage,
     getText = editor.getText,
+    -- Where an element of the editor is in the page's text: which embed or link a widget of the editor is
+    posAtDOM = editor.posAtDOM,
     replaceRange = editor.replaceRange,
     -- Files inserted: the selection they go into
     getSelection = editor.getSelection,

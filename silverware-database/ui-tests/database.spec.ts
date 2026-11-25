@@ -692,6 +692,19 @@ test("of two blocks written alike, the one a view is picked in is written", asyn
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n${BLOCK}\ntext between\n\n\`\`\`silverware-database\nid: tasks\nview: count\n\`\`\`\n`);
 });
 
+test("of two blocks written alike far apart, a view picked in the second with the first out of the page: written into the second", async ({ page, space }) => {
+  const far = Array.from({ length: 160 }, (_, i) => `Line ${i + 1} between.`).join("\n\n");
+  await space.open({ Page: `# Page\n\n${BLOCK}\n${far}\n\n${BLOCK}\nEnd\n`, ...TASKS }, "Page");
+  // (Scrolled to its end, and waited for it: the filler's first line gone from the page, its last shown)
+  await page.evaluate(() => document.querySelector(".cm-scroller")!.scrollTo(0, 1e9));
+  await expect(page.locator(".cm-line", { hasText: /^Line 1 between\.$/ })).toHaveCount(0);
+  await expect(page.locator(".cm-line", { hasText: "Line 160 between." })).toBeVisible();
+  // (The first block's place gone from the page: its text far above the view)
+  await expect(page.locator(".swd-place")).toHaveCount(1);
+  await pickView(page, "Count", page.locator(".swd-place").first());
+  await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n${BLOCK}\n${far}\n\n\`\`\`silverware-database\nid: tasks\nview: count\n\`\`\`\n\nEnd\n`);
+});
+
 test("the settings turn a view off: saved in Library/Config, the picker without it at once", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${BLOCK}`, ...TASKS }, "Page");
   await page.locator(".swd-view-picker").click();

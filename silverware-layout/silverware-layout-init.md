@@ -135,6 +135,8 @@ if js and js.window then
     end,
     -- A grid's Alt+click: the cursor where the click was in its markdown; /grid: where the cursor is
     moveCursor = editor.moveCursor,
+    -- Where an element of the editor is in the page's text: which of two grids written alike one is
+    posAtDOM = editor.posAtDOM,
     getCursor = editor.getCursor,
     -- Wrap in grid: the selection, and a pick (its mode, its number of columns)
     getSelection = editor.getSelection,

@@ -13,7 +13,7 @@ import type { Rendered, RenderedItem } from "../../../../shared/rendered.ts";
 import { ASSETS_PATH } from "../../model/settings.ts";
 import type { FileFacts } from "../../core/stored.ts";
 import { documentUrl, pageNamesOf } from "../../../../shared/silverbullet/platform.ts";
-import { editorPosition } from "./editorposition.ts";
+import { positionOf } from "../../../../shared/silverbullet/position.ts";
 import { editorSheetArea } from "../../../../shared/silverbullet/editorarea.ts";
 
 const FRAME = ".sb-inline-content";
@@ -113,6 +113,8 @@ export function drawnTarget(frame: HTMLElement): { readonly target: string; read
 }
 
 export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: Document, rendered: Rendered) {
+  // Where an element of the editor is in the page's text, as SilverBullet's editor says (editor.posAtDOM)
+  const position = positionOf(bridge.posAtDOM);
   // What is drawn outside the editor, as last told: each element's item (its place, its room)
   const told = new WeakMap<HTMLElement, RenderedItem>();
   const remember = (items: readonly RenderedItem[]) => {
@@ -236,11 +238,11 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
       return { kind: "file", path: target, url: documentUrl(target) };
     },
     renderedRanges: (text: string) => rendered.ranges(text),
-    // Where an element of the editor is in the page's text: SILVERBULLET-INTERNAL, see editorposition.ts (a widget of
-    // the content's own asked by its box, a link by itself)
-    positionOf: (element: HTMLElement): number | undefined => {
+    // Where an element of the editor is in the page's text, as SilverBullet's editor says (`editor.posAtDOM`): a widget
+    // of the content's own asked by its box, a link by itself
+    positionOf: async (element: HTMLElement): Promise<number | undefined> => {
       const top = topOf(element);
-      return top ? editorPosition(doc, top.matches(LINE) ? element : top) : undefined;
+      return top ? position?.(top.matches(LINE) ? element : top) : undefined;
     },
     // The text drawn around an element of the editor's (2.12.1, probed 2026-11-14: each line of the page in view is a
     // `.cm-line` of the content, its text drawn without its marks; an embed's widget is a box of the content's own,

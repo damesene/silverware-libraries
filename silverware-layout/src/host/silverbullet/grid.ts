@@ -20,6 +20,7 @@ import { editorSampleLook } from "../../../../shared/silverbullet/editorsample.t
 import { highlightCodeIn } from "./codeblocks.ts";
 import { afterPress, HANDS_ALT_PRESS_TO_FIELD, SILVERBULLET_EDITORS, textForDrawing } from "./behaviour.ts";
 import { focusPage, isPageText, pressBesideGrid } from "./dom.ts";
+import { positionOf } from "../../../../shared/silverbullet/position.ts";
 import { ownTasks } from "./tasks.ts";
 import { keepUndrawn } from "./undrawn.ts";
 
@@ -69,6 +70,8 @@ export function silverBulletGridHost(bridge: Bridge, writer: PageWriter, drawer:
   const keyKept = keptKeys(bridge.listCommands, (message) => void bridge.flash(message, "info"));
   // A cell edited in Silverware Editor's editor where the init page hands its API over, else a `<textarea>`
   const editors = editorsOf(bridge.editor, SILVERBULLET_EDITORS);
+  // Where a grid drawn is in the page's text, as SilverBullet's editor says (its region's end): which of grids alike it is
+  const position = positionOf(bridge.posAtDOM);
   return {
     editors,
     // (A cell's code blocks highlighted by it too, where it highlights: SilverBullet's rendering highlights none)
@@ -90,6 +93,7 @@ export function silverBulletGridHost(bridge: Bridge, writer: PageWriter, drawer:
     afterPress,
     handsAltPressToField: HANDS_ALT_PRESS_TO_FIELD,
     focusPage,
+    ...(position ? { positionOf: position } : {}),
     isPageText,
     pressBesideGrid,
     pageSelection: async (): Promise<{ readonly from: number; readonly to: number } | undefined> => {

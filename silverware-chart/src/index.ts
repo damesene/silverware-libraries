@@ -3,6 +3,7 @@
 // then a code widget defined for each of `languages()`, rendering `render(…)`,
 // and the page's edits told to `pageModified(…)`.
 import { applyLayers } from "../../shared/layers.ts";
+import { positionOf } from "../../shared/silverbullet/position.ts";
 import { keepFromWidgetMenu } from "../../shared/silverbullet/widgetmenu.ts";
 import { layoutOf } from "../../shared/layout.ts";
 import { type Bridge, listOf, missingBridgeFunctions, readSettings, type Settings } from "./bridge.ts";
@@ -46,6 +47,7 @@ export async function init(bridge: Bridge): Promise<void> {
     loadChart,
     table: tableApi(bridge),
     layout: layoutOf(bridge.layout),
+    positionOf: positionOf(bridge.posAtDOM),
   });
 }
 

@@ -18,7 +18,7 @@ export type DragGrids = {
   // The grid of the page's text a grid drawn was last found as
   placedOf(grid: HTMLElement): Grid | undefined;
   // A grid drawn as a page's text has it now
-  found(text: string, grid: HTMLElement): { readonly grid: Grid; readonly occurrence: number; readonly of: number } | undefined;
+  found(text: string, grid: HTMLElement): Promise<{ readonly grid: Grid; readonly occurrence: number; readonly of: number } | undefined>;
   // The grids drawn, in the page's order
   drawn(): HTMLElement[];
   // The field of the cell edited, where a node is in it, and that cell's place
@@ -145,7 +145,7 @@ export class GridDrag {
     const place: CellPlace = { grid: source.grid, nth: this.grids.drawn().indexOf(source.grid), index: source.index };
     this.grids.inTurn([place], async () => {
       const text = await this.grids.host().pageText();
-      const found = place.grid.isConnected ? this.grids.found(text, place.grid) : undefined;
+      const found = place.grid.isConnected ? await this.grids.found(text, place.grid) : undefined;
       const cell = found?.grid.cells[place.index];
       if (!found || !cell || cell.content.slice(source.from, source.to) !== source.text) return "the text moved changed in the page meanwhile";
       const content = cell.content.slice(0, source.from) + cell.content.slice(source.to);
@@ -192,7 +192,7 @@ export class GridDrag {
     const places = source?.kind === "cell" ? [place, { grid: source.grid, nth: this.grids.drawn().indexOf(source.grid), index: source.index }] : source?.kind === "field" ? [place, source.place] : [place];
     this.grids.inTurn(places, async () => {
       const text = await this.grids.host().pageText();
-      const found = place.grid.isConnected ? this.grids.found(text, place.grid) : undefined;
+      const found = place.grid.isConnected ? await this.grids.found(text, place.grid) : undefined;
       const cell = found?.grid.cells[index];
       if (!found || !cell) return "this grid changed in the page since it was drawn";
       let offset = endAt(cell.content, cellElement, y) ?? blankLineAt(cell.content, cellElement, y) ?? offsetInCell(cell.content, cellElement, target, caret);
@@ -204,7 +204,7 @@ export class GridDrag {
         // written with it)
         const sourceGrid = source.kind === "cell" ? source.grid : source.place.grid;
         const sourceIndex = source.kind === "cell" ? source.index : source.place.index;
-        const from = sourceGrid.isConnected ? this.grids.found(text, sourceGrid) : undefined;
+        const from = sourceGrid.isConnected ? await this.grids.found(text, sourceGrid) : undefined;
         const was = from?.grid.cells[sourceIndex];
         const whole = source.kind === "cell" ? was?.content : source.editor.getText();
         if (!from || !was || whole === undefined || whole.slice(source.from, source.to) !== source.text) return "the text moved changed in the page meanwhile";

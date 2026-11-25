@@ -34,25 +34,27 @@ test("the same image at a long page's top and end, the top scrolled away: a view
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\nTop:\n\n${image}\n\n${filler}\n\nThe end:\n\n![[${space.folder}/photo.png|Photo|120|{ view: card }]]\n\nAfter it.\n`);
 });
 
-// SILVERBULLET-INTERNAL (src/host/silverbullet/editorposition.ts): a SilverBullet changing what it is fails here, by name
-test("SilverBullet's editor gives a widget's position: client.editorView.posAtDOM, an embed's start, a link within it", async ({ page, space }) => {
+// What Silverware Assets takes of SilverBullet's editor (shared/silverbullet/position.ts): a SilverBullet changing it fails here, by name
+test("SilverBullet's editor gives a widget's position: editor.posAtDOM, an embed's start, a link within it", async ({ page, space }) => {
   // (The same file twice, its embeds' texts apart: SilverBullet 2.12.1 draws one text's medium in one of its widgets alone)
   const image = (alt: string) => `![[${space.folder}/photo.png|${alt}]]`;
   const link = `[[${space.folder}/doc.pdf]]`;
   await space.open({ Page: `# Page\n\n${image("A")}\n\nSee ${link} here.\n\n${image("B")}\n` }, "Page", { "photo.png": PIXEL_PNG, "doc.pdf": "%PDF-1.4\n" });
   await expect(page.locator("#sb-main [data-swa-type]")).toHaveCount(2);
   await expect(page.locator("#sb-main [data-swa-link]")).toHaveCount(1);
-  const found = await page.evaluate(() => {
-    const view = (window as unknown as { client: { editorView: { posAtDOM(node: Node, offset: number): number; state: { doc: { toString(): string } } } } }).client.editorView;
+  const found = await page.evaluate(async () => {
+    const client = (window as unknown as { client: { editorView: { state: { doc: { toString(): string } } }; clientSystem: { localSyscall(name: string, args: unknown[]): Promise<number> } } }).client;
+    // (The call the init page hands over: SilverBullet's public editor.posAtDOM)
+    const posAtDOM = (node: Element) => client.clientSystem.localSyscall("editor.posAtDOM", [node]);
     const top = (element: Element) => {
       let at = element;
       while (at.parentElement && !at.parentElement.matches(".cm-content")) at = at.parentElement;
       return at;
     };
     return {
-      text: view.state.doc.toString(),
-      embeds: [...document.querySelectorAll("#sb-main [data-swa-type]")].map((frame) => view.posAtDOM(top(frame), 0)),
-      link: view.posAtDOM(document.querySelector("#sb-main [data-swa-link]")!, 0),
+      text: client.editorView.state.doc.toString(),
+      embeds: await Promise.all([...document.querySelectorAll("#sb-main [data-swa-type]")].map((frame) => posAtDOM(top(frame)))),
+      link: await posAtDOM(document.querySelector("#sb-main [data-swa-link]")!),
     };
   });
   expect(found.embeds).toEqual([found.text.indexOf(image("A")), found.text.indexOf(image("B"))]);

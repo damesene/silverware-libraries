@@ -32,6 +32,8 @@ export type Bridge = {
   readonly renderMarkdown?: (text: string) => string | Promise<string>;
   // Optional, for a grid's Alt+click: the cursor put at an offset of the page's text, centred in view (`editor.moveCursor`)
   readonly moveCursor?: (at: number, center?: boolean) => unknown;
+  // Where an element of the editor is in the page's text (`editor.posAtDOM`): which of two grids written alike one is
+  readonly posAtDOM?: (element: Element) => unknown;
   // Optional, for `/grid`: where the cursor is, an offset of the page's text (`editor.getCursor`)
   readonly getCursor?: () => unknown;
   // Optional, for Wrap in grid: the selection (`editor.getSelection`: `{ from, to }`) and a pick of one of options

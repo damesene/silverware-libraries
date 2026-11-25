@@ -54,6 +54,8 @@ if js and js.window then
     getSelection = editor.getSelection,
     setSelection = editor.setSelection,
     moveCursor = editor.moveCursor,
+    -- Where an element of the editor is in the page's text: which of two blocks written alike a place is
+    posAtDOM = editor.posAtDOM,
     navigate = editor.navigate,
     -- A mention pressed: SilverBullet's Mention Inbox on that identity, the focus left in the editor (none before its inbox)
     openMentions = editor.openNavigator and function(identity)

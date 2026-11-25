@@ -47,7 +47,7 @@ export function blocksAlike(text: string, language: string, body: string): Block
 }
 
 /** Whether two blocks' texts are the same (line ends of either kind alike) */
-export function sameBody(a: string, b: string): boolean {
+function sameBody(a: string, b: string): boolean {
   return a.replace(/\r/g, "") === b.replace(/\r/g, "");
 }
 

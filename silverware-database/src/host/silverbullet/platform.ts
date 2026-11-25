@@ -36,6 +36,8 @@ export type Bridge = {
   setSelection?(from: number, to: number): Promise<void>;
   // The cursor put at an offset of the page open (Edit source: a block with the cursor in it shows its markdown)
   moveCursor?(at: number): Promise<void>;
+  // Where an element of the editor is in the page's text (editor.posAtDOM): which of two blocks written alike a place is
+  posAtDOM?(element: Element): Promise<unknown>;
   navigate(ref: string): Promise<void>;
   // SilverBullet's Mention Inbox opened on an identity (`@` and the name in lower case, its identityId), the focus left in the
   // editor: what a mention pressed does (editor.openNavigator, SilverBullet 2.12.1 on); none where it has no such view

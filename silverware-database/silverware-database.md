@@ -40,7 +40,7 @@ id: tasks
 ```
 ````
 
-A database can be shown on as many pages as you like, and more than once on one page. Two blocks written exactly alike on one page are each their own: a view picked in one is written into it, told apart from the other by their order; where the other is out of view (far up or down a long page), nothing is written and it says so: scroll so both show, or write them apart in their markdown (another `view:` line in one of them).
+A database can be shown on as many pages as you like, and more than once on one page. Two blocks written exactly alike on one page are each their own: a view picked in one is written into it, wherever the other is on the page.
 
 Above it, one bar: at its left, quietly, the database's name and how many items show (a note, not a heading: write one in the page if you want one), then the view shown as one button (its icon, its name, a down arrow), at its right its tools. Pressed, the view's button lists the views (the one shown checked; arrows and Enter from the keys, Esc closes it). The one you pick is written into the block (`view: …`), and so is what a view keeps there (its filter, its sort, prefixed by its name). Its tools:
 

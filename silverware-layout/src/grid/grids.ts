@@ -5,10 +5,11 @@
 // (`refresh`): a `columns` edited shows without a new drawing.
 //
 // A click in a cell edits its markdown in place, written when the cell is left (one edit); an Alt+click shows the raw
-// text with the cursor where the click was. Which of the page's grids a grid drawn is: the one of its body, by its
-// order among the grids of that body drawn (core/match.ts).
+// text with the cursor where the click was. Which of the page's grids a grid drawn is: the one of its body, of several
+// alike the one its place in the text falls in, as the host says (`GridHost.positionOf`, shared/placed.ts).
 import type { Attributes } from "../../../shared/markdown/attributes.ts";
 import { type Grid, readGridBody, readGrids } from "../../../shared/markdown/grid.ts";
+import { blockAt } from "../../../shared/placed.ts";
 import { gridsOfBody } from "./core/match.ts";
 import { borderAttribute, borderOf } from "./model/border.ts";
 import { columnsWithout, columnTemplate, fitsColumns, minWidthOf, validateMinWidth } from "./model/columns.ts";
@@ -111,6 +112,8 @@ export type GridHost = {
   afterPress?(doc: Document): Promise<void>;
   /** The page's editor a cell is in given the focus back as the cell is left (none: nothing) */
   focusPage?(cell: HTMLElement): void;
+  /** Where a grid drawn is in the page's text (any place from its start to its end): which of grids written alike it is (none: a grid alone of its body found, none of several) */
+  positionOf?(element: Element): Promise<number | undefined>;
   /** Whether an Alt+press in the field of a cell edited is handed to the field as it comes, where the host would take it first (none: the field takes its own) */
   readonly handsAltPressToField?: boolean;
   /** Whether a press is beside a grid on its line or in the margin at its height, where the host's editor would put its cursor into the grid's text (none: none is) */
@@ -131,7 +134,7 @@ export type GridHost = {
   keyKept?(event: KeyboardEvent): void;
 };
 
-// How long after a grid is drawn its attributes are read again (it is in the page by then, its order among its alike known)
+// How long after a grid is drawn its attributes are read again (it is in the page by then, its place in the text known)
 const SETTLE_MS = 50;
 // How long a grid written is waited for to be drawn anew (the host draws it a moment after its text changed), at most
 const REDRAWN_MS = 3000;
@@ -377,7 +380,7 @@ export class Grids {
       }, () => this.textEdges?.(), () => this.view?.());
     }
     this.host.settle?.(element);
-    // In the page, its order among the grids of its body is known: its own attributes then (and what it drew told)
+    // In the page, its place in the text is known: its own attributes then (and what it drew told)
     this.refreshSoon();
     // (In the page: what it drew told then, as it is now there to tell. Told before it was put in (the host puts it in
     // when it is scrolled to, any time after drawing it), its files were left out of what was told: `watchMounted`)
@@ -445,7 +448,7 @@ export class Grids {
     if (text === undefined) return;
     let changed = false;
     for (const element of drawn) {
-      const found = this.found(text, element);
+      const found = await this.found(text, element);
       if (!found) continue;
       showColumns(element, columnTemplate(found.grid.attributes.columns, element.querySelectorAll(":scope > .swl-grid-cell").length, found.grid.attributes["min-width"]));
       showFit(element, fitsColumns(found.grid.attributes.columns));
@@ -522,8 +525,7 @@ export class Grids {
 
   /** A grid drawn's attributes written (a value, or null: taken off); why not, as text */
   async writeAttributes(element: HTMLElement, attributes: Readonly<Record<string, string | null>>): Promise<string | undefined> {
-    const text = await this.host.pageText().catch(() => undefined);
-    const found = text === undefined ? undefined : this.found(text, element);
+    const found = await this.foundNow(element);
     if (!found) return "this grid changed in the page since it was drawn";
     const problem = await this.host.writeAttributes({ body: found.grid.body, occurrence: found.occurrence, of: found.of, attributes });
     if (problem) return problem;
@@ -661,8 +663,7 @@ export class Grids {
     }
     // Its content emptied: the cell written empty (one edit), the grid drawn anew by it
     if (action.kind === "clear") {
-      const text = await this.host.pageText().catch(() => undefined);
-      const found = text === undefined ? undefined : this.found(text, element);
+      const found = await this.foundNow(element);
       if (!found) return void said("this grid changed in the page since it was drawn");
       const problem = await this.host.writeCell({ body: found.grid.body, occurrence: found.occurrence, of: found.of, cell, content: "" }).catch((error: unknown) => (error instanceof Error ? error.message : String(error)));
       return void (problem && this.host.problem(`Silverware Layout: the cell was not cleared: ${problem}`));
@@ -673,8 +674,7 @@ export class Grids {
       if (!problem) showBorder(element, action.style);
       return void said(problem);
     }
-    const text = await this.host.pageText().catch(() => undefined);
-    const found = text === undefined ? undefined : this.found(text, element);
+    const found = await this.foundNow(element);
     if (!found || !this.host.changeCells) return void said("this grid changed in the page since it was drawn");
     const cells: CellsChange =
       action.kind === "move"
@@ -716,7 +716,7 @@ export class Grids {
       [place],
       async () => {
         const text = await this.host.pageText();
-        const found = place.grid.isConnected ? this.found(text, place.grid) : undefined;
+        const found = place.grid.isConnected ? await this.found(text, place.grid) : undefined;
         if (!found) return "this grid changed in the page since it was drawn";
         // (Into a cell: its content as drawn with it, its offset that content's; another by then, nothing written)
         const drawnCell = picked.place.kind === "cell" ? readGridBody(this.bodies.get(picked.grid) ?? "")[picked.place.cell]?.content : undefined;
@@ -743,15 +743,24 @@ export class Grids {
     return [...this.doc.querySelectorAll<HTMLElement>(".swl-grid")].filter((element) => this.bodies.has(element));
   }
 
-  /** A grid drawn as the page's text has it: the grid, its place among those of its body, how many those are */
-  private found(text: string, element: HTMLElement): { readonly grid: Grid; readonly occurrence: number; readonly of: number } | undefined {
+  /**
+   * A grid drawn as the page's text has it: of the grids of its body the one alone, else the one its place in the text
+   * falls in (the host's `positionOf`); with its place among those of its body and how many those are. None where it is
+   * not in the text, or which of several it is cannot be told
+   */
+  private async found(text: string, element: HTMLElement, at?: Promise<number | undefined>): Promise<{ readonly grid: Grid; readonly occurrence: number; readonly of: number } | undefined> {
     const body = this.bodies.get(element);
     if (body === undefined) return undefined;
-    const nth = this.drawn().filter((one) => this.bodies.get(one) === body).indexOf(element);
     const alike = gridsOfBody(text, body);
-    if (!alike.length) return undefined;
-    const occurrence = Math.min(Math.max(nth, 0), alike.length - 1);
-    return { grid: alike[occurrence]!, occurrence, of: alike.length };
+    const grid = alike.length === 1 ? alike[0] : blockAt(alike, await (at ?? this.host.positionOf?.(element)));
+    return grid && { grid, occurrence: alike.indexOf(grid), of: alike.length };
+  }
+
+  /** A grid drawn as the page's text has it now, its place asked as the text is read (an edit between would set one against the other) */
+  private async foundNow(element: HTMLElement): Promise<{ readonly grid: Grid; readonly occurrence: number; readonly of: number } | undefined> {
+    const at = this.host.positionOf?.(element);
+    const text = await this.host.pageText().catch(() => undefined);
+    return text === undefined ? undefined : this.found(text, element, at);
   }
 
   /** The grid drawn and its cell a node is in (none: not in a grid of these) */
@@ -811,8 +820,7 @@ export class Grids {
   /** A task's box in a cell clicked: its state in the cell's markdown toggled (`[ ]` done `[x]`, any other undone), written */
   async toggleTask(element: HTMLElement, cellElement: HTMLElement, box: HTMLElement): Promise<void> {
     const index = Number(cellElement.getAttribute("data-swl-cell"));
-    const text = await this.host.pageText().catch(() => undefined);
-    const found = text === undefined ? undefined : this.found(text, element);
+    const found = await this.foundNow(element);
     const cell = found?.grid.cells[index];
     if (!found || !cell) return this.host.problem("Silverware Layout: this grid changed in the page since it was drawn; toggle the task there");
     const content = toggledTask(cell.content, offsetOf(box));
@@ -833,7 +841,7 @@ export class Grids {
     // (The page's look of a task's box and a hashtag read once, for its field: as the cell is drawn)
     const look = this.lookIn(cellElement);
     let text = await this.host.pageText().catch(() => undefined);
-    let found = text === undefined ? undefined : this.found(text, element);
+    let found = text === undefined ? undefined : await this.found(text, element);
     // Read as another cell's write had changed the grid, before it was drawn anew: opened once it is, in that drawing
     if (!found && this.writes > 0) {
       await this.writing;
@@ -841,7 +849,7 @@ export class Grids {
       const againCell = again?.querySelector<HTMLElement>(`:scope > .swl-grid-cell[data-swl-cell="${index}"]`);
       if (again && againCell) [element, cellElement] = [again, againCell];
       text = await this.host.pageText().catch(() => undefined);
-      found = text === undefined ? undefined : this.found(text, element);
+      found = text === undefined ? undefined : await this.found(text, element);
     }
     const cell = found?.grid.cells[index];
     if (!found || !cell) {
@@ -893,7 +901,7 @@ export class Grids {
       // nothing written: no other grid is taken for it)
       const grid = place.grid;
       const text = await this.host.pageText();
-      const found = grid.isConnected ? this.found(text, grid) : undefined;
+      const found = grid.isConnected ? await this.found(text, grid) : undefined;
       if (!found) return "its grid changed in the page meanwhile";
       const problem = await this.host.writeCell({ body: found.grid.body, occurrence: found.occurrence, of: found.of, cell: place.index, content });
       if (problem) return problem;
@@ -963,8 +971,7 @@ export class Grids {
 
   /** The cursor put where a point of a cell's rendering is in the page's text (no cell: at the grid's start) */
   async showSource(element: HTMLElement, cellElement: HTMLElement | undefined, target: Element, caret: { readonly node: Node; readonly offset: number } | undefined): Promise<void> {
-    const text = await this.host.pageText().catch(() => undefined);
-    const found = text === undefined ? undefined : this.found(text, element);
+    const found = await this.foundNow(element);
     if (!found) return;
     const cell = cellElement ? found.grid.cells[Number(cellElement.getAttribute("data-swl-cell"))] : undefined;
     if (!cell) return this.host.moveCursor(found.grid.from);

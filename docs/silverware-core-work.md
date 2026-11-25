@@ -98,7 +98,10 @@ Estimates are rough; checkpoints correct them. About 5 to 6 months in all.
   layers (host-free `src/`, `src/host/silverbullet/`) and its isolation test;
   scripts/hostisolation.test.ts (docs/silverware-core.md, *SilverBullet kept
   apart*) with today's leaks listed, each with the step that moves it
-  (step 4 for the plugins' entries and shared/configpage.ts).
+  (step 4 for the plugins' entries and shared/configpage.ts);
+  scripts/pagewrites.test.ts (docs/silverware-core.md, *Storage*) with today's
+  writes outside the writer listed (Chart's and Layout's: step 4; the
+  settings' `CONFIG_PAGE`: step 4).
 - **Not in it**: any service. The core only loads and says its version.
 - **Done when**: the module-state test fails on a new `let` at a shared/
   file's top level and the host test on a new `.sb-` selector outside a
@@ -145,10 +148,18 @@ Estimates are rough; checkpoints correct them. About 5 to 6 months in all.
   viewers keep of SilverBullet in their entry files (and Tags'
   `space/silverbullet.ts`) moves there, the entry only composing; the leaks
   of *SilverBullet kept apart* move into bindings; shared/configpage.ts into
-  shared/silverbullet/.
+  shared/silverbullet/. Storage at the same boundary (docs/silverware-core.md,
+  *Storage*): every plugin's settings through `Platform.settings`, with a
+  `save` of the plugin's own block for settings that are tables (the
+  toolbar's favourites), no plugin touching `Library/Config`; Silverware Chart
+  writes its block by the `codeBlocks` part (its formats' codec unchanged);
+  Silverware Layout's `/grid` by the `grids` part.
 - **Done when**: no plugin's Lua hands a function the core hands; the host
-  test's list holds no plugin entry, leak or shared/ file any more; every
-  plugin's UI tests green, on `test:ui:sb` and `test:ui:sb:edge` too.
+  test's list holds no plugin entry, leak or shared/ file any more; the page
+  writes test's list holds editing tools only (the toolbar, editors' fields)
+  and Silverware Tags' UI (step 10); a chart's block written while the page is
+  edited elsewhere, and two charts' blocks written alike, each a UI test;
+  every plugin's UI tests green, on `test:ui:sb` and `test:ui:sb:edge` too.
 
 ### 5. Geometry and editing surfaces (1 week)
 
@@ -203,8 +214,10 @@ Estimates are rough; checkpoints correct them. About 5 to 6 months in all.
   board; **checkpoint C** (stop for the user: the drag tests `--repeat-each 10`,
   hand-kept state gone, `update(snapshot)` decided); then the database's other
   views, place, peek, Properties, editors and helpers (P2); then the toolbar's
-  settings, the tags workspace, the table's other dialogs, the formula field.
-  Each part its own commits, its snapshot first.
+  settings, the tags workspace (its page changes planned by Silverware Tags'
+  modules alone, the UI calling them: *Storage*, the page writes test's last
+  entries but the editing tools gone), the table's other dialogs, the formula
+  field. Each part its own commits, its snapshot first.
 - **Done when**: each part: its snapshot unchanged, its hand-kept state gone,
   its tests green in parallel.
 
@@ -212,11 +225,12 @@ Estimates are rough; checkpoints correct them. About 5 to 6 months in all.
 
 - **Scope**: CLAUDE.md files say what the code now is (the plans' content that
   became code moves there, as each CLAUDE.md says what is, not what is to be
-  built); shared/ modules left unused removed; the lists of the module-state
-  and host tests hold only what is each plugin's own by design;
-  docs/ui-without-framework.md
-  marked replaced; the releases drafted (docs/silverware-core.md, *Releases*)
-  and proposed to the user.
+  built; the root CLAUDE.md gets the rules of *Where code goes*, *SilverBullet
+  kept apart* and *Storage*: the two kinds of plugins and their abstraction);
+  shared/ modules left unused removed; the lists of the module-state, host
+  and page writes tests hold only what is each plugin's own by design or an
+  editing tool; docs/ui-without-framework.md marked replaced; the releases
+  drafted (docs/silverware-core.md, *Releases*) and proposed to the user.
 
 ## Apart from this branch
 

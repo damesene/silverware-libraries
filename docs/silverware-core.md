@@ -245,21 +245,79 @@ plugin's few own pieces.
 
 ## Storage
 
-Nothing in these plans changes how data is kept. Markdown is the format;
-the stores are the abstraction, as today:
+Markdown stays the format; nothing here changes what a space holds. What
+changes is that every plugin reaches it through the abstraction that fits
+what it works on, and none writes a page's text by itself.
 
-- Silverware Database's store (`DatabaseStore`, src/store/: the pages store and
-  the memory store, both passing src/store/contract.ts), its items opaque
-  `ItemKey`s.
-- Silverware Table's markdown store over the table model (shared/table/).
-- The page writer (shared/pages/), the one place writing a page's text.
-- The formulas read through `TableSource` and `FormulaCells` (shared/formulas/),
-  never a store or a page: moving them into the core takes no knowledge of
-  storage with them.
+### Two kinds of plugins, two abstractions
 
-The core holds no storage: its index (H) is the binding's reading of
-SilverBullet's index, handed to the stores through the `Index` of
-`Platform` as today.
+- **A plugin with a model of its own**: what the user works on is not text,
+  only kept as text. A database's item is a record kept as a page with its
+  frontmatter; a table is a model of cells kept as a markdown table. **A store
+  with a contract** maps the model to markdown and back, with a store in
+  memory beside the real one, both passing the contract's tests. Silverware
+  Database (`DatabaseStore`, src/store/, src/store/contract.ts, its items
+  opaque `ItemKey`s) and Silverware Table (its markdown store over the table
+  model, src/store/, core/store.ts) are so today.
+- **A plugin over the document**: what the user works on is the document's
+  own syntax: a hashtag (Silverware Tags), a grid (Silverware Layout), an
+  embed (Silverware Assets), a chart's block (Silverware Chart). There is no
+  model kept as text; it is the text. **The document model** is the
+  abstraction: the markdown reader (shared/markdown/: blocks, grids, embeds,
+  tags, a block's lines) gives structure, and the page writer's parts
+  (shared/pages/: `tags`, `grids`, `embeds`, `codeBlocks`, a plugin's own
+  registered part) take planned changes. A store over these would only pass
+  calls on. A plugin whose block holds a format of its own reads and writes it
+  by a codec (Silverware Chart's formats: `read` and `write` between its model
+  and the block's text), the block itself written by the `codeBlocks` part.
+
+Silverware Toolbar is neither: it is an editing tool, changing the user's text
+in the surface being edited, as the user would; so are a field's own edits
+(`setText` in a grid's cell or the peek).
+
+### Rules
+
+- **Every write of a page's text goes through the page writer** (shared/pages/),
+  never a range written by a plugin (`replaceRange`, `writePage` of a page's
+  text): the writer reads the page as it is, tells blocks written alike apart
+  by their place, and leaves a page changed since it was read. Editing tools
+  (the toolbar, an editor's field) are the exception, listed by the test.
+- **A plugin over the document works on structure, not on places in the
+  text**: it reads through the reader and writes through a part's changes,
+  never by offsets of its own.
+- **The domain plans writes; the UI calls the domain.** No dialog or panel
+  composes page changes itself.
+- **Settings through `Platform.settings`** (shared/platform.ts: `get`, `save`),
+  made by the binding; a plugin's settings that are tables (the toolbar's
+  favourites), kept in its own block of the configuration page today
+  (shared/configpage.ts), go through it too (a `save` of the plugin's own
+  block). No plugin reads or writes `Library/Config` itself: where settings
+  are kept is the host's.
+- **The formulas** read through `TableSource` and `FormulaCells`
+  (shared/formulas/), never a store or a page: moving them into the core takes
+  no knowledge of storage with them. The core holds no storage: its index (H)
+  is the binding's reading of SilverBullet's index, handed to the stores
+  through `Platform`'s `index` as today.
+
+### Where the plugins are today (2026-11-25)
+
+- **Silverware Chart** reads its block through its formats' codec, then writes
+  the text it made by `replaceRange` of the block's offsets
+  (src/core/controller.ts:203, src/modules/insert.ts:36): to be written by the
+  `codeBlocks` part, as Silverware Database writes its block.
+- **Silverware Layout**'s `/grid` puts a grid in by `replaceRange` (src/index.ts,
+  `runSlashCommand`): to go through the `grids` part.
+- **Silverware Tags** composes page changes in its UI (src/ui/chips.ts,
+  workspace.ts) beside its modules: the UI to call its modules alone.
+- **Settings**: every plugin reads them through its bridge and writes its block
+  of `Library/Config` through shared/configpage.ts; Silverware Database alone
+  through `Platform.settings`.
+- Silverware Database, Table and Assets keep to the rules already.
+
+**The test** (scripts/pagewrites.test.ts, in `verify`): `replaceRange`,
+`writePage`, `writeFile` of a page and `CONFIG_PAGE` outside the page writer,
+the bindings and the listed editing tools fail it; today's places listed with
+the step that moves each.
 
 ## Services
 
@@ -494,7 +552,12 @@ Weighed for what they bring; each changes only with the step that needs it.
 - 2026-11-25: SilverBullet is a host kept apart: its knowledge in bindings
   (`host/silverbullet/` of each plugin and of the core, shared/silverbullet/),
   checked by a test of markers; the core is host-free outside its binding.
-  Storage stays as it is: markdown the format, the stores the abstraction.
+- 2026-11-25: storage: markdown stays the format. A plugin with a model of its
+  own has a store with a contract; a plugin over the document works through
+  the reader and the page writer's parts, on structure, not offsets; every
+  write of a page's text goes through the writer (editing tools apart);
+  settings through `Platform.settings`. No store added where the text is the
+  model (*Storage*).
 - 2026-11-25: Safari is not tested; it is met when a user reports a problem.
 - 2026-11-25: custom views stay framework-free (only DOM and callbacks cross
   their contract).

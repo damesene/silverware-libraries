@@ -197,15 +197,38 @@ export class PeekPanel {
     return true;
   }
 
-  /** The module stopped: closed whatever is shown; a body typed and not written said with its text, nothing else can keep it */
+  /**
+   * The module stopped: closed whatever is shown; a body typed and not left yet written as leaving it would (the core
+   * outlives the module: it is kept as Space Lua loads again), said with its text only where that write fails, as a body
+   * kept from before is, nothing else can keep it
+   */
   stop(): void {
     const shown = this.shown;
     const field = this.element && shown?.field?.body.element.isConnected ? shown.field.body : undefined;
     // (A body typed and not left yet: not every browser blurs a field as it goes)
     const typed = shown && field && field.element.dataset.reading === undefined && shown.body && field.getText() !== (shown.body.was ?? "") ? field.getText() : undefined;
     const inField = field && field.element.dataset.reading === undefined ? field.getText() : undefined;
-    const kept = shown?.kept ? { ...shown.kept, text: inField ?? shown.kept.text } : typed === undefined ? undefined : { text: typed, why: "the module stopped before it was written" };
-    if (shown && kept) this.host.ui.notify(`Silverware Database: the content typed for "${shown.item.name}" was not written (${kept.why}). It was:\n${kept.text}`, { type: "error" });
+    const lost = (text: string, why: string) => this.host.ui.notify(`Silverware Database: the content typed for "${shown!.item.name}" was not written (${why}). It was:\n${text}`, { type: "error" });
+    if (shown?.kept) lost(inField ?? shown.kept.text, shown.kept.why);
+    else if (shown && typed !== undefined) {
+      const was = shown.body?.was;
+      // (After a write going on; the body then as written, so the field's own write as it goes finds nothing to write)
+      this.writing = this.writing
+        .then(() => this.host.core.setBody(shown.database, shown.item, typed, was))
+        .then(
+          (result) => {
+            if (isRefused(result)) {
+              if (result.cause !== "unchanged") lost(typed, result.problem);
+              return;
+            }
+            shown.body = { was: typed };
+            // (The places showing it drawn anew, as a body written as it is left does)
+            this.host.refreshPlaces(shown.database);
+          },
+          (error) => lost(typed, error instanceof Error ? error.message : String(error)),
+        )
+        .catch(() => undefined);
+    }
     this.remove();
   }
 

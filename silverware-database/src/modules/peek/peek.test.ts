@@ -744,14 +744,32 @@ describe("the peek", () => {
     expect(document.querySelector(".swd-peek-add-property")).toBeNull();
   });
 
-  it("says a body typed and not left as the module stops", async () => {
-    const { q, peek, modules, told } = await setup();
+  it("writes a body typed and not left as the module stops (Space Lua loaded again), nothing said where it is written", async () => {
+    const { q, peek, modules, told, store, named } = await setup();
     await peek("Fix login");
     const body = q<HTMLTextAreaElement>(".swd-peek-body");
     body.focus();
     body.value = "Typed, not left";
+    const before = told.length;
     modules.stop();
-    expect(told.at(-1)).toContain("Typed, not left");
+    // (Said at once before: what was typed reported lost as the module stopped, though written a moment later)
+    expect(told.slice(before)).toEqual([]);
+    await vi.waitFor(async () => expect(await store.body("tasks", (await named("Fix login")).key)).toBe("Typed, not left"), { timeout: 5_000 });
+    expect(told.slice(before)).toEqual([]);
+  });
+
+  it("says a body typed and not left as the module stops where its write is refused, with its text", async () => {
+    const { q, peek, modules, told, core, store, named } = await setup();
+    await peek("Fix login");
+    const body = q<HTMLTextAreaElement>(".swd-peek-body");
+    body.focus();
+    body.value = "Mine";
+    // (Changed elsewhere since it was read: refused)
+    const item = await named("Fix login");
+    await core.setBody("tasks", item, "Theirs", await store.body("tasks", item.key));
+    modules.stop();
+    await vi.waitFor(() => expect(told.at(-1)).toContain("Mine"), { timeout: 5_000 });
+    expect(await store.body("tasks", (await named("Fix login")).key)).toBe("Theirs");
   });
 
   it("shows another item pressed in its place in the same panel, never closed and opened anew; a press elsewhere closes it", async () => {

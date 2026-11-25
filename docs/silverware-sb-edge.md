@@ -2,7 +2,7 @@
 
 Plan, started 2026-11-17 (branch `fix/sb-edge`). Takes in the earlier plan for tool pages under `Library/` (2026-11-13, `docs/silverware-library-prefix.md`, removed).
 
-> **Done** (2026-11-25, branch `drop-silverbullet-2.12`): SilverBullet 3.0 was released on 2026-11-24 and Silverware now needs it; the cleanup below is done (*Cleanup* > *Done*), the versions for 2.12 kept in the branch `silverbullet-2.12`. What follows is the record of what 3.0 changed and how it was met.
+> **Done** (2026-11-25, branch `drop-silverbullet-2.12`): SilverBullet 3.0 was released on 2026-11-24 and Silverware now needs it; the cleanup below is done (*Cleanup* > *Done*), the versions for 2.12 kept in the branch `silverbullet-2.12`; the questions left open answered from 3.0.0's source (*Open*), two of them still open. What follows is the record of what 3.0 changed and how it was met; what still holds is in the CLAUDE.md files (the root's *Verified in SilverBullet*, the plugins').
 
 ## Goal
 
@@ -13,7 +13,7 @@ Every plugin works on SilverBullet 2.12.1 (the latest release, the user's Docker
 ## Sources
 
 - **Read SilverBullet's `main` on GitHub** (`gh` is not installed on this machine; `curl` works): a file as `https://raw.githubusercontent.com/silverbulletmd/silverbullet/main/<path>` (spaces as `%20`), a commit with its files and diff as `https://api.github.com/repos/silverbulletmd/silverbullet/commits/<sha>`, recent commits as `…/commits?sha=main&since=<ISO date>`. Downloaded JSON goes to the scratchpad, read with `node`.
-- **Not in the local fork**: `d:\git\silverbullet` (origin `damesene/silverbullet`) stops at 2026-11-06 and has no remote for SilverBullet's own repository. Do not conclude from the fork that this plan is wrong.
+- **The local fork**: `d:\git\silverbullet` (origin `damesene/silverbullet`, `upstream` SilverBullet's own repository, fetched with its tags): `git show 3.0.0:<path>` reads the release.
 - Key files: `docs/CHANGELOG.md` (section *Edge (3.0 edition)*), `docs/ADR/012 Tooling Lives in Library.md`, `docs/Tool Page.md`, `docs/Theming/Upgrading Existing Styles.md`, `plug-api/lib/tool_pages.ts`, `client/config_management/config_page.ts`, `config_block.ts`, `managed_edit.ts`, `client/workbench/libraries/library_names.ts`.
 - **An edge build to run**: `npm run test:ui:sb:edge` (on Windows SilverBullet's release `edge`, downloaded into `.cache/silverbullet/`; elsewhere the image in `scripts/silverbullet/edge.mjs`). CI runs it daily (`edge-tests.yml`).
 
@@ -106,14 +106,19 @@ What the edge UI tests and probes showed, each with its fix (or why there is non
 
 ## Open
 
-- **Silverware Database's tests on edge under a full run's load** (2026-11-17): `database.spec.ts` 18, 228, 668 and 824 failed or were flaky in full runs on edge (4 workers), all passed repeated alone (16 of 16, 2 workers). Races to find and fix where they are.
+Answered on 2026-11-25 from SilverBullet 3.0.0's source (tag `3.0.0`), nothing left to change for them:
+
+- **Silverware Database's tests on edge under a full run's load** (2026-11-17: `database.spec.ts` 18, 228, 668 and 824 failed or were flaky in full runs on edge): their races were fixed one by one; CI's last runs on 3.0.0 and on edge had no flaky test and no retry.
+- **The boot pass and our `config.define`**: the boot pass fills the configuration first (`boot.ts`, the object the client keeps); the full load clears it and runs every script again (`client_system.ts` `loadLuaScriptsImpl`). `config.define` sets a default only where no value is (`applySchemaDefaults`), and `config.set` after it overrides it, so a user's `config.set("silverware.…")` holds whether it runs before our definition or after.
+- **Pages tagged `meta/template` outside `Library/`**: SilverBullet 3.0 tells its pages by their place alone (`isLibraryPage`, `plug-api/lib/library_pages.ts`), so such a page is an ordinary one, and Silverware Tags shows it so (its tag `meta/template` stays out of the view while *Hide and protect library pages* is on).
+- **Style order**: styles apply by priority first (highest first, none counting as 0), then by page name, then by place (`tooling.ts` `compareToolBlocks`). Ours have none, so a user's page sorting before `Library/damesene/` (`Library/Style`: capitals sort first) applies before ours, and of two rules alike ours wins. It does not reach what the library pages tell users to set: Silverware Database's widths are read as fallbacks (`var(--swd-cell-max-width, 24em)`), and a theme of Silverware Table's is a selector of its own name.
+- **`codeWidget.define` merges** (`config.merge({"codeWidgets", language}, def)`): Silverware Chart's widget takes what was there and replaces its `render`. The configuration is cleared each time Space Lua loads, so what drew a language before is never Silverware Chart's own: its init page's mark against wrapping itself (`silverwareChart`, `before.before`) went. A UI test checks the fallback it guarded: a library drawing `mermaid`, Space Lua loaded three times, the flowchart still the library's and the chart still ours.
+- **`config.persist`**: weighed, *Cleanup* > *Weighed and left*.
+
+Still open:
+
 - **Reported by the user on edge (2026-11-17)**: (1) an XLSX file's preview and full view look wrong, as if styles leaked into them (striped rows, dark header cells), kept so in the preview made of it (Regenerate preview did not help); the side panel shows it right. (2) SilverBullet's own "↳ sample.xlsx" heading above ours (its embed card's `::before`: fixed for every file in Silverware Assets' style page, not yet deployed then). (3) A task's checkbox no longer grows and shrinks with the font zoom. (1) and (2) fixed (see *Findings*: the embed's card, the XLSX sheet's weight; checked by a probe, a preview and a full view drawn right). (3) not found yet: in a page's text on edge the box grows with the zoom (a probe: 13.3 px at 18 px, 16.3 px at 22 px, `0.7407em` of Layout's rule over the browser's 13.33 px control font, as SilverBullet's own box is 13.3 px at 18 px there); where the user saw it (a grid's cell, a database's peek, a setting) to be asked.
 - **Silverware Toolbar and SilverBullet's selection bubble** (edge): both show by a selection. Either Silverware Toolbar hides SilverBullet's bubble while it is on (a style rule on `.sb-selection-bubble`, perhaps a setting), or the docs tell users to turn it off (`markupBar.selectionBubble`, Workbench > Configuration). The user's decision.
-- Whether the boot pass runs users' `config.set("silverware.…")` lines before our `config.define`. Probe on edge.
-- What Silverware Tags shows for pages tagged `meta/template` outside `Library/` on edge.
-- Style order: whether a user's override of our variables still wins.
-- `codeWidget.define` merging: Silverware Chart reads `config.get({ "codeWidgets", language })` before defining.
-- `config.persist(path, value)` (edge) could replace our writer for values the Configuration Manager reads.
 
 ## Cleanup
 
@@ -144,7 +149,8 @@ What the edge UI tests and probes showed, each with its fix (or why there is non
 - The configuration page's name is no longer handed over by the init pages (`configPage` went from every bridge): `shared/configpage.ts`' `CONFIG_PAGE` is `Library/Config`, the init pages write the same page. Code, tests and CLAUDE.md say `Library/Config` (or "the configuration page") where they said `CONFIG`.
 - The init pages' save no longer calls `editor.rebuildEditorState` after `editor.reloadConfigAndCommands` (3.0's builds the editor's state anew itself), nor guards `sync.performFileSync`; Silverware Tags' panel no longer asks whether `view.define` exists (it did in 2.12.1 too).
 - SilverBullet 2.12.1's widget button bar (`.button-bar`) is gone from the style pages and the code that hid it (Chart, Database, Layout's grid, Assets): 3.0 draws `.sb-widget-menu-bar` alone. The ⋮ beside a widget is 3.0's release's too: its tests run on every SilverBullet target, not on edge alone; the space tree's tests expect its command there.
-- Silverware Tags names SilverBullet's own pages "library pages" where a user sees it (*Hide and protect library pages*; the setting's key `protectMeta` stays), as 3.0's tree has them under *Library*.
+- Silverware Tags names SilverBullet's own pages "library pages" where a user sees it (*Hide and protect library pages*; the setting's key `protectMeta` stays), as 3.0's tree has them under *Library*; the code too, as SilverBullet's: `isToolPage` became `isLibraryPage` (`shared/pages/tags/names.ts`).
+- Silverware Chart's init page no longer marks its code widget against wrapping itself (*Open*: the configuration is cleared each time Space Lua loads).
 - The UI tests' servers serve a data folder always and write `Library/Config.md`; the first-index wait is `afterIndexCompleted` alone.
 - **A widget's block told by SilverBullet's editor** (`editor.posAtDOM`, public in 3.0, each init page handing it over; `shared/placed.ts`, `shared/silverbullet/position.ts`): of blocks written alike, Silverware Chart, Database and Layout's grids write the one a widget's place falls in, in place of their order among the widgets drawn, which was short where one was out of the page (CodeMirror keeps far blocks out): Chart and Database refused then, Layout wrote a cell into the wrong grid. Probed on 3.0.0: a code block's widget gives its block's start, a custom syntax's its region's end. Silverware Assets asks it in place of `client.editorView.posAtDOM`. Left as they are: Silverware Table pairs a table drawn with its text synchronously (`data-pos`, before it is laid out), which an asynchronous call cannot; a grid's new drawing after a write of ours is taken by its order at once (`redrawn`), in a MutationObserver.
 
@@ -154,4 +160,4 @@ Weighed and left (2026-11-25, from a survey of what 3.0 offers):
 - `markdown.renderToDom` in place of `markdownToHtml` for a grid's cells and the sheet view: it takes no options, so no `annotationPositions`, which a cell's clicks and its tasks need (`data-pos`).
 - `posAtCoords` (a drop's place in Silverware Assets) has no public call yet: `editorposition.ts` keeps reading `client.editorView` for it alone.
 
-**After it:** `test:ui:sb` moved to a release with these changes, the 2.12.1 scenarios dropped (merged with Dependabot's PR #56, which moves CI's SilverBullet to 3.0); a release per plugin, MAJOR (a space on 2.12 stops working), each changelog's first line a **Breaking:** one (needs SilverBullet 3.0 or later; on SilverBullet 2.12, the branch `silverbullet-2.12`, and how to switch to it: *Before it*); `README.md` saying the same; a forum post drafted for the user; this plan marked done, its decisions moved to the plugins' CLAUDE.md where they still hold.
+**After it:** `test:ui:sb` moved to a release with these changes, the 2.12.1 scenarios dropped (merged with Dependabot's PR #56, which moves CI's SilverBullet to 3.0); a release per plugin, MAJOR (a space on 2.12 stops working), each changelog's first line a **Breaking:** one (needs SilverBullet 3.0 or later; on SilverBullet 2.12, the branch `silverbullet-2.12`, and how to switch to it: *Before it*); `README.md` saying the same; a forum post drafted for the user; this plan marked done, its decisions moved to the plugins' CLAUDE.md where they still hold. All done in `drop-silverbullet-2.12` but the forum post, which the user asks for.

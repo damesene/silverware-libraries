@@ -1,7 +1,7 @@
 ---
 name: Library/damesene/silverware-layout
 tags: meta/library
-version: 2.0.4
+version: 2.0.5
 description: "Silverware Layout: Columns in a page (/grid), the width of a page's text and where it stands, centred, at the left or at the left while a side panel is open (its own or a default for every page) and of its tables, databases, charts and grids, wider or narrower than the text by a handle beside them that snaps to guides of your own, and placed at the left, in the middle or at the right; the editor's font size, and font zoom with Ctrl + scroll or a pinch, files zooming with the text."
 files:
 - silverware-layout.js

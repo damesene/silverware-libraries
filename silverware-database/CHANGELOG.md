@@ -1,5 +1,10 @@
 # Silverware Database: changelog
 
+## 1.4.2 (2026-11-24)
+
+- Settings are saved again on SilverBullet 3.0: saving any setting kept nothing before (SilverBullet 3.0 tells its configuration page another way).
+- Fixed: content typed in an item's peek as SilverBullet reloads its scripts (another plugin's settings saved) is saved, and no longer reported as lost.
+
 ## 1.4.1 (2026-11-22)
 
 - A date or a time picked in its calendar is saved at once, its formulas shown anew; one typed is still saved by Enter or as you leave the field.

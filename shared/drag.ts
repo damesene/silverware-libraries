@@ -112,9 +112,11 @@ export function reorder(e: PointerEvent, options: Reorder): void {
     const by = last.y < r.top + SCROLL_EDGE ? -1 : last.y > r.bottom - SCROLL_EDGE ? 1 : 0;
     if (!by) return;
     const edge = by < 0 ? r.top + SCROLL_EDGE - last.y : last.y - (r.bottom - SCROLL_EDGE);
-    const before = container.scrollTop;
+    // (Ended at its end alone: a frame whose scroll the browser took back, its scroll anchoring as the element was placed
+    // above what shows, scrolled none, and the list stopped short of its top under load)
+    const end = by < 0 ? 0 : container.scrollHeight - container.clientHeight;
+    if (by < 0 ? container.scrollTop <= end : container.scrollTop >= end - 1) return;
     container.scrollTop += by * Math.ceil((SCROLL_STEP * Math.min(edge, SCROLL_EDGE)) / SCROLL_EDGE);
-    if (container.scrollTop === before) return;
     place(last.x, last.y);
     scrolling = win.requestAnimationFrame(scroll);
   };

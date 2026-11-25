@@ -9,11 +9,13 @@ Silverware is a collection of plugins (libraries) for [SilverBullet](https://sil
 
 ## Install
 
-Add this repository in SilverBullet with the `Library: Add Repository` command and the URI:
+This branch, `silverbullet-2.12`, keeps the versions for **SilverBullet 2.12**; the branch `main` is for SilverBullet 3.0 and later. On SilverBullet 2.12, add this repository with the `Library: Add Repository` command and the URI:
 
 ```text
-https://github.com/damesene/silverware-libraries/blob/main/REPO.md
+https://github.com/damesene/silverware-libraries/blob/silverbullet-2.12/REPO.md
 ```
+
+A plugin you installed before from `main` updates from `main`, which needs SilverBullet 3.0: remove it and install it again from this repository, or change `blob/main/` to `blob/silverbullet-2.12/` in the `share.uri` of its page (under `Library/damesene/`).
 
 Then install a plugin with `Library: Install`.
 

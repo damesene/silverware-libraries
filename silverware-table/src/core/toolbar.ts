@@ -311,8 +311,22 @@ export class Toolbar {
     bar.style.left = "0px";
     bar.style.maxWidth = "";
     bar.classList.add("swt-visible");
+    bar.classList.remove("swt-out-of-view");
     const widest = Math.max(0, ...Array.from(bar.children, (row) => (row as HTMLElement).offsetWidth));
     bar.style.maxWidth = `${Math.ceil(Math.max(widest, right - left))}px`;
+    // A panel of the host's over part of the page (SilverBullet's space tree) and none of the table in view across, or
+    // no room for the toolbar beside it (the window kept it in reach over the panel): hidden, still shown for the
+    // table, so it comes back as the panel goes; its open menu closed, which it placed over the panel. Only where such a
+    // panel narrows the view: a toolbar wider than a narrow screen's page stays as before, nor is a table not laid out
+    // (in tests) covered
+    const page = host.viewBounds(widget, false);
+    const narrowed = shown.left > page.left || shown.right < page.right;
+    const covered = narrowed && tableRect.right > tableRect.left && (Math.min(rect.right, tableRect.right, shown.right) <= left || bar.offsetWidth > shown.right - shown.left);
+    bar.classList.toggle("swt-out-of-view", covered);
+    if (covered) {
+      if (this.context.menu.kind === "table") this.context.menu.close(false);
+      return;
+    }
     const above = headerRect.top - bar.offsetHeight - BAR_GAP;
     // No room above the header: over the header's right end instead. A header held below the top of the view has the
     // room (STICKY_GAP): the toolbar goes there, so it never covers a column's name while the page scrolls; one held at

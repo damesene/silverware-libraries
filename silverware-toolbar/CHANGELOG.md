@@ -1,5 +1,10 @@
 # Silverware Toolbar: changelog
 
+## 1.1.3 (2026-11-24)
+
+- Settings are saved again on SilverBullet 3.0: saving any setting kept nothing before (SilverBullet 3.0 tells its configuration page another way).
+- On a phone with SilverBullet 3.0, the toolbar docked at the bottom steps aside while the space tree is open, so it no longer covers the tree's last items.
+
 ## 1.1.2 (2026-11-19)
 
 - Fixed: letting go of a favourite dragged in the settings, or cancelling the drag with Esc, no longer counts as a click on what lies under the pointer.

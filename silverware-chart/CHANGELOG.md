@@ -1,5 +1,11 @@
 # Silverware Chart: changelog
 
+## 1.2.2 (2026-11-25)
+
+- A chart's width set with Silverware Layout is saved again, and its toolbar and the following of its table work, after SilverBullet reloads its scripts without redrawing the page (until now only a reload of the page fixed it).
+- On SilverBullet 3.0 the menu SilverBullet shows beside a widget no longer appears beside a chart, which has its own.
+- Two charts written the same on one page are each changed as their own: a width, a setting or a table picked for the second one no longer goes to the first, and each reads the table above or below itself.
+
 ## 1.2.1 (2026-11-19)
 
 - Panels, menus and dialogs scroll with a thin scrollbar, the same in every Silverware plugin; SilverBullet's own scrollbar is unchanged.

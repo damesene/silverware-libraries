@@ -1,7 +1,7 @@
 ---
 name: Library/damesene/silverware-assets
 tags: meta/library
-version: 1.1.1
+version: 1.1.2
 description: "Silverware Assets: embedded files shown full, as a preview or as a card (a zip or a document too), a link to a file with its icon and a menu, a file opened in a side panel or enlarged, a link turned into an embed and back."
 files:
 - silverware-assets.js
@@ -31,6 +31,8 @@ Point at a file, and a **…** button shows at its top right (also in a grid's c
 - **Delete file…**, last (a file of your space).
 
 A click on a card or a preview opens the file in a new tab; Shift+click does the same, unless you set otherwise: either can instead open it in the side panel, enlarged, or download it.
+
+**A file that is not there** (deleted or moved, or not reached): an image, a video or audio shown as a preview or full keeps its place. A box of the same size stands in for it, with the file's icon and name and *File not found*; a preview's label still shows above it, and its **…** menu works as for any file (**Remove from page**, **Show as**, **Rename…**). Shown full, the box takes the size its embed gives (`![[photo.png|300x200]]`). If the file comes back, it shows again.
 
 **Its alignment**, with [Silverware Layout](https://github.com/damesene/silverware-libraries/blob/main/silverware-layout/silverware-layout.md) installed (it places what is on a page): click the bar beside a file (a preview's too), and **Align** in its menu puts it at the left, in the middle or at the right of its line (of its cell, in a grid); kept in its embed, `![[photo.png|Photo||{ align: center }]]`. Without its own, the default in **Silverware Layout: Settings** (its **Alignment** tab: previews and full files apart) holds, left unless you change it. A card is always at the left. Without Silverware Layout files stand as SilverBullet draws them.
 

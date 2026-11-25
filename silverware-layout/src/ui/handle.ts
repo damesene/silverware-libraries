@@ -54,8 +54,11 @@ export type HandleHost<W> = {
   textWidth(): number;
   paneWidth(): number;
   guides(): readonly Guide[];
-  // The part of the window the page is seen in (below SilverBullet's top bar), top and bottom
-  view(): { readonly top: number; readonly bottom: number };
+  // The part of the window the page is seen in (below SilverBullet's top bar), top and bottom; left and right where a
+  // panel of the host's lies over part of the page (its space tree on a narrow screen)
+  view(): { readonly top: number; readonly bottom: number; readonly left?: number; readonly right?: number };
+  // Told as what lies over the page may have changed the view without a scroll or a resize (such a panel opened)
+  watchView?(listener: () => void): () => void;
   // The part of a widget the user sees, where its plugin says it is not its whole box (a held header)
   seen(widget: W): { readonly top: number; readonly bottom: number } | undefined;
   // Where a drag's guides go: the box the page scrolls in, so they lie under its widgets (none: over the page)
@@ -108,6 +111,8 @@ export class WidthHandle<W> {
   // them as well, not taken twice
   private tapped = -Infinity;
   private tappedTwice = -Infinity;
+  // Hidden while it would lie over a panel of the host's over the page (SilverBullet's space tree), its widget kept
+  private covered = false;
 
   constructor(
     private readonly doc: Document,
@@ -121,6 +126,7 @@ export class WidthHandle<W> {
     doc.addEventListener("pointerdown", (e) => this.touched(e), { capture: true, passive: true });
     doc.addEventListener("scroll", () => this.follow(), { capture: true, passive: true });
     doc.defaultView?.addEventListener("resize", () => this.follow());
+    host.watchView?.(() => this.follow());
     this.bar.addEventListener("pointerdown", (e) => this.pressed(e));
     this.bar.addEventListener("pointermove", (e) => this.dragged(e));
     this.bar.addEventListener("pointerup", (e) => void this.released(e));
@@ -236,6 +242,7 @@ export class WidthHandle<W> {
     this.stay();
     if (this.drag) return;
     this.box.hidden = true;
+    this.covered = false;
     this.widget = undefined;
     this.closeMenu?.();
   }
@@ -269,6 +276,18 @@ export class WidthHandle<W> {
     const inside = this.roomOf() !== undefined;
     const end = this.anchorOf() === "end";
     const left = inside ? (end ? rect.left + 4 : rect.right - 4 - bar) : end ? rect.left - 6 - bar : rect.right + 6;
+    // Not over a panel of the host's lying over the page (its space tree): hidden while it would be, its widget kept, so
+    // it comes back as the panel goes (not while it is dragged: it ends as it is let go); its menu closed with it
+    if (!this.drag && ((view.left !== undefined && left < view.left) || (view.right !== undefined && left + bar > view.right))) {
+      this.covered = true;
+      this.box.hidden = true;
+      this.closeMenu?.();
+      return;
+    }
+    if (this.covered) {
+      this.covered = false;
+      this.box.hidden = false;
+    }
     this.box.classList.toggle(`${BASE}-inside`, inside);
     Object.assign(this.box.style, { left: `${Math.round(left)}px`, top: `${Math.round(at)}px`, height: `${Math.round(height)}px` });
     // (A widget not widened: its bar for its menu alone)
@@ -277,7 +296,7 @@ export class WidthHandle<W> {
 
   /** Placed again as the page scrolls or the window changes; gone where its widget is (drawn anew, scrolled away) */
   private follow(): void {
-    if (this.box.hidden) return;
+    if (this.box.hidden && !this.covered) return;
     // (A pane become too narrow, a phone turned: no room beside its widget any more, none shown)
     if (!this.drag && this.widget && !this.shown(this.widget)) return this.hide();
     this.place();

@@ -10,10 +10,10 @@ import { test as base, expect, type Locator, type Page } from "@playwright/test"
 import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 
-import { boxOf, commandDefined } from "../../scripts/ui-test-helpers.ts";
+import { boxOf, commandDefined, runSilverBulletCommand } from "../../scripts/ui-test-helpers.ts";
 import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
 
-export { boxOf };
+export { boxOf, runSilverBulletCommand };
 
 /**
  * A widget's width as SilverBullet draws it at the text's width, checked against the text's line: SilverBullet's

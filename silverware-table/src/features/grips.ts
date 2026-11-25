@@ -186,7 +186,14 @@ export class Grips implements Feature {
     this.target = { info, column: ref.column, ...(ref.row > 0 ? { row: ref.row } : {}) };
     // The part of a wide table in view: the table itself may be scrolled sideways
     const shown = this.host.rectOf(info, "table");
-    if (!shown) return;
+    // None of it in view (a panel of the host's over it: SilverBullet's space tree): no grip over what covers it, the
+    // target kept, so they come back as it is in view again
+    if (!shown) {
+      for (const grip of [this.rowGrip, this.columnGrip]) grip.classList.remove("swt-visible");
+      // (A grip's menu open, placed by its grip: over what covers the table now)
+      if (this.menu) this.closeMenu(false);
+      return;
+    }
     const rearranged = this.host.rearranged(info);
     const fixed = !!this.host.fixedShape(info.model);
     this.columnGrip.classList.toggle("swt-no-drag", fixed);
@@ -197,13 +204,19 @@ export class Grips implements Feature {
       const height = rowRect.bottom - rowRect.top;
       const length = Math.max(GRIP_THICKNESS, Math.min(height - 8, ROW_GRIP_LENGTH));
       Object.assign(this.rowGrip.style, { width: `${GRIP_THICKNESS}px`, height: `${length}px` });
-      // Half on the table's left edge, half in the cell
-      this.host.place(this.rowGrip, shown.left - GRIP_THICKNESS / 2, rowRect.top + (height - length) / 2);
+      // Half on the table's left edge, half in the cell; within the page's view (not over a panel of the host's over the
+      // rest: SilverBullet's space tree)
+      const view = this.host.rectOf(info, "view");
+      this.host.place(this.rowGrip, Math.max(shown.left - GRIP_THICKNESS / 2, view?.left ?? -Infinity), rowRect.top + (height - length) / 2);
     } else {
       this.rowGrip.classList.remove("swt-visible");
     }
     const h = this.host.rectOf(info, { column: ref.column });
-    if (h) {
+    // (No room for it in the part of the table in view, narrower than its column, the rest under a panel of the host's:
+    // none, rather than over it)
+    const room = shown.right - shown.left;
+    if (h && room < h.right - h.left && room < Math.max(GRIP_THICKNESS, Math.min(h.right - h.left - 8, COLUMN_GRIP_LENGTH))) this.columnGrip.classList.remove("swt-visible");
+    else if (h) {
       const width = h.right - h.left;
       const length = Math.max(GRIP_THICKNESS, Math.min(width - 8, COLUMN_GRIP_LENGTH));
       Object.assign(this.columnGrip.style, { width: `${length}px`, height: `${GRIP_THICKNESS}px` });

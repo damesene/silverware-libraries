@@ -79,3 +79,29 @@ test("a chart's text in proportion to the page's: Chart.js's 12 px at SilverBull
   await page.keyboard.up("Control");
   await expect.poll(() => tickSize(page)).toBe(18);
 });
+
+test("a chart after Space Lua is loaded again without the page's widgets drawn anew: drawn anew by the chart's new start, its toolbar shown and its width saved", async ({ page, space }) => {
+  await space.open({ Page: PAGE }, "Page");
+  await expect(page.locator(".swc-widget canvas")).toBeVisible();
+  const before = await page.locator(".swc-chart").elementHandle();
+  // SilverBullet's own reload of the scripts alone (`system.loadScripts`, as a script may run it), the widgets kept
+  await page.evaluate(async () => {
+    const system = (window as unknown as { client: { clientSystem: { localSyscall(name: string, args: unknown[]): Promise<unknown> } } }).client.clientSystem;
+    await system.localSyscall("system.loadScripts", []).catch(() => system.localSyscall("system.loadSpaceScripts", []));
+  });
+  await expect.poll(() => before!.evaluate((box) => box.isConnected)).toBe(false);
+  await expect(page.locator(".swc-widget canvas")).toBeVisible();
+
+  const b = await boxOf(page.locator(".swc-widget"));
+  await page.mouse.move(b.x + 40, b.y + b.height / 2);
+  // (Its toolbar the new start's, shown as it is hovered)
+  await expect(page.locator(".swc-bar.swc-visible")).toHaveCount(1);
+  const bar = page.locator(".swl-handle-bar");
+  await expect(bar).toBeVisible();
+  const at = await boxOf(bar);
+  await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(at.x + 150, at.y + at.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await space.saved("Page")) ?? "").toMatch(/\n%% layout\.width: \d+\n```/);
+});

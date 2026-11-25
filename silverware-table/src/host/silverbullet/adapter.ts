@@ -252,10 +252,17 @@ export class SilverBulletAdapter implements TableAdapter {
     return this.overlays.owns(node);
   }
 
-  rectOf(info: WidgetInfo, part: { readonly row: number; readonly column: number } | { readonly row: number } | { readonly column: number } | "table"): Rect | undefined {
-    if (part === "table") {
+  rectOf(info: WidgetInfo, part: { readonly row: number; readonly column: number } | { readonly row: number } | { readonly column: number } | "table" | "view"): Rect | undefined {
+    if (part === "table" || part === "view") {
       const widget = info.table.closest<HTMLElement>(WIDGET_SELECTOR);
-      return widget ? shownRect(widget, info) : undefined;
+      if (!widget) return undefined;
+      if (part === "view") return viewBounds(widget);
+      // Across, as far as the page is in view too (not under a panel of SilverBullet's over it: its space tree); none
+      // where the view has none of a table that has a width (one not laid out kept as it is)
+      const view = viewBounds(widget);
+      const table = shownRect(widget, info);
+      const shown = { ...table, left: Math.max(table.left, view.left), right: Math.min(table.right, view.right) };
+      return table.right > table.left && shown.right <= shown.left ? undefined : shown;
     }
     const element =
       "row" in part && "column" in part

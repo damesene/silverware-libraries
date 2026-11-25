@@ -1,5 +1,12 @@
 # Silverware Table: changelog
 
+## 2.0.2 (2026-11-24)
+
+- Settings are saved again on SilverBullet 3.0: saving any setting kept nothing before (SilverBullet 3.0 tells its configuration page another way).
+- Tables keep their width and scroll sideways on SilverBullet 3.0, which now draws a table in a frame that let it grow past the text.
+- On a phone, a table's toolbar and handles no longer lie over SilverBullet's space tree, where a tap on a page in the tree hit them.
+- The sheet view shows its column lines in every theme, also through striped and coloured rows.
+
 ## 2.0.1 (2026-11-22)
 
 - **Changed:** a custom function reading every argument whole declares it as `argument: "range"`; the helper `ALL_RANGES` of the first 2.0.0 is gone (write `"range"` in its place). A function by its arguments' place, `argument: (at) => …`, is as it was.

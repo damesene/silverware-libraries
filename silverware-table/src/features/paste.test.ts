@@ -8,6 +8,9 @@ describe("Pasting from a spreadsheet", () => {
 
   const TOTAL = "| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Apple | 10 |\n| Total | |\n";
   const field = () => editor.querySelector<HTMLInputElement>(".swt-cell-editor")!;
+  // The page as a paste writes it, read once the write is done (and what it says, told after): its turns take longer
+  // while other test files run
+  const written = (expected: string) => vi.waitFor(() => expect(text).toBe(expected), { timeout: 5_000 });
 
   const pasteText = (text: string, shift = false) => {
     key(field(), "v", { ctrlKey: true, shiftKey: shift });
@@ -22,9 +25,8 @@ describe("Pasting from a spreadsheet", () => {
     clickOn(cell(1, 0));
     const event = pasteText("Fig\t2\nPlum\t5\n");
     expect(event.defaultPrevented).toBe(true);
-    await flush();
-    expect(text).toBe('| Name | Qty |\n|---|---|\n| Fig | 2 |\n| Plum | 5 |\n| Total | |\n');
-    expect(flashes).toEqual(["Silverware Table: pasted 2 × 2 cells"]);
+    await written('| Name | Qty |\n|---|---|\n| Fig | 2 |\n| Plum | 5 |\n| Total | |\n');
+    await vi.waitFor(() => expect(flashes).toEqual(["Silverware Table: pasted 2 × 2 cells"]), { timeout: 5_000 });
   });
 
   it("pastes from a selected cell (select mode): its editor opens for the paste", async () => {
@@ -38,17 +40,15 @@ describe("Pasting from a spreadsheet", () => {
     const event = new Event("paste", { bubbles: true, cancelable: true });
     Object.defineProperty(event, "clipboardData", { value: { getData: () => "Fig\t2" } });
     field().dispatchEvent(event);
-    await flush();
-    expect(text).toBe("| Name | Qty |\n|---|---|\n| Fig | 2 |\n| Pear | 3 |\n| Apple | 10 |\n| Total | |\n");
+    await written("| Name | Qty |\n|---|---|\n| Fig | 2 |\n| Pear | 3 |\n| Apple | 10 |\n| Total | |\n");
   });
 
   it("pastes as new rows with Ctrl+Shift+V", async () => {
     await setup(TOTAL);
     clickOn(cell(2, 0));
     pasteText("Fig\t2\nPlum\t5", true);
-    await flush();
-    expect(text).toBe('| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Fig | 2 |\n| Plum | 5 |\n| Apple | 10 |\n| Total | |\n');
-    expect(flashes).toEqual(["Silverware Table: pasted 2 new rows"]);
+    await written('| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Fig | 2 |\n| Plum | 5 |\n| Apple | 10 |\n| Total | |\n');
+    await vi.waitFor(() => expect(flashes).toEqual(["Silverware Table: pasted 2 new rows"]), { timeout: 5_000 });
   });
 
   it("leaves a single value to the field, and refuses a sorted table", async () => {
@@ -70,8 +70,7 @@ describe("Pasting from a spreadsheet", () => {
     await setup(CALC);
     clickOn(cell(2, 0));
     pasteText("Fig\t2\nPlum\t5\t99", true);
-    await flush();
-    expect(text).toBe(
+    await written(
       `| Name | Qty | Twice |\n|---|---|---|\n| Pear | 3 | 6 <meta formulas.f='=[@qty]*2'> |\n| Fig | 2 | 4 <meta formulas.f='=[@qty]*2'> |\n| Plum | 5 | 99 |\n| Apple | 10 | 20 <meta formulas.f='=[@qty]*2'> |\n`,
     );
   });
@@ -81,9 +80,8 @@ describe("Pasting from a spreadsheet", () => {
     await setup(TAGGED, { "silverware.table.modules.formulas.enabled": false });
     clickOn(cell(1, 0));
     pasteText("Fig\t2\nAll\t9");
-    await flush();
     // Nothing recalculated: the value pasted stays, the formula kept for when formulas are on
-    expect(text).toBe(`| Name | Qty |\n|---|---|\n| Fig <meta core.n='pear'> | 2 |\n| All | 9 <meta formulas.f='=SUM([qty])'> |\n`);
+    await written(`| Name | Qty |\n|---|---|\n| Fig <meta core.n='pear'> | 2 |\n| All | 9 <meta formulas.f='=SUM([qty])'> |\n`);
   });
 
   describe("from the cell menu", () => {
@@ -173,8 +171,7 @@ describe("Pasting from a spreadsheet", () => {
       // Pasted lower: moved, where they were emptied
       clickOn(cell(3, 0));
       pasteText("Pear\t3\nFig\t2\n");
-      await flush();
-      expect(text).toBe(`| Name | Qty |\n|---|---|\n| | |\n| | |\n| Pear | 3 |\n| Fig | 2 <meta formulas.f='=1+1'> |\n`);
+      await written(`| Name | Qty |\n|---|---|\n| | |\n| | |\n| Pear | 3 |\n| Fig | 2 <meta formulas.f='=1+1'> |\n`);
       await controller.scan();
       expect(edges()).toBe(0);
     });
@@ -230,8 +227,7 @@ describe("Pasting from a spreadsheet", () => {
       clickOn(cell(2, 0));
       field().select();
       pasteText("Pear");
-      await flush();
-      expect(text).toBe(`| Name | Qty |\n|---|---|\n| <meta core.n='pear'> | 3 |\n| Pear <meta core.n='fig'> | 2 |\n| | 9 <meta core.cn='nine'> |\n`);
+      await written(`| Name | Qty |\n|---|---|\n| <meta core.n='pear'> | 3 |\n| Pear <meta core.n='fig'> | 2 |\n| | 9 <meta core.cn='nine'> |\n`);
     });
 
     it("ends the cut when rows are added or deleted (a cell of the same value is not taken for it)", async () => {
@@ -304,8 +300,7 @@ describe("Pasting from a spreadsheet", () => {
       expect(paste.getAttribute("aria-disabled")).toBeNull();
       paste.click();
       await flush();
-      await flush();
-      expect(text).toBe(`| Name | Qty |\n|---|---|\n| | 3 |\n| Fig | 2 <meta formulas.f='=1+1'> |\n| | |\n| | Pear |\n`);
+      await written(`| Name | Qty |\n|---|---|\n| | 3 |\n| Fig | 2 <meta formulas.f='=1+1'> |\n| | |\n| | Pear |\n`);
       // A header's menu is its column's; with the header among the cells selected, its name is not cut
       await controller.scan();
       openMenu(cell(0, 0));
@@ -324,8 +319,7 @@ describe("Pasting from a spreadsheet", () => {
     key(field(), "Escape");
     clickOn(cell(0, 0));
     pasteText("Item\tCost\nFig\t2\n");
-    await flush();
-    expect(text).toBe("| Item | Cost #currency-usd |\n|---|---|\n| Fig | 2 |\n");
+    await written("| Item | Cost #currency-usd |\n|---|---|\n| Fig | 2 |\n");
   });
 
   it("copies, cuts and pastes rows and columns from their grips' menus", async () => {

@@ -124,6 +124,30 @@ describe("Controller", () => {
     for (const icon of icons) expect([icon.getAttribute("width"), icon.getAttribute("height")]).toEqual(["1em", "1em"]);
   });
 
+  it("hides the toolbar where a panel of SilverBullet's over the page leaves the table none of the view, not otherwise", async () => {
+    await setup(`| A |\n|---|\n| 1 |\n`);
+    const bar = () => document.querySelector(".swt-bar")!;
+    // (jsdom lays nothing out: the table placed, the toolbar some width; the view the window's, 1024 px)
+    const widget = document.querySelector<HTMLElement>(".sb-table-widget")!;
+    const at = (element: Element, left: number, right: number) => (element.getBoundingClientRect = () => new DOMRect(left, 60, right - left, 100));
+    at(widget, 20, 392);
+    at(widget.querySelector("table")!, 20, 392);
+    Object.defineProperty(bar(), "offsetWidth", { configurable: true, get: () => 114 });
+    cell(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+    expect(bar().classList.contains("swt-visible")).toBe(true);
+    expect(bar().classList.contains("swt-out-of-view")).toBe(false);
+    // The space tree over the table: none of it in view
+    const tree = Object.assign(document.createElement("div"), { className: "sb-nav-root sb-nav-root-lhs" });
+    at(tree, 0, 1000);
+    document.body.append(tree);
+    controller.toolbarChanged();
+    await vi.waitFor(() => expect(bar().classList.contains("swt-out-of-view")).toBe(true), { timeout: 5_000 });
+    // Gone again: the toolbar back
+    tree.remove();
+    controller.toolbarChanged();
+    await vi.waitFor(() => expect(bar().classList.contains("swt-out-of-view")).toBe(false), { timeout: 5_000 });
+  });
+
   it("keeps the toolbar to icons, the rest in its ⋯ menu, destructive last", async () => {
     await setup(`| A |\n|---|\n| 1 |\n| <meta core.table core.name='prices'> |\n`, { "silverware.table.metadata": true });
     cell(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));

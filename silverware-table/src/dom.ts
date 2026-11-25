@@ -25,6 +25,9 @@ export const EDITOR_SELECTOR = ".cm-content";
 // while the page is too short to scroll
 export const SCROLLER_SELECTOR = ".cm-scroller";
 
+// The page's view less SilverBullet's panels lying over it (its space tree, from 3.0): the controls stay out of them
+export { besideNavPanels, watchNavPanels } from "../../shared/silverbullet/navpanels.ts";
+
 // The lines of a table's markdown follow its widget in SilverBullet's editor,
 // hidden (`hideBlockSource` in client/codemirror/util.ts; the first, which it
 // keeps showing as an empty line, by the style page). A press on an empty line

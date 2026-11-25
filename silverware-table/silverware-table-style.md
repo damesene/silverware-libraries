@@ -260,6 +260,23 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
 .sb-table-widget.swt-table {
   overflow: auto !important;
 }
+/* SilverBullet from 3.0 draws its table in a frame (.sb-table-frame: an inline flex box centring a table wider than the
+   text, as wide as its content up to the editor's): a table of ours keeps the line's width, or the one Silverware Layout
+   gives it, and scrolls sideways in it, its columns' widths its own (the frame a block; Silverware Layout may still make
+   it an inline block as wide as the line, where it places the table) */
+:is(#sb-main, html) .cm-content > .sb-table-frame:has(> .sb-table-widget.swt-table) {
+  display: block;
+  width: 100%;
+}
+/* (Its frame named by the table in it too: of more weight than SilverBullet's rule for any table in a frame, whatever the
+   order the pages' styles load in) */
+:is(#sb-main, html) .cm-content > .sb-table-frame:has(> .swt-table) > .sb-table-widget.swt-table {
+  display: block;
+  flex: initial;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+}
 .sb-table-widget tfoot.swt-stuck {
   position: relative;
   z-index: 3;
@@ -611,6 +628,14 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
   height: var(--swt-sheet-row);
   padding-top: 0 !important;
   padding-bottom: 0 !important;
+}
+/* The sheet's column lines through its tables too, whatever their theme: drawn by each cell at its right edge, where the
+   board draws them (a theme without lines between columns showed the board's through its cells alone, and a row with a
+   ground of its own, striped or filled, hid them); a theme's own lines between columns left out, the grid's in their
+   place. Of more weight than a theme's rule (:is(#sb-main, html) … [data-swt-theme] tr > td + td) */
+:is(#sb-main, html) .sb-table-widget.swt-table.swt-sheet-table tr > td {
+  border-left: 0;
+  border-right: 1px solid var(--swt-sheet-line);
 }
 /* The cell is not clipped itself (what sits on its edges stays reachable: the
    fill handle, the pin mark, the selection's handles); its content is, at the
@@ -2629,6 +2654,11 @@ html[data-theme="dark"] .swt-excel-error {
 }
 .swt-floating.swt-visible {
   display: flex !important;
+}
+/* Shown for its table while none of the table is in view across (a panel of SilverBullet's over it: its space tree on
+   a phone): hidden until it is again, never over that panel */
+.swt-floating.swt-visible.swt-out-of-view {
+  display: none !important;
 }
 /* Two boxes, each as wide as what it holds, at the toolbar's right edge: the
    names left of how the table is shown and the icons where both fit in the

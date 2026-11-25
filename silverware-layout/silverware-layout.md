@@ -1,7 +1,7 @@
 ---
 name: Library/damesene/silverware-layout
 tags: meta/library
-version: 2.0.4
+version: 2.0.5
 description: "Silverware Layout: Columns in a page (/grid), the width of a page's text and where it stands, centred, at the left or at the left while a side panel is open (its own or a default for every page) and of its tables, databases, charts and grids, wider or narrower than the text by a handle beside them that snaps to guides of your own, and placed at the left, in the middle or at the right; the editor's font size, and font zoom with Ctrl + scroll or a pinch, files zooming with the text."
 files:
 - silverware-layout.js
@@ -122,6 +122,7 @@ What you should know:
 
 - A grid in a page you embed in another (`![[Other page]]`) is shown with its columns there too; edit it on its own page.
 - A grid ends at the first line `</grid>`, wherever it is: a code block in a cell that holds such a line ends the grid there. Grids in grids are not supported yet.
+- A block a plugin draws (a database's or a chart's) shows in a cell as its code, not drawn: put it beside the grid.
 - Links and images in a grid show in their pages' backlinks, and a renamed page or image is renamed in a grid too. Its hashtags are known to SilverBullet (completed, listed, and a paragraph holding one found by a query of its tag); its tasks and list items are not indexed yet.
 - A task in a cell is toggled by its box there, as in the page.
 - A grid starts on a line of its own, not straight after a paragraph's line: leave a blank line before it (/grid does).

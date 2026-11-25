@@ -1,5 +1,10 @@
 # Silverware Layout: changelog
 
+## 2.0.5 (2026-11-24)
+
+- Settings are saved again on SilverBullet 3.0: saving any setting kept nothing before (SilverBullet 3.0 tells its configuration page another way).
+- On a narrow screen, a widget's handle no longer lies over SilverBullet's space tree.
+
 ## 2.0.4 (2026-11-22)
 
 - Fixed: a grid drawn before the page's styles were loaded takes the page's look (its text zoomed) once they are, instead of keeping the look it read first.

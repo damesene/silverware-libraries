@@ -159,6 +159,67 @@ describe("embedded media decorated", () => {
     expect(one.native!.classList.contains("swa-native-hidden")).toBe(false);
   });
 
+  it("puts a box in the place of a picture whose file could not be loaded, its name there unless its label names it; gone as it loads after all", async () => {
+    const { decorator } = setUp("![[gone.png|||{ view: preview }]] ![[Photo.png|A photo|300x200]] ![[late.png]]");
+    const [preview, full, late] = [frame("gone.png"), frame("Photo.png"), frame("late.png")];
+    await decorator.decorate([preview!, full!, late!]);
+    for (const one of [preview!, full!]) one.native!.dispatchEvent(new Event("error"));
+    // A preview: its label names the file (the alt text falls back to the name), the box says why alone
+    expect(preview!.frame.hasAttribute("data-swa-missing")).toBe(true);
+    expect(preview!.native!.classList.contains("swa-native-hidden")).toBe(true);
+    expect(preview!.frame.querySelector(".swa-missing")!.textContent).toBe("gone.pngFile not found");
+    expect(preview!.frame.hasAttribute("data-swa-label-named")).toBe(true);
+    // Shown full: no label, the box of its embed's size, naming its file (not its alt text); its "…" there
+    expect(full!.frame.hasAttribute("data-swa-label-named")).toBe(false);
+    const box = full!.frame.querySelector<HTMLElement>(".swa-missing")!;
+    expect(box.textContent).toBe("Photo.pngFile not found");
+    expect([box.style.width, box.style.height]).toEqual(["calc(300px * var(--sw-content-scale, 1))", "calc(200px * var(--sw-content-scale, 1))"]);
+    expect(full!.frame.querySelector(".swa-more")).not.toBeNull();
+    // Failed, then loaded after all: the box gone, the picture shown
+    late!.native!.dispatchEvent(new Event("error"));
+    expect(late!.frame.querySelectorAll(".swa-missing")).toHaveLength(1);
+    late!.native!.dispatchEvent(new Event("load"));
+    expect(late!.frame.querySelector(".swa-missing")).toBeNull();
+    expect(late!.frame.hasAttribute("data-swa-missing")).toBe(false);
+    expect(late!.native!.classList.contains("swa-native-hidden")).toBe(false);
+    // Drawn again: no box until it fails again, then one; loaded after all, none, the picture shown (what the drawing
+    // before listened to ended with it, else it would have taken away a box it did not draw, or left its own)
+    await decorator.decorate([preview!]);
+    expect(preview!.frame.querySelector(".swa-missing")).toBeNull();
+    preview!.native!.dispatchEvent(new Event("error"));
+    expect(preview!.frame.querySelectorAll(".swa-missing")).toHaveLength(1);
+    preview!.native!.dispatchEvent(new Event("load"));
+    expect(preview!.frame.querySelector(".swa-missing")).toBeNull();
+    expect(preview!.frame.hasAttribute("data-swa-missing")).toBe(false);
+    expect(preview!.native!.classList.contains("swa-native-hidden")).toBe(false);
+  });
+
+  it("tells a picture that failed before it was decorated by decoding it: a box for it, none for one that decodes (an SVG of no size of its own)", async () => {
+    const { decorator } = setUp("![[gone.png]] ![[drawing.svg]]");
+    const [gone, svg] = [frame("gone.png"), frame("drawing.svg")];
+    // (Done loading, of no size, before the decorator watches it: jsdom loads no picture, the browser's state stubbed)
+    for (const [one, decodes] of [[gone!, false], [svg!, true]] as const)
+      Object.defineProperties(one.native!, { complete: { value: true }, naturalWidth: { value: 0 }, decode: { value: () => (decodes ? Promise.resolve() : Promise.reject(new Error("broken"))) } });
+    await decorator.decorate([gone!, svg!]);
+    await vi.waitFor(() => expect(gone!.frame.querySelector(".swa-missing")).not.toBeNull());
+    expect(svg!.frame.querySelector(".swa-missing")).toBeNull();
+  });
+
+  it("tells a video missing by its own error alone, not a source's that another may follow", async () => {
+    const { decorator } = setUp("![[clip.mp4]]");
+    const one = frame("clip.mp4", false);
+    const video = document.createElement("video");
+    video.setAttribute("src", ".fs/clip.mp4");
+    one.frame.replaceChildren(video);
+    await decorator.decorate([{ ...one, native: video }]);
+    // (A <source>'s error: no error of the element's own)
+    video.dispatchEvent(new Event("error"));
+    expect(one.frame.querySelector(".swa-missing")).toBeNull();
+    Object.defineProperty(video, "error", { value: { code: 4 } });
+    video.dispatchEvent(new Event("error"));
+    expect(one.frame.querySelector(".swa-missing")).not.toBeNull();
+  });
+
   it("shows a file the host cannot draw as a card, its click opening it in a tab", async () => {
     const { state, decorator } = setUp("![[Docs/archive.zip]]");
     const one = frame("Docs/archive.zip", false);

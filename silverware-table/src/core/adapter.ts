@@ -63,7 +63,7 @@ export interface TableAdapter {
   /** A cell scrolled into view */
   revealCell(info: WidgetInfo, ref: CellRef): void;
   /** Where a part of a table is in the window (TableHost.rectOf) */
-  rectOf(info: WidgetInfo, part: { readonly row: number; readonly column: number } | { readonly row: number } | { readonly column: number } | "table"): Rect | undefined;
+  rectOf(info: WidgetInfo, part: { readonly row: number; readonly column: number } | { readonly row: number } | { readonly column: number } | "table" | "view"): Rect | undefined;
   /** Rows (columns) dragged (TableHost.dragLines) */
   dragLines(info: WidgetInfo, axis: "row" | "column", block: { readonly first: number; readonly last: number }, pressedAt: number, blockTo: (asked: number) => number): LineDrag | undefined;
   /** The part of an area of cells in view (TableHost.areaRect) */

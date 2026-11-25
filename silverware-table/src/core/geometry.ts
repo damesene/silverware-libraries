@@ -1,7 +1,7 @@
 // Where tables and their cells are on screen: boxes in viewport coordinates,
 // what of a table is in view as the page and the table scroll. Functions of
 // the DOM only, no state; the controller offers them to features (TableHost).
-import { SCROLLER_SELECTOR, WIDGET_SELECTOR } from "../dom.ts";
+import { besideNavPanels, SCROLLER_SELECTOR, WIDGET_SELECTOR } from "../dom.ts";
 import type { WidgetInfo } from "./feature.ts";
 
 /** A box in viewport coordinates; sides may be infinite (no limit on that side) */
@@ -55,9 +55,10 @@ export function scrollParentOf(element: HTMLElement): HTMLElement | undefined {
 /**
  * Where the page is in view around an element: its scroller (below the
  * editor's top bar, also while the page is too short to scroll), or the
- * window, cut to what an on-screen keyboard leaves visible
+ * window, cut to what an on-screen keyboard leaves visible, and (with `besidePanels`, the default) less the host's
+ * panels lying over the page (SilverBullet's space tree)
  */
-export function viewBounds(element: HTMLElement): Rect {
+export function viewBounds(element: HTMLElement, besidePanels = true): Rect {
   const win = element.ownerDocument.defaultView!;
   // A table whose box is laid over the window (position: fixed, e.g. shown full screen) is in view across the window
   const widget = element.closest<HTMLElement>(WIDGET_SELECTOR);
@@ -71,7 +72,10 @@ export function viewBounds(element: HTMLElement): Rect {
   const visual = win.visualViewport;
   const visibleBottom = visual && visual.height > 0 ? visual.offsetTop + visual.height : Infinity;
   const visibleTop = visual && visual.height > 0 ? visual.offsetTop : -Infinity;
-  return { left: view.left, right: view.right, top: Math.max(view.top, visibleTop), bottom: Math.min(view.bottom, visibleBottom) };
+  const page = { left: view.left, right: view.right, top: Math.max(view.top, visibleTop), bottom: Math.min(view.bottom, visibleBottom) };
+  // Less SilverBullet's panels lying over the page (its space tree on a phone): what is placed by the view stays out of
+  // them, never over them (a widget laid over the window lies over them itself)
+  return overWindow || !besidePanels ? page : besideNavPanels(page, element.ownerDocument);
 }
 
 /** Where a table is in view: the table, cut to the box that scrolls it sideways */

@@ -1179,6 +1179,60 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 [data-swa-type][data-swa-view="full"] object.swa-medium {
   height: var(--swa-height, 480px) !important;
 }
+/* A file the host could not load (not in the space, or not reached; data-swa-missing): a box in its picture's place, of
+   a preview's size (its height, its width the settings' or four thirds of it) or, shown full, of a smaller picture's
+   (the size its embed gives, the code's; as wide as Silverware Layout's handle sets, where it does), with the type's icon, the file's name and why, so the
+   file keeps its place and its "…" */
+/* (Its display important: SilverBullet's rules for what a rendered block holds weigh more) */
+.swa-missing {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  box-sizing: border-box;
+  max-width: 100%;
+  height: var(--swa-height, 160px);
+  width: var(--swa-preview-width, calc(var(--swa-height, 160px) * 4 / 3));
+  padding: 10px;
+  overflow: hidden;
+  border: 1px dashed var(--ui-surface-border-color, rgba(128, 128, 128, 0.45));
+  border-radius: var(--ui-radius-lg, 6px);
+  font-family: var(--ui-font, system-ui, sans-serif);
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--subtle-color, rgba(128, 128, 128, 0.95));
+  text-align: center;
+}
+[data-swa-view="preview"] .swa-missing {
+  cursor: pointer;
+}
+[data-swa-view="full"] .swa-missing {
+  width: calc(320px * var(--sw-content-scale, 1));
+  height: calc(200px * var(--sw-content-scale, 1));
+}
+[data-swa-type][data-swl-width]:not([data-swa-view="preview"]) .swa-missing {
+  width: 100%;
+}
+.swa-missing > .swa-icon {
+  display: inline-flex;
+  font-size: 28px;
+  opacity: 0.75;
+}
+.swa-missing > .swa-missing-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swa-missing > .swa-missing-note {
+  font-size: 0.9em;
+  opacity: 0.8;
+}
+/* (Its label names the file already: data-swa-label-named) */
+[data-swa-label-named] .swa-missing > .swa-missing-name {
+  display: none;
+}
 /* A card's frame: the card alone in it (its menu's way in within the card: its icon, else an arrow after its name) */
 [data-swa-view="card"] {
   display: flex !important;

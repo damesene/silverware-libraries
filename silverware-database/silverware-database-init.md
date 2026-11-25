@@ -8,10 +8,10 @@ What starts [Silverware Database](silverware-database.md) in SilverBullet: its s
 ```space-lua
 -- priority: -10
 -- SB-2.12-COMPAT: the configuration page, CONFIG in SilverBullet 2.12.1 and older, Library/Config from its 3.0 (edge),
--- told by index.toolPages (tool pages under Library/ came with the move); once 2.12.1 is dropped, "Library/Config" alone
-local configPage = index.toolPages and "Library/Config" or "CONFIG"
+-- told by index.libraryPages (library pages under Library/ came with the move); once 2.12.1 is dropped, "Library/Config" alone
+local configPage = index.libraryPages and "Library/Config" or "CONFIG"
 -- SB-2.12-COMPAT: whether SilverBullet tells its own pages by their place (after 2.12.1, the same release as its tool pages); once 2.12.1 is dropped, always
-local afterTwelve = index.toolPages ~= nil
+local afterTwelve = index.libraryPages ~= nil
 
 -- (After the API page, priority 50, and the user's scripts, priority 0: their views and types are defined by now)
 config.defineCategory {

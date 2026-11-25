@@ -1,5 +1,9 @@
 # Silverware Tags: changelog
 
+## 1.1.3 (2026-11-24)
+
+- Settings are saved again on SilverBullet 3.0: saving any setting kept nothing before (SilverBullet 3.0 tells its configuration page another way).
+
 ## 1.1.2 (2026-11-21)
 
 - Shares updated code with Silverware Table 1.4.0; nothing changes in use.

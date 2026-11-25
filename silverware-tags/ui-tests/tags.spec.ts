@@ -26,7 +26,8 @@ test("a rename typed into the tag's name is reviewed in the window, applied ever
   expect(await pageText(page, "Projects/Alpha")).toContain("#todo");
   await window.locator(".swg-apply").click();
   await expect.poll(() => pageText(page, "Projects/Alpha")).toContain("- [ ] Write the brief #task/open");
-  expect(await pageText(page, "Meetings/2026-10-01")).toContain("| Ann | the brief #task/open |");
+  // (The pages written in turn: each waited for)
+  await expect.poll(() => pageText(page, "Meetings/2026-10-01")).toContain("| Ann | the brief #task/open |");
   // Back in the tags, the new name shown; Undo is reviewed as any change (what goes back), then puts every page back
   await expect(window.locator(".swg-name-field")).toHaveValue("task/open");
   await window.locator(".swg-undo").click();
@@ -35,7 +36,7 @@ test("a rename typed into the tag's name is reviewed in the window, applied ever
   expect(await pageText(page, "Projects/Alpha")).toContain("#task/open");
   await window.locator(".swg-apply").click();
   await expect.poll(() => pageText(page, "Projects/Alpha")).toContain("- [ ] Write the brief #todo");
-  expect(await pageText(page, "Meetings/2026-10-15")).toContain("#todo");
+  await expect.poll(() => pageText(page, "Meetings/2026-10-15")).toContain("#todo");
   // Undone: nothing left to undo
   await expect(window.locator(".swg-undo")).toHaveCount(0);
 });
@@ -94,8 +95,8 @@ test("by page: a folder picks its pages, their tags shown with counts, a tag add
   await expect(window.locator(".swg-preview-page")).toHaveCount(2);
   await window.locator(".swg-apply").click();
   await expect.poll(() => pageText(page, "Meetings/2026-10-01")).toContain("tags: project/alpha, review\n");
-  // A page without a frontmatter gets one; its tag line, left with no tag, goes
-  expect(await pageText(page, "Meetings/2026-10-15")).toBe("---\ntags: [review]\n---\n- [ ] Send the notes #todo\n");
+  // A page without a frontmatter gets one; its tag line, left with no tag, goes (written in turn after the first: waited for)
+  await expect.poll(() => pageText(page, "Meetings/2026-10-15")).toBe("---\ntags: [review]\n---\n- [ ] Send the notes #todo\n");
   // Back in the view, the same pages picked, nothing left to change
   await expect(window.locator('.swg-their-tags [data-swg-chip="review"]')).toBeVisible();
   await expect(window.locator(".swg-review-changes")).toBeDisabled();

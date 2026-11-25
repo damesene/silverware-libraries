@@ -4,6 +4,9 @@
 // (host/marks.ts), which its style page reads, so no rule of its names any host's element.
 import type { Width } from "../model/width.ts";
 
+/** Where the page is seen in the window: top and bottom; left and right where a panel of the host's narrows it */
+export type PageView = { readonly top: number; readonly bottom: number; readonly left?: number; readonly right?: number };
+
 export type PageHost = {
   /** The element the page's text and its widgets are in; none while the host has none (its editor not made yet) */
   content(): HTMLElement | undefined;
@@ -11,8 +14,13 @@ export type PageHost = {
   editor(): HTMLElement | undefined;
   /** The pane the page is in: a widget is never wider than it (less a gutter) */
   pane(): HTMLElement;
-  /** The part of the window the page is seen in (below the host's own bars), top and bottom */
-  view(): { readonly top: number; readonly bottom: number };
+  /**
+   * The part of the window the page is seen in (below the host's own bars), top and bottom; its left and right edges
+   * where a panel of the host's lies over part of the page (none: the pane's)
+   */
+  view(): PageView;
+  /** `listener` told as what lies over the page may have changed the view without a scroll or a resize; its end given back */
+  watchView?(listener: () => void): () => void;
   /** Where a drag's guides go: the box the page scrolls in, so they lie under its widgets (none: over the page) */
   guideLayer(): HTMLElement | undefined;
   /** The page's text shown at a width (none: the host's own) */

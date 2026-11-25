@@ -1,5 +1,10 @@
 # Silverware Assets: changelog
 
+## 1.1.2 (2026-11-24)
+
+- Settings are saved again on SilverBullet 3.0: saving any setting kept nothing before (SilverBullet 3.0 tells its configuration page another way).
+- An image, a video or audio whose file is missing keeps its place as a preview or full: a box of the same size says *File not found*, and its **…** menu works (before, a preview was a sliver and a full file had no size, its menu out of reach).
+
 ## 1.1.1 (2026-11-21)
 
 - Shares updated code with Silverware Table 1.4.0; nothing changes in use.

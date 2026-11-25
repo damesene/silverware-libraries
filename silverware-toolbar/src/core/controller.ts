@@ -21,7 +21,7 @@ import { keyMatches } from "../../../shared/keys.ts";
 import { type Icons, iconsOf } from "../../../shared/icons.ts";
 import { overWindowOf, overWindowShown, watchOverWindow } from "../../../shared/overwindow.ts";
 import { type Bridge, readShortcut, type Settings } from "../bridge.ts";
-import { CONTENT_SELECTOR, inEditor, pageContentOf, viewTopOf } from "../dom.ts";
+import { CONTENT_SELECTOR, inEditor, navPanelOverPage, pageContentOf, viewTopOf, watchNavPanels } from "../dom.ts";
 import { ICONS } from "../icons.ts";
 import { type Action, type ActionEditor, type Change, type Context, NO_ARGS, withArgs } from "./action.ts";
 import { Bar, type Dock, type Shown } from "./bar.ts";
@@ -106,6 +106,8 @@ export class Controller {
   private retryAt = 0;
   // Watching for something shown over the whole window (shared/overwindow.ts), while started
   private stopWatchingWindow: (() => void) | undefined;
+  // Watching SilverBullet's panels over the page (its space tree on a phone), while started
+  private stopWatchingPanels: (() => void) | undefined;
   // The editing surface the toolbar acts on (where the focus last was in text: kept while the toolbar's own fields
   // have it), none: the page's editor
   private surface: EditingSurface | undefined;
@@ -163,6 +165,15 @@ export class Controller {
     this.doc.addEventListener("focusout", this.onBlur);
     this.docking.start();
     this.stopWatchingWindow = watchOverWindow(this.doc, this.windowChanged);
+    // (A panel of SilverBullet's over the page stands it back as what shows over the window does: told as that changes,
+    // not on every move in the panel, a transition of its items' hover among them)
+    let panelOver = navPanelOverPage(this.doc);
+    this.stopWatchingPanels = watchNavPanels(this.doc, () => {
+      const over = navPanelOverPage(this.doc);
+      if (over === panelOver) return;
+      panelOver = over;
+      this.windowChanged(over || overWindowShown(this.doc));
+    });
     // Running: the style page hides the host's own toolbar by a selection meanwhile (one toolbar there, this one)
     this.doc.documentElement.setAttribute(RUNNING_ATTRIBUTE, "");
     // Shown always: from the start
@@ -182,6 +193,8 @@ export class Controller {
     this.docking.stop();
     this.stopWatchingWindow?.();
     this.stopWatchingWindow = undefined;
+    this.stopWatchingPanels?.();
+    this.stopWatchingPanels = undefined;
     this.doc.documentElement.removeAttribute(RUNNING_ATTRIBUTE);
     this.bar.remove();
     this.popup.remove();
@@ -298,8 +311,9 @@ export class Controller {
     if (caret && !this.watcher.current() && this.persistent() && this.writing()) void this.caretMoved(caret);
   }
 
-  // Something shown over the whole window by another plugin (a table, a database in full screen): the toolbar, its
-  // popup and panel go, the room kept for it docked given back; once it ends, the toolbar shows as set
+  // Something shown over the whole window by another plugin (a table, a database in full screen), or a panel of
+  // SilverBullet's over the page: the toolbar, its popup and panel go, the room kept for it docked given back; once it
+  // ends, the toolbar shows as set
   private windowChanged = (shown: boolean): void => {
     if (!shown) {
       this.showAsSet();
@@ -315,9 +329,11 @@ export class Controller {
   /**
    * Whether the toolbar stands back: while another plugin shows something over the whole window (a full screen, a
    * database's peek), unless the field written in is in it (the peek's content): shown over it then, marked so on the
-   * root (`data-swb-over-sheet`: its layer over the sheet's)
+   * root (`data-swb-over-sheet`: its layer over the sheet's); and while a panel of SilverBullet's lies over the page (its
+   * space tree on a phone, whose items the toolbar docked at the bottom lay over)
    */
   private standsBack(): boolean {
+    if (navPanelOverPage(this.doc)) return true;
     const over = overWindowShown(this.doc);
     let inside = false;
     if (over) {

@@ -1,5 +1,9 @@
 # UI without a framework (decided 2026-11-02)
 
+Revisited 2026-11-25: the condition of *When to look again* is met (Silverware
+Database); Preact is planned in docs/silverware-preact.md, on Silverware Core
+(docs/silverware-core.md). This file stays as the record of the first decision.
+
 The plugins build their own UI with `el()` (shared/elements.ts) and shared
 components in `shared/`, not with a UI framework. This records why, what was
 measured, and when to look at it again.

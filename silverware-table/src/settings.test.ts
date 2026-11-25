@@ -142,7 +142,7 @@ describe("The settings dialog", () => {
     let page = "# Configuration\n\n```space-lua\n" + MANAGED_MARKER + '\nconfig.set("theme", "dark")\n```\n';
     const pages: string[] = [];
     await setup(PAGE, {}, {
-      readPage: (name) => (name === "CONFIG" ? page : ""),
+      readPage: (name) => (name === "Library/Config" ? page : ""),
       saveConfigPage: (text) => {
         pages.push(text);
         page = text;

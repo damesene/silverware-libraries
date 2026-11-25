@@ -15,7 +15,7 @@ test("a widget's handle shown by a tap: the space tree opened over the page, it 
   const handle = page.locator(".swl-handle:not([hidden])");
   await expect(handle).toBeVisible();
   const shownAt = (await handle.boundingBox())!.x;
-  test.skip(!(await runSilverBulletCommand(page, "Navigate: Tree")), "a SilverBullet without the space tree (2.12.1)");
+  expect(await runSilverBulletCommand(page, "Navigate: Tree")).toBe(true);
   const tree = page.locator(".sb-nav-root");
   await expect(tree).toBeVisible();
   // Over the page (the narrow screen's), not beside it, and where the handle was: else this test tests nothing

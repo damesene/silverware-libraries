@@ -15,13 +15,13 @@ export type Bridge = {
   readonly listPages: () => unknown;
   // A notification
   readonly flash: (message: string, type?: "info" | "error") => unknown;
+  // Optional: where an element of the editor is in the page's text (editor.posAtDOM): which embed a widget is
+  readonly posAtDOM?: (element: Element) => unknown;
   // Optional: without it, settings keep their defaults
   readonly getConfig?: (path: string, defaultValue: unknown) => unknown;
   // Optional, for the settings window: asks before closing it with changes (else the browser's confirm)
   readonly confirm?: (message: string) => boolean | Promise<boolean>;
-  // The configuration page's name (Library/Config, or CONFIG before SilverBullet's tool pages), told by the init page
-  readonly configPage?: string;
-  // Optional, for the settings window: the CONFIG page saved as SilverBullet's Configuration Manager saves it, the
+  // Optional, for the settings window: the configuration page saved as SilverBullet's Configuration Manager saves it, the
   // configuration loaded again (readPage reads it)
   readonly saveConfigPage?: (text: string) => unknown;
   // Optional: one of SilverBullet's UI options (`editor.getUiOption`: `markdownSyntaxRendering`, the markdown shown as written)

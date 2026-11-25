@@ -24,11 +24,7 @@ export type Bridge = {
   // Optional, for a value asked (a grid's min width in px): SilverBullet's prompt, `value` its field's text; none where
   // it is cancelled (`editor.prompt`)
   readonly prompt?: (message: string, value: string) => string | undefined | null | Promise<string | undefined | null>;
-  // The configuration page's name (Library/Config, or CONFIG before SilverBullet's tool pages), told by the init page
-  readonly configPage?: string;
-  // Whether SilverBullet takes an Alt+press in a widget before what is in it (after 2.12.1), told by the init page
-  readonly widgetTakesAltPress?: boolean;
-  // Optional, for the dialog's default text width: the CONFIG page saved as SilverBullet's Configuration Manager saves
+  // Optional, for the dialog's default text width: the configuration page saved as SilverBullet's Configuration Manager saves
   // it, the configuration loaded again (readPage reads it)
   readonly saveConfigPage?: (text: string) => unknown;
   // Optional, for the grids: markdown rendered to HTML as SilverBullet renders a page, its embeds expanded, each
@@ -36,6 +32,8 @@ export type Bridge = {
   readonly renderMarkdown?: (text: string) => string | Promise<string>;
   // Optional, for a grid's Alt+click: the cursor put at an offset of the page's text, centred in view (`editor.moveCursor`)
   readonly moveCursor?: (at: number, center?: boolean) => unknown;
+  // Where an element of the editor is in the page's text (`editor.posAtDOM`): which of two grids written alike one is
+  readonly posAtDOM?: (element: Element) => unknown;
   // Optional, for `/grid`: where the cursor is, an offset of the page's text (`editor.getCursor`)
   readonly getCursor?: () => unknown;
   // Optional, for Wrap in grid: the selection (`editor.getSelection`: `{ from, to }`) and a pick of one of options

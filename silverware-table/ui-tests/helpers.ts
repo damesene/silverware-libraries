@@ -272,7 +272,7 @@ export async function setSettings(page: Page, values: Record<string, Setting>): 
   settingsOf.set(page, settings);
   if (target === "silverbullet") {
     const lines = Object.entries(settings).map(([key, value]) => `config.set(${JSON.stringify(key)}, ${JSON.stringify(value)})`);
-    // Written and indexed as SilverBullet's Configuration Manager saves CONFIG, so the page loaded anew has
+    // Written and indexed as SilverBullet's Configuration Manager saves Library/Config, so the page loaded anew has
     // them (a file written beside SilverBullet is indexed after the page has loaded its Space Lua)
     await page.evaluate(
       async ({ name, text }) => {

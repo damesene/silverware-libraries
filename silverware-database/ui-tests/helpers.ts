@@ -85,7 +85,7 @@ export type Space = {
   open(pages: Readonly<Record<string, string>>, open: string, files?: Readonly<Record<string, Uint8Array | string>>): Promise<void>;
   /** A page's text as saved (its name under the folder); undefined where there is none */
   saved(name: string): Promise<string | undefined>;
-  /** The space's CONFIG page as saved (the settings dialog writes it; put back as it was after the test) */
+  /** The space's configuration page as saved (the settings dialog writes it; put back as it was after the test) */
   config(): Promise<string | undefined>;
   /** Whether a file is in the space (its name under the folder, with its extension) */
   hasFile(name: string): boolean;
@@ -156,7 +156,7 @@ export const test = base.extend<{ space: Space }>({
       config: async () => (existsSync(configPath) ? (await readFile(configPath, "utf8")).replace(/\r\n/g, "\n") : undefined),
       hasFile: (name) => existsSync(join(server().space, folder, name)),
     });
-    // (The page closed first: an open client would take CONFIG written under it for a change of its own)
+    // (The page closed first: an open client would take Library/Config written under it for a change of its own)
     await page.close();
     await rm(join(server().space, folder), { recursive: true, force: true });
     await rm(join(server().space, "Library", folder), { recursive: true, force: true });

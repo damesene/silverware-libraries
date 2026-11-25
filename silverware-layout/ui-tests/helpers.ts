@@ -2,7 +2,7 @@
 // What Silverware Layout's interaction tests share. The text's width is SilverBullet's own (its `--editor-width`),
 // which the playground has not: these tests run against a real SilverBullet only (npm run test:ui:sb), the committed
 // silverware-layout.js deployed, and are skipped on the playground. A test's pages are written into its worker's space
-// (UiLayout/<test>/<name>), the first opened, and removed after; CONFIG is put back as it was.
+// (UiLayout/<test>/<name>), the first opened, and removed after; Library/Config is put back as it was.
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -40,7 +40,7 @@ export type Space = {
   open(pages: Readonly<Record<string, string>>, open: string, files?: Readonly<Record<string, Uint8Array | string>>): Promise<void>;
   /** A page's text as saved (its name under the folder) */
   saved(name: string): Promise<string | undefined>;
-  /** The space's CONFIG page as saved */
+  /** The space's configuration page as saved */
   config(): Promise<string | undefined>;
 };
 
@@ -93,7 +93,7 @@ export const test = base.extend<{ space: Space }>({
       saved: async (name) => (existsSync(path(name)) ? (await readFile(path(name), "utf8")).replace(/\r\n/g, "\n") : undefined),
       config: async () => (existsSync(configPath) ? (await readFile(configPath, "utf8")).replace(/\r\n/g, "\n") : undefined),
     });
-    // (The page closed first: an open client would take CONFIG written under it for a change of its own)
+    // (The page closed first: an open client would take Library/Config written under it for a change of its own)
     await page.close();
     await rm(join(server().space, folder), { recursive: true, force: true });
     // (Previews Silverware Assets kept of its files: silverware-assets/src/core/stored.ts)

@@ -156,7 +156,7 @@ export interface Settings {
   /** A setting's value, `fallback` where it has none */
   get(path: string, fallback: unknown): Awaitable<unknown>;
   /**
-   * Settings saved where the user keeps them (in SilverBullet the CONFIG page); undefined: back to the default. `reload`
+   * Settings saved where the user keeps them (in SilverBullet the configuration page); undefined: back to the default. `reload`
    * false: the configuration not loaded again (in SilverBullet that runs Space Lua anew, starting the plugin anew), the
    * values set in it as it is, for a value the plugin applies itself (a module's own, as its host keeps them)
    */

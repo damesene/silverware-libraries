@@ -5,7 +5,7 @@ Written 2026-11-14 so that a new session can start from here; brought up to date
 ## Done on the branch (in short)
 
 - **Silverware Layout**: the grid (`<grid>`/`<cell>`, a cell edited in place, its caret and selection carried, Ctrl+Z, tasks, `/grid`, Wrap in grid with its modes and Move to grid (named Put into grid at first), a cell's menu by its grip (a "…" at first), embedded pages' grids, indexing); column widths dragged by a divider between columns, snapping to ratios and to the page text's edges, guides shown; a grid's edges dragged alone (its place kept as `shift` beside `width`; Alt: both ways) in place of the width handle's bar; grips for every handle (the user's choice); blank lines of a cell kept as the editor shows them, a click on one placing the caret there; an empty cell a line high; Wrap in grid taking a paragraph's lines as blocks each.
-- **Silverware Assets** (new plugin, prefix `swa-`, `silverware.assets`, command `Silverware Assets: Settings`): embedded files shown full, as a preview or a card; links to files with their icon and menu; link ↔ embed; side panel and enlarged views; the settings window (Assets, Markdown tabs; a preview's size for all files and per type; a full PDF's height); the markdown-as-written mode (`shared/syntaxmode.ts`); which embed a widget of the editor is (SilverBullet's `posAtDOM` first, marked `SILVERBULLET-INTERNAL`, `src/host/silverbullet/editorposition.ts`; else the text around it; else the run of widgets drawn).
+- **Silverware Assets** (new plugin, prefix `swa-`, `silverware.assets`, command `Silverware Assets: Settings`): embedded files shown full, as a preview or a card; links to files with their icon and menu; link ↔ embed; side panel and enlarged views; the settings window (Assets, Markdown tabs; a preview's size for all files and per type; a full PDF's height); the markdown-as-written mode (`shared/syntaxmode.ts`); which embed a widget of the editor is (SilverBullet's `editor.posAtDOM` first, public from 3.0, `shared/silverbullet/position.ts`; else the text around it; else the run of widgets drawn).
 - A review of the whole branch (2026-11-14) and its findings fixed; the isolation tests check Assets' layers and its use of Layout through its API alone.
 
 ## Left before the merge
@@ -24,11 +24,11 @@ Written 2026-11-14 so that a new session can start from here; brought up to date
 
 ## Waiting on others
 
-- **The user's pull request to SilverBullet**: a position on an embed's widget (`inline_content.ts`, `lua_widget.ts`). Once in a release: Silverware Assets reads it where it is there (`editorposition.ts`, the one place to change), `posAtDOM` kept for the versions before.
+- **The user's pull request to SilverBullet**: a position on an embed's widget (`inline_content.ts`, `lua_widget.ts`). It became `editor.posAtDOM` (#2241, merged 2026-11-14, in 3.0), which Silverware Assets now asks (`shared/silverbullet/position.ts`); `editorposition.ts` keeps `posAtCoords` alone.
 
 ## Proposed, not started (the user's word needed)
 
-- **`posAtDOM` for the other plugins** (after this branch's merge, a branch of its own; the grid could come here): Silverware Chart writes the first of two identical charts (a bug), Silverware Database refuses a block written twice with one out of view, Silverware Table's `data-pos` goes stale; the helper moved to `shared/silverbullet/` (marked `SILVERBULLET-INTERNAL`, the same comment), each plugin's host using it first, its answer checked against the text.
+- **`posAtDOM` for the other plugins**: done 2026-11-25 (branch `drop-silverbullet-2.12`), through SilverBullet's public `editor.posAtDOM` (the user's pull request #2241, in 3.0): Silverware Chart, Database and Layout's grids tell blocks written alike apart by it (`shared/placed.ts`), Silverware Assets asks it in place of `client.editorView`. Silverware Table keeps its `data-pos` (its pairing is synchronous): docs/silverware-sb-edge.md, *Cleanup* > *Done*.
 - **A PDF's page**: `![[doc.pdf|||{ page: 3 }]]`, the viewer's URL given `#page=3` (Chrome, Edge, Firefox), in the full view and the preview; a menu item "Show page…". Not on a phone without a PDF viewer (a card there).
 
 ## Decided, not to do now

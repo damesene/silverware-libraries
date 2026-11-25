@@ -88,7 +88,7 @@ export function previewSize(settings: AssetSettings, type: string): { readonly w
   return { ...(width === undefined ? {} : { width }), height: own.height ?? settings.preview.height };
 }
 
-/** Where the settings are kept (read whole): Silverware Assets' own block of CONFIG (tables the Configuration Manager would lose) */
+/** Where the settings are kept (read whole): Silverware Assets' own block of Library/Config (tables the Configuration Manager would lose) */
 export const ASSETS_PATH = "silverware.assets";
 
 /** The settings as kept, each key its own path (`silverware.assets.views`…): other settings under `silverware.assets` left as they are */
@@ -110,7 +110,7 @@ export function storedAssetSettings(settings: AssetSettings): Record<string, unk
     full: { height: settings.full.height, types: Object.fromEntries(Object.entries(settings.full.types).map(([k, v]) => [k, { ...v }])), labels: storedLabels(settings.full.labels) },
     card: { fields: [...settings.card.fields] },
     link: { fields: [...settings.link.fields] },
-    // (Former settings, taken out of CONFIG as the settings are saved: where a file stands, Silverware Layout's now; a
+    // (Former settings, taken out of Library/Config as the settings are saved: where a file stands, Silverware Layout's now; a
     // view's settings before they were kept by view, docs/silverware-assets-names.md)
     originals: undefined,
     anchor: undefined,
@@ -217,7 +217,7 @@ export function readAssetSettings(value: unknown): { readonly settings: AssetSet
   const fields = <F extends string>(value: unknown, known: readonly F[], fallback: readonly F[]): readonly F[] => {
     const list = record(value).fields;
     if (Array.isArray(list)) return list.filter((field): field is F => (known as readonly unknown[]).includes(field));
-    // (An empty list comes back from CONFIG as an empty table, `{}`: none shown, not the default)
+    // (An empty list comes back from Library/Config as an empty table, `{}`: none shown, not the default)
     return list && typeof list === "object" && !Object.keys(list).length ? [] : fallback;
   };
   const preview = record(given.preview);

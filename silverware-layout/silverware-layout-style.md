@@ -1121,7 +1121,7 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   background: none;
 }
 /* A cell's lists as the page draws them in its editor: each mark at the list's edge in the page's columns, as many as
-   its source takes with the space after it (`--editor-column`, SilverBullet's after 2.12.1, else a character's width: a
+   its source takes with the space after it (`--editor-column`, SilverBullet's, else a character's width: a
    bullet's `- ` 2, a number's `1. ` 3, a task's box `[ ] ` 4 after either; Silverware Editor's LIST_COLUMNS, its field's
    look of the same cell), a nested list a mark's columns in, the marks in the theme's colour of the page's bullets, a
    done task's text struck through. The cell's own lists and those in them alone */
@@ -1182,7 +1182,7 @@ The look of [Silverware Layout](silverware-layout.md): its settings dialog. It i
   text-decoration-line: line-through;
 }
 /* A quote as the page's editor draws one: its theme's colours and ground, its text after two of the page's columns (as
-   the page's editor lays its `> ` out: --editor-column, set after 2.12.1, else a character's width), its bar within them */
+   the page's editor lays its `> ` out: --editor-column, else a character's width), its bar within them */
 .swl-grid-cell > blockquote:not(#swl-none) {
   margin-left: 0;
   margin-right: 0;

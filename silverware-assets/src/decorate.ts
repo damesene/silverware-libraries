@@ -85,8 +85,11 @@ export type AssetHost = {
   placeOf?(element: HTMLElement): number | undefined;
   /** The text drawn around a widget of the host's or a link in its text (the lines before, a link's own, after); none: not known */
   contextOf?(element: HTMLElement): LineContext | undefined;
-  /** Where a widget of the host's or a link in its text is in the page's text, where the host can say (checked against the text before it is taken) */
-  positionOf?(element: HTMLElement): number | undefined;
+  /**
+   * Where a widget of the host's or a link in its text is in the page's text, where the host can say (checked against
+   * the text before it is taken: an element in another widget, a table's cell, is told as that widget's place)
+   */
+  positionOf?(element: HTMLElement): Promise<number | undefined>;
   pageText(): Promise<string>;
   pageName(): Promise<string>;
   /** An embed's target as the host draws it (resolved from the page), to find a drawn one by */
@@ -544,12 +547,12 @@ export class AssetDecorator {
 
   /** A link drawn found in the page as it is now: by its place, else where the host says, else by the text around it and the run of links drawn */
   private async linkInPage(link: DrawnLink): Promise<{ readonly link: ReturnType<typeof readLinks>[number]; readonly occurrence: number; readonly of: number } | undefined> {
-    const text = await this.host.pageText();
-    const links = readLinks(text);
     const at = link.position?.();
+    // (Where the host says it is, asked as the text is read: an edit between would set one against the other)
+    const [text, told] = await Promise.all([this.host.pageText(), at === undefined ? this.host.positionOf?.(link.element) : undefined]);
+    const links = readLinks(text);
     let found = at !== undefined ? linkAt(links, at) : undefined;
-    // An editor's link where the host says it is, a link of its target and form starting there (or within it)
-    const told = at === undefined ? this.host.positionOf?.(link.element) : undefined;
+    // An editor's link where the host says it is (`told`), a link of its target and form starting there (or within it)
     const there = told === undefined ? undefined : outside(links, this.host.renderedRanges(text)).find((one) => told >= one.from && told < one.to && one.style === link.style && sameTarget(one.target) === sameTarget(link.target));
     if (there) {
       const sameText = links.filter((other) => other.text === there.text);
@@ -916,8 +919,10 @@ export class AssetDecorator {
       one.frame.setAttribute("data-swa-target", sameTarget(one.target));
       if (!one.position) one.frame.setAttribute("data-swa-widget", "");
     }
-    for (const one of drawn) {
-      const found = this.locate(one, text, page);
+    // (Where the host says each widget is, asked of all at once: one round to the host for the batch)
+    const places = await Promise.all(drawn.map((one) => (one.position ? undefined : this.host.positionOf?.(one.frame))));
+    for (const [i, one] of drawn.entries()) {
+      const found = this.locate(one, text, page, places[i]);
       if (!found) continue;
       const asset = this.host.assetOf(found.embed, page);
       const type = typeFor(this.registry.types.all, asset);
@@ -939,13 +944,12 @@ export class AssetDecorator {
    * run of them the widgets drawn now are, the editor drawing what is in view. None: not found (a medium rendered
    * outside the editor whose place is not known yet, never taken for another)
    */
-  private locate(one: DrawnEmbed, text: string, page: string): Found | undefined {
+  private locate(one: DrawnEmbed, text: string, page: string, told: number | undefined): Found | undefined {
     const embeds = readEmbeds(text);
     const at = one.position?.();
     if (one.position) return at === undefined ? undefined : embedAt(embeds, at);
     const widgetsEmbeds = outside(embeds, this.host.renderedRanges(text)).filter((embed) => isFileTarget(embed.target));
-    // Where the host says it is, an embed of its file starting there; else by the text around it, the run drawn
-    const told = this.host.positionOf?.(one.frame);
+    // Where the host says it is (`told`), an embed of its file starting there; else by the text around it, the run drawn
     const there = told === undefined ? undefined : widgetsEmbeds.find((embed) => embed.from === told && sameTarget(this.host.resolved(embed, page)) === sameTarget(one.target));
     if (there) return occurrenceIn(embeds, there);
     const inText = widgetsEmbeds.map((embed): Placed => ({ target: sameTarget(this.host.resolved(embed, page)), at: embed.from / Math.max(text.length, 1) }));
@@ -971,8 +975,8 @@ export class AssetDecorator {
 
   /** The embed a frame is, found again in the page as it is now: another embed may have changed since it was decorated (the same file's in a grid, written) */
   private async locateNow(one: DrawnEmbed): Promise<Found | undefined> {
-    const [text, page] = await Promise.all([this.host.pageText(), this.host.pageName()]);
-    return this.locate(one, text, page);
+    const [text, page, told] = await Promise.all([this.host.pageText(), this.host.pageName(), one.position ? undefined : this.host.positionOf?.(one.frame)]);
+    return this.locate(one, text, page, told);
   }
 
   /** Every embed decorated in the page decorated again (the settings saved) */

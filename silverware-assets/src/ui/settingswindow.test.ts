@@ -26,13 +26,13 @@ describe("the settings window", () => {
   });
 
   it("says why a tab was not saved, the window kept", async () => {
-    const tab = markdownTab(document, { hideAssets: true }, async () => "CONFIG is read-only");
+    const tab = markdownTab(document, { hideAssets: true }, async () => "Library/Config is read-only");
     new SettingsWindow(document).open([tab], store);
     const box = tab.panel.querySelector<HTMLInputElement>("input[type=checkbox]")!;
     box.checked = false;
     box.dispatchEvent(new Event("change", { bubbles: true }));
     button("Save").click();
-    await expect.poll(() => document.querySelector(".swa-dialog-note")?.textContent).toBe("Not saved: CONFIG is read-only");
+    await expect.poll(() => document.querySelector(".swa-dialog-note")?.textContent).toBe("Not saved: Library/Config is read-only");
     expect(document.querySelector(".swa-dialog")).not.toBeNull();
   });
 

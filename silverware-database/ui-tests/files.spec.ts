@@ -1,6 +1,6 @@
 // Files & media (docs/silverware-database-files.md) against SilverBullet, every plugin installed (Silverware Assets
 // among them): a value's files drawn in a table's cell and the peek's row, a file opened by a press.
-import { expect, test } from "./helpers.ts";
+import { boxOf, expect, test } from "./helpers.ts";
 
 // A pixel of PNG, each image of the test one
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
@@ -24,8 +24,8 @@ test("a value's files: a table's cell draws three and counts the rest, a press o
   const image = buttons.first().locator("img");
   await expect(image).toHaveAttribute("src", /files\/a\.png$/);
   await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && !!img.style.height)).toBe(true);
-  expect(Math.round((await image.boundingBox())!.height)).toBe(28);
-  expect((await cell.locator(".swd-media-strip").boundingBox())!.height).toBeLessThanOrEqual(28.5);
+  expect(Math.round((await boxOf(image)).height)).toBe(28);
+  expect((await boxOf(cell.locator(".swd-media-strip"))).height).toBeLessThanOrEqual(28.5);
   // A file pressed: in Silverware Assets' side panel, the cell not edited
   await buttons.nth(1).click();
   await expect(page.locator(".swa-side-panel .swa-panel-title")).toHaveText("b.png");
@@ -45,7 +45,7 @@ test("a value's files: a table's cell draws three and counts the rest, a press o
   await expect(page.locator(".swd-peek")).toHaveCSS("scrollbar-width", "thin");
   const small = row.locator(".swd-media-button").first().locator("img");
   await expect.poll(() => small.evaluate((img: HTMLImageElement) => img.complete && !!img.style.height)).toBe(true);
-  expect(Math.round((await small.boundingBox())!.height)).toBe(28);
+  expect(Math.round((await boxOf(small)).height)).toBe(28);
   // A press on a file there opens it too, the peek kept
   await row.locator(".swd-media-button").nth(2).click();
   await expect(page.locator(".swa-side-panel .swa-panel-title")).toHaveText("c.png");
@@ -74,7 +74,7 @@ test("a value's files edited in its popup: one taken out, one dragged by its gri
   const cell = page.locator(".swd-table tbody tr", { hasText: "Holiday" }).locator('td[data-key="photos"]');
   await expect(cell.locator(".swd-media-button")).toHaveCount(3);
   // A press in the cell beside the files: the popup (laid over the page from the body), its search focused
-  const box = (await cell.boundingBox())!;
+  const box = await boxOf(cell);
   await page.mouse.click(box.x + box.width - 4, box.y + box.height / 2);
   const popup = page.locator(".swd-editor-files");
   const rows = popup.locator(".swd-files-row");
@@ -99,8 +99,8 @@ test("a value's files edited in its popup: one taken out, one dragged by its gri
   await expect.poll(shown).toEqual(["a.png", "c.png"]);
   // c.png dragged by its grip above a.png (measured once its row has its height: its image loaded and sized)
   await expect.poll(() => popup.locator(".swd-files-row img").evaluateAll((images) => images.every((one) => (one as HTMLImageElement).complete && !!(one as HTMLImageElement).style.height))).toBe(true);
-  const grip = (await popup.getByRole("button", { name: /^Move c\.png/ }).boundingBox())!;
-  const first = (await popup.locator(".swd-files-row").first().boundingBox())!;
+  const grip = await boxOf(popup.getByRole("button", { name: /^Move c\.png/ }));
+  const first = await boxOf(popup.locator(".swd-files-row").first());
   await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
   await page.mouse.down();
   await page.mouse.move(grip.x + grip.width / 2, first.y + 4, { steps: 8 });
@@ -195,7 +195,7 @@ test("files dropped or pasted on a value of files: Silverware Assets' dialog of 
 test("files dropped on the files' popup: added to its list, written as it is left", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: files\nview: table\n```\n", "Page/db-files": ROOT, "Page/db-files/Holiday": withFiles(space.folder, "a0", ["a.png"]) }, "Page", { "files/a.png": PNG });
   const cell = page.locator(".swd-table tbody tr", { hasText: "Holiday" }).locator('td[data-key="photos"]');
-  const box = (await cell.boundingBox())!;
+  const box = await boxOf(cell);
   await page.mouse.click(box.x + box.width - 4, box.y + box.height / 2);
   const popup = page.locator(".swd-editor-files");
   await expect(popup.locator(".swd-files-row")).toHaveAttribute("title", "a.png");
@@ -266,12 +266,14 @@ test("files zoom with the content (Silverware Layout's font zoom with files): a 
   const cell = page.locator(".swd-table tbody tr", { hasText: "Holiday" }).locator('td[data-key="photos"]');
   const image = cell.locator(".swd-media-button img");
   await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && !!img.style.height)).toBe(true);
-  const sizes = async () => ({
-    strip: Math.round((await cell.locator(".swd-media-strip").boundingBox())!.height),
-    image: Math.round((await image.boundingBox())!.height),
-    file: Math.round((await cell.locator('[data-swd-media="file"]').boundingBox())!.height),
+  // (Read once by boxOf; polled, a box not there yet is only read again)
+  const read = async (box: typeof boxOf) => ({
+    strip: Math.round((await box(cell.locator(".swd-media-strip"))).height),
+    image: Math.round((await box(image)).height),
+    file: Math.round((await box(cell.locator('[data-swd-media="file"]'))).height),
   });
-  const before = await sizes();
+  const sizes = () => read(async (one) => (await one.boundingBox())!);
+  const before = await read(boxOf);
   expect([before.strip, before.image]).toEqual([28, 28]);
   // (The scale Silverware Layout sets on the root as the font is zoomed, files following it: nothing drawn again)
   await page.evaluate(() => document.documentElement.style.setProperty("--sw-content-scale", "2"));
@@ -296,7 +298,7 @@ test("a large image in the files' popup held in its box while it loads, not draw
     await route.fulfill({ status: 200, contentType: "image/png", body: Buffer.from(big) });
   });
   const cell = page.locator(".swd-table tbody tr", { hasText: "Holiday" }).locator('td[data-key="photos"]');
-  const box = (await cell.boundingBox())!;
+  const box = await boxOf(cell);
   await page.mouse.click(box.x + box.width - 4, box.y + box.height / 2);
   const image = page.locator(".swd-editor-files .swd-files-row img");
   await expect(image).toHaveCount(1);
@@ -305,7 +307,7 @@ test("a large image in the files' popup held in its box while it loads, not draw
   expect(loading).toEqual({ complete: false, sized: "", maxWidth: "150px", maxHeight: "150px" });
   release();
   await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && !!img.style.height)).toBe(true);
-  const loaded = (await image.boundingBox())!;
+  const loaded = await boxOf(image);
   expect([Math.round(loaded.width), Math.round(loaded.height)]).toEqual([150, 113]);
 });
 
@@ -320,7 +322,7 @@ test("a file's card with a long name: pressed and hovered on the card alone, not
   const button = cell.locator(".swd-media-button");
   await expect(button.locator(".swd-media-name")).toBeVisible();
   // (Its name cut within its box: the button as wide as the card, the cell wider)
-  const [pressed, card, line] = [(await button.boundingBox())!, (await button.locator(".swd-media").boundingBox())!, (await cell.boundingBox())!];
+  const [pressed, card, line] = [await boxOf(button), await boxOf(button.locator(".swd-media")), await boxOf(cell)];
   expect(Math.abs(pressed.width - card.width)).toBeLessThanOrEqual(1);
   expect(pressed.x + pressed.width).toBeLessThan(line.x + line.width - 40);
   // Beside the card, in the cell: no file under the pointer
@@ -338,8 +340,8 @@ test("a board's card narrower than its files: they shrink, their names cut, the 
   );
   const value = page.locator(".swd-board-card", { hasText: "Reports" }).locator('.swd-board-value[data-key="photos"]');
   await expect(value.locator(".swd-media-button")).toHaveCount(3);
-  const box = (await page.locator(".swd-board-card", { hasText: "Reports" }).boundingBox())!;
-  const more = (await value.locator(".swd-media-more").boundingBox())!;
+  const box = await boxOf(page.locator(".swd-board-card", { hasText: "Reports" }));
+  const more = await boxOf(value.locator(".swd-media-more"));
   expect(more.width).toBeGreaterThan(0);
   expect(more.x + more.width).toBeLessThanOrEqual(box.x + box.width);
   await expect(value.locator(".swd-media-more")).toHaveText("+1");

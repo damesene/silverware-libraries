@@ -17,6 +17,14 @@ https://github.com/damesene/silverware-libraries/blob/main/REPO.md
 
 Then install a plugin with `Library: Install`.
 
+The plugins need **SilverBullet 3.0 or later**. The versions for SilverBullet 2.12 are kept in the branch [`silverbullet-2.12`](https://github.com/damesene/silverware-libraries/tree/silverbullet-2.12): on SilverBullet 2.12, add its repository instead,
+
+```text
+https://github.com/damesene/silverware-libraries/blob/silverbullet-2.12/REPO.md
+```
+
+and switch a plugin installed before from `main` to it: remove it and install it again from that repository, or change `blob/main/` to `blob/silverbullet-2.12/` in the `share.uri` of its page (under `Library/damesene/`).
+
 ## Plugins
 
 - **Silverware Table** ([`silverware-table/`](silverware-table/silverware-table.md)): sort, filter and edit markdown tables

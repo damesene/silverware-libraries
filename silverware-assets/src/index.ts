@@ -32,7 +32,7 @@ import { showUploadProgress } from "./ui/uploadprogress.ts";
 
 const SETTINGS = "Silverware Assets: Settings";
 const CLEAN_UP = "Silverware Assets: Clean up previews";
-// Silverware Assets' own block of CONFIG: its tables, which the Configuration Manager's block would lose (shared/configpage.ts)
+// Silverware Assets' own block of Library/Config: its tables, which the Configuration Manager's block would lose (shared/configpage.ts)
 const OWN_MARKER = "-- managed-by: silverware-assets";
 
 // The bridge handed over last (a problem told through it)
@@ -396,13 +396,13 @@ async function cleanUpPreviews(): Promise<void> {
 // The settings window, made as it is first opened
 let settingsWindow: SettingsWindow | undefined;
 
-/** The settings window: the settings as configured, the types and actions registered; saved into CONFIG */
+/** The settings window: the settings as configured, the types and actions registered; saved into Library/Config */
 async function openSettings(): Promise<void> {
   const bridge = current;
   const shown = decorator;
   if (!bridge || !shown) return;
   const save = (values: Readonly<Record<string, unknown>>, marker?: string) =>
-    saveConfigPage({ configPage: bridge.configPage, readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values, marker));
+    saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values, marker));
   const [settings, syntax] = await Promise.all([readAssetSettings(bridge.getConfig ? await bridge.getConfig(ASSETS_PATH, undefined) : undefined).settings, readSyntaxSettings(bridge)]);
   const input = {
     settings,

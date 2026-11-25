@@ -3,7 +3,7 @@
 // playground has not: these tests run against a real SilverBullet only (npm run test:ui:sb), the committed bundles
 // deployed (every plugin: a file in a grid is Silverware Layout's grid and Silverware Assets' file), and are skipped on
 // the playground. A test's pages and files are written into its worker's space (UiAssets/<test>/<name>), the first
-// page opened, and removed after; CONFIG is put back as it was.
+// page opened, and removed after; Library/Config is put back as it was.
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -33,7 +33,7 @@ export type Space = {
   writeKept(name: string, content: string): Promise<void>;
   /** A page's text as saved (its name under the folder) */
   saved(name: string): Promise<string | undefined>;
-  /** The space's CONFIG page as saved */
+  /** The space's configuration page as saved */
   config(): Promise<string | undefined>;
   /** Whether a file is in the space (its name under the folder, with its extension) */
   hasFile(name: string): boolean;
@@ -94,7 +94,7 @@ export const test = base.extend<{ space: Space }>({
       hasFile: (name) => existsSync(join(server().space, folder, name)),
       config: async () => (existsSync(configPath) ? (await readFile(configPath, "utf8")).replace(/\r\n/g, "\n") : undefined),
     });
-    // (The page closed first: an open client would take CONFIG written under it for a change of its own)
+    // (The page closed first: an open client would take Library/Config written under it for a change of its own)
     await page.close();
     await rm(join(server().space, folder), { recursive: true, force: true });
     // (Previews Silverware Assets kept of its files: silverware-assets/src/core/stored.ts)

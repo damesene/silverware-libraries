@@ -16,7 +16,7 @@
 //   shows them on the page as typed, the dialog all but gone meanwhile; Restore defaults puts the
 //   default ones back, once confirmed (saved, as all, on Save). Ascending as the tab is drawn, left in the order typed
 //   until it is drawn again.
-// Save writes what changed (the page's into its frontmatter, the default, the guides and the font into CONFIG), Cancel
+// Save writes what changed (the page's into its frontmatter, the default, the guides and the font into Library/Config), Cancel
 // or Esc puts the page back. The shared dialog, tabs and controls (shared/), classes `swl-dialog-*`.
 import { type SegmentedControl, segmentedControl } from "../../../shared/controls.ts";
 import { type Dialog, Dialogs } from "../../../shared/dialog.ts";

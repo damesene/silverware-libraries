@@ -2,7 +2,7 @@ import { ranksInOrder } from "../src/domain/rank.ts";
 import { expect, item, root, runCommand, test } from "./helpers.ts";
 
 // Load more (docs/silverware-database-load-more.md) in SilverBullet: how many items show at first set in the settings
-// (kept in CONFIG, read as the place is drawn), a press drawing the next, what was loaded kept through a write of an item
+// (kept in Library/Config, read as the place is drawn), a press drawing the next, what was loaded kept through a write of an item
 // loaded (SilverBullet drawing the block anew as the index changes)
 
 test("load more: items shown at first set in the settings, a press drawing the next with the focus on the first, a value changed in a row loaded kept drawn", async ({ page, space }) => {

@@ -120,7 +120,7 @@ test("with the settings dialog open, Ctrl + scroll over the page zooms as its Th
   expect(await fontSize(page)).toBe(THEME + 2);
 });
 
-test("the font size for every page set in the dialog, shown at once, saved into CONFIG; the zoom's default then", async ({ page, space }) => {
+test("the font size for every page set in the dialog, shown at once, saved into Library/Config; the zoom's default then", async ({ page, space }) => {
   await space.open({ Page: PAGE }, "Page");
   await runCommand(page, LAYOUT_SETTINGS);
   const dialog = page.locator(".swl-dialog");

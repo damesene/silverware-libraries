@@ -174,7 +174,7 @@ test.describe("SilverBullet's space tree over the page", () => {
     await expect(page.locator(".swt-grip.swt-visible").first()).toBeVisible();
     const boxesOf = () => shown.evaluateAll((all) => all.map((one) => one.getBoundingClientRect()).map((r) => ({ left: r.left, right: r.right, top: r.top, bottom: r.bottom })));
     const before = await boxesOf();
-    test.skip(!(await runSilverBulletCommand(page, "Navigate: Tree")), "a SilverBullet without the space tree (2.12.1)");
+    expect(await runSilverBulletCommand(page, "Navigate: Tree")).toBe(true);
     const tree = page.locator(".sb-nav-root");
     await expect(tree).toBeVisible();
     const panel = (await tree.boundingBox())!;

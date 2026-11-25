@@ -6,9 +6,8 @@ tags: meta
 What starts [Silverware Assets](silverware-assets.md) in SilverBullet: its settings, the JavaScript loaded and handed SilverBullet's space and editor API, its command. It is installed with the library; its Space Lua API is [silverware-assets-api](silverware-assets-api.md).
 
 ```space-lua
--- SB-2.12-COMPAT: the configuration page, CONFIG in SilverBullet 2.12.1 and older, Library/Config from its 3.0 (edge),
--- told by index.libraryPages (library pages under Library/ came with the move); once 2.12.1 is dropped, "Library/Config" alone
-local configPage = index.libraryPages and "Library/Config" or "CONFIG"
+-- The configuration page, where SilverBullet keeps the space's settings (shared/configpage.ts names it alike)
+local configPage = "Library/Config"
 
 -- Settings: how files are shown (tables, kept in Silverware Assets' own block of the configuration page: the Configuration Manager
 -- would lose them), and the markdown as written (shown in the Configuration Manager)
@@ -53,6 +52,8 @@ if js and js.window then
   silverwareAssetsJs.init({
     getCurrentPage = editor.getCurrentPage,
     getText = editor.getText,
+    -- Where an element of the editor is in the page's text: which embed or link a widget of the editor is
+    posAtDOM = editor.posAtDOM,
     replaceRange = editor.replaceRange,
     -- Files inserted: the selection they go into
     getSelection = editor.getSelection,
@@ -82,12 +83,11 @@ if js and js.window then
     end,
     -- The settings window: saved as SilverBullet's Configuration Manager saves (the configuration page, indexed, the
     -- configuration loaded again)
-    configPage = configPage,
     saveConfigPage = function(text)
       space.writePage(configPage, text)
       -- Written: the rest only loads it; a failure there says so, the page is saved
       local ok, err = pcall(function()
-        if sync and sync.performFileSync then sync.performFileSync(configPage .. ".md") end
+        sync.performFileSync(configPage .. ".md")
         mq.send("indexQueue", configPage .. ".md")
         mq.awaitEmptyQueue("indexQueue")
         editor.reloadConfigAndCommands()

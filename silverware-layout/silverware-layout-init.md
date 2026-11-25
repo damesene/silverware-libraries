@@ -6,11 +6,8 @@ tags: meta
 What starts [Silverware Layout](silverware-layout.md) in SilverBullet: its settings (shown in the Configuration Manager), the JavaScript loaded and handed SilverBullet's space and editor API, its command, and the events it follows. It is installed with the library; its Space Lua API is [silverware-layout-api](silverware-layout-api.md).
 
 ```space-lua
--- SB-2.12-COMPAT: the configuration page, CONFIG in SilverBullet 2.12.1 and older, Library/Config from its 3.0 (edge),
--- told by index.libraryPages (library pages under Library/ came with the move); once 2.12.1 is dropped, "Library/Config" alone
-local configPage = index.libraryPages and "Library/Config" or "CONFIG"
--- SB-2.12-COMPAT: whether SilverBullet takes an Alt+press in a widget at the widget, before what is in it (after 2.12.1: its builds since 2026-11 do, as they have library pages); once 2.12.1 is dropped, always
-local afterTwelve = index.libraryPages ~= nil
+-- The configuration page, where SilverBullet keeps the space's settings (shared/configpage.ts names it alike)
+local configPage = "Library/Config"
 
 -- Settings, shown in the Configuration Manager (Configuration: Open)
 config.defineCategory({
@@ -138,6 +135,8 @@ if js and js.window then
     end,
     -- A grid's Alt+click: the cursor where the click was in its markdown; /grid: where the cursor is
     moveCursor = editor.moveCursor,
+    -- Where an element of the editor is in the page's text: which of two grids written alike one is
+    posAtDOM = editor.posAtDOM,
     getCursor = editor.getCursor,
     -- Wrap in grid: the selection, and a pick (its mode, its number of columns)
     getSelection = editor.getSelection,
@@ -154,14 +153,11 @@ if js and js.window then
     editor = silverware.editor and silverware.editor.api,
     -- The dialog's default text width: saved as SilverBullet's Configuration Manager saves
     -- (the configuration page, indexed, the configuration loaded again)
-    configPage = configPage,
-    -- SilverBullet takes an Alt+press in a widget before what is in it: a grid's cell edited hands it to its field
-    widgetTakesAltPress = afterTwelve,
     saveConfigPage = function(text)
       space.writePage(configPage, text)
       -- Written: the rest only loads it; a failure there says so, the page is saved
       local ok, err = pcall(function()
-        if sync and sync.performFileSync then sync.performFileSync(configPage .. ".md") end
+        sync.performFileSync(configPage .. ".md")
         mq.send("indexQueue", configPage .. ".md")
         mq.awaitEmptyQueue("indexQueue")
         editor.reloadConfigAndCommands()

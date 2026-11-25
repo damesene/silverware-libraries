@@ -6,7 +6,7 @@ Plan, decisions (2026-11-10), sizes and steps: [docs/silverware-icons.md](../doc
 
 ## How a value is written
 
-- **`<set>:<name>`** (`lucide:house`) for an icon of a set, in CONFIG and frontmatter alike: plain text that Lua and queries read. **Anything else is text shown as itself**: an emoji is its character (`🏠`), so values written before Silverware Icons existed stay valid.
+- **`<set>:<name>`** (`lucide:house`) for an icon of a set, in Library/Config and frontmatter alike: plain text that Lua and queries read. **Anything else is text shown as itself**: an emoji is its character (`🏠`), so values written before Silverware Icons existed stay valid.
 - Told apart by form alone (`shared/iconref.ts`, pure: `^[a-z][a-z0-9-]*:[a-z0-9][a-z0-9-]*$`), so a plugin reads, checks and keeps a value without Silverware Icons installed or a set loaded. A domain may import iconref.ts.
 - The plugins' own rules stay theirs and take a reference whole (the toolbar's `iconOf`, the database's `validateIcon`). No value is dropped because a set is missing; a set gone shows its references as missing, never rewritten.
 - Accepted: a text with a reference's form (`a:1`) is read as a reference.

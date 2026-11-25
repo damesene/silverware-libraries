@@ -57,6 +57,8 @@ if js and js.window then
       return editor.filterBox(label, options, "", "Type to find a table")
     end,
     getConfig = config.get,
+    -- Where an element of the editor is in the page's text: which of two charts written alike a widget shows
+    posAtDOM = editor.posAtDOM,
   }
   -- Silverware Table's API, where it is installed (its API page has priority 50: defined before this block)
   if silverware.table and silverware.table.tables and silverware.table.onWrite then
@@ -87,13 +89,11 @@ if js and js.window then
     }
   end
   -- A code widget for each language a format reads; a block that is no chart goes to what drew that language before
+  -- (never ours: SilverBullet clears the configuration each time it loads Space Lua, so each load defines it anew)
   for _, language in ipairs(silverwareChartJs.languages()) do
     local before = config.get({ "codeWidgets", language }, nil)
-    if before and before.silverwareChart then before = before.before end
     codeWidget.define {
       language = language,
-      silverwareChart = true,
-      before = before,
       render = function(body, pageName)
         local element = silverwareChartJs.render(language, body, pageName)
         if element then

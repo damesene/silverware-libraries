@@ -5,6 +5,28 @@ import { boxOf, expect, test, textWidthOf } from "./helpers.ts";
 const LOREM = "Quisque placerat sollicitudin leo, quis sollicitudin dui pretium in. Donec vulputate a turpis at convallis.";
 const CHART = "```mermaid\nxychart-beta\n  x-axis [a, b, c]\n  bar [3, 5, 2]\n```";
 const PAGE = `# Chart\n\n${LOREM}\n\n${CHART}\n\n${LOREM}\n`;
+// Lines enough between two blocks alike that the first is out of the page (CodeMirror keeps what is far from view out)
+const FAR = Array.from({ length: 160 }, (_, i) => `Line ${i + 1} between.`).join("\n\n");
+
+test("of two charts written alike far apart, the second widened with the first out of the page: its width written into the second", async ({ page, space }) => {
+  await space.open({ Page: `# Chart\n\n${CHART}\n\n${FAR}\n\n${CHART}\n\n${LOREM}\n` }, "Page");
+  // (Scrolled to its end, and waited for it: the filler's first line gone from the page, its last shown)
+  await page.evaluate(() => document.querySelector(".cm-scroller")!.scrollTo(0, 1e9));
+  await expect(page.locator(".cm-line", { hasText: /^Line 1 between\.$/ })).toHaveCount(0);
+  await expect(page.locator(".cm-line", { hasText: "Line 160 between." })).toBeVisible();
+  await expect(page.locator(".swc-widget canvas")).toHaveCount(1);
+  const b = await boxOf(page.locator(".swc-widget"));
+  await page.mouse.move(b.x + 40, b.y + b.height / 2);
+  const bar = page.locator(".swl-handle-bar");
+  await expect(bar).toBeVisible();
+  const at = await boxOf(bar);
+  await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(at.x + 150, at.y + at.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await space.saved("Page")) ?? "").toMatch(/\n%% layout\.width: \d+\n```\n\nQuisque/);
+  expect((await space.saved("Page"))!.indexOf("layout.width")).toBeGreaterThan((await space.saved("Page"))!.indexOf("Line 160"));
+});
 
 test.use({ viewport: { width: 1600, height: 900 } });
 

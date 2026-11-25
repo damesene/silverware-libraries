@@ -7,11 +7,8 @@ What starts [Silverware Database](silverware-database.md) in SilverBullet: its s
 
 ```space-lua
 -- priority: -10
--- SB-2.12-COMPAT: the configuration page, CONFIG in SilverBullet 2.12.1 and older, Library/Config from its 3.0 (edge),
--- told by index.libraryPages (library pages under Library/ came with the move); once 2.12.1 is dropped, "Library/Config" alone
-local configPage = index.libraryPages and "Library/Config" or "CONFIG"
--- SB-2.12-COMPAT: whether SilverBullet tells its own pages by their place (after 2.12.1, the same release as its tool pages); once 2.12.1 is dropped, always
-local afterTwelve = index.libraryPages ~= nil
+-- The configuration page, where SilverBullet keeps the space's settings (shared/configpage.ts names it alike)
+local configPage = "Library/Config"
 
 -- (After the API page, priority 50, and the user's scripts, priority 0: their views and types are defined by now)
 config.defineCategory {
@@ -57,6 +54,8 @@ if js and js.window then
     getSelection = editor.getSelection,
     setSelection = editor.setSelection,
     moveCursor = editor.moveCursor,
+    -- Where an element of the editor is in the page's text: which of two blocks written alike a place is
+    posAtDOM = editor.posAtDOM,
     navigate = editor.navigate,
     -- A mention pressed: SilverBullet's Mention Inbox on that identity, the focus left in the editor (none before its inbox)
     openMentions = editor.openNavigator and function(identity)
@@ -122,13 +121,10 @@ if js and js.window then
     -- The settings dialog: saved as SilverBullet's Configuration Manager saves (the configuration page, indexed, the configuration loaded again)
     -- `set`: written and indexed, the configuration not loaded again (that runs Space Lua anew and starts Silverware Database
     -- anew: the item's panel closed as its width was saved), these values set in it as it is, by path (config.set)
-    configPage = configPage,
-    -- SilverBullet's own pages told by their place (under Library/), else by an own meta tag: none offered as references
-    toolPagesByPlace = afterTwelve,
     saveConfigPage = function(text, set)
       space.writePage(configPage, text)
       local ok, err = pcall(function()
-        if sync and sync.performFileSync then sync.performFileSync(configPage .. ".md") end
+        sync.performFileSync(configPage .. ".md")
         mq.send("indexQueue", configPage .. ".md")
         mq.awaitEmptyQueue("indexQueue")
         if set then
@@ -137,7 +133,6 @@ if js and js.window then
           end
         else
           editor.reloadConfigAndCommands()
-          if editor.rebuildEditorState then editor.rebuildEditorState() end
         end
       end)
       if not ok and set then

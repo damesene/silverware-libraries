@@ -114,7 +114,7 @@ test.describe("The toolbar on a phone", () => {
     await page.touchscreen.tap(line.x + 4, line.y + line.height / 2);
     await expect(bar(page)).toHaveClass(/swb-docked/);
     const docked = (await bar(page).boundingBox())!;
-    test.skip(!(await runSilverBulletCommand(page, "Navigate: Tree")), "a SilverBullet without the space tree (2.12.1)");
+    expect(await runSilverBulletCommand(page, "Navigate: Tree")).toBe(true);
     const tree = page.locator(".sb-nav-root");
     await expect(tree).toBeVisible();
     // (Where the toolbar was the tree lies now: else this test tests nothing)

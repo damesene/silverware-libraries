@@ -18,6 +18,8 @@ function host(text: string, fail?: string) {
     cursor: undefined as number | undefined,
     problems: [] as string[],
     refuse: undefined as string | undefined,
+    // Where each grid drawn is in the page's text, as a host's editor says (SilverBullet: its region's end)
+    places: new Map<Element, number>(),
   };
   const gridHost: GridHost = {
     renderMarkdown: async (markdown) => {
@@ -46,6 +48,7 @@ function host(text: string, fail?: string) {
     moveCursor: (at) => void (state.cursor = at),
     problem: (message) => void state.problems.push(message),
     settle: (element) => void state.settled.push(element),
+    positionOf: async (element) => state.places.get(element),
   };
   return { state, gridHost };
 }
@@ -114,13 +117,16 @@ describe("the grids", () => {
     expect(grid.querySelectorAll(".swl-grid-cell")[1]!.innerHTML).toBe('<div class="swl-grid-plain">Right</div>');
   });
 
-  it("sets the columns again as the <grid> line changes, each grid drawn by its order among those of its body", async () => {
+  it("sets the columns again as the <grid> line changes, each grid drawn by its place among those of its body", async () => {
     const page = (a: string, b: string) => `<grid columns="${a}">\n${body}\n</grid>\n\n<grid columns="${b}">\n${body}\n</grid>`;
     const { state, gridHost } = host(page("1", "3"));
     const grids = new Grids(document, gridHost);
     const first = await grids.render(body);
     const second = await grids.render(body);
-    document.body.append(first, second);
+    // (Drawn the second first: its place in the text, not its order in the page, tells which it is)
+    state.places.set(first, page("1", "3").indexOf("</grid>") + "</grid>".length);
+    state.places.set(second, page("1", "3").length);
+    document.body.append(second, first);
     await grids.refresh();
     expect([first, second].map((grid) => grid.style.getPropertyValue("--swl-grid-columns"))).toEqual(["repeat(1, minmax(0, 1fr))", "repeat(3, minmax(0, 1fr))"]);
     state.text = page("2", "1fr 1fr");
@@ -154,6 +160,8 @@ describe("a cell edited", () => {
     const grids = new Grids(document, gridHost);
     grids.start();
     const [first, second] = [await grids.render(body), await grids.render(body)];
+    state.places.set(first, page.indexOf("</grid>") + "</grid>".length);
+    state.places.set(second, page.lastIndexOf("</grid>") + "</grid>".length);
     document.body.append(first, second);
     const cell = second.querySelectorAll(".swl-grid-cell")[1]!;
     cell.querySelector("span")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -175,6 +183,7 @@ describe("a cell edited", () => {
     const grids = new Grids(document, gridHost);
     grids.start();
     const grid = await grids.render(body);
+    state.places.set(grid, page.indexOf("</grid>") + "</grid>".length);
     document.body.append(grid);
     const cell = grid.querySelector(".swl-grid-cell")!;
     cell.dispatchEvent(new MouseEvent("click", { bubbles: true }));

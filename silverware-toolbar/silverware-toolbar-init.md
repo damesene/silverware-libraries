@@ -6,9 +6,8 @@ tags: meta
 What starts [Silverware Toolbar](silverware-toolbar.md) in SilverBullet: its settings (shown in the Configuration Manager), the JavaScript loaded and handed SilverBullet's editor and config API, and its commands. It is installed with the library; its Space Lua API is [silverware-toolbar-api](silverware-toolbar-api.md).
 
 ```space-lua
--- SB-2.12-COMPAT: the configuration page, CONFIG in SilverBullet 2.12.1 and older, Library/Config from its 3.0 (edge),
--- told by index.libraryPages (library pages under Library/ came with the move); once 2.12.1 is dropped, "Library/Config" alone
-local configPage = index.libraryPages and "Library/Config" or "CONFIG"
+-- The configuration page, where SilverBullet keeps the space's settings (shared/configpage.ts names it alike)
+local configPage = "Library/Config"
 
 -- Settings, shown in the Configuration Manager (Configuration: Open)
 config.defineCategory {
@@ -112,16 +111,14 @@ if js and js.window then
     readPage = space.readPage,
     -- The settings dialog: saved as SilverBullet's Configuration Manager saves
     -- (the configuration page, indexed, the configuration loaded again)
-    configPage = configPage,
     saveConfigPage = function(text)
       space.writePage(configPage, text)
       -- Written: the rest only loads it; a failure there says so, the page is saved
       local ok, err = pcall(function()
-        if sync and sync.performFileSync then sync.performFileSync(configPage .. ".md") end
+        sync.performFileSync(configPage .. ".md")
         mq.send("indexQueue", configPage .. ".md")
         mq.awaitEmptyQueue("indexQueue")
         editor.reloadConfigAndCommands()
-        if editor.rebuildEditorState then editor.rebuildEditorState() end
       end)
       if not ok then
         editor.flashNotification("Silverware Toolbar: the settings are saved in " .. configPage .. ", but loading them failed (" .. tostring(err) .. "): reload the page", "error")
@@ -142,10 +139,9 @@ if js and js.window then
     startCompletion = editor.startCompletion,
     -- Whether SilverBullet's keyboard bar is on (the settings offer to turn it off on a phone)
     getUiOption = editor.getUiOption,
-    -- SilverBullet's own toolbar by a selection (its markup bar's bubble, after 2.12.1, a space's setting), which the
-    -- style page hides: the settings offer turning it off, so it is not drawn at all (config.persist came with it).
-    -- SB-2.12-COMPAT: `config.persist and` for 2.12.1, which has neither; once it is dropped, the table alone
-    hostSelectionBar = config.persist and {
+    -- SilverBullet's own toolbar by a selection (its markup bar's bubble, a space's setting), which the style page hides:
+    -- the settings offer turning it off, so it is not drawn at all
+    hostSelectionBar = {
       -- (Drawn where the space's setting and this device's markup bar are on, on a computer: the latter the JS asks)
       shown = function()
         return config.get("markupBar.selectionBubble", true) ~= false and editor.getUiOption("markupBar") ~= false

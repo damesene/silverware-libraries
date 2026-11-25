@@ -1,7 +1,7 @@
 ---
 name: Library/damesene/silverware-toolbar
 tags: meta/library
-version: 1.1.3
+version: 2.0.0
 description: "Silverware Toolbar: select text and a toolbar beside it (over the keyboard on a phone) formats it, turns its lines into a list, a heading, a quote or a code block and back, and runs any action or command; gesture buttons, text snippets, and icons and emoji of your own with Silverware Icons."
 files:
 - silverware-toolbar.js
@@ -66,7 +66,7 @@ An item shown with its label may have a fixed width, in characters: `width = 9` 
 
 The settings dialog's *Toolbars* tab edits them without writing Lua (see *Settings*): a tab for each toolbar, with what shows it, + *New toolbar*; the one picked with its name, *Used for* (*Click*, *Touch*: picked here, the toolbar showing it before no longer does), *Where* and *When*, *Duplicate* and *Delete* (not the last; one in use asked first, its way of working given to the first left); *Reset to defaults* (asked first) puts *Float* and *Docked* back. It shows each item as the toolbar does: its icon alone, or its label too, at its width. Click an item to change how it shows (its icon, or its icon and label), its label's width, and its own icon and label (empty: the action's; ↺ puts the action's back); its panel opens right under it. A docked toolbar's rows have on top their *Pinned left* and *Pinned right* boxes side by side, the ends of their line, and their other items under them: drag an item in to pin it, out to unpin it, or set *Pin* in its panel. By the selection a pinned item has a pin by its name; moved by hand where its pin would put it back at an end, it is unpinned. By finger, hold an item a moment to drag it; moved at once, your finger scrolls the list.
 
-In your configuration page (`Library/Config`; `CONFIG` in SilverBullet 2.12 and before), written by hand:
+In your configuration page (`Library/Config`), written by hand:
 
 ```lua
 config.set("silverware.toolbar.favorites", {
@@ -112,7 +112,7 @@ The button shows as pressed when its first action is on for the selection; a swi
 
 *Silverware Toolbar settings…*, the gear by the search field of the **…** list (typing `settings` there finds it too; or the command *Silverware Toolbar: Settings*), opens the settings, for every page in the space:
 
-* **General**: the key for every action, as SilverBullet writes keys (`Ctrl-Shift-q`, `Alt-k`), and whether a format works on the word at the cursor. On a phone with SilverBullet's keyboard bar on, it offers to turn that bar off (on that device, at once). SilverBullet's own toolbar by the text you select (in its versions after 2.12) is hidden, so only this one shows; where it is on, General offers to turn it off for every device, so SilverBullet does not draw it at all.
+* **General**: the key for every action, as SilverBullet writes keys (`Ctrl-Shift-q`, `Alt-k`), and whether a format works on the word at the cursor. On a phone with SilverBullet's keyboard bar on, it offers to turn that bar off (on that device, at once). SilverBullet's own toolbar by the text you select is hidden, so only this one shows; where it is on, General offers to turn it off for every device, so SilverBullet does not draw it at all.
 * **Toolbars**: your toolbars (see *Toolbars and their favourites*), and the one picked's rows, one under another. Each item shows as in the toolbar. Click it for its panel under the row: *Show* (its icon, or its label too), *Width* (its label's, in characters), and an action's own *Icon* and *Label* (↺ puts the action's back). Drag an item within its row or into another, or with the keyboard: focus it (Tab) and press **Alt+←** or **Alt+→** to move it within its row, **Alt+↑** or **Alt+↓** into the row above or below, **Delete** to remove it; **×** removes it. **Add** searches every action (and a separator, and a gesture button, whose actions it asks for next; each set in its panel, opened by a click on it: its actions, and for each its own panel: its action, *Change…*, its own icon and label) to add at the row's end; **Add row** adds a row, the **×** in a row's head removes it with its items. A row left empty is left out. An item no action has is dimmed, named by its id.
 * **Modules**: each part of the toolbar on or off (its actions with it).
 

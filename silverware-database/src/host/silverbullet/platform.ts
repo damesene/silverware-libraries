@@ -36,6 +36,8 @@ export type Bridge = {
   setSelection?(from: number, to: number): Promise<void>;
   // The cursor put at an offset of the page open (Edit source: a block with the cursor in it shows its markdown)
   moveCursor?(at: number): Promise<void>;
+  // Where an element of the editor is in the page's text (editor.posAtDOM): which of two blocks written alike a place is
+  posAtDOM?(element: Element): Promise<unknown>;
   navigate(ref: string): Promise<void>;
   // SilverBullet's Mention Inbox opened on an identity (`@` and the name in lower case, its identityId), the focus left in the
   // editor: what a mention pressed does (editor.openNavigator, SilverBullet 2.12.1 on); none where it has no such view
@@ -67,11 +69,7 @@ export type Bridge = {
   // SilverBullet's commands and their shortcuts (`system.listCommands`): one pressed in a panel of ours, where it does
   // nothing, told (none: nothing told)
   listCommands?(): Promise<unknown>;
-  // The configuration page's name (Library/Config, or CONFIG before SilverBullet's tool pages), told by the init page
-  configPage?: string;
-  // Whether SilverBullet tells its own pages by their place (under Library/) rather than by a meta tag, told by the init page
-  toolPagesByPlace?: boolean;
-  // The CONFIG page written as the Configuration Manager writes it (synced, indexed, the configuration loaded again)
+  // The configuration page written as the Configuration Manager writes it (synced, indexed, the configuration loaded again)
   // `set`: written and indexed, the configuration not loaded again (which starts the plugin anew), these values set in it
   // as it is (config.set, by path), so SilverBullet's config and the plugin read them alike
   saveConfigPage?(text: string, set?: Readonly<Record<string, unknown>>): Promise<void>;
@@ -86,7 +84,7 @@ export function listOf<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
-// The database's own block of the CONFIG page: the Configuration Manager writes its block anew from the settings its
+// The database's own block of the configuration page: the Configuration Manager writes its block anew from the settings its
 // schema shows (ui), which views' settings, open-ended, are not, so they would go with its next save (seen in its source,
 // plugs/configuration-manager, 2026-11-07)
 export const OWN_MARKER = "-- managed-by: silverware-database";
@@ -150,7 +148,7 @@ export function silverBulletPlatform(bridge: Bridge): {
       reservedKeys: PAGE_KEYS,
       documentDates: pageDates,
       tasks: async (pages) => tasksOfPages(await index.objects("task"), pages),
-      referableDocuments: async () => referablePages(await index.objects("page"), bridge.toolPagesByPlace === true),
+      referableDocuments: async () => referablePages(await index.objects("page")),
       onChanged: (listener) => {
         listeners.add(listener);
         return () => void listeners.delete(listener);
@@ -179,12 +177,12 @@ export function silverBulletPlatform(bridge: Bridge): {
     },
     settings: {
       get: (path, fallback) => bridge.getConfig(path, fallback),
-      // Into CONFIG's managed block, as the other plugins' settings dialogs save (shared/configpage.ts)
+      // Into Library/Config's managed block, as the other plugins' settings dialogs save (shared/configpage.ts)
       ...(bridge.saveConfigPage
         ? {
-            // (Not loaded again: the values set in SilverBullet's configuration as it is, as CONFIG has them now)
+            // (Not loaded again: the values set in SilverBullet's configuration as it is, as Library/Config has them now)
             save: (values, options) =>
-              saveConfigPage({ configPage: bridge.configPage, readPage: (name) => bridge.readPage(name), saveConfigPage: (text) => bridge.saveConfigPage!(text, options?.reload === false ? values : undefined) }, (text) => withConfigSettings(text, values, OWN_MARKER)),
+              saveConfigPage({ readPage: (name) => bridge.readPage(name), saveConfigPage: (text) => bridge.saveConfigPage!(text, options?.reload === false ? values : undefined) }, (text) => withConfigSettings(text, values, OWN_MARKER)),
           }
         : {}),
     },

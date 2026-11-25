@@ -184,7 +184,7 @@ document.getElementById("reset")!.addEventListener("click", () => {
   void space.navigate("index");
 });
 
-// The settings by path, as config.get gives them: the playground's own store (no CONFIG page here)
+// The settings by path, as config.get gives them: the playground's own store (no configuration page here)
 const SETTINGS = "silverware.tags.playground.settings";
 const readStored = (): Record<string, unknown> => {
   try {

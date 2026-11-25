@@ -18,6 +18,8 @@ import { type ConflictHost, openConflict } from "./core/conflictdialog.ts";
 import type { ItemConflict } from "./core/core.ts";
 import type { Item } from "./model/database.ts";
 import { type CodeBlock, codeBlocksOf, sameBody } from "../../shared/pages/blocks.ts";
+import { blockAt } from "../../shared/placed.ts";
+import { positionOf } from "../../shared/silverbullet/position.ts";
 import { pageChanges } from "../../shared/pages/changes.ts";
 import { pageWriter, type PageWriter } from "../../shared/pages/writer.ts";
 import type { Platform } from "../../shared/platform.ts";
@@ -488,11 +490,11 @@ function start(element: HTMLElement, shown: Shown): void {
 /**
  * A block's text written anew through the page writer, where it is still as
  * read: the one of its page whose element this is, among the blocks alike (a
- * database shown twice the same) by their order in the page
+ * database shown twice the same) by its place in the text (`blockOf`)
  */
 async function writeBlock(element: HTMLElement, shown: Shown, body: string, text: string): Promise<boolean> {
   const { writer, platform } = app!;
-  const found = await blockOf(element, shown, body);
+  const found = await blockOf(element, body);
   if (!found) return false;
   const { occurrence, of: inText } = found;
   // (The place drawn as the write starts: drawn anew meanwhile, from the text its element was rendered for, it is no longer the one that wrote)
@@ -518,30 +520,29 @@ async function writeBlock(element: HTMLElement, shown: Shown, body: string, text
 }
 
 /**
- * Which of the page's blocks an element is, those written alike told apart by
- * their order: found only where every one of them is shown (CodeMirror keeps
- * blocks out of view out of the page), else nothing guessed and said why
+ * Which of the page's blocks an element is: the one alone of its text, else of those written alike the one its place
+ * in the text falls in (SilverBullet's editor says it, `editor.posAtDOM`); else nothing guessed and said why
  */
-async function blockOf(element: HTMLElement, shown: Shown, body: string): Promise<{ readonly occurrence: number; readonly of: number; readonly block: CodeBlock } | undefined> {
+async function blockOf(element: HTMLElement, body: string): Promise<{ readonly occurrence: number; readonly of: number; readonly block: CodeBlock } | undefined> {
   const { platform } = app!;
   if (!app!.shown.has(element)) {
     platform.ui.notify("Silverware Database: this block was drawn before Silverware Database started again: reload the page", { type: "error" });
     return undefined;
   }
-  const alike = [...app!.shown].filter(([one, other]) => other.page === shown.page && sameBody(other.current) === sameBody(body) && one.isConnected).map(([one]) => one);
-  alike.sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
-  const occurrence = alike.indexOf(element);
-  const inText = codeBlocksOf(String(await platform.editor.text())).filter((block) => block.language === BLOCK_LANGUAGE && sameBody(block.body) === sameBody(body));
-  if (occurrence < 0 || alike.length !== inText.length) {
-    platform.ui.notify("Silverware Database: this block is written the same as another of the page, which is out of view: scroll so both show, or tell them apart (a line of your own in one)", { type: "error" });
+  // (Its place asked as the text is read: an edit between would set one against the other)
+  const [text, at] = await Promise.all([platform.editor.text(), positionOf(bridgeCalls?.posAtDOM)?.(element)]);
+  const inText = codeBlocksOf(String(text)).filter((block) => block.language === BLOCK_LANGUAGE && sameBody(block.body) === sameBody(body));
+  const block = blockAt(inText, at);
+  if (!block) {
+    platform.ui.notify(inText.length ? "Silverware Database: this block is written the same as another of the page, and which of them it is cannot be told: tell them apart (a line of your own in one)" : "Silverware Database: this block is not in the page any more", { type: "error" });
     return undefined;
   }
-  return { occurrence, of: inText.length, block: inText[occurrence]! };
+  return { occurrence: inText.indexOf(block), of: inText.length, block };
 }
 
 /** The block's markdown shown to edit: the cursor put at the start of its text (SilverBullet shows a block with the cursor in it as text) */
 async function editSource(element: HTMLElement, shown: Shown): Promise<void> {
-  const found = await blockOf(element, shown, shown.current);
+  const found = await blockOf(element, shown.current);
   if (!found) return;
   if (!bridgeCalls?.moveCursor) return app!.platform.ui.notify("Silverware Database: this SilverBullet cannot put the cursor into the block", { type: "error" });
   await bridgeCalls.moveCursor(found.block.bodyFrom);

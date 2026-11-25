@@ -88,7 +88,7 @@ export class SettingsWindow {
       update();
       note.textContent = "Saving…";
       note.classList.remove(`${BASE}-problem`);
-      // (Each tab that changed, one after another: each writes the CONFIG page)
+      // (Each tab that changed, one after another: each writes the configuration page)
       let problem: string | undefined;
       for (const tab of list) {
         if (problem || !tab.changed()) continue;

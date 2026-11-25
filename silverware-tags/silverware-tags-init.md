@@ -6,11 +6,8 @@ tags: meta
 What starts [Silverware Tags](silverware-tags.md) in SilverBullet: its settings (shown in the Configuration Manager), the JavaScript loaded and handed SilverBullet's space and editor API, its commands and the Tags panel. It is installed with the library; its Space Lua API is [silverware-tags-api](silverware-tags-api.md).
 
 ```space-lua
--- SB-2.12-COMPAT: the configuration page, CONFIG in SilverBullet 2.12.1 and older, Library/Config from its 3.0 (edge),
--- told by index.libraryPages (library pages under Library/ came with the move); once 2.12.1 is dropped, "Library/Config" alone
-local configPage = index.libraryPages and "Library/Config" or "CONFIG"
--- SB-2.12-COMPAT: whether SilverBullet tells its own pages by their place (after 2.12.1, the same release as its tool pages); once 2.12.1 is dropped, always
-local afterTwelve = index.libraryPages ~= nil
+-- The configuration page, where SilverBullet keeps the space's settings (shared/configpage.ts names it alike)
+local configPage = "Library/Config"
 
 -- Settings, shown in the Configuration Manager (Configuration: Open)
 config.defineCategory {
@@ -26,8 +23,8 @@ config.define("silverware.tags", {
     protectMeta = {
       type = "boolean",
       default = true,
-      description = "SilverBullet's own pages (tagged meta or a tag under it: libraries, templates, its API) are left out: their tags show nowhere and no change touches them. Off: they show, their tags apart (Meta), and changes reach them.",
-      ui = { category = "Silverware Tags", label = "Hide and protect meta pages", priority = 1 },
+      description = "SilverBullet's own pages (under Library/: libraries, the configuration, its API) are left out: their tags show nowhere, and no change touches them; tags meta and under it (what SilverBullet tells templates and libraries by) are left out of the view too. Off: they show, the meta tags apart (Meta), and changes reach them.",
+      ui = { category = "Silverware Tags", label = "Hide and protect library pages", priority = 1 },
     },
     newTagsForm = {
       type = "string",
@@ -68,8 +65,7 @@ if js and js.window then
       end
       return names
     end,
-    -- The index's tags: one object per tag, page and context (the collection also holds objects tagged #tag);
-    -- a table row's and a heading's hashtags are in none: the rows' and the headings' own tags
+    -- The index's tags: one object per tag, page and context (the collection also holds objects tagged #tag)
     queryTags = function()
       local records = {}
       for _, t in ipairs(query[[from index.tag "tag"]]) do
@@ -77,13 +73,11 @@ if js and js.window then
           table.insert(records, { name = t.name, page = t.page, parent = t.parent })
         end
       end
-      -- SB-2.12-COMPAT: "header" for SilverBullet 2.12.1, whose headings' hashtags are no `tag` objects (after it they are,
-      -- read twice so, once each kept by tagRecordsOf); once 2.12.1 is dropped: "table" alone
-      for _, kind in ipairs({ "table", "header" }) do
-        for _, o in ipairs(query[[from index.tag(kind)]]) do
-          for _, name in ipairs(o.tags or {}) do
-            table.insert(records, { name = name, page = o.page, parent = kind })
-          end
+      -- A table's rows' hashtags are in no `tag` object (SilverBullet 3.0 makes them of paragraphs, items, tasks and
+      -- headings, probed 2026-11-25): the rows' own tags
+      for _, o in ipairs(query[[from index.tag "table"]]) do
+        for _, name in ipairs(o.tags or {}) do
+          table.insert(records, { name = name, page = o.page, parent = "table" })
         end
       end
       return records
@@ -105,18 +99,14 @@ if js and js.window then
     confirm = editor.confirm,
     -- The settings dialog: saved as SilverBullet's Configuration Manager saves
     -- (the configuration page, indexed, the configuration loaded again)
-    configPage = configPage,
-    -- SilverBullet's own pages told by their place (under Library/), else by an own meta tag
-    toolPagesByPlace = afterTwelve,
     saveConfigPage = function(text)
       space.writePage(configPage, text)
       -- Written: the rest only loads it; a failure there says so, the page is saved
       local ok, err = pcall(function()
-        if sync and sync.performFileSync then sync.performFileSync(configPage .. ".md") end
+        sync.performFileSync(configPage .. ".md")
         mq.send("indexQueue", configPage .. ".md")
         mq.awaitEmptyQueue("indexQueue")
         editor.reloadConfigAndCommands()
-        if editor.rebuildEditorState then editor.rebuildEditorState() end
       end)
       if not ok then
         editor.flashNotification("Silverware Tags: the settings are saved in " .. configPage .. ", but loading them failed (" .. tostring(err) .. "): reload the page", "error")
@@ -170,7 +160,7 @@ if js and js.window then
       end
     end
   end
-  if view and view.define and silverwareTagsJs.panelOn() then
+  if silverwareTagsJs.panelOn() then
     view.define {
       name = "silverware.tags",
       title = "Tags",

@@ -1,4 +1,4 @@
-// The toolbar's settings dialog (saved in the playground's store, or in SilverBullet's CONFIG page)
+// The toolbar's settings dialog (saved in the playground's store, or in SilverBullet's configuration page)
 import type { Locator, Page } from "@playwright/test";
 import { answerConfirm, bar, barButton, caret, expect, lineBox, popup, ready, select, test, text } from "./helpers.ts";
 

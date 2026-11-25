@@ -8,7 +8,8 @@
 // give them (and the user's definitions, custom.ts).
 import type { Layout, LayoutProvider } from "../../../shared/layout.ts";
 import { customFormats } from "../custom.ts";
-import { type Block, blockOf, blocksAlike, blocksOf, sameBody } from "./blocks.ts";
+import { blockAt as blockAtPlace, type PositionOf } from "../../../shared/placed.ts";
+import { type Block, blockOf, blocksAlike, blocksOf } from "./blocks.ts";
 import { type ChartConstructor, chartBox, type Drawn, DrawnCharts } from "./drawn.ts";
 import type { ChartFormat } from "./format.ts";
 import { type ChartModel, isUnreadable, type Source, type Unreadable } from "./model.ts";
@@ -42,6 +43,8 @@ export type ControllerEnv = {
   // Silverware Layout's API where it is installed (else its stand-in): the charts registered with it, laid out at the
   // width their blocks keep (shared/layout.ts)
   readonly layout?: Layout;
+  // Where a chart's element is in the page's text (SilverBullet's editor): which of the blocks written alike it shows
+  readonly positionOf?: PositionOf;
 };
 
 // The edits of a page come one per key: the charts read their sources once they pause
@@ -49,6 +52,8 @@ const FOLLOW_MS = 120;
 
 // Why a chart's block is not found in the page's text
 const NOT_WHERE_IT_WAS = "the chart's block is not where it was (edited meanwhile)";
+// Why not, where several blocks are written the same and which one a chart is cannot be told
+const ALIKE = "this chart is written the same as another of the page, and which of them it is cannot be told: tell them apart (a line of your own in one)";
 
 /** A block as an element was rendered for: drawn anew from it */
 export type RenderedBlock = { readonly language: string; readonly body: string; readonly page: string };
@@ -149,8 +154,6 @@ export class Controller {
   private readonly blocks = new WeakMap<HTMLElement, RenderedBlock>();
   // Stopped: what is to draw anew what of its charts comes back into the page
   private drawAnewBy: ((element: HTMLElement, block: RenderedBlock) => void) | undefined;
-  // Charts written alike in the page drawn by the first such block's source, to be read again by their own places
-  private readonly alikePending = new Set<Drawn>();
 
   constructor(
     private readonly doc: Document,
@@ -184,8 +187,7 @@ export class Controller {
       write: async (element, changes) => {
         const entry = entryOf(element);
         if (!entry || !this.env.replaceRange) return "this chart cannot be written here";
-        const text = await this.env.getText();
-        const block = this.blockAt(text, entry);
+        const { block } = await this.current(entry);
         if ("problem" in block) return block.problem;
         const read = this.read(block.language, block.body);
         if (!read || isUnreadable(read.model)) return NOT_WHERE_IT_WAS;
@@ -205,26 +207,26 @@ export class Controller {
   }
 
   /**
-   * The page's block a chart shows (its block as it knows it now, a write of its own since too; its element in the page):
-   * of the blocks written alike, the one at its element's place among theirs (told apart by their order, so only where
-   * every one of them is shown: CodeMirror keeps blocks out of view out of the page), the one where it is alone; else why not
+   * The page's block a chart shows (its block as it knows it now, a write of its own since too): the one alone of that
+   * text, else of the blocks written alike the one its element's place in the text falls in (`positionOf`); else why not
    */
-  private blockAt(text: string, shown: RenderedBlock & { readonly box: HTMLElement }): Block | { readonly problem: string } {
-    const inText = blocksAlike(text, shown.language, shown.body);
-    if (inText.length <= 1) return inText[0] ?? { problem: NOT_WHERE_IT_WAS };
-    const alike = [...this.rendered].filter((one) => {
-      const block = this.blocks.get(one);
-      return one.isConnected && !!block && block.page === shown.page && block.language === shown.language && sameBody(block.body, shown.body);
-    });
-    alike.sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
-    const at = alike.indexOf(shown.box);
-    if (at < 0 || alike.length !== inText.length) return { problem: "this chart is written the same as another of the page, which is out of view: scroll so both show, or tell them apart" };
-    return inText[at]!;
+  private async blockAt(text: string, shown: RenderedBlock & { readonly box: HTMLElement }, at?: Promise<number | undefined>): Promise<Block | { readonly problem: string }> {
+    const alike = blocksAlike(text, shown.language, shown.body);
+    if (!alike.length) return { problem: NOT_WHERE_IT_WAS };
+    const block = alike.length === 1 ? alike[0] : blockAtPlace(alike, await (at ?? this.env.positionOf?.(shown.box)));
+    return block ?? { problem: ALIKE };
+  }
+
+  /** The page's text now and the block a chart shows in it, its place asked as the text is read */
+  private async current(shown: RenderedBlock & { readonly box: HTMLElement }): Promise<{ readonly text: string; readonly block: Block | { readonly problem: string } }> {
+    const at = this.env.positionOf?.(shown.box);
+    const text = await this.env.getText();
+    return { text, block: await this.blockAt(text, shown, at) };
   }
 
   /** `blockAt`'s block, none where it is not found */
-  private blockIn(text: string, shown: RenderedBlock & { readonly box: HTMLElement }): Block | undefined {
-    const block = this.blockAt(text, shown);
+  private async blockIn(text: string, shown: RenderedBlock & { readonly box: HTMLElement }): Promise<Block | undefined> {
+    const block = await this.blockAt(text, shown);
     return "problem" in block ? undefined : block;
   }
 
@@ -366,7 +368,7 @@ export class Controller {
     if (!type) return this.problem(`no chart type "${model.type}"`);
     let data: SourceData | undefined;
     // Written alike elsewhere in the page: its source (a table above it, below it) read by the first such block's place
-    // now, and again by its own once it is in the page among them (`alikePending`)
+    // now, and again by its own once it is in the page (its place there told, `sourceAgain`)
     let alike = false;
     if (model.source) {
       const known = pageText ?? (await this.pageText(page, text));
@@ -411,12 +413,10 @@ export class Controller {
           // (One drawn by it after that, never in the page: `render` of the new one draws it)
           if (this.drawAnewBy) return void (box.isConnected && this.drawAnewBy(box, { language, body: text, page }));
           this.drawn.add(entry);
-          if (alike) {
+          if (alike && box.isConnected) {
             alike = false;
-            this.alikePending.add(entry);
+            void this.sourceAgain(entry);
           }
-          // (Each such chart come into the page may be the one the others waited for to tell their places apart)
-          if (box.isConnected && this.alikePending.size) void this.sourcesAgain();
           // Its text's size followed (known as it is put in the page, the page's font set larger or smaller): drawn
           // anew where it is not the size it was drawn at (made before it was in the page: Chart.js's own)
           unwatchFont ??= watchFontSize(box, () => {
@@ -425,7 +425,6 @@ export class Controller {
         },
         () => {
           this.drawn.remove(entry);
-          this.alikePending.delete(entry);
           unwatchFont?.();
           unwatchFont = undefined;
         },
@@ -450,7 +449,7 @@ export class Controller {
     const run = ++this.followRun;
     for (const entry of this.drawn.shown()) {
       if (entry.page !== page || !entry.model.source) continue;
-      const data = await this.sourceData(entry.model, page, text, this.blockIn(text, entry));
+      const data = await this.sourceData(entry.model, page, text, await this.blockIn(text, entry));
       // (Edits after it read meanwhile: the later run draws them, this one's would be older)
       if (run !== this.followRun) return;
       // A source that cannot be read now (a table being renamed): the chart stays as it was until it can
@@ -474,24 +473,16 @@ export class Controller {
     }
   }
 
-  /**
-   * The charts written alike whose places are not told apart yet (`draw`): each one's source read again by its block's
-   * place among them, drawn anew where it reads otherwise; one whose place cannot be told yet (another of them not in the
-   * page) left waiting for the next to come in, or for an edit (`follow`)
-   */
-  private async sourcesAgain(): Promise<void> {
-    for (const entry of [...this.alikePending]) {
-      if (!entry.box.isConnected) continue;
-      const text = await this.pageText(entry.page, entry.body);
-      const block = this.blockIn(text, entry);
-      if (!block) continue;
-      this.alikePending.delete(entry);
-      const data = await this.sourceData(entry.model, entry.page, text, block);
-      if (!data || isUnreadable(data) || (entry.data && sameSource(entry.data, data))) continue;
-      entry.data = data;
-      this.redraw(entry, withData(entry.model, data));
-      this.markStale(entry, data);
-    }
+  /** A chart written alike with another of the page, its source read again by its own block (`draw`): drawn anew where it reads otherwise */
+  private async sourceAgain(entry: Drawn): Promise<void> {
+    const text = await this.pageText(entry.page, entry.body);
+    const block = await this.blockIn(text, entry);
+    if (!block) return;
+    const data = await this.sourceData(entry.model, entry.page, text, block);
+    if (!data || isUnreadable(data) || (entry.data && sameSource(entry.data, data))) return;
+    entry.data = data;
+    this.redraw(entry, withData(entry.model, data));
+    this.markStale(entry, data);
   }
 
   /** A source's problem shown: drawn as the chart in its place once the page's edits let its source be read */
@@ -547,8 +538,7 @@ export class Controller {
 
   /** Update data: the chart's block written with its source's data, by its format, as one edit */
   private async updateData(entry: Drawn): Promise<void> {
-    const text = await this.env.getText();
-    const block = this.blockAt(text, entry);
+    const { text, block } = await this.current(entry);
     if ("problem" in block) return this.env.flash?.(`Silverware Chart: ${block.problem}: nothing was written`, "error");
     const edit = await this.blockEdit(block, entry.page, text);
     if (edit) await this.env.replaceRange?.(edit.from, edit.to, edit.text);
@@ -603,9 +593,8 @@ export class Controller {
 
   /** A block's source written anew (a column picked where its reference found none), with its data where they can be read */
   private async pick(element: HTMLElement, page: string, source: Source): Promise<void> {
-    const text = await this.env.getText();
     const rendered = this.blocks.get(element);
-    const block = rendered ? this.blockAt(text, { ...rendered, box: element }) : { problem: NOT_WHERE_IT_WAS };
+    const { text, block } = rendered ? await this.current({ ...rendered, box: element }) : { text: "", block: { problem: NOT_WHERE_IT_WAS } };
     if ("problem" in block) return this.env.flash?.(`Silverware Chart: ${block.problem}: nothing was written`, "error");
     const edit = await this.blockEdit(block, page, text, source);
     if (edit) await this.env.replaceRange?.(edit.from, edit.to, edit.text);
@@ -627,8 +616,7 @@ export class Controller {
   private menuHost(): ChartMenuHost {
     // The chart's block in the page now, with the page's text and the model it holds
     const located = async (entry: Drawn) => {
-      const text = await this.env.getText();
-      const block = this.blockAt(text, entry);
+      const { text, block } = await this.current(entry);
       const read = "problem" in block ? undefined : this.read(block.language, block.body);
       if ("problem" in block || !read || isUnreadable(read.model)) {
         this.env.flash?.(`Silverware Chart: ${"problem" in block ? block.problem : NOT_WHERE_IT_WAS}: nothing was written`, "error");
@@ -684,7 +672,7 @@ export class Controller {
         ),
       candidates: async (entry) => {
         const text = await this.pageText(entry.page, entry.body);
-        return this.candidates({ page: entry.page, text, block: this.blockIn(text, entry) });
+        return this.candidates({ page: entry.page, text, block: await this.blockIn(text, entry) });
       },
       rewrite: async (entry, change) => {
         const at = await located(entry);
@@ -725,7 +713,7 @@ export class Controller {
       reload: async (entry) => {
         if (entry.model.source) {
           const text = await this.pageText(entry.page, entry.body);
-          const data = await this.sourceData(entry.model, entry.page, text, this.blockIn(text, entry));
+          const data = await this.sourceData(entry.model, entry.page, text, await this.blockIn(text, entry));
           if (data && !isUnreadable(data)) {
             entry.data = data;
             this.markStale(entry, data);

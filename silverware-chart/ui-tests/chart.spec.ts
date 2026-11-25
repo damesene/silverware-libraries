@@ -1,4 +1,4 @@
-import { embedOf, expectWidgetMenuKept, onSilverBulletEdge } from "../../scripts/silverbullet-widgetmenu.ts";
+import { embedOf, expectWidgetMenuKept } from "../../scripts/silverbullet-widgetmenu.ts";
 import { charts, expect, savedText, test } from "./helpers.ts";
 
 const SALES = `| Month | Revenue | Cost |
@@ -37,6 +37,35 @@ flowchart LR
   // No Mermaid library in the tests' space: the flowchart shows as code (below the charts, scrolled into the editor's view)
   await page.locator(".cm-scroller").evaluate((scroller) => scroller.scrollTo(0, scroller.scrollHeight));
   await expect(page.locator(".swc-code")).toContainText("flowchart LR");
+});
+
+test("leaves what is no chart to what drew Mermaid before it, Space Lua loaded again and again", async ({ page, open }) => {
+  await open("# Charts\n\n```mermaid\npie\n  \"a\" : 1\n```\n\n```mermaid\nflowchart LR\n  A --> B\n```\n");
+  await expect.poll(() => charts(page)).toEqual([{ type: "pie", labels: ["a"], data: [[1]] }]);
+  await expect(page.locator(".swc-code")).toContainText("flowchart LR");
+  // A library drawing mermaid, as SilverBullet's Mermaid does, of priority 0: before the chart's init page. Written
+  // through SilverBullet, then Space Lua loaded (once for the library, twice more), and the flowchart changed, so its
+  // widget is drawn by what the last load defined
+  const library = `\`\`\`space-lua
+codeWidget.define {
+  language = "mermaid",
+  render = function(body)
+    return widget.new { html = "<b class='ui-mermaid'>mermaid</b>", display = "block" }
+  end,
+}
+\`\`\`
+`;
+  await page.evaluate(async (text) => {
+    const system = (window as unknown as { client: { clientSystem: { localSyscall(name: string, args: unknown[]): Promise<unknown> } } }).client.clientSystem;
+    await system.localSyscall("space.writePage", ["Library/UiChart/Mermaid", text]);
+    for (let i = 0; i < 3; i++) await system.localSyscall("system.loadScripts", []);
+    const at = ((await system.localSyscall("editor.getText", [])) as string).indexOf("A --> B");
+    await system.localSyscall("editor.replaceRange", [at, at + "A --> B".length, "A --> C"]);
+  }, library);
+  // The chart's widget never took itself for what drew before it: the flowchart is the library's, the chart still ours
+  await expect(page.locator(".ui-mermaid")).toHaveCount(1);
+  await expect(page.locator(".swc-code")).toHaveCount(0);
+  await expect.poll(() => charts(page)).toEqual([{ type: "pie", labels: ["a"], data: [[1]] }]);
 });
 
 test("says why it cannot draw a chart", async ({ page, open }) => {
@@ -347,7 +376,6 @@ test("a chart under what another plugin shows over the window (a table in full s
 });
 
 test("SilverBullet's ⋮ beside a widget (its edge): kept from a chart, shown beside a widget not ours (shared/silverbullet/widgetmenu.ts)", async ({ page, open }) => {
-  test.skip(!onSilverBulletEdge, "the ⋮ beside a widget is SilverBullet's edge's (after 2.12.1)");
   // (Its own library page embedded, under the chart: a page every test's space has, long, the chart drawn above it)
   await open(`# Charts\n\n\`\`\`mermaid\nxychart-beta\n  x-axis ["a", "b"]\n  bar "one" [1, 2]\n\`\`\`\n\nBetween\n\n${embedOf("Library/damesene/silverware-chart")}\n`);
   await expect.poll(() => charts(page)).toHaveLength(1);

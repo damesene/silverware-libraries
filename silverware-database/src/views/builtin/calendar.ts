@@ -51,11 +51,14 @@ const picked = new Map<string, Day>();
 const opened = new Map<string, Map<Day, number>>();
 const undatedFolded = new Set<string>();
 
-// What a drag is: the item, what of it is dragged (it whole, by the day it was taken by; its start; its end)
-type Drag = { item?: Item; what?: "move" | "start" | "end"; grab?: Day };
+// What a drag is: the item (and its element dragged), what of it is dragged (it whole, by the day it was taken by; its start; its end); and whether
+// the view was to be drawn anew meanwhile (held until the drag ends: a drawing under it took the element dragged away)
+type Drag = { item?: Item; box?: HTMLElement; what?: "move" | "start" | "end"; grab?: Day; pending?: boolean };
 
 function draw(host: ViewHost, element: HTMLElement, drag: Drag): void {
   const doc = host.document;
+  // (Drawn now: nothing held any more)
+  drag.pending = false;
   const spans = viewSpans(host);
   if (!spans) {
     element.replaceChildren(el(doc, "p", { class: "swd-place-note", text: "No property of dates: add one (a date, a date and time) in Properties" }));
@@ -133,6 +136,7 @@ function draw(host: ViewHost, element: HTMLElement, drag: Drag): void {
     });
     const start = (what: Drag["what"], grab: Day | undefined) => (event: DragEvent) => {
       drag.item = item;
+      drag.box = box;
       drag.what = what;
       drag.grab = grab;
       event.dataTransfer?.setData(DRAG_TYPE, item.key);
@@ -165,13 +169,15 @@ function draw(host: ViewHost, element: HTMLElement, drag: Drag): void {
     box.addEventListener("dragend", () => {
       box.classList.remove("swd-cal-dragged");
       drag.item = undefined;
+      drag.box = undefined;
       for (const over of element.querySelectorAll(".swd-drop")) over.classList.remove("swd-drop");
+      if (drag.pending) redraw();
     });
     return box;
   };
   // A drop on a day: the item moved there (by as many days as from the day it was taken by), or its start or end that day
   const dropped = (day: Day) => {
-    // (The item as it is now: drawn anew while it was dragged, its value may have changed)
+    // (The item as it is now: its value may have changed while it was dragged)
     const item = drag.item && (host.items.find((one) => one.key === drag.item!.key) ?? drag.item);
     const { what, grab } = drag;
     drag.item = undefined;
@@ -392,6 +398,7 @@ export const CALENDAR_VIEW: ViewDefinition = {
   render(host, element) {
     const drag: Drag = {};
     draw(host, element, drag);
-    return { update: () => draw(host, element, drag) };
+    // (Not under a drag of one of its items: drawn once it ends; drawn at once where the element dragged is gone)
+    return { update: () => (drag.item && drag.box?.isConnected ? void (drag.pending = true) : draw(host, element, drag)) };
   },
 };

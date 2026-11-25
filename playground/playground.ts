@@ -384,7 +384,7 @@ const bridge: Bridge = {
   getCursor: () => cursor,
   undo: () => step(undoStack, redoStack),
   redo: () => step(redoStack, undoStack),
-  // Silverware Table's settings dialog (Settings in the header, or a table's ⋯ menu): no CONFIG page here, the playground's own store
+  // Silverware Table's settings dialog (Settings in the header, or a table's ⋯ menu): no configuration page here, the playground's own store
   saveSettings: (values) => {
     for (const [path, value] of Object.entries(values)) {
       if (value === undefined) delete settings[path];

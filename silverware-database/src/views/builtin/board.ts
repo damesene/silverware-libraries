@@ -22,12 +22,15 @@ const DRAG_TYPE = "application/x-silverware-database-item";
 
 const ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="3.5" height="11" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="6.25" y="2.5" width="3.5" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="11" y="2.5" width="3.5" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>';
 
-// A drag going on: the card dragged and the column it left, the line showing where it goes (before the card `before`, null: at
-// the column's end), the column it is over
-type Drag = { item?: Item; from?: ItemGroup; line?: HTMLElement; before?: string | null; over?: HTMLElement };
+// A drag going on: the card dragged (its item and element) and the column it left, the line showing where it goes (before the
+// card `before`, null: at the column's end), the column it is over; and whether the board was to be drawn anew meanwhile
+// (held until the drag ends: a drawing under it took the card dragged away)
+type Drag = { item?: Item; card?: HTMLElement; from?: ItemGroup; line?: HTMLElement; before?: string | null; over?: HTMLElement; pending?: boolean };
 
 function draw(host: ViewHost, element: HTMLElement, drag: Drag): void {
   const doc = host.document;
+  // (Drawn now: nothing held any more)
+  drag.pending = false;
   const grouping = host.grouping;
   if (!grouping) {
     element.replaceChildren(el(doc, "p", { class: "swd-place-note", text: "A board groups its items by a property: this database has none yet." }));
@@ -77,6 +80,7 @@ function endDrag(drag: Drag): void {
   drag.line?.remove();
   drag.over?.classList.remove("swd-drop");
   drag.item = undefined;
+  drag.card = undefined;
   drag.from = undefined;
   drag.line = undefined;
   drag.before = undefined;
@@ -204,6 +208,7 @@ function card(host: ViewHost, by: Property, item: Item, column: ItemGroup, drag:
     });
   box.addEventListener("dragstart", (event) => {
     drag.item = item;
+    drag.card = box;
     drag.from = column;
     event.dataTransfer?.setData(DRAG_TYPE, item.key);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
@@ -226,6 +231,11 @@ export const BOARD_VIEW: ViewDefinition = {
   render(host, element) {
     const drag: Drag = {};
     draw(host, element, drag);
-    return { update: () => draw(host, element, drag) };
+    // (Not under a drag of one of its cards: drawn once it ends, after the card's own dragend; drawn at once where the card
+    // dragged is gone)
+    element.addEventListener("dragend", () => {
+      if (drag.pending) draw(host, element, drag);
+    });
+    return { update: () => (drag.item && drag.card?.isConnected ? void (drag.pending = true) : draw(host, element, drag)) };
   },
 };

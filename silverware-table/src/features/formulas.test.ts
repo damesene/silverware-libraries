@@ -420,11 +420,13 @@ describe("Formulas", () => {
     await setup(TOTAL);
     clickOn(cell(3, 1));
     await type("'=not a formula");
-    expect(text).toContain("| Total | =not a formula |");
+    // (Written once the write is done: under load later than a turn)
+    await vi.waitFor(() => expect(text).toContain("| Total | =not a formula |"), { timeout: 5_000 });
+    await controller.scan();
     clickOn(cell(3, 1));
     expect(field().value).toBe("'=not a formula");
     await type("'=still not a formula");
-    expect(text).toContain("| Total | =still not a formula |");
+    await vi.waitFor(() => expect(text).toContain("| Total | =still not a formula |"), { timeout: 5_000 });
   });
 
   it("adjusts references when a row is deleted", async () => {

@@ -837,9 +837,9 @@ describe("the same file outside a grid and in it", () => {
   it("takes the host's word for where a widget is where an embed of its file starts there, else finds it as without it", async () => {
     const text = "# Notes\n\n![[cat.png]]\n\nMiddle\n\n![[cat.png]]\n\n![[dog.png]]\n";
     const second = text.lastIndexOf("![[cat.png]]");
-    const choose = async (positionOf: (element: HTMLElement) => number | undefined) => {
+    const choose = async (place: (element: HTMLElement) => number | undefined) => {
       document.body.replaceChildren();
-      const { state, decorator } = setUp(text, {}, { positionOf, contextOf: () => ({ before: ["Notes"], after: ["Middle"] }) });
+      const { state, decorator } = setUp(text, {}, { positionOf: async (element) => place(element), contextOf: () => ({ before: ["Notes"], after: ["Middle"] }) });
       const one = frame("cat.png");
       await decorator.decorate([one]);
       one.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();

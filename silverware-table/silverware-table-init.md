@@ -6,9 +6,8 @@ tags: meta
 What starts [Silverware Table](silverware-table.md) in SilverBullet: its settings (shown in the Configuration Manager), the JavaScript loaded and handed SilverBullet's editor and config API, the events it follows, its commands, and completion in a formula given to `silverware.table.evaluate` or `evaluateText`. It is installed with the library; its Space Lua API is [silverware-table-api](silverware-table-api.md).
 
 ```space-lua
--- SB-2.12-COMPAT: the configuration page, CONFIG in SilverBullet 2.12.1 and older, Library/Config from its 3.0 (edge),
--- told by index.libraryPages (library pages under Library/ came with the move); once 2.12.1 is dropped, "Library/Config" alone
-local configPage = index.libraryPages and "Library/Config" or "CONFIG"
+-- The configuration page, where SilverBullet keeps the space's settings (shared/configpage.ts names it alike)
+local configPage = "Library/Config"
 
 -- Settings, shown in the Configuration Manager (Configuration: Open)
 config.defineCategory {
@@ -512,16 +511,14 @@ if js and js.window then
     layout = silverware.layout and silverware.layout.api,
     -- The settings dialog: saved as SilverBullet's Configuration Manager saves
     -- (the configuration page, indexed, the configuration loaded again)
-    configPage = configPage,
     saveConfigPage = function(text)
       space.writePage(configPage, text)
       -- Written: the rest only loads it; a failure there says so, the page is saved
       local ok, err = pcall(function()
-        if sync and sync.performFileSync then sync.performFileSync(configPage .. ".md") end
+        sync.performFileSync(configPage .. ".md")
         mq.send("indexQueue", configPage .. ".md")
         mq.awaitEmptyQueue("indexQueue")
         editor.reloadConfigAndCommands()
-        if editor.rebuildEditorState then editor.rebuildEditorState() end
       end)
       if not ok then
         editor.flashNotification("Silverware Table: the settings are saved in " .. configPage .. ", but loading them failed (" .. tostring(err) .. "): reload the page", "error")

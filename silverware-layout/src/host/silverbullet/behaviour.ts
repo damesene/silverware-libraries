@@ -90,12 +90,8 @@ export const SILVERBULLET_EDITORS: EditorHost = { historyAtWindow: true };
 export const TWO_FINGER_TAP_COMMAND = "Navigate: Page Picker";
 
 /**
- * Whether an Alt+press in the field of a cell edited is handed to the field by the grids as it comes: where
- * SilverBullet takes an Alt+press anywhere in a widget at the widget's element (its capture, `widget_util.ts`), before
- * what is in it, and puts its cursor at the widget's start (the grid's markdown shown, the cell left): after 2.12.1, as
- * the init page tells (`widgetTakesAltPress`). 2.12.1 does not, and the field takes its own (an Alt+drag selecting).
- * SB-2.12-COMPAT: told for 2.12.1; once it is dropped, always.
+ * An Alt+press in the field of a cell edited is handed to the field by the grids as it comes: SilverBullet takes an
+ * Alt+press anywhere in a widget at the widget's element (its capture, `widget_util.ts`), before what is in it, and
+ * puts its cursor at the widget's start (the grid's markdown shown, the cell left)
  */
-export function handsAltPressToField(widgetTakesAltPress: unknown): boolean {
-  return widgetTakesAltPress === true;
-}
+export const HANDS_ALT_PRESS_TO_FIELD = true;

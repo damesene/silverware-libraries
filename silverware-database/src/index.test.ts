@@ -64,26 +64,39 @@ afterEach(() => {
 });
 
 describe("Silverware Database in SilverBullet", () => {
-  it("writes a view picked into the block it was picked in, and nothing where a block alike is out of view", async () => {
+  it("writes a view picked into the block it was picked in, told by its place in the text (the other out of view too); nothing where that is not told", async () => {
     vi.useFakeTimers();
     const { memory, bridge, told } = bridgeOf({ Page: TWICE, "Page/db-tasks": ROOT }, "Page");
-    init(bridge);
+    // Where SilverBullet's editor says each place is: the block it was drawn for
+    const places = new Map<Element, number>();
+    init({ ...bridge, posAtDOM: async (element: Element) => places.get(element) });
     defineViews(VIEWS);
     const [first, second] = [render("id: tasks", "Page"), render("id: tasks", "Page")];
+    places.set(first, 0);
+    places.set(second, TWICE.lastIndexOf("```silverware-database"));
     document.body.append(first, second);
     await settle();
     pickView(second, "b");
     await settle();
     expect(memory.pages.get("Page")).toBe("```silverware-database\nid: tasks\n```\n\nmiddle\n\n```silverware-database\nid: tasks\nview: b\n```\n");
-    // One of two blocks alike out of view (CodeMirror keeps it out of the page): which is which cannot be told, nothing written
+    // The second alone in the page (the first out of view, CodeMirror keeping it out): its own block all the same
     memory.pages.set("Page", TWICE);
     const lone = render("id: tasks", "Page");
+    places.set(lone, TWICE.lastIndexOf("```silverware-database"));
     document.body.replaceChildren(lone);
     await settle();
     pickView(lone, "b");
     await settle();
+    expect(memory.pages.get("Page")).toBe("```silverware-database\nid: tasks\n```\n\nmiddle\n\n```silverware-database\nid: tasks\nview: b\n```\n");
+    // A place whose place is not told: which is which cannot be told, nothing written
+    memory.pages.set("Page", TWICE);
+    const unknown = render("id: tasks", "Page");
+    document.body.replaceChildren(unknown);
+    await settle();
+    pickView(unknown, "b");
+    await settle();
     expect(memory.pages.get("Page")).toBe(TWICE);
-    expect(told.some((one) => one.includes("out of view"))).toBe(true);
+    expect(told.some((one) => one.includes("cannot be told"))).toBe(true);
   });
 
   it("lets the places and the tidying of before go as it starts again (Space Lua loaded again)", () => {

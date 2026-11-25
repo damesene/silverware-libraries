@@ -21,7 +21,7 @@ Charts written in a format other tools draw (Mermaid's `xychart-beta` and `pie` 
 
 - What Mermaid cannot say goes in `%% chart.<key>: <value>` comments (`chart.kinds` for a series' kind that is no bar or line, an area, points, steps); unknown keys, directives and other comments kept on writing.
 - An axis' range goes in Mermaid's `y-axis` / `x-axis` only with both ends: one end alone is a syntax error in Mermaid's grammar (`xychart.jison`), so `chart.yFrom` / `yTo` / `xFrom` / `xTo` instead (decided 2026-11-03, so every comment of ours is `chart.*`).
-- Mermaid blocks that are no chart (a flowchart) go to what drew `mermaid` before: the init page (priority -10, after SilverBullet's Mermaid library at 0 and Silverware Table's API at 50) keeps `config.get({"codeWidgets", language})` as the widget's `before`, ours marked `silverwareChart` so a reload of Space Lua does not wrap itself.
+- Mermaid blocks that are no chart (a flowchart) go to what drew `mermaid` before: the init page (priority -10, after SilverBullet's Mermaid library at 0 and Silverware Table's API at 50) keeps `config.get({"codeWidgets", language})` as the widget's `before`. It is never ours: SilverBullet clears the configuration each time it loads Space Lua (`loadLuaScriptsImpl`, 3.0.0), and `codeWidget.define` merges into what was there (`config.merge`), its `render` replaced.
 
 ## Silverware Layout
 

@@ -89,13 +89,11 @@ if js and js.window then
     }
   end
   -- A code widget for each language a format reads; a block that is no chart goes to what drew that language before
+  -- (never ours: SilverBullet clears the configuration each time it loads Space Lua, so each load defines it anew)
   for _, language in ipairs(silverwareChartJs.languages()) do
     local before = config.get({ "codeWidgets", language }, nil)
-    if before and before.silverwareChart then before = before.before end
     codeWidget.define {
       language = language,
-      silverwareChart = true,
-      before = before,
       render = function(body, pageName)
         local element = silverwareChartJs.render(language, body, pageName)
         if element then

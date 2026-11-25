@@ -38,6 +38,8 @@ export const test = base.extend<{ open: (text: string) => Promise<void> }>({
     } finally {
       await page.close();
       await rm(join(server().space, FOLDER), { recursive: true, force: true });
+      // (A test's own page of Space Lua, under the real Library/)
+      await rm(join(server().space, "Library", FOLDER), { recursive: true, force: true });
     }
   },
   open: async ({ page }, use) => {

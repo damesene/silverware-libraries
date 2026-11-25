@@ -39,6 +39,35 @@ flowchart LR
   await expect(page.locator(".swc-code")).toContainText("flowchart LR");
 });
 
+test("leaves what is no chart to what drew Mermaid before it, Space Lua loaded again and again", async ({ page, open }) => {
+  await open("# Charts\n\n```mermaid\npie\n  \"a\" : 1\n```\n\n```mermaid\nflowchart LR\n  A --> B\n```\n");
+  await expect.poll(() => charts(page)).toEqual([{ type: "pie", labels: ["a"], data: [[1]] }]);
+  await expect(page.locator(".swc-code")).toContainText("flowchart LR");
+  // A library drawing mermaid, as SilverBullet's Mermaid does, of priority 0: before the chart's init page. Written
+  // through SilverBullet, then Space Lua loaded (once for the library, twice more), and the flowchart changed, so its
+  // widget is drawn by what the last load defined
+  const library = `\`\`\`space-lua
+codeWidget.define {
+  language = "mermaid",
+  render = function(body)
+    return widget.new { html = "<b class='ui-mermaid'>mermaid</b>", display = "block" }
+  end,
+}
+\`\`\`
+`;
+  await page.evaluate(async (text) => {
+    const system = (window as unknown as { client: { clientSystem: { localSyscall(name: string, args: unknown[]): Promise<unknown> } } }).client.clientSystem;
+    await system.localSyscall("space.writePage", ["Library/UiChart/Mermaid", text]);
+    for (let i = 0; i < 3; i++) await system.localSyscall("system.loadScripts", []);
+    const at = ((await system.localSyscall("editor.getText", [])) as string).indexOf("A --> B");
+    await system.localSyscall("editor.replaceRange", [at, at + "A --> B".length, "A --> C"]);
+  }, library);
+  // The chart's widget never took itself for what drew before it: the flowchart is the library's, the chart still ours
+  await expect(page.locator(".ui-mermaid")).toHaveCount(1);
+  await expect(page.locator(".swc-code")).toHaveCount(0);
+  await expect.poll(() => charts(page)).toEqual([{ type: "pie", labels: ["a"], data: [[1]] }]);
+});
+
 test("says why it cannot draw a chart", async ({ page, open }) => {
   await open('# Chart\n\n```mermaid\npie\n  "a" : 1\n%% chart.type: sunburst\n```\n');
   await expect(page.locator(".swc-problem")).toHaveText('Silverware Chart: no chart type "sunburst"');

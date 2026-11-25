@@ -31,6 +31,14 @@ where the work is, what to do next and what done means. **What** is built and
   `!` for a breaking change, no body, no co-author trailer.
 - **The branch stays green** after each step: it could be merged at any
   checkpoint.
+- **The UI tests are the oracle.** A commit that converts or moves code adds
+  UI tests but changes none: a test that must change for it shows a change of
+  behaviour, which is the user's decision. A part's unit tests written for
+  synchronous drawing are rewritten only after a UI scenario covers what they
+  checked.
+- **Rendering baselines first** (step S): before a part is converted or moved
+  onto the core, its DOM, look, geometry and rendering stability are recorded
+  against today's code; after, they hold.
 - **Plans follow the code.** A decision made while working goes into the
   plan's *Decided* with its date, in the same commit; a step's scope that
   turned out different is corrected in its section here. Nothing is kept only
@@ -52,6 +60,7 @@ where the work is, what to do next and what done means. **What** is built and
 | Step | What | State |
 | --- | --- | --- |
 | 0 | The plans | done (2026-11-25) |
+| S | The safety net: tests against today's code | not started |
 | 1 | The core's skeleton, the gate, `requires:`, build and tests | not started |
 | 2 | Preact in the core, `.tsx` everywhere | not started |
 | A | Checkpoint A | |
@@ -76,7 +85,66 @@ P1 to P3 and I1 to I6 its *API changes*.
 
 ## Steps
 
-Estimates are rough; checkpoints correct them. About 5 to 6 months in all.
+Estimates are rough; checkpoints correct them. About 6 to 7 months in all.
+
+### S. The safety net (2 to 3 weeks)
+
+Tests written against today's code, so they record today's behaviour and the
+rewrite is checked against it. The UI tests (about 660 scenarios, run against
+SilverBullet's release and edge) check behaviour as a user acts; what they
+miss is where this work reaches most (counted 2026-11-25): the plugins
+together (Silverware Table 0 of 22 spec files touch another plugin, Database
+2 of 5, Toolbar 2 of 8, Assets 3 of 7, Layout 5 of 15), Space Lua loaded
+again (no scenario), what lies on top, the rendering itself, and the parts
+with few scenarios that are rewritten (Silverware Tags 21, Chart 20, Icons 5,
+Editor 3). The rest of the plan leans on this step.
+
+- **Scope**:
+  1. **The plugins together**, a suite of its own (a folder of ui-tests, its
+     CI group): a dialog over another plugin's dialog (Esc, Tab, the focus
+     back), Silverware Assets' upload dialog over a database's peek, Silverware
+     Icons' picker in a settings dialog, the toolbar over a grid's cell and
+     over the peek, one menu open at a time across plugins, a side panel over
+     another, a widget over the window under its own controls.
+  2. **System: Reload** in each plugin: after it the plugin works, no
+     listener twice (an action done once), the database's Undo and an open
+     peek kept, a table's view kept, the toolbar's settings kept.
+  3. **What lies on top**: `elementFromPoint` at an overlay's middle and
+     corners and at the controls over a widget, in each stacking the plugins
+     make, not visibility alone.
+  4. **Characterization of the parts rewritten with few scenarios**: the tags
+     workspace (each action, its writes), a chart's block written (from its
+     settings, a table followed, two blocks alike), the icons' picker, the
+     editor's field in each host.
+  5. **Rendering baselines** of each part the work converts or moves (views,
+     the place's chrome, the peek, dialogs, menus, side panels, the toolbar's
+     settings, the tags workspace), in its main states:
+     - **DOM**: a normalized `outerHTML` (classes, `data-*`, structure);
+     - **look and geometry**, kept as text, not pictures: the computed styles
+       of its key elements (font, colours, spacing, borders, sizes) and their
+       boxes against the anchor and each other, light and dark theme, desktop
+       and phone, compared with a tolerance, text widths left out (they follow
+       the machine's fonts). Catches what the DOM misses (a wrapper more that
+       breaks a flex, a padding moved, a panel shifted) and reads as a diff;
+     - **rendering stability** per action: the element kept (the same node
+       after an action that rebuilds nothing: typing in a filter, one item
+       changed), nothing blinking (a MutationObserver over the action: no node
+       of an unchanged item removed and put back), the focus, the caret and the
+       scroll kept through a data change, a write of the block and a redraw by
+       SilverBullet. Where today's code blinks or loses the focus, the test
+       records it as it is (marked, with the fix expected): the conversion
+       turns it green, checkpoint C's measure.
+  6. **Rendering cost**: a database's views and a table drawn with 1,000 and
+     10,000 items, timed in the playground, written here; compared after each
+     conversion.
+  Stored screenshots (docs/silverware-look-compare.md, its second kind: a few
+  scenes, Linux in Docker, refreshed only on purpose) only if the look and
+  geometry baselines let something through.
+- **Not in it**: changes of the plugins' code, but test hooks a test needs
+  (none in what SilverBullet runs: the root CLAUDE.md's rule).
+- **Done when**: every item above has its tests, green in parallel and
+  `--repeat-each 10` for the new files; the known blinks and lost focus listed
+  here with their tests; the rendering costs written here.
 
 ### 1. The core's skeleton (1 week)
 
@@ -170,9 +238,8 @@ Estimates are rough; checkpoints correct them. About 5 to 6 months in all.
 
 ### 6. Overlays in the core (2 to 3 weeks)
 
-- **Scope**: first, DOM snapshot tests of every dialog, menu and side panel as
-  they are (docs/silverware-preact.md, *Steps* 1). Then, in Preact in the
-  core: the stack and its layers, dialogs, menus (from shared/popupmenu.ts),
+- **Scope**: the rendering baselines of every dialog, menu and side panel
+  (step S) checked to be in place. Then, in Preact in the core: the stack and its layers, dialogs, menus (from shared/popupmenu.ts),
   side panels (a second on top of the first), `useFloating`, `useKeptFocus`;
   the marks written by the host, their watchers as signals.
 - **Not in it**: moving the plugins onto them (step 7).

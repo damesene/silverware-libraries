@@ -172,11 +172,13 @@ view can do, ours do with it.
 The conversions, in their order; each is a step of docs/silverware-core-work.md
 (after Silverware Core, its bridge, overlays and registry).
 
-1. **DOM snapshot tests** of each part before it is converted: a normalized
-   `outerHTML` (classes, `data-*`, structure) in its main states. The
-   conversion keeps it unchanged; a difference is a decision (a theme's
-   selectors: a major), never an update of the snapshot in passing. The
-   overlays' snapshots are made before Silverware Core takes them over.
+1. **Rendering baselines** of each part before it is converted
+   (docs/silverware-core-work.md, step S): its DOM, its look and geometry as
+   text, its rendering stability per action (the element kept, nothing
+   blinking, focus, caret and scroll kept), its cost. The conversion keeps the
+   DOM, look and geometry unchanged (a difference is a decision: a theme's
+   selectors, a major; never an update of a baseline in passing) and turns
+   the stability tests that record today's blinks green.
 2. **The database's data layer** (layer 1) and its definitions signal, under
    today's `el()` views. Worth it alone.
 3. **The database's place UI** (layer 2) on `Shown`, the handover's payload,
@@ -201,9 +203,12 @@ The conversions, in their order; each is a step of docs/silverware-core-work.md
 
 ## Risks
 
-- **DOM as public surface**: kept by the snapshots, not by the look tests
+- **DOM as public surface**: kept by the baselines, not by the look tests
   (ui-tests/look compares the page, a grid's cell and the peek, not the
   views' markup).
+- **Rendering**: where the conversion goes wrong is drawing, not logic; the
+  baselines' look, geometry and stability tests are the guard, unit tests
+  alone are not.
 - **Unit tests written for synchronous drawing** (about 1300 `querySelector`
   in the tests of database, table, toolbar, tags): a part's tests change with
   it.

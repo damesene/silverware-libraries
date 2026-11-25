@@ -2,7 +2,7 @@
 // it, by context. Read anew whenever a dialog opens or a change is applied
 // (the index is the space's, it changes without telling).
 import type { Space, TagRecord } from "../space/space.ts";
-import { isToolPage, matches } from "../../../shared/pages/tags/names.ts";
+import { isLibraryPage, matches } from "../../../shared/pages/tags/names.ts";
 
 export type TagInfo = {
   readonly name: string;
@@ -14,7 +14,7 @@ export type TagInfo = {
 export type Catalog = {
   readonly tags: ReadonlyMap<string, TagInfo>;
   readonly pages: readonly string[];
-  // SilverBullet's own pages among those read (isToolPage: under Library/), left out of the rest where hidden, told apart else
+  // SilverBullet's own pages among those read (isLibraryPage: under Library/), left out of the rest where hidden, told apart else
   readonly silverBullet: ReadonlySet<string>;
 };
 
@@ -24,7 +24,7 @@ export type CatalogOptions = {
 };
 
 export function catalogOf(records: readonly TagRecord[], pages: readonly string[], options: CatalogOptions = {}): Catalog {
-  const silverBullet = new Set([...pages, ...records.map((r) => r.page)].filter(isToolPage));
+  const silverBullet = new Set([...pages, ...records.map((r) => r.page)].filter(isLibraryPage));
   const hidden = options.hideMeta ? silverBullet : new Set<string>();
   const tags = new Map<string, { name: string; pages: Set<string>; byContext: Map<string, Set<string>> }>();
   for (const { name, page, parent } of records) {

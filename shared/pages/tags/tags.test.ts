@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { addPageTags, pageTags, removePageTags, removeTags, renameTags, tagUses } from "./edit.ts";
 import { readFrontmatter, writeTags } from "./frontmatter.ts";
 import { hashtagOf } from "../../markdown/inline.ts";
-import { cleanName, isMetaTag, isToolPage, isWithin, validateName, renamedTag } from "./names.ts";
+import { cleanName, isMetaTag, isLibraryPage, isWithin, validateName, renamedTag } from "./names.ts";
 import { scanHashtags } from "./scan.ts";
 
 const names = (text: string) => scanHashtags(text, readFrontmatter(text).bodyStart).map((t) => `${t.name}:${t.context}`);
@@ -25,7 +25,7 @@ describe("names", () => {
     expect([isMetaTag("meta"), isMetaTag("meta/library"), isMetaTag("metal"), isMetaTag("meta-notes")]).toEqual([true, true, false, false]);
   });
   it("tells SilverBullet's own pages by their place, under Library/", () => {
-    expect([isToolPage("Library/Config"), isToolPage("Library/Std/Pages/Index"), isToolPage("Library"), isToolPage("LibraryNotes/x"), isToolPage("Templates/Note")]).toEqual([true, true, false, false, false]);
+    expect([isLibraryPage("Library/Config"), isLibraryPage("Library/Std/Pages/Index"), isLibraryPage("Library"), isLibraryPage("LibraryNotes/x"), isLibraryPage("Templates/Note")]).toEqual([true, true, false, false, false]);
   });
   it("reads a typed name and says what is wrong with one", () => {
     expect(cleanName(" #todo ")).toBe("todo");

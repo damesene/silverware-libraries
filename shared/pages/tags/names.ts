@@ -31,11 +31,11 @@ export function isMetaTag(tag: string): boolean {
 }
 
 /**
- * A page SilverBullet keeps for itself by where it is: a tool page, under
- * `Library/` (its `isToolPage`, plug-api/lib/tool_pages.ts, from its 3.0).
+ * A page SilverBullet keeps for itself by where it is: a library page, under
+ * `Library/` (its `isLibraryPage`, plug-api/lib/library_pages.ts, from its 3.0).
  * `Library` alone and `LibraryNotes/x` are not.
  */
-export function isToolPage(name: string): boolean {
+export function isLibraryPage(name: string): boolean {
   return name.startsWith("Library/");
 }
 

@@ -5,7 +5,7 @@
 import type { Notifier, Space, WritingPlatform } from "../space/space.ts";
 import { TAGS_VIEW, Workspace } from "../ui/workspace.ts";
 import type { FrontmatterForm } from "../../../shared/pages/tags/frontmatter.ts";
-import { isToolPage } from "../../../shared/pages/tags/names.ts";
+import { isLibraryPage } from "../../../shared/pages/tags/names.ts";
 import { indexCaughtUp, readCatalog } from "./catalog.ts";
 import { PageHistory } from "../../../shared/pages/history.ts";
 import { pageWriter, type PageWriter } from "../../../shared/pages/writer.ts";
@@ -57,7 +57,7 @@ export class Controller {
   ) {
     const catalog = () => readCatalog(space, { hideMeta: this.options.protectMeta });
     // SilverBullet's own page (under Library/) is never changed: told by its name, as the catalog hides it
-    const meta: Guard = (page) => (isToolPage(page.name) ? "a library page: left alone (Hide and protect library pages)" : undefined);
+    const meta: Guard = (page) => (isLibraryPage(page.name) ? "a library page: left alone (Hide and protect library pages)" : undefined);
     this.guard = this.options.protectMeta ? meta : undefined;
     // The one page writer of Silverware Tags (the setting: how a page's tags are written where it has none yet)
     this.writer = pageWriter(platform, { newTagsForm: this.options.newTagsForm ?? "flow" });

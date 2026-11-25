@@ -18,7 +18,7 @@ A manager of the space's tags (prefix `swg-`, settings and API under `silverware
 
 ## Meta pages
 
-- `silverware.tags.protectMeta` (on by default, decided 2026-10-31; shown as *Hide and protect library pages* from 2026-11-25): a library page (under `Library/`: `isToolPage` in shared/pages/tags/names.ts) is out of the catalog (`catalogOf`'s `hideMeta`), and the controller's `Guard` (core/plan.ts, the writer's `leaveAlone`) leaves one alone by its name. So renaming `#auto` skips library pages. The tags `meta` and under it (`isMetaTag`: what SilverBullet tells templates and libraries by) are left out of the window's view and the panel too, on whatever page.
+- `silverware.tags.protectMeta` (on by default, decided 2026-10-31; shown as *Hide and protect library pages* from 2026-11-25): a library page (under `Library/`: `isLibraryPage` in shared/pages/tags/names.ts) is out of the catalog (`catalogOf`'s `hideMeta`), and the controller's `Guard` (core/plan.ts, the writer's `leaveAlone`) leaves one alone by its name. So renaming `#auto` skips library pages. The tags `meta` and under it (`isMetaTag`: what SilverBullet tells templates and libraries by) are left out of the window's view and the panel too, on whatever page.
 - Off: meta tags are shown apart: panel segments All, Page tags, Tasks without them and Meta; the window's Tags | Meta; By page without library pages.
 
 ## Gotchas

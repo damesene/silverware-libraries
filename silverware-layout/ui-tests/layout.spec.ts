@@ -1,19 +1,26 @@
 import { boxOf, expect, LAYOUT_SETTINGS, runCommand, test, waitForIndexedLayout, widths, widthSet } from "./helpers.ts";
 
-// Frames a page may show at the page before's width: none on an idle machine, one on a busy one (the width is set from
-// SilverBullet's editor:pageLoaded, dispatched after the page is shown; docs/silverware-layout.md, probe 2)
-const LATE_FRAMES = 1;
-
 const wide = (body: string) => `---\n_layout:\n  width: 1100\n---\n# Wide\n\n${body}\n`;
 
 test("a page's own width in its frontmatter: its text and the top bar at it, a page without at the theme's, the other's width not left as a link is followed", async ({ page, space }) => {
-  // Every frame: which page is shown (by its heading: a page's Linked Mentions quote the other) and its text's width
+  // Every frame: which page is shown (by its heading: a page's Linked Mentions quote the other), its text's width and
+  // when; and each change of the root's style (where the width is set): when, and the width set then. The width is set
+  // from SilverBullet's editor:pageLoaded, dispatched after the page is shown (docs/silverware-layout.md, probe 2):
+  // frames before it may show the page before's width (none on an idle machine, one or two on a busy one), never a frame
+  // after it, and no other width set after it
   await page.addInitScript(() => {
-    const frames: { page: string; width: number }[] = ((window as unknown as { swlFrames: typeof frames }).swlFrames = []);
+    const record = window as unknown as { swlFrames: { page: string; width: number; at: number }[]; swlStyled: { width: string; at: number }[] };
+    record.swlFrames = [];
+    record.swlStyled = [];
+    // (The document watched: its root is not there yet as this runs)
+    new MutationObserver((changes) => {
+      const root = document.documentElement;
+      if (changes.some((change) => change.target === root)) record.swlStyled.push({ width: root.style.getPropertyValue("--editor-width"), at: performance.now() });
+    }).observe(document, { attributes: true, attributeFilter: ["style"], subtree: true });
     const tick = () => {
       const content = document.querySelector("#sb-main .cm-content");
       const heading = content?.querySelector(".sb-line-h1")?.textContent ?? "";
-      frames.push({ page: heading.includes("Wide") ? "wide" : heading.includes("Plain") ? "plain" : "", width: Math.round(content?.getBoundingClientRect().width ?? 0) });
+      record.swlFrames.push({ page: heading.includes("Wide") ? "wide" : heading.includes("Plain") ? "plain" : "", width: Math.round(content?.getBoundingClientRect().width ?? 0), at: performance.now() });
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
@@ -23,18 +30,38 @@ test("a page's own width in its frontmatter: its text and the top bar at it, a p
   // (A page written for the test: its layout in the index once it is indexed, as a page of the space has it)
   await waitForIndexedLayout(page, `${space.folder}/Wide`);
 
-  const framesFrom = () => page.evaluate(() => (window as unknown as { swlFrames: unknown[] }).swlFrames.length);
-  const framesSince = (from: number) => page.evaluate((i) => (window as unknown as { swlFrames: { page: string; width: number }[] }).swlFrames.slice(i), from);
-  let from = await framesFrom();
+  const now = () => page.evaluate(() => performance.now());
+  /**
+   * What went wrong since `from` once the width `set` was set on the root (`""`: none of its own): another width set
+   * after it, or a frame of `shown` at another width than `width`. The frames before it are told in the test's
+   * annotations: how many is the machine's speed, not a failure.
+   */
+  const lateFrames = async (from: number, shown: string, set: string, width: number) => {
+    const found = await page.evaluate(
+      ({ from, shown, set, width }) => {
+        const record = window as unknown as { swlFrames: { page: string; width: number; at: number }[]; swlStyled: { width: string; at: number }[] };
+        const styled = record.swlStyled.filter((change) => change.at > from);
+        const at = styled.find((change) => change.width === set)?.at;
+        if (at === undefined) return { wrong: `the width ${JSON.stringify(set)} was not set`, before: 0 };
+        const wrong = [...styled.filter((change) => change.at > at && change.width !== set), ...record.swlFrames.filter((f) => f.at > at && f.page === shown && f.width !== width)];
+        return { wrong, before: record.swlFrames.filter((f) => f.at > from && f.at <= at && f.page === shown && f.width !== width).length };
+      },
+      { from, shown, set, width },
+    );
+    test.info().annotations.push({ type: "frames before the width", description: `${shown}: ${found.before}` });
+    return found.wrong;
+  };
+  let from = await now();
   await page.locator("#sb-main .cm-content a, #sb-main .cm-content .sb-wiki-link-page").filter({ hasText: "Plain" }).first().click();
   await expect.poll(() => widths(page)).toEqual({ text: 800, topBar: 800 });
   expect(await widthSet(page)).toBe("");
-  expect((await framesSince(from)).filter((f) => f.page === "plain" && f.width !== 800).length).toBeLessThanOrEqual(LATE_FRAMES);
+  expect(await lateFrames(from, "plain", "", 800)).toEqual([]);
 
-  from = await framesFrom();
+  from = await now();
   await page.locator("#sb-main .cm-content a, #sb-main .cm-content .sb-wiki-link-page").filter({ hasText: "Wide" }).first().click();
   await expect.poll(() => widths(page)).toEqual({ text: 1100, topBar: 1100 });
-  expect((await framesSince(from)).filter((f) => f.page === "wide" && f.width !== 1100).length).toBeLessThanOrEqual(LATE_FRAMES);
+  expect(await widthSet(page)).toBe("1100px");
+  expect(await lateFrames(from, "wide", "1100px", 1100)).toEqual([]);
 });
 
 // The dialog's rows of the Page tab: this page's width, all pages'

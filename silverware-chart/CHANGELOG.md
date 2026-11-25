@@ -1,5 +1,10 @@
 # Silverware Chart: changelog
 
+## 2.0.0 (2026-11-25)
+
+- **Breaking:** needs SilverBullet 3.0 or later. On SilverBullet 2.12, use the versions kept for it in the branch `silverbullet-2.12`: add its repository, `https://github.com/damesene/silverware-libraries/blob/silverbullet-2.12/REPO.md` (*Library: Add Repository*), then remove this library and install it again from there (or change `blob/main/` to `blob/silverbullet-2.12/` in the `share.uri` of its page).
+- Two charts written the same on one page are each changed as their own wherever the other is, also far up or down the page.
+
 ## 1.2.2 (2026-11-25)
 
 - A chart's width set with Silverware Layout is saved again, and its toolbar and the following of its table work, after SilverBullet reloads its scripts without redrawing the page (until now only a reload of the page fixed it).

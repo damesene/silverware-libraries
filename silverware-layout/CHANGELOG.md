@@ -1,5 +1,10 @@
 # Silverware Layout: changelog
 
+## 3.0.0 (2026-11-25)
+
+- **Breaking:** needs SilverBullet 3.0 or later. On SilverBullet 2.12, use the versions kept for it in the branch `silverbullet-2.12`: add its repository, `https://github.com/damesene/silverware-libraries/blob/silverbullet-2.12/REPO.md` (*Library: Add Repository*), then remove this library and install it again from there (or change `blob/main/` to `blob/silverbullet-2.12/` in the `share.uri` of its page).
+- Fixed: of two grids written the same, a cell edited in the second was written into the first where the first was far up the page.
+
 ## 2.0.5 (2026-11-24)
 
 - Settings are saved again on SilverBullet 3.0: saving any setting kept nothing before (SilverBullet 3.0 tells its configuration page another way).

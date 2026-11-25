@@ -285,6 +285,18 @@ describe("the board", () => {
     expect(inRankOrder((await items()).filter((one) => one.values.status === "Done")).map((one) => one.name)).toEqual(["Write docs", "Fix login"]);
   });
 
+  it("is not drawn anew under a drag of one of its cards: drawn once it ends, the card dragged kept till then", async () => {
+    const { all, store, named } = await setup("board");
+    const card = all('.swd-board-column[data-value="Todo"] .swd-board-card')[0]!;
+    card.dispatchEvent(new Event("dragstart", { bubbles: true }));
+    store.changeOutside("tasks", (await named("Plan")).key, { values: { status: null } });
+    await settle();
+    expect(card.isConnected).toBe(true);
+    card.dispatchEvent(new Event("dragend", { bubbles: true }));
+    expect(card.isConnected).toBe(false);
+    expect(all(".swd-board-column").map((column) => column.getAttribute("aria-label"))).toEqual(["No Status", "Todo", "Done"]);
+  });
+
   it("moves nothing for a card dropped on itself", async () => {
     const { all, items } = await setup("board");
     const before = (await items()).map((one) => one.rank);

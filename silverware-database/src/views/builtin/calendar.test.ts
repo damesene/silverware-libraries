@@ -52,7 +52,7 @@ async function setup(items: readonly { name: string; due?: Value; until?: Value 
     to.dispatchEvent(new Event("dragover", { bubbles: true, cancelable: true }));
     to.dispatchEvent(new Event("drop", { bubbles: true, cancelable: true }));
   };
-  return { element, all, day, onDay, names, stored, opened, told, drag };
+  return { element, all, day, onDay, names, stored, opened, told, drag, place };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
@@ -100,6 +100,21 @@ describe("the calendar", () => {
     drag(element.querySelector(".swd-cal-undated .swd-cal-item")!, day("2026-11-13"));
     await settle();
     expect(await stored()).toEqual({ Sync: ["2026-11-12T10:00", undefined], Someday: ["2026-11-13", undefined] });
+  });
+
+  it("is not drawn anew under a drag of one of its items: drawn once it ends, the element dragged kept till then", async () => {
+    const { onDay, place } = await setup([{ name: "Sync", due: "2026-11-05T10:00" }]);
+    const dragged = onDay("2026-11-05")[0]!;
+    dragged.dispatchEvent(new Event("dragstart", { bubbles: true }));
+    await place.refresh();
+    expect(dragged.isConnected).toBe(true);
+    dragged.dispatchEvent(new Event("dragend", { bubbles: true }));
+    expect(dragged.isConnected).toBe(false);
+    expect(onDay("2026-11-05").map((one) => one.textContent)).toEqual(["10:00 Sync"]);
+    // (Not dragged any more: drawn at once)
+    const next = onDay("2026-11-05")[0]!;
+    await place.refresh();
+    expect(next.isConnected).toBe(false);
   });
 
   it("never drags a value that reads as no day (its text would go), and writes nothing for a drop on its own day", async () => {

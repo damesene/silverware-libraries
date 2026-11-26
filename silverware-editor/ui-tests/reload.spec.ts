@@ -12,7 +12,14 @@ test("after System: Reload a peek's field is one editor, a word typed written on
   await expect(page.locator(".swd-menu:visible .swd-label", { hasText: /^Properties$/ })).toHaveCount(1);
   await page.keyboard.press("Escape");
   await expect(page.locator(".swd-menu:visible")).toHaveCount(0);
-  await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
+  // (The editor is loaded once SilverBullet has started, when the browser is idle: a peek opened before keeps a plain
+  // field while it is open; opened again until its field is the editor)
+  await expect(async () => {
+    if (await page.locator(".swd-peek").count()) await page.keyboard.press("Escape");
+    await expect(page.locator(".swd-peek")).toHaveCount(0, { timeout: 1000 });
+    await page.locator(".swd-list-name", { hasText: "Fix login" }).click({ timeout: 1000 });
+    await expect(peekField(page).locator(".cm-content")).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
   const field = peekField(page);
   await expect(field).toHaveCount(1);
   await expect.poll(() => fieldReady(field)).toBe(true);

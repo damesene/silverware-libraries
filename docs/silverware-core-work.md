@@ -84,7 +84,7 @@ where the work is, what to do next and what done means. **What** is built and
 | Step | What | State |
 | --- | --- | --- |
 | 0 | The plans | done (2026-11-25) |
-| S | The safety net: tests against today's code | in progress: items 1 to 3 done (2026-11-26) |
+| S | The safety net: tests against today's code | in progress: items 1 to 4 done (2026-11-26) |
 | 1 | The core's skeleton, the gate, `requires:`, build and tests | not started |
 | 2 | Preact in the core, `.tsx` everywhere | not started |
 | A | Checkpoint A | |
@@ -143,7 +143,23 @@ P1 to P3 and I1 to I6 its *API changes*.
   bar, popup, an action's panel and Turn into list; the tags' manager. Across plugins: item 1. Icons, Editor and the
   three viewers lay no layer of their own. **Not covered yet** (by worth): Properties' own menus over its dialog, a
   filter or sort tool's menu, Table's choices list, cell popup, formula hint and fill tip, Layout's Move to grid
-  picker, Assets' Rename and insert dialogs and upload progress, the plugins' settings windows. Next: items 4 to 6.
+  picker, Assets' Rename and insert dialogs and upload progress, the plugins' settings windows.
+- **Item 4 done** (what the existing scenarios left out, recorded as it is today, each test's writes whole):
+  Silverware Tags' manager: Remove, a merge, Cleanup's merge and a change by page, each with every page it wrote
+  exactly, then undone, every page back (`silverware-tags/ui-tests/undo.spec.ts`; only Rename's Undo was tested). A
+  chart's block: written into the one of two alike it was changed on; the settings saved unchanged writing nothing,
+  a block following a table too; two blocks alike following one table both written by a cell's edit, the table as
+  Silverware Table writes it (`silverware-chart/ui-tests/writes.spec.ts`). Silverware Icons' picker keys: at its
+  edges, with the search empty, given back to the search as a key is typed (`silverware-icons/ui-tests/keys.spec.ts`).
+  Silverware Editor's field in its two hosts (a grid's cell, a database's peek: the only `editors.create`) writing
+  what SilverBullet's page editor writes for the same keys (`silverware-editor/ui-tests/hosts.spec.ts`, the page the
+  reference: a list ended by Enter on its empty item puts the next text on the line after it, which Markdown reads
+  as the item's; the page does the same). **Not recorded yet**: Tags' Remove of several tags, Remove taking the text
+  too or from page tags only, the subtags options, Page tags on the open page, the panel's + and − and their Undo,
+  the Undo command, a custom operation's Undo, Undo of a page changed after it, Add to pages and Remove from pages
+  from a tag; a chart's exact block after a settings change, settings saved on the second of two alike; the picker's
+  Nothing found, a group with a search, a tab switched; the editor's Ctrl+Z and Ctrl+Y per host, leaving by a press
+  beside, Ctrl+Enter in a cell, the notice of a key SilverBullet keeps. Next: items 5 and 6.
 
 ## Steps
 

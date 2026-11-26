@@ -37,7 +37,8 @@ test("a rename typed into the tag's name is reviewed in the window, applied ever
   await window.locator(".swg-apply").click();
   await expect.poll(() => pageText(page, "Projects/Alpha")).toContain("- [ ] Write the brief #todo");
   await expect.poll(() => pageText(page, "Meetings/2026-10-15")).toContain("#todo");
-  // Undone: nothing left to undo
+  // Undone: nothing left to undo (once the undo's review is gone: its foot has no Undo either)
+  await expect(window.locator(".swg-review-title")).toHaveCount(0);
   await expect(window.locator(".swg-undo")).toHaveCount(0);
 });
 

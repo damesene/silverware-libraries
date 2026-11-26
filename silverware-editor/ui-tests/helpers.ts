@@ -26,6 +26,8 @@ export type Space = {
   open(pages: Readonly<Record<string, string>>, open: string, files?: Readonly<Record<string, Uint8Array | string>>): Promise<void>;
   /** Another of the pages written opened, the plugins started */
   goTo(name: string): Promise<void>;
+  /** A page's text as saved (its name under the folder); undefined where there is none */
+  saved(name: string): Promise<string | undefined>;
 };
 
 /** Tests get `page` and `space`: an error in the page fails the test */
@@ -80,6 +82,7 @@ export const test = base.extend<{ space: Space }>({
         await goTo(open);
       },
       goTo,
+      saved: async (name) => (existsSync(path(name)) ? (await readFile(path(name), "utf8")).replace(/\r\n/g, "\n") : undefined),
     });
     // (The page closed first: an open client would take Library/Config written under it for a change of its own)
     await page.close();

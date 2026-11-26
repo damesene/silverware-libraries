@@ -160,6 +160,20 @@ P1 to P3 and I1 to I6 its *API changes*.
   from a tag; a chart's exact block after a settings change, settings saved on the second of two alike; the picker's
   Nothing found, a group with a search, a tab switched; the editor's Ctrl+Z and Ctrl+Y per host, leaving by a press
   beside, Ctrl+Enter in a cell, the notice of a key SilverBullet keeps. Next: items 5 and 6.
+- **Item 5, how it is laid out** (agreed with the user, 2026-11-26): each plugin's baselines in an area of its own,
+  `<plugin>/ui-tests/baselines/` (a CI group each), on `scripts/ui-test-baselines.ts`: `domOf` (normalized DOM),
+  `lookOf` (computed styles and boxes of named parts against the part's own box, a part holding text without its
+  width), `expectBaseline` (a file each, `<spec>.baselines/<name>.json`, boxes within 1 px; `SW_BASELINES=update`
+  writes them, never a checking run), `setTheme` (light or dark as the system asks: SilverBullet 3.0 follows
+  `prefers-color-scheme`; a `data-theme` set by hand changes no colour), `keptThrough` (which items' nodes an action
+  keeps, and how many nodes it took out and put back), `settledLook` (read once SilverBullet's font is loaded and two
+  readings a frame apart agree). The DOM keeps what shows (`hidden`, `title`, `disabled`…, an icon's hash), not other
+  plugins' marks. **Item 5 so far**: Silverware Database's place and its table, list and board views (DOM and look,
+  light and dark, on a desktop and a phone: Chrome's Pixel 7, its touch and pixel ratio), and a filter typed and an item changed
+  elsewhere (`silverware-database/ui-tests/baselines/views.spec.ts`; the field keeps its focus and caret, every row is
+  drawn anew: known, what was kept in the report's annotations). Still to record: the filter written into the block
+  (Enter, the field left) and SilverBullet's drawing anew after it, its focus, caret and rows; the calendar and timeline (a fixed clock), the peek, Properties, menus, side
+  panels, the toolbar's settings, the tags' manager, and each with its stability.
 
 ## Steps
 
@@ -243,6 +257,9 @@ Editor 3). The rest of the plan leans on this step.
     Esc goes on to the editor, whose Escape collapses the selection; both halves to fix (2026-11-26;
     silverware-toolbar/ui-tests/stacking.spec.ts, "Turn into's list on top whole (known: …)"). Expected fixed by steps
     4 and 6.
+  - A database's view is drawn anew whole as its filter is typed in, and as an item changes elsewhere: every row put
+    anew, none kept (2026-11-26; silverware-database/ui-tests/baselines/views.spec.ts, "(known: every row drawn
+    anew)", two tests). Expected kept by the Preact conversion of the views (step 10, checkpoint C's measure).
   - System: Reload closes a database's peek open: the modules are made anew by a load of Space Lua, the peek among
     them; what was typed in it is written once as it closes (2026-11-26;
     silverware-database/ui-tests/reload.spec.ts, "the peek kept open (known: closed)"). Expected kept once the peek's

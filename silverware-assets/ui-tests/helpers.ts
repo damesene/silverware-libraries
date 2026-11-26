@@ -8,12 +8,12 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Page } from "@playwright/test";
-import { appendToPage, commandDefined, reloadSpaceLua } from "../../scripts/ui-test-helpers.ts";
+import { appendToPage, commandDefined, ON_TOP, onTopAt, reloadSpaceLua } from "../../scripts/ui-test-helpers.ts";
 import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
 
-export { appendToPage, expect, reloadSpaceLua };
+export { appendToPage, expect, ON_TOP, onTopAt, reloadSpaceLua };
 
 export const onSilverBullet = process.env.SW_TARGET === "silverbullet";
 const server = () => silverbulletServer(test.info().parallelIndex, process.env.SW_SB_SPACE ?? "");

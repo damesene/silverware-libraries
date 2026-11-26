@@ -24,10 +24,9 @@ import { OWN_MARKER } from "../src/bridge.ts";
 import type { Favorites } from "../src/core/favorites.ts";
 import { SETTINGS_VERSION } from "../src/migrations/index.ts";
 
-import { boxOf, reloadSpaceLua } from "../../scripts/ui-test-helpers.ts";
-import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
+import { boxOf, expectNoPageErrorsYet, ON_TOP, onTopAt, pageErrors, reloadSpaceLua } from "../../scripts/ui-test-helpers.ts";
 
-export { boxOf, reloadSpaceLua };
+export { boxOf, expectNoPageErrorsYet, ON_TOP, onTopAt, reloadSpaceLua };
 
 export { expect };
 
@@ -79,14 +78,9 @@ export const test = base.extend<{ favorites: Favorites | null }>({
     // touch points (navigator.maxTouchPoints 10 on a Windows machine with a digitizer), and the toolbar then offers
     // what a finger needs (src/index.ts) as on a phone
     if (testInfo.project.name !== "touch") await page.addInitScript(() => Object.defineProperty(Navigator.prototype, "maxTouchPoints", { get: () => 0 }));
-    const errors: string[] = [];
-    // (Read by its stack: SilverBullet's own, as it starts, thrown in its client alone)
-    page.on("pageerror", (e) => void (silverBulletsOwnError(e.stack ?? e.message) || errors.push(e.message)));
-    page.on("console", (m) => {
-      // (SilverBullet answers what it looks for and does not find with a 404, which the page logs: a file's preview kept
-      // in the space looked for by Silverware Assets, as Assets' own tests allow)
-      if (m.type() === "error" && !/404/.test(m.text()) && !silverBulletsOwnError(m.text())) errors.push(m.text());
-    });
+    // (A 404 allowed among them: a file's preview kept in the space looked for by Silverware Assets, as Assets' own
+    // tests allow)
+    const errors = pageErrors(page);
     const name = `UiToolbar/${testInfo.testId}`;
     const config = configFile(server().space);
     try {

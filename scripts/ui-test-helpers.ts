@@ -153,3 +153,54 @@ export async function withSpace(page: Page, root: string, started: readonly stri
   if (configBefore === undefined) await rm(configPath, { force: true });
   else await writeFile(configPath, configBefore);
 }
+
+/**
+ * What the document has on top at an element's middle and inside each of its corners: whether each is the element or
+ * in it (in a shadow root too), named by where it fails; a point outside the window `"outside view"` (the document has
+ * nothing there to hit), not taken for one covered. What lies over it there by its stacking (another plugin's control,
+ * a panel of the page) shows; visibility alone would not. Each corner is read `inset` px in, or past its own rounding
+ * where that is more (its computed radii, elliptical too: a point r·(1 − 1/√2) in from the corner on the larger r is
+ * inside the arc; a round control's corners so too)
+ */
+export async function onTopAt(target: Locator, inset = 3): Promise<Record<string, boolean | "outside view">> {
+  await boxOf(target);
+  return target.evaluate((element, inset) => {
+    const box = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    // A corner's radii in px, across and down (one value both; a share of the box's width across, of its height down;
+    // no more than half the side, as CSS draws a radius too large for its box)
+    const radii = (value: string): [number, number] => {
+      const [across = "0", down = across] = value.split(" ");
+      const px = (one: string, side: number) => Math.min(side / 2, one.endsWith("%") ? (parseFloat(one) / 100) * side : parseFloat(one) || 0);
+      return [px(across, box.width), px(down, box.height)];
+    };
+    // In past the arc: (1 − d/r)² ≤ ½ on each axis once d ≥ r·(1 − 1/√2) for the larger r, so the two sum to 1 at most;
+    // short of the box's middle
+    const inFrom = (value: string) => Math.min(Math.max(inset, Math.ceil(Math.max(...radii(value)) * (1 - Math.SQRT1_2)) + 1), Math.min(box.width, box.height) / 2);
+    const points: Record<string, [number, number]> = {
+      middle: [box.left + box.width / 2, box.top + box.height / 2],
+      "top left": [box.left + inFrom(style.borderTopLeftRadius), box.top + inFrom(style.borderTopLeftRadius)],
+      "top right": [box.right - inFrom(style.borderTopRightRadius), box.top + inFrom(style.borderTopRightRadius)],
+      "bottom left": [box.left + inFrom(style.borderBottomLeftRadius), box.bottom - inFrom(style.borderBottomLeftRadius)],
+      "bottom right": [box.right - inFrom(style.borderBottomRightRadius), box.bottom - inFrom(style.borderBottomRightRadius)],
+    };
+    const within = (node: Element | null): boolean => {
+      for (let at: Node | null = node; at; at = at.parentNode ?? (at instanceof ShadowRoot ? at.host : null)) if (at === element) return true;
+      return false;
+    };
+    const deepest = (x: number, y: number) => {
+      let found = document.elementFromPoint(x, y);
+      while (found?.shadowRoot) {
+        const inner = found.shadowRoot.elementFromPoint(x, y);
+        if (!inner || inner === found) break;
+        found = inner;
+      }
+      return found;
+    };
+    const outside = (x: number, y: number) => x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight;
+    return Object.fromEntries(Object.entries(points).map(([name, [x, y]]) => [name, outside(x, y) ? "outside view" : within(deepest(x, y))]));
+  }, inset);
+}
+
+/** Every point `onTopAt` reads on top */
+export const ON_TOP = { middle: true, "top left": true, "top right": true, "bottom left": true, "bottom right": true };

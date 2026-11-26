@@ -23,10 +23,10 @@ import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { LONG_PRESS_MS } from "../src/core/press.ts";
 
-import { boxOf, reloadSpaceLua, runSilverBulletCommand } from "../../scripts/ui-test-helpers.ts";
+import { boxOf, ON_TOP, onTopAt, reloadSpaceLua, runSilverBulletCommand } from "../../scripts/ui-test-helpers.ts";
 import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
 
-export { boxOf, reloadSpaceLua, runSilverBulletCommand };
+export { boxOf, ON_TOP, onTopAt, reloadSpaceLua, runSilverBulletCommand };
 
 export { expect };
 

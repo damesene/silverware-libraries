@@ -18,9 +18,9 @@ import { SAMPLE_PAGES } from "../../playground/tags-sample.ts";
 import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
-import { commandDefined, reloadSpaceLua } from "../../scripts/ui-test-helpers.ts";
+import { commandDefined, ON_TOP, onTopAt, reloadSpaceLua } from "../../scripts/ui-test-helpers.ts";
 
-export { commandDefined, expect, reloadSpaceLua };
+export { commandDefined, expect, ON_TOP, onTopAt, reloadSpaceLua };
 
 const target = process.env.SW_TARGET === "silverbullet" ? "silverbullet" : "playground";
 export const onSilverBullet = target === "silverbullet";

@@ -84,7 +84,7 @@ where the work is, what to do next and what done means. **What** is built and
 | Step | What | State |
 | --- | --- | --- |
 | 0 | The plans | done (2026-11-25) |
-| S | The safety net: tests against today's code | in progress: items 1 and 2 done (2026-11-26) |
+| S | The safety net: tests against today's code | in progress: items 1 to 3 done (2026-11-26) |
 | 1 | The core's skeleton, the gate, `requires:`, build and tests | not started |
 | 2 | Preact in the core, `.tsx` everywhere | not started |
 | A | Checkpoint A | |
@@ -132,8 +132,18 @@ P1 to P3 and I1 to I6 its *API changes*.
   reset (a unit test: one listener after a reset), Silverware Icons' `defineSets` (a `Library/` set, reloaded, its
   icon drawn, no notification), Layout's handle with each provider registered again (one handle on a table hovered),
   Silverware Database's press beside its block, the Tags panel (a row opened: one manager; a manager open across the
-  reload), Layout's font zoom (one step per Ctrl+scroll), Assets' File: Upload (one dialog). Next: item 3's
-  stackings within a plugin, then items 4 to 6.
+  reload), Layout's font zoom (one step per Ctrl+scroll), Assets' File: Upload (one dialog).
+- **Item 3 done** (`onTopAt` and `ON_TOP` in scripts/ui-test-helpers.ts, each corner read past its own rounding;
+  `<plugin>/ui-tests/stacking.spec.ts` in Chart, Layout, Table, Database, Assets, Toolbar and Tags): each plugin's own
+  layers on top whole, and where one has an Esc, it closes that layer alone, what is under it kept in its own state (a
+  selection, a chart's toolbar, a table over the window): a chart's toolbar, menu and settings; a grid's cell grip
+  and handle with their menus; a table's toolbar, menu, round + and a dialog, and the table over the window with its
+  toolbar and menu; a database's place menu, Properties, a value's files' popup with a file's menu over it, the peek
+  and its color picker; Assets' file menu, side panel and a file enlarged (its box, not the backdrop); the toolbar's
+  bar, popup, an action's panel and Turn into list; the tags' manager. Across plugins: item 1. Icons, Editor and the
+  three viewers lay no layer of their own. **Not covered yet** (by worth): Properties' own menus over its dialog, a
+  filter or sort tool's menu, Table's choices list, cell popup, formula hint and fill tip, Layout's Move to grid
+  picker, Assets' Rename and insert dialogs and upload progress, the plugins' settings windows. Next: items 4 to 6.
 
 ## Steps
 
@@ -212,6 +222,11 @@ Editor 3). The rest of the plan leans on this step.
   - In a grid's cell edited, the Esc that hides Silverware Toolbar leaves the cell too, for the same reason
     (2026-11-26; cross-plugin/ui-tests/stacking/stacking.spec.ts, "then leaves the cell (known: …)"). Expected fixed
     by steps 4 and 6.
+  - Esc in Silverware Toolbar's Turn into list hides the bar too, where the popup's and a panel's Esc close them
+    alone: the list has no key handler and takes no focus, so the controller's key listener hides the bar and the
+    Esc goes on to the editor, whose Escape collapses the selection; both halves to fix (2026-11-26;
+    silverware-toolbar/ui-tests/stacking.spec.ts, "Turn into's list on top whole (known: …)"). Expected fixed by steps
+    4 and 6.
   - System: Reload closes a database's peek open: the modules are made anew by a load of Space Lua, the peek among
     them; what was typed in it is written once as it closes (2026-11-26;
     silverware-database/ui-tests/reload.spec.ts, "the peek kept open (known: closed)"). Expected kept once the peek's

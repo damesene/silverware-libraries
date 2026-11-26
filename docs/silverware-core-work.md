@@ -48,6 +48,20 @@ where the work is, what to do next and what done means. **What** is built and
   its modules one by one: formulas, navpanels, widgetmenu, editorsample, room,
   contentscale, watchmark, dialog, popupmenu…) updates that text with it, so
   no CLAUDE.md describes code that is gone. Step 11 only checks.
+- **A bug a test finds in today's code is recorded, not fixed in passing**, in
+  every step (agreed with the user, 2026-11-26): the test asserts the behaviour
+  wanted and is marked `test.fail(true, "Known (YYYY-MM-DD): …")` just before
+  that assertion, after what sets it up, `expectNoPageErrorsYet(page)` on the
+  line above it (an error of the page before the mark a failure, not taken for
+  the known bug); the bug is listed in step S's *Known*
+  with the file and the step expected to fix it. A step whose work fixes one
+  sees it "unexpectedly passed" and takes the mark and the entry off in the
+  same commit. What is left is step K's. **The behaviour such a test asserts
+  is a claim, not the oracle**: what was taken for right when the bug was
+  found, never checked by a passing run. Before a fix makes it pass, it is
+  checked again (step K, *Before each fix*). `scripts/ui-test-locks.test.ts` (in
+  `verify`) fails on a mark without a dated reason, without that check above
+  it, or not listed.
 - **A test's list of exceptions only shrinks.** The checks of this work
   (module state, SilverBullet's markers, page writes, UI islands) start with
   today's exceptions listed, each with the step that removes it; an entry is
@@ -70,7 +84,7 @@ where the work is, what to do next and what done means. **What** is built and
 | Step | What | State |
 | --- | --- | --- |
 | 0 | The plans | done (2026-11-25) |
-| S | The safety net: tests against today's code | in progress: item 1 begun (2026-11-26) |
+| S | The safety net: tests against today's code | in progress: items 1 and 2 done (2026-11-26) |
 | 1 | The core's skeleton, the gate, `requires:`, build and tests | not started |
 | 2 | Preact in the core, `.tsx` everywhere | not started |
 | A | Checkpoint A | |
@@ -84,6 +98,7 @@ where the work is, what to do next and what done means. **What** is built and
 | 9 | The settled index and the page's look (H, I) | not started |
 | 10 | Preact conversions | not started |
 | C | Checkpoint C (inside step 10, after the board) | |
+| K | The known bugs fixed: no `test.fail` mark left | not started |
 | 11 | Cleanup and release | not started |
 
 Letters in parentheses name sections of docs/silverware-core.md, *Services*;
@@ -93,17 +108,32 @@ P1 to P3 and I1 to I6 its *API changes*.
 
 - **Step S, how it is laid out** (agreed with the user, 2026-11-26): the plugins together are `cross-plugin/ui-tests/`
   (SilverBullet only; an area folder each, a CI group each: `stacking/` now). System: Reload goes in **each plugin's**
-  `ui-tests/`, every one of the 12 (the viewers and Icons too: each registers with another plugin's API again), a
+  `ui-tests/`, every one of the 12 (the viewers and Icons too: their init or API page runs again), a
   shared helper for the reload in `scripts/ui-test-helpers.ts`; "no listener twice" is checked by behaviour (an action
   done once: one write, one menu, one notification), never by hooks in `src/`. Item 3 covers every stacking, a
   plugin's own too (its menus over its dialogs, its controls over its widgets), those in its plugin's folder.
 - **Shared helpers**: `scripts/ui-test-helpers.ts` has the space fixture (`withSpace`) and the page's errors
   (`pageErrors`); `cross-plugin/` uses them. The plugins' own helpers still have their copies: moved onto these when
   touched, not all at once.
-- **Item 1 done so far** (`cross-plugin/ui-tests/stacking/stacking.spec.ts`): Assets' dialog over the peek, Icons'
-  picker over Properties, the toolbar and its popup over the peek. Still to write: a dialog over another plugin's
-  dialog with Tab, the icon picker in the toolbar's settings, the toolbar over a grid's cell, one menu open across
-  plugins, a side panel over another, a widget over the window under its own controls; then items 2 to 6.
+- **Item 1 done** (`cross-plugin/ui-tests/stacking/stacking.spec.ts`, 12 scenarios, each green 10 times in
+  parallel): Assets' dialog and side panel over the peek, Icons' picker over Properties (Esc, Tab and Shift+Tab at
+  the dialog's edges, on top) and in the toolbar's settings, the toolbar and its popup over the peek and over a grid's
+  cell, one menu open across plugins (by a command and as a user goes), a database over the window with its own menu
+  on top and the toolbar standing back. **One menu open holds today by the focus leaving a menu or a press beside
+  it**, no rule the plugins share (a database's menu closes as the focus leaves it or by a press beside it, the
+  toolbar's popup by a press outside): the core's one stack of overlays (step 6) makes it a rule.
+- **Item 2 done** (`<plugin>/ui-tests/reload.spec.ts` in each of the 12; `reloadSpaceLua` in
+  scripts/ui-test-helpers.ts runs System: Reload and returns once Space Lua has run again, probed; what a plugin
+  starts after its init page, a database's modules, is waited for by what it shows): after it each plugin works once
+  (one bar, one menu, one editor, one chart toolbar, a row or an action done once, Silverware Assets' Upload file
+  there with no notice of its actions defined again, Ctrl+Z undoing one edit, a preview or chart drawn once for an embed put in after), Undo kept, a
+  table's sheet view kept, the toolbar's favourites kept, a peek's typed text written once. Not yet exercised by
+  it (each re-run by a load, the cheapest check named): Silverware Table's definitions and `onWrite` listeners
+  reset (a unit test: one listener after a reset), Silverware Icons' `defineSets` (a `Library/` set, reloaded, its
+  icon drawn, no notification), Layout's handle with each provider registered again (one handle on a table hovered),
+  Silverware Database's press beside its block, the Tags panel (a row opened: one manager; a manager open across the
+  reload), Layout's font zoom (one step per Ctrl+scroll), Assets' File: Upload (one dialog). Next: item 3's
+  stackings within a plugin, then items 4 to 6.
 
 ## Steps
 
@@ -167,14 +197,25 @@ Editor 3). The rest of the plan leans on this step.
 - **Done when**: every item above has its tests, green in parallel and
   `--repeat-each 10` for the new files; the known blinks and lost focus listed
   here with their tests; the rendering costs written here.
-- **Known, recorded by tests**: today's behaviour asserted exactly, "(known)" in the test's title and a comment saying
-  what is expected once fixed; the fix makes the test fail, which says to assert the fixed behaviour and take the
-  entry here off (not `test.fail()`: it would take a broken setup for the known bug):
+- **Known, recorded by tests** (agreed with the user, 2026-11-26): the test asserts the behaviour wanted and is marked
+  `test.fail(true, "Known (YYYY-MM-DD): …")` just before that assertion, after what sets it up (a setup that breaks
+  is an ordinary failure). The report shows it expected to fail with its reason; the fix shows as "unexpectedly
+  passed", which says to take the mark and its entry here off (*Rules of this work*; what is left is step K's).
+  Every mark is found by `test.fail(`, and
+  `scripts/ui-test-locks.test.ts` (in `verify`) fails on one without a dated reason or whose file is not named here:
   - Silverware Icons' picker in a database's Properties dialog lies in the dialog's scroller, its bottom under the
-    footer (2026-11-26; cross-plugin/ui-tests/stacking: "on top whole, but its bottom"). Expected fixed by step 6.
-  - In a database's peek, one Esc with Silverware Toolbar shown by a selection hides the toolbar and closes the peek
-    too (2026-11-26; cross-plugin/ui-tests/stacking: "one Esc hides the toolbar and closes the peek too"). Expected
-    fixed by steps 4 and 6.
+    footer (2026-11-26; cross-plugin/ui-tests/stacking/stacking.spec.ts, "on top whole (known: …)"). Expected fixed
+    by step 6.
+  - In a database's peek, the Esc that hides Silverware Toolbar (shown by a selection) closes the peek too: the
+    toolbar's key listener does not take it (2026-11-26; cross-plugin/ui-tests/stacking/stacking.spec.ts, "Esc hides
+    the toolbar alone (known: …)"). Expected fixed by steps 4 and 6.
+  - In a grid's cell edited, the Esc that hides Silverware Toolbar leaves the cell too, for the same reason
+    (2026-11-26; cross-plugin/ui-tests/stacking/stacking.spec.ts, "then leaves the cell (known: …)"). Expected fixed
+    by steps 4 and 6.
+  - System: Reload closes a database's peek open: the modules are made anew by a load of Space Lua, the peek among
+    them; what was typed in it is written once as it closes (2026-11-26;
+    silverware-database/ui-tests/reload.spec.ts, "the peek kept open (known: closed)"). Expected kept once the peek's
+    state is the core's (steps 6 and 10).
 
 ### 1. The core's skeleton (1 week)
 
@@ -345,6 +386,32 @@ Editor 3). The rest of the plan leans on this step.
   blinks are gone, its hand-kept state gone, its tests green in parallel; the
   UI islands test's list holds decorations of SilverBullet's DOM only.
 
+### K. The known bugs fixed (as long as what is left takes)
+
+- **Scope**: every test still marked `test.fail(true, "Known …")` (found by
+  `test.fail(`; listed in step S's *Known*): the behaviour fixed where it
+  belongs (a module's bug in the module, the root CLAUDE.md's rule), the mark
+  and its *Known* entry taken off in the same commit, one bug a commit. A fix
+  that changes what a space has (settings, the Space Lua API, a theme's
+  selectors, stored markdown) or the behaviour a user sees beyond the bug is
+  the user's decision: stop and ask. A bug whose fix the work shows is out of
+  this branch's reach is the user's to keep or drop, with why written here.
+- **Before each fix**, the behaviour the test asserts is checked again, not
+  taken from it: a test marked failing has never passed, so what it asserts
+  was written as the right behaviour when the bug was found and nothing has
+  tested that claim. Read against the plugins' user docs (library pages), the
+  plans' decisions, what the same action does on the other surfaces (the page,
+  a grid's cell, a peek, a dialog) and the platform's convention (an Esc closes
+  the top layer alone, the focus back where it was); where the test asks for
+  less or other than that, or where it is unsure, the test is corrected first
+  and shown to the user, never the code bent to it. A fix that makes its test
+  pass but changes another test's result is a change of behaviour: stop and
+  ask.
+- **Not in it**: new features; bugs no test records (each gets its test and
+  mark first, then is fixed here).
+- **Done when**: no `test.fail(` in any `ui-tests/`, step S's *Known* empty;
+  the tests that held them green in parallel, `--repeat-each 10`.
+
 ### 11. Cleanup and release
 
 - **Scope**: CLAUDE.md files say what the code now is (the plans' content that
@@ -363,7 +430,8 @@ Editor 3). The rest of the plan leans on this step.
   nothing imports a removed module; no deprecated alias left without its
   removal decided; every CLAUDE.md read against the code (each section's
   files exist, nothing it names is gone); verify, the UI tests on the
-  release and edge, and the safety net (step S) green.
+  release and edge, and the safety net (step S) green, no known bug marked
+  (step K).
 
 ## Apart from this branch
 

@@ -24,10 +24,10 @@ import { OWN_MARKER } from "../src/bridge.ts";
 import type { Favorites } from "../src/core/favorites.ts";
 import { SETTINGS_VERSION } from "../src/migrations/index.ts";
 
-import { boxOf } from "../../scripts/ui-test-helpers.ts";
+import { boxOf, reloadSpaceLua } from "../../scripts/ui-test-helpers.ts";
 import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
 
-export { boxOf };
+export { boxOf, reloadSpaceLua };
 
 export { expect };
 

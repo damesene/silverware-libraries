@@ -62,3 +62,47 @@ describe("interaction tests kept from running in parallel", () => {
     expect(keptApartUnallowed("a.spec.ts", `// no lock: here\nconst a = 1;\n`)).toEqual([]);
   });
 });
+
+// A test that holds a known bug (step S of docs/silverware-core-work.md): the behaviour wanted asserted, marked
+// `test.fail(true, "Known (YYYY-MM-DD): …")` after what sets it up and `expectNoPageErrorsYet(page)` on the line above
+// (the fixtures check the page's errors after the test, by then taken for the known bug), so the report shows it
+// expected to fail and a fix
+// shows as "unexpectedly passed". Each is found by its mark: its reason dated and its file listed in the runbook's
+// *Known* entries, so none is forgotten (step K fixes what is left); a bare `test.fail()` (any failure taken for the
+// known one) is none. A mark is read on its line: written over several lines it is refused.
+const KNOWN = /\btest\.fail\((.*)/g;
+const KNOWN_REASON = /^true,\s*"Known \(\d{4}-\d{2}-\d{2}\): \S/;
+
+/**
+ * Where a file marks a test failing without a dated reason, or without the page's errors checked on the line above
+ * (`expectNoPageErrorsYet(page)`: else an error of the page before it is taken for the known bug): `file:line`, the line
+ */
+export function knownUnexplained(file: string, text: string): string[] {
+  const lines = text.split("\n");
+  return lines.flatMap((line, index) =>
+    [...line.replace(/\/\/.*$/, "").matchAll(KNOWN)]
+      .filter((one) => !KNOWN_REASON.test(one[1]!) || !/\bexpectNoPageErrorsYet\(page\);/.test(lines[index - 1] ?? ""))
+      .map(() => `${file}:${index + 1}: ${line.trim()}`),
+  );
+}
+
+describe("interaction tests holding a known bug", () => {
+  it("each has a dated reason, and its file is in the runbook's Known entries", () => {
+    const runbook = readFileSync(join(ROOT, "docs", "silverware-core-work.md"), "utf8");
+    const files = uiTestFiles().map((file) => [relative(ROOT, file).replace(/\\/g, "/"), readFileSync(file, "utf8")] as const);
+    expect(files.flatMap(([file, text]) => knownUnexplained(file, text))).toEqual([]);
+    const marked = files.filter(([, text]) => /\btest\.fail\(/.test(text.replace(/\/\/.*$/gm, ""))).map(([file]) => file);
+    expect(marked.filter((file) => !runbook.includes(file))).toEqual([]);
+  });
+
+  it("takes a dated reason after the page's errors checked, refuses a bare mark, one without its date or without the check", () => {
+    const checked = "  expectNoPageErrorsYet(page);\n";
+    expect(knownUnexplained("a.spec.ts", `${checked}  test.fail(true, "Known (2026-11-26): one Esc closes both");\n`)).toEqual([]);
+    expect(knownUnexplained("a.spec.ts", `  test.fail(true, "Known (2026-11-26): one Esc closes both");\n`)).toHaveLength(1);
+    expect(knownUnexplained("a.spec.ts", `${checked}  test.fail();\n`)).toHaveLength(1);
+    expect(knownUnexplained("a.spec.ts", `${checked}  test.fail(true, "one Esc closes both");\n`)).toHaveLength(1);
+    expect(knownUnexplained("a.spec.ts", `  // test.fail() in a comment\n`)).toEqual([]);
+    // (Over several lines: refused, its reason not on the mark's line)
+    expect(knownUnexplained("a.spec.ts", `${checked}  test.fail(\n    true,\n    "Known (2026-11-26): one Esc closes both",\n  );\n`)).toHaveLength(1);
+  });
+});

@@ -10,8 +10,9 @@ import { dirname, join } from "node:path";
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
+import { reloadSpaceLua } from "../../scripts/ui-test-helpers.ts";
 
-export { expect };
+export { expect, reloadSpaceLua };
 
 export const onSilverBullet = process.env.SW_TARGET === "silverbullet";
 const server = () => silverbulletServer(test.info().parallelIndex, process.env.SW_SB_SPACE ?? "");

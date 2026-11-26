@@ -32,8 +32,9 @@ export async function commandDefined(page: Page, name: string): Promise<void> {
 type Runs = { runCommandByName(name: string): Promise<void>; clientSystem?: { commandHook?: { buildAllCommands(): Map<string, unknown> } } };
 
 /**
- * One of SilverBullet's own commands run as its palette would, where this SilverBullet has it (Navigate: Tree from its
- * 3.0): whether it did. Its plugin's commands are waited for by `commandDefined`; SilverBullet's are there as it starts
+ * A command run as SilverBullet's palette would, where this SilverBullet has it (Navigate: Tree from its 3.0; a
+ * plugin's once defined, which `commandDefined` waits for): whether it did. Not waited for (its run may wait for the
+ * user, a dialog of its), a failure of it not told here; what it shows is waited for by the test
  */
 export async function runSilverBulletCommand(page: Page, name: string): Promise<boolean> {
   return page.evaluate((command) => {
@@ -45,12 +46,31 @@ export async function runSilverBulletCommand(page: Page, name: string): Promise<
 }
 
 /**
+ * SilverBullet's System: Reload, as its palette runs it, waited for until Space Lua has run again (each plugin's init
+ * and API pages run again on the modules already loaded, docs/silverware-core.md *Probes* 2; probed 2026-11-26: a
+ * block counting its runs had run once more as this returned). What a plugin starts after its init page returns (a
+ * database's modules, an editor's CodeMirror) is not waited for: a test waits for what it shows
+ */
+export async function reloadSpaceLua(page: Page): Promise<void> {
+  await page.evaluate(() => (window as unknown as { client: { runCommandByName(name: string): Promise<void> } }).client.runCommandByName("System: Reload"));
+}
+
+/** Text put at the page's end through SilverBullet's editor, as typed: its widgets drawn for it */
+export async function appendToPage(page: Page, text: string): Promise<void> {
+  await page.evaluate((text) => {
+    const view = (window as unknown as { client: { editorView: { state: { doc: { length: number } }; dispatch(spec: unknown): void } } }).client.editorView;
+    view.dispatch({ changes: { from: view.state.doc.length, insert: text } });
+  }, text);
+}
+
+/**
  * Errors of the page a test fails on, gathered as they come: thrown in it or logged as errors, but SilverBullet's own
  * (scripts/silverbullet-noise.ts) and a 404 (SilverBullet answers what it looks for and does not find with one, which
  * the page logs). A suite's own exceptions stay in its helpers: `alsoAllowed`, thrown or logged
  */
 export function pageErrors(page: Page, alsoAllowed?: RegExp): string[] {
   const errors: string[] = [];
+  gathered.set(page, errors);
   // (Read by its stack: SilverBullet's own, as it starts, thrown in its client alone)
   page.on("pageerror", (e) => void (silverBulletsOwnError(e.stack ?? e.message) || alsoAllowed?.test(e.message) || errors.push(e.message)));
   page.on("console", (m) => {
@@ -58,6 +78,20 @@ export function pageErrors(page: Page, alsoAllowed?: RegExp): string[] {
     if (m.type() === "error" && !/404/.test(text) && !alsoAllowed?.test(text) && !silverBulletsOwnError(text)) errors.push(text);
   });
   return errors;
+}
+
+// Each page's errors as `pageErrors` gathers them, for `expectNoPageErrorsYet`
+const gathered = new WeakMap<Page, string[]>();
+
+/**
+ * No error in the page so far (`pageErrors`'): checked before a test marks itself failing for a known bug
+ * (`test.fail(true, "Known …")`), so an error of the page before it is a failure, not taken for the known one (the
+ * fixture checks the errors only after the test)
+ */
+export function expectNoPageErrorsYet(page: Page): void {
+  const errors = gathered.get(page);
+  if (!errors) throw new Error("expectNoPageErrorsYet: the page's errors are not gathered by pageErrors");
+  expect(errors, "errors in the page before the known bug's mark").toEqual([]);
 }
 
 /** A test's pages in its worker's SilverBullet space */

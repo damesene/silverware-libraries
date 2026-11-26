@@ -10,12 +10,11 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Page, type Locator } from "@playwright/test";
-import { boxOf, commandDefined } from "../../scripts/ui-test-helpers.ts";
+import { boxOf, commandDefined, expectNoPageErrorsYet, pageErrors, reloadSpaceLua } from "../../scripts/ui-test-helpers.ts";
 
-export { boxOf };
+export { boxOf, expectNoPageErrorsYet, reloadSpaceLua };
 import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
-import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
 
 export { expect };
 
@@ -99,13 +98,7 @@ export type Space = {
 export const test = base.extend<{ space: Space }>({
   page: async ({ page }, use) => {
     test.skip(!onSilverBullet, "a database is drawn by SilverBullet's code widget: tested against SilverBullet only");
-    const errors: string[] = [];
-    // (Read by its stack: SilverBullet's own, as it starts, thrown in its client alone)
-    page.on("pageerror", (e) => void (silverBulletsOwnError(e.stack ?? e.message) || errors.push(e.message)));
-    page.on("console", (m) => {
-      // (SilverBullet answers what it looks for and does not find with a 404, which the page logs)
-      if (m.type() === "error" && !/404/.test(m.text()) && !silverBulletsOwnError(m.text())) errors.push(m.text());
-    });
+    const errors = pageErrors(page);
     try {
       await use(page);
       expect(errors, "errors in the page").toEqual([]);

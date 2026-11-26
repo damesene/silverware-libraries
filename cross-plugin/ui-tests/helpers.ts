@@ -4,9 +4,9 @@
 // real SilverBullet only and are skipped on the playground. A test's pages are written into its worker's space
 // (UiCross/<test>/<name>), the first opened, and removed after; Library/Config is put back as it was.
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
-import { boxOf, pageErrors, type Space, withSpace } from "../../scripts/ui-test-helpers.ts";
+import { boxOf, expectNoPageErrorsYet, pageErrors, runSilverBulletCommand, type Space, withSpace } from "../../scripts/ui-test-helpers.ts";
 
-export { boxOf, expect, type Space };
+export { boxOf, expect, expectNoPageErrorsYet, runSilverBulletCommand, type Space };
 
 export const onSilverBullet = process.env.SW_TARGET === "silverbullet";
 

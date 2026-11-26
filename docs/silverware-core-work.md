@@ -70,7 +70,7 @@ where the work is, what to do next and what done means. **What** is built and
 | Step | What | State |
 | --- | --- | --- |
 | 0 | The plans | done (2026-11-25) |
-| S | The safety net: tests against today's code | not started |
+| S | The safety net: tests against today's code | in progress: item 1 begun (2026-11-26) |
 | 1 | The core's skeleton, the gate, `requires:`, build and tests | not started |
 | 2 | Preact in the core, `.tsx` everywhere | not started |
 | A | Checkpoint A | |
@@ -91,7 +91,19 @@ P1 to P3 and I1 to I6 its *API changes*.
 
 ## Notes for the next session
 
-- (none yet)
+- **Step S, how it is laid out** (agreed with the user, 2026-11-26): the plugins together are `cross-plugin/ui-tests/`
+  (SilverBullet only; an area folder each, a CI group each: `stacking/` now). System: Reload goes in **each plugin's**
+  `ui-tests/`, every one of the 12 (the viewers and Icons too: each registers with another plugin's API again), a
+  shared helper for the reload in `scripts/ui-test-helpers.ts`; "no listener twice" is checked by behaviour (an action
+  done once: one write, one menu, one notification), never by hooks in `src/`. Item 3 covers every stacking, a
+  plugin's own too (its menus over its dialogs, its controls over its widgets), those in its plugin's folder.
+- **Shared helpers**: `scripts/ui-test-helpers.ts` has the space fixture (`withSpace`) and the page's errors
+  (`pageErrors`); `cross-plugin/` uses them. The plugins' own helpers still have their copies: moved onto these when
+  touched, not all at once.
+- **Item 1 done so far** (`cross-plugin/ui-tests/stacking/stacking.spec.ts`): Assets' dialog over the peek, Icons'
+  picker over Properties, the toolbar and its popup over the peek. Still to write: a dialog over another plugin's
+  dialog with Tab, the icon picker in the toolbar's settings, the toolbar over a grid's cell, one menu open across
+  plugins, a side panel over another, a widget over the window under its own controls; then items 2 to 6.
 
 ## Steps
 
@@ -155,6 +167,14 @@ Editor 3). The rest of the plan leans on this step.
 - **Done when**: every item above has its tests, green in parallel and
   `--repeat-each 10` for the new files; the known blinks and lost focus listed
   here with their tests; the rendering costs written here.
+- **Known, recorded by tests**: today's behaviour asserted exactly, "(known)" in the test's title and a comment saying
+  what is expected once fixed; the fix makes the test fail, which says to assert the fixed behaviour and take the
+  entry here off (not `test.fail()`: it would take a broken setup for the known bug):
+  - Silverware Icons' picker in a database's Properties dialog lies in the dialog's scroller, its bottom under the
+    footer (2026-11-26; cross-plugin/ui-tests/stacking: "on top whole, but its bottom"). Expected fixed by step 6.
+  - In a database's peek, one Esc with Silverware Toolbar shown by a selection hides the toolbar and closes the peek
+    too (2026-11-26; cross-plugin/ui-tests/stacking: "one Esc hides the toolbar and closes the peek too"). Expected
+    fixed by steps 4 and 6.
 
 ### 1. The core's skeleton (1 week)
 

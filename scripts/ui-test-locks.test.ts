@@ -15,7 +15,7 @@ const ALLOWED = /\/\/\s*Lock allowed by the user \(\d{4}-\d{2}-\d{2}\):\s*\S/;
 // How far above a line kept apart its comment may be (the comment, a line of the test's name or details between)
 const ABOVE = 3;
 
-/** The interaction tests' files: each plugin's `ui-tests/`, its area folders too */
+/** The interaction tests' files: each folder's `ui-tests/` (a plugin's, cross-plugin/), its area folders too */
 function uiTestFiles(): string[] {
   const walk = (dir: string): string[] =>
     readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -24,7 +24,9 @@ function uiTestFiles(): string[] {
       return entry.name.endsWith(".ts") ? [path] : [];
     });
   return readdirSync(ROOT, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name.startsWith("silverware-"))
+    // (Every folder holding one, as the CI's groups take them: scripts/ui-test-groups.mjs; a folder without one, as
+    // .git or test-results, gives nothing, node_modules not even looked into)
+    .filter((entry) => entry.isDirectory() && entry.name !== "node_modules")
     .flatMap((entry) => {
       try {
         return walk(join(ROOT, entry.name, "ui-tests"));

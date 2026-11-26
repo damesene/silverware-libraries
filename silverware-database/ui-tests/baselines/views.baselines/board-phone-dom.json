@@ -46,7 +46,7 @@
   "          span.swd-pill [data-color=\"0\"] \"Todo\"",
   "          span.swd-board-count \"1\"",
   "        div.swd-board-cards",
-  "          article.swd-board-card [data-item=\"page-1\" draggable=\"true\"]",
+  "          article.swd-board-card [data-item=\"#1\" draggable=\"true\"]",
   "            button.swd-board-name [title=\"Open Fix login\" type=\"button\"] \"Fix login\"",
   "        button.swd-board-add [title=\"Add an item to Todo\" type=\"button\"] \"+ New\"",
   "      section.swd-board-column [aria-label=\"Done\" data-group=\"value:\\\"Done\\\"\" data-value=\"Done\"]",
@@ -54,7 +54,7 @@
   "          span.swd-pill [data-color=\"1\"] \"Done\"",
   "          span.swd-board-count \"1\"",
   "        div.swd-board-cards",
-  "          article.swd-board-card [data-item=\"page-2\" draggable=\"true\"]",
+  "          article.swd-board-card [data-item=\"#2\" draggable=\"true\"]",
   "            button.swd-board-name [title=\"Open Write docs\" type=\"button\"] \"Write docs\"",
   "        button.swd-board-add [title=\"Add an item to Done\" type=\"button\"] \"+ New\""
 ]

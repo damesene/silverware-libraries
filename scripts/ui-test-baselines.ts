@@ -22,13 +22,22 @@ const SHOWN = ["role", "hidden", "title", "type", "disabled", "tabindex", "dragg
  * `data-*` but the tests' own `data-test-*` and those matching `omit`: another plugin's, which its own baselines
  * keep), the properties its inline style sets (their names: their values are geometry, kept by `lookOf`), its own
  * text trimmed. An SVG is its tag, classes and a short hash of its markup (an icon swapped shows; its paths are its
- * set's). `replace` takes out what differs between runs (a test's folder in a link)
+ * set's). `replace` takes out what differs between runs (a test's folder in a link); an `opaque` attribute's values
+ * (an item's key, given in the order the store read the pages) are numbered as they first come in the subtree, `#1`,
+ * `#2`…: the same item the same number wherever it is drawn
  */
-export async function domOf(target: Locator, options: { replace?: Readonly<Record<string, string>>; omit?: RegExp } = {}): Promise<string[]> {
+export async function domOf(target: Locator, options: { replace?: Readonly<Record<string, string>>; omit?: RegExp; opaque?: readonly string[] } = {}): Promise<string[]> {
   const lines = await target.evaluate(
-    (root, { shown, omit }) => {
+    (root, { shown, omit, opaque }) => {
       const out: string[] = [];
       const omitted = omit ? new RegExp(omit[0], omit[1]) : undefined;
+      const numbers = new Map<string, string>();
+      const numbered = (name: string, value: string) => {
+        if (!opaque.includes(name)) return value;
+        const key = `${name}=${value}`;
+        if (!numbers.has(key)) numbers.set(key, `#${[...numbers.keys()].filter((one) => one.startsWith(`${name}=`)).length + 1}`);
+        return numbers.get(key)!;
+      };
       const hash = (text: string) => {
         let h = 0x811c9dc5;
         for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
@@ -39,7 +48,7 @@ export async function domOf(target: Locator, options: { replace?: Readonly<Recor
         const attrs = [...element.attributes]
           .filter((one) => shown.includes(one.name) || one.name.startsWith("aria-") || one.name.startsWith("data-"))
           .filter((one) => !one.name.startsWith("data-test-") && !omitted?.test(one.name))
-          .map((one) => `${one.name}=${JSON.stringify(one.value)}`);
+          .map((one) => `${one.name}=${JSON.stringify(numbered(one.name, one.value))}`);
         // (Its inline style: what shows with its value, a colour, `display: none`; geometry, its name alone)
         const style = (element as HTMLElement).style;
         if (style?.length) attrs.push(`style=${JSON.stringify([...style].sort().map((one) => (/^(display|visibility|opacity|color|background|border-color|fill|stroke)/.test(one) ? `${one}:${style.getPropertyValue(one)}` : one)).join(","))}`);
@@ -58,12 +67,12 @@ export async function domOf(target: Locator, options: { replace?: Readonly<Recor
       walk(root, 0);
       return out;
     },
-    { shown: SHOWN, omit: options.omit ? ([options.omit.source, options.omit.flags] as const) : undefined },
+    { shown: SHOWN, omit: options.omit ? ([options.omit.source, options.omit.flags] as const) : undefined, opaque: options.opaque ?? [] },
   );
   return lines.map((line) => Object.entries(options.replace ?? {}).reduce((text, [from, to]) => text.split(from).join(to), line));
 }
 
-/** The look of an element: what a theme or a layout change would show */
+/** The look of an element: what a theme or a layout change would show (not its outline: the focus ring follows where the focus is, which the stability checks read) */
 const STYLES = [
   "display",
   "position",
@@ -88,7 +97,6 @@ const STYLES = [
   "border-right",
   "border-radius",
   "box-shadow",
-  "outline",
   "padding",
   "margin",
   "gap",

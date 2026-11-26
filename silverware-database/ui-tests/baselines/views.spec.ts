@@ -49,7 +49,7 @@ for (const [device, use] of [["desktop", {}], ["phone", PHONE]] as const) {
         await space.open({ Page: BLOCK(view), ...TASKS }, "Page");
         const place = page.locator(".swd-place");
         await expect(place.locator(items)).toHaveCount(2);
-        await expectBaseline(`${view}-${device}-dom`, await domOf(place, { omit: OTHERS }));
+        await expectBaseline(`${view}-${device}-dom`, await domOf(place, { omit: OTHERS, opaque: ["data-item"] }));
         for (const theme of ["light", "dark"] as const) {
           await setTheme(page, theme);
           await expectBaseline(`${view}-${device}-${theme}`, await settledLook(page, place, { ...CHROME, ...parts }, FONT));

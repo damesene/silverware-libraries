@@ -171,8 +171,10 @@ P1 to P3 and I1 to I6 its *API changes*.
   plugins' marks. **Item 5 so far**: Silverware Database's place and its table, list and board views (DOM and look,
   light and dark, on a desktop and a phone: Chrome's Pixel 7, its touch and pixel ratio), and a filter typed and an item changed
   elsewhere (`silverware-database/ui-tests/baselines/views.spec.ts`; the field keeps its focus and caret, every row is
-  drawn anew: known, what was kept in the report's annotations). Still to record: the filter written into the block
-  (Enter, the field left) and SilverBullet's drawing anew after it, its focus, caret and rows; the calendar and timeline (a fixed clock), the peek, Properties, menus, side
+  drawn anew: known, what was kept in the report's annotations); its menu, peek and Properties, and the calendar and
+  timeline at a fixed day (`page.clock.setSystemTime`: the time runs, `setFixedTime` stopped SilverBullet's indexing),
+  each opened in its theme, and a filter written into the block by Enter and by the field left, SilverBullet drawing
+  the block's widget anew, the focus, caret and the page's scroll kept (`overlays.spec.ts`). Still to record: side
   panels, the toolbar's settings, the tags' manager, and each with its stability.
 
 ## Steps
@@ -260,6 +262,10 @@ Editor 3). The rest of the plan leans on this step.
   - A database's view is drawn anew whole as its filter is typed in, and as an item changes elsewhere: every row put
     anew, none kept (2026-11-26; silverware-database/ui-tests/baselines/views.spec.ts, "(known: every row drawn
     anew)", two tests). Expected kept by the Preact conversion of the views (step 10, checkpoint C's measure).
+  - A database's peek keeps the text colour of the theme it was opened in when the theme is switched while it is
+    open: it copies the editor's colour into its inline style once (host/silverbullet/platform.ts `editorLook`), dark
+    text on the dark theme (2026-11-26; silverware-database/ui-tests/baselines/overlays.spec.ts, "(known: kept
+    light)"). Expected to follow the theme once the peek's look is read where it is drawn (steps 6 and 10).
   - System: Reload closes a database's peek open: the modules are made anew by a load of Space Lua, the peek among
     them; what was typed in it is written once as it closes (2026-11-26;
     silverware-database/ui-tests/reload.spec.ts, "the peek kept open (known: closed)"). Expected kept once the peek's

@@ -42,7 +42,7 @@ npm run deploy -- <space folder>   # copy every plugin into a local space's Libr
 - Named `Silverware <Name>`, commands `Silverware <Name>: …`, settings and Space Lua API under `silverware.<name>` (one global `silverware`, `silverware = silverware or {}`); what a plugin's Lua blocks share that is not API under `silverware_internal.<name>`, so `silverware.<name>.` completes to the API alone. `config.define("silverware.<name>", …)`: SilverBullet splits a dotted key into nested objects (its `client/config.ts`).
 - CSS classes, data attributes and CSS variables under the plugin's prefix.
 - A plugin needs no other installed. One plugin uses another only through its public API handed over by its init page's Lua (Silverware Chart takes Silverware Table's `silverware.table.tables`; the toolbar and the database take `silverware.icons.api`), never through its code: each plugin's isolation test checks imports.
-- The scripts (build, deploy) list the plugins; vitest, tsc and Playwright find every plugin's tests; CI runs each plugin's `ui-tests/` (and each area folder under it) as a job of its own (`scripts/ui-test-groups.mjs`).
+- The scripts (build, deploy) list the plugins; vitest, tsc and Playwright find every plugin's tests; CI runs each folder's `ui-tests/` (each plugin's, and `cross-plugin/`'s: the plugins together, what one lays over another's, against SilverBullet only) and each area folder under it as a job of its own (`scripts/ui-test-groups.mjs`). What every folder's helpers share is in `scripts/ui-test-helpers.ts` (a test's space, `withSpace`; the page's errors, `pageErrors`): a new suite builds on it, not on a copy.
 
 ## Working rules
 

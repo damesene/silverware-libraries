@@ -1,5 +1,5 @@
 // The groups the interaction tests run in, a CI job each (integration-tests.yml),
-// as JSON for its matrix: each plugin's (a folder with ui-tests/) specs in
+// as JSON for its matrix: each folder's with ui-tests/ (a plugin's, cross-plugin/) specs in
 // ui-tests/ itself one group, its name the plugin's; each folder under ui-tests/
 // holding specs a group of its own (silverware-table/ui-tests/sheet/: the sheet
 // view's), so a plugin parts an area of its tests by a folder, nothing else

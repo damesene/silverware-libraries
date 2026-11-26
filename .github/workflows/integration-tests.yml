@@ -4,9 +4,10 @@
 # request (.github/dependabot.yml), which these tests then run against: green, it
 # merges by itself (dependabot.yml in this folder); red, the repository's owner is
 # assigned to it, which GitHub tells them.
-# Each plugin's tests (<plugin>/ui-tests/) in a job of its own, and each area a
-# plugin keeps in a folder under it (silverware-table/ui-tests/sheet/: the sheet
-# view's) in one of its own (scripts/ui-test-groups.mjs), side by side on runners
+# Each plugin's tests (<plugin>/ui-tests/; cross-plugin/ui-tests/ alike) in a job
+# of its own, and each area a plugin keeps in a folder under it
+# (silverware-table/ui-tests/sheet/: the sheet view's) in one of its own
+# (scripts/ui-test-groups.mjs), side by side on runners
 # of their own, each with the workers and SilverBullet servers a run had: the run
 # takes as long as its largest group, a new plugin or area gets its job by its
 # folder, and no runner is loaded more than one was (more workers on one made the

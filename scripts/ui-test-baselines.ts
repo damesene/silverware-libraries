@@ -9,7 +9,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { expect, type Locator, type Page, test } from "@playwright/test";
+import { devices, expect, type Locator, type Page, test } from "@playwright/test";
 
 /** How far a box may move or grow, in px, and still be the same (rounding, a font's hinting); the only numbers kept */
 const TOLERANCE = 1;
@@ -108,16 +108,30 @@ const STYLES = [
   "z-index",
 ] as const;
 
-export type Look = Record<string, { readonly box?: readonly [number, number, number, number]; readonly style: Record<string, string> } | "none">;
+export type Box = readonly [number, number, number, number];
+
+export type Look = Record<string, { readonly box?: Box; readonly style: Record<string, string> } | "none" | Place>;
+
+/** Where a part lies: its box against the window, and against its anchor where it has one (the button it opened from) */
+export type Place = { readonly window: Box; readonly anchor?: Box };
+
+/**
+ * Where a part's place is read: always against the window (the viewport: it moves as the page scrolls, so for a part
+ * laid over the page alone, a menu, a dialog, a panel, a sheet, never one in the page's flow), and against `anchor`
+ * where given (one visible element, scoped to its widget: Playwright's locators are strict)
+ */
+export type PlaceOf = { readonly anchor?: Locator };
 
 /**
  * Each of `parts` (a name, a selector within the target, or "" for the target itself): its computed styles and its box
  * against the target's top left (x, y, width, height, whole px), the first element matching (a selector naming which,
  * `:nth-child`, for another); "none" where none does. A part holding text directly has no width kept (-1: it follows
- * the machine's fonts)
+ * the machine's fonts). With `place`, under `@place` the part's box against the window and its anchor (`Place`): what a
+ * menu moved off its button, a dialog no longer centred or a panel shifted shows; without it, nothing of the kind
+ * (the baselines recorded before it stay as they are)
  */
-export async function lookOf(target: Locator, parts: Readonly<Record<string, string>>): Promise<Look> {
-  return target.evaluate(
+export async function lookOf(target: Locator, parts: Readonly<Record<string, string>>, place?: PlaceOf): Promise<Look> {
+  const look: Look = await target.evaluate(
     (root, { parts, styles }) => {
       const origin = root.getBoundingClientRect();
       return Object.fromEntries(
@@ -135,6 +149,15 @@ export async function lookOf(target: Locator, parts: Readonly<Record<string, str
     },
     { parts, styles: STYLES as readonly string[] },
   );
+  if (!place) return look;
+  if ("@place" in parts) throw new Error("lookOf: a part named @place takes the place's own key");
+  const box = (one: { x: number; y: number; width: number; height: number }) => [Math.round(one.x), Math.round(one.y), Math.round(one.width), Math.round(one.height)] as const;
+  const own = await target.boundingBox();
+  if (!own) throw new Error("lookOf: the part has no box to place");
+  const anchor = place.anchor ? await place.anchor.boundingBox() : undefined;
+  if (place.anchor && !anchor) throw new Error("lookOf: the part's anchor has no box");
+  const relative: Box | undefined = anchor ? [Math.round(own.x - anchor.x), Math.round(own.y - anchor.y), Math.round(own.width), Math.round(own.height)] : undefined;
+  return { ...look, "@place": { window: box(own), ...(relative ? { anchor: relative } : {}) } };
 }
 
 /**
@@ -142,7 +165,7 @@ export async function lookOf(target: Locator, parts: Readonly<Record<string, str
  * fallback would move every box after a text), then read until two readings a frame apart are the same (what a
  * change of size or theme lays out, a ResizeObserver's work too, done)
  */
-export async function settledLook(page: Page, target: Locator, parts: Readonly<Record<string, string>>, fontFamily: string): Promise<Look> {
+export async function settledLook(page: Page, target: Locator, parts: Readonly<Record<string, string>>, fontFamily: string, place?: PlaceOf): Promise<Look> {
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
   // (A face of the page's own of that family loaded: `document.fonts.check` says yes of a family the page has none of)
   await expect.poll(() => page.evaluate((family) => [...document.fonts].some((face) => face.family.replace(/["']/g, "") === family && face.status === "loaded"), fontFamily), `the font ${fontFamily} loaded`).toBe(true);
@@ -152,7 +175,7 @@ export async function settledLook(page: Page, target: Locator, parts: Readonly<R
     .poll(async () => {
       last = look;
       await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
-      look = await lookOf(target, parts);
+      look = await lookOf(target, parts, place);
       return last !== undefined && JSON.stringify(last) === JSON.stringify(look);
     })
     .toBe(true);
@@ -259,4 +282,59 @@ export async function keptThrough(within: Locator, items: string, key: string, a
     },
     { items, key },
   );
+}
+
+/** A phone: Chrome's Pixel 7, its size, touch and pixel ratio (its browser type left out: a group cannot change it, and it is Chromium either way) */
+export const PHONE = (({ defaultBrowserType: _, ...rest }) => rest)(devices["Pixel 7"]);
+
+/** A thing a plugin draws, recorded by `recordParts` */
+export type Part<A> = {
+  /** The page and what it shows opened, given the test's fixtures: the part's element given */
+  readonly open: (args: A) => Promise<Locator>;
+  /** Its parts whose look is kept (a name, a selector within the part, "" for the part itself) */
+  readonly parts: Readonly<Record<string, string>>;
+  /** The font its text is drawn in, waited for loaded (SilverBullet's own: its page's iA-Mono, its interface's Inter, its peek's Lora) */
+  readonly font: string;
+  /** Where its place is read against (`PlaceOf`: a part laid over the page alone); none: its place not recorded */
+  readonly place?: (args: A) => PlaceOf;
+};
+
+/** What `domOf` is given for a part: from the test's fixtures where it reads them (a test's folder replaced) */
+export type DomOptions<A> = { readonly omit?: RegExp; readonly opaque?: readonly string[]; readonly replace?: (args: A) => Readonly<Record<string, string>> };
+
+/**
+ * Declares a test of the spec's own: its title, and its body given the fixtures it names. The spec writes it, as
+ * Playwright tells a test's fixtures by the names it destructures (`({ page, space }) => …`) and keeps a test's file
+ * where `test()` is called (the baselines beside it): `(title, body) => test(title, ({ page, space }) => body({ page, space }))`.
+ * A `test()` called in this helper instead would keep its baselines beside scripts/, and Playwright refuses a body
+ * whose first parameter is not destructured. Its tests share that line of the spec: pick one by `-g`, not `file:line`
+ */
+export type Declare<A> = (title: string, body: (args: A) => Promise<void>) => void;
+
+/** What `recordParts` takes of the spec's `test`: its groups and their options (a device) */
+export type Grouping = { describe(title: string, body: () => void): void; use(options: object): void };
+
+/**
+ * A test per device (a desktop, `PHONE`), part and theme: the part opened in its theme (asked for before the page
+ * loads, then waited for as SilverBullet takes it), its DOM from the light run (`<name>-<device>-dom`), its look in
+ * each (`<name>-<device>-<theme>`), its place where it has one. `group` is the spec's `test` (its groups and their
+ * options), each test declared by `declare`
+ */
+export function recordParts<A extends { page: Page }>(group: Grouping, declare: Declare<A>, parts: Readonly<Record<string, Part<A>>>, dom: DomOptions<A> = {}): void {
+  for (const [device, use] of [["desktop", {}], ["phone", PHONE]] as const) {
+    group.describe(`on a ${device}`, () => {
+      group.use(use);
+      for (const [name, { open, parts: shown, font, place }] of Object.entries(parts)) {
+        for (const theme of ["light", "dark"] as const) {
+          declare(`the ${name} opened in the ${theme} theme: its look${theme === "light" ? " and its DOM" : ""}`, async (args) => {
+            await args.page.emulateMedia({ colorScheme: theme });
+            const part = await open(args);
+            await setTheme(args.page, theme);
+            if (theme === "light") await expectBaseline(`${name}-${device}-dom`, await domOf(part, { omit: dom.omit, opaque: dom.opaque, replace: dom.replace?.(args) }));
+            await expectBaseline(`${name}-${device}-${theme}`, await settledLook(args.page, part, shown, font, place?.(args)));
+          });
+        }
+      }
+    });
+  }
 }

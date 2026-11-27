@@ -4,16 +4,14 @@
 // (scripts/ui-test-baselines.ts; written anew only by SW_BASELINES=update); the peek's colours after the theme is
 // switched while it is open (known); and a filter written into the block, by Enter and by the field left, its focus,
 // caret and the page's scroll kept through SilverBullet drawing the block anew.
-import { devices, type Locator, type Page } from "@playwright/test";
-import { domOf, expectBaseline, keptThrough, setTheme, settledLook } from "../../../scripts/ui-test-baselines.ts";
+import type { Locator, Page } from "@playwright/test";
+import { keptThrough, type Part, recordParts, setTheme } from "../../../scripts/ui-test-baselines.ts";
 import { expect, expectNoPageErrorsYet, type Space, fieldReady, item, root, test } from "../helpers.ts";
 
 const TASKS = { "Page/db-tasks": root("tasks", "Tasks"), "Page/db-tasks/Fix login": item("Todo", "a0"), "Page/db-tasks/Write docs": item("Done", "a1") };
 const BLOCK = (view: string, extra = "") => `# Page\n\n\`\`\`silverware-database\nid: tasks\nview: ${view}\n${extra}\`\`\`\n`;
 // Silverware Layout's marks on a widget of its (its own baselines keep them)
 const OTHERS = /^data-swl-/;
-// (A device's browser type left out: a group cannot change it, and it is Chromium either way)
-const { defaultBrowserType: _, ...PHONE } = devices["Pixel 7"];
 // The day the dated views are drawn on: a Monday, mid-month, its morning (local time: the machine's, Node's and the
 // browser's alike); an item on it, one later that week, one over the weekend
 const TODAY = new Date("2026-11-16T09:00:00");
@@ -26,14 +24,8 @@ const DATED_PAGES = {
   "Page/db-tasks/Trip": DATED("2026-11-20", "2026-11-23", "a2"),
 };
 
-type Part = {
-  /** The page and what it shows opened, the part's element given */
-  readonly open: (page: Page, space: Space) => Promise<Locator>;
-  /** Its parts whose look is kept */
-  readonly parts: Readonly<Record<string, string>>;
-  /** The font its text is drawn in, waited for loaded (SilverBullet's own: its page's, its interface's, its peek's) */
-  readonly font: string;
-};
+// What its parts are opened with: the test's page and space
+type Args = { page: Page; space: Space };
 
 /** The peek on Fix login, its field the editor (one opened before the editor loaded keeps a plain field: opened again) */
 async function openPeek(page: Page, space: Space): Promise<Locator> {
@@ -49,9 +41,9 @@ async function openPeek(page: Page, space: Space): Promise<Locator> {
   return peek;
 }
 
-const PARTS: Readonly<Record<string, Part>> = {
+const PARTS: Readonly<Record<string, Part<Args>>> = {
   menu: {
-    open: async (page, space) => {
+    open: async ({ page, space }) => {
       await space.open({ Page: BLOCK("table"), ...TASKS }, "Page");
       await page.locator(".swd-more").click();
       const menu = page.locator(".swd-menu:visible");
@@ -62,12 +54,12 @@ const PARTS: Readonly<Record<string, Part>> = {
     font: "Inter",
   },
   peek: {
-    open: openPeek,
+    open: ({ page, space }) => openPeek(page, space),
     parts: { peek: "", top: ".swd-peek-top", head: ".swd-peek-head", name: ".swd-peek-name", close: ".swd-peek-close", closeX: ".swd-peek-close-x", closeBack: ".swd-peek-close-back", props: ".swd-peek-props-box", value: ".swd-peek-value", add: ".swd-peek-add-property", body: ".swd-peek-body" },
     font: "Lora",
   },
   properties: {
-    open: async (page, space) => {
+    open: async ({ page, space }) => {
       await space.open({ Page: BLOCK("table"), ...TASKS }, "Page");
       await page.locator(".swd-more").click();
       await page.locator(".swd-menu:visible .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: /^Properties$/ }) }).first().click();
@@ -79,7 +71,7 @@ const PARTS: Readonly<Record<string, Part>> = {
     font: "Inter",
   },
   calendar: {
-    open: async (page, space) => {
+    open: async ({ page, space }) => {
       await page.clock.setSystemTime(TODAY);
       await space.open({ Page: BLOCK("calendar"), ...DATED_PAGES }, "Page");
       const place = page.locator(".swd-place");
@@ -92,7 +84,7 @@ const PARTS: Readonly<Record<string, Part>> = {
     font: "iA-Mono",
   },
   timeline: {
-    open: async (page, space) => {
+    open: async ({ page, space }) => {
       await page.clock.setSystemTime(TODAY);
       await space.open({ Page: BLOCK("timeline", "timeline.endBy: end\n"), ...DATED_PAGES }, "Page");
       const place = page.locator(".swd-place");
@@ -106,23 +98,7 @@ const PARTS: Readonly<Record<string, Part>> = {
   },
 };
 
-for (const [device, use] of [["desktop", {}], ["phone", PHONE]] as const) {
-  test.describe(`on a ${device}`, () => {
-    test.use(use);
-    for (const [name, { open, parts, font }] of Object.entries(PARTS)) {
-      for (const theme of ["light", "dark"] as const) {
-        test(`the ${name} opened in the ${theme} theme: its look${theme === "light" ? " and its DOM" : ""}`, async ({ page, space }) => {
-          // (The theme asked for before the page loads, then waited for as SilverBullet takes it)
-          await page.emulateMedia({ colorScheme: theme });
-          const part = await open(page, space);
-          await setTheme(page, theme);
-          if (theme === "light") await expectBaseline(`${name}-${device}-dom`, await domOf(part, { omit: OTHERS, opaque: ["data-item"], replace: { [encodeURI(space.folder)]: "<folder>", [space.folder]: "<folder>" } }));
-          await expectBaseline(`${name}-${device}-${theme}`, await settledLook(page, part, parts, font));
-        });
-      }
-    }
-  });
-}
+recordParts(test, (title, body) => test(title, ({ page, space }) => body({ page, space })), PARTS, { omit: OTHERS, opaque: ["data-item"], replace: ({ space }) => ({ [encodeURI(space.folder)]: "<folder>", [space.folder]: "<folder>" }) });
 
 test("the theme switched to dark with the peek open: its text in the dark theme's colour (known: kept light)", async ({ page, space }) => {
   await page.emulateMedia({ colorScheme: "light" });

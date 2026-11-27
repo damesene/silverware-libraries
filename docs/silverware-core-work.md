@@ -122,7 +122,8 @@ P1 to P3 and I1 to I6 its *API changes*.
 Read this first; the dated entries below are the record of what each item did and found.
 
 - **Done and pushed** (branch `silverware-core`, each a commit of its own): step S items 1 to 4, and item 5 for
-  Silverware Database (`silverware-database/ui-tests/baselines/views.spec.ts`, `overlays.spec.ts`). Seven known bugs
+  Silverware Database (`silverware-database/ui-tests/baselines/views.spec.ts`, `overlays.spec.ts`), and the shared
+  baseline code with a part's place (*Next* 1). Seven known bugs
   are marked, in eight tests (step S, *Known*; `grep -rn "test.fail(" */ui-tests`).
 - **Decided with the user (2026-11-27)**, after a review of the first answers against the plans and the code:
   - **Item 5 records every dialog, menu and floating list a later step changes, now**, before step 1: steps 1 to 5
@@ -179,12 +180,13 @@ Read this first; the dated entries below are the record of what each item did an
       each conversion (step 10) both are run on the commit before it and the one after, in the same session: numbers
       months apart (another machine, SilverBullet, Chromium) are not compared.
 - **Next, in order**:
-  1. **The shared baseline code**: move what the two database specs repeat into `scripts/ui-test-baselines.ts`
-     (the root CLAUDE.md's *Shared helpers first*): the phone (`PHONE`, Pixel 7 less its browser type), the `Part`
-     shape and `overlays.spec.ts`' loop (each part opened in its theme, a test per device, part and theme), its
-     baselines' names kept (`<part>-<device>-dom`, `<part>-<device>-<theme>`); `overlays.spec.ts` uses it, its
-     baselines unchanged (a checking run green); `views.spec.ts` takes `PHONE` from it and keeps its own loop (a view
-     drawn once, the theme switched in place). With it, `lookOf`'s optional anchor (the decision above).
+  1. **Done (2026-11-27)**: `scripts/ui-test-baselines.ts` has `PHONE`, `Part`, `recordParts` (a test per device,
+     part and theme; the spec gives a `declare` that destructures its fixtures, as Playwright reads a test's fixtures
+     from its parameters and keeps its file, and so its baselines' folder, where `test()` is called) and `lookOf`'s
+     and `settledLook`'s optional `place` (`@place`: the part's box against the window and its `anchor`; probed on the
+     database's menu: under its ⋯, right edges aligned). `overlays.spec.ts` uses it, its baselines unchanged;
+     `views.spec.ts` takes `PHONE`. No part records its place yet: the parts below use it (a part laid over the
+     page alone, its anchor one visible element).
   2. **Item 5's parts** (the decision above), a unit per plugin folder (Silverware Table perhaps two: its dialogs,
      then its menus and floating lists), each the database's way: a part per thing drawn, opened in its theme, its
      DOM from the light run, its look per theme and device with its placement, a `keptThrough` check of one action

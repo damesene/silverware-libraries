@@ -2,8 +2,7 @@
 // chrome and the table, list and board views, their DOM once and their look in each theme on a desktop and on a phone
 // (Chrome's Pixel 7: its size, touch and pixel ratio), recorded against today's code (scripts/ui-test-baselines.ts; written anew only
 // by SW_BASELINES=update); and what typing in a filter and an item changed elsewhere leave in place.
-import { devices } from "@playwright/test";
-import { domOf, expectBaseline, keptThrough, setTheme, settledLook } from "../../../scripts/ui-test-baselines.ts";
+import { domOf, expectBaseline, keptThrough, PHONE, setTheme, settledLook } from "../../../scripts/ui-test-baselines.ts";
 import { expect, expectNoPageErrorsYet, item, root, test } from "../helpers.ts";
 
 const TASKS = { "Page/db-tasks": root("tasks", "Tasks"), "Page/db-tasks/Fix login": item("Todo", "a0"), "Page/db-tasks/Write docs": item("Done", "a1") };
@@ -37,9 +36,6 @@ const VIEWS = {
 } as const;
 // Silverware Layout's marks on a widget of its (its own baselines keep them)
 const OTHERS = /^data-swl-/;
-
-// (A device's browser type left out: a group cannot change it, and it is Chromium either way)
-const { defaultBrowserType: _, ...PHONE } = devices["Pixel 7"];
 
 for (const [device, use] of [["desktop", {}], ["phone", PHONE]] as const) {
   test.describe(`on a ${device}`, () => {

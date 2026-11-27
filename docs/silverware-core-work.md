@@ -239,14 +239,20 @@ Read this first; the dated entries below are the record of what each item did an
      (`menus.spec.ts`) and a height typed in the settings (`dialogs.spec.ts`, kept). Two bugs found (*Known*): the
      table's toolbar drawing its buttons anew, and on a phone the formula's names closed as it is typed. A menu held in
      the window at its right edge (`placemenu.ts`' clamp to `innerWidth`) is not recorded yet: the ⋯ menus are laid
-     leftwards from their button and the view picker's, laid rightwards, starts at the place's left, so none reaches it
-     (the peek's colour popover at the right margin is `views/popover.ts`'); recorded first in step 6 (the overlays), a
-     tool menu in a window narrower than its left edge plus its width.  `keptThrough` now throws where two items share a
-     name or one has none (a module's settings row has no `data-swt-setting`: rows are named by their text). **Second,
-     next**: a cell's floating editors (a typed select's suggestions, one of a table's last column on a phone held in
-     the window by `views/float.ts`' clamp, a multi-select, a link, a reference's search, files and a file's menu); a
-     select's and a date's pickers are the browser's (none to record), and so is an item's removal (`editor.confirm`).
-     Then Silverware Chart's settings and menu.
+     leftwards from their button and the view picker's is laid rightwards from its button near the place's left (x 93 on
+     a phone, the menu ending at 303 of 412), so none reaches it (the peek's colour popover at the right margin is
+     `views/popover.ts`'); recorded first in step 6 (the overlays), a tool menu in a window narrower than its left edge
+     plus its width. `keptThrough` now throws where two items share a name or one has none (a module's settings row has
+     no `data-swt-setting`: rows are named by their text). **Second, next**: a cell's floating editors (a typed select's
+     suggestions, one of a table's last column on a phone held in the window by `views/float.ts`' clamp, a multi-select,
+     a link, a reference's search, files and a file's menu); a select's and a date's pickers are the browser's (none to
+     record), and so is an item's removal (`editor.confirm`). How: a spec of its own, `baselines/editors.spec.ts` on
+     `parts.ts`; a root with select, multi-select, link, reference and files properties, a second database for a
+     reference's search, files under `<root page>/files` for the files editor and a file's menu (drawn by SilverBullet's
+     own source, Silverware Assets not installed: `core/media.ts`); the editors open by `views/editors.ts` `editValue`
+     and `views/fileseditor.ts`; each panel is lifted into the body (`.swd-lifted`, `views/float.ts` `floatPanel`), so
+     it is found in the document and placed against its cell; the phone's last-column panel is `float.ts`' clamp. Then
+     Silverware Chart's settings and menu.
   3. **The lists left of items 2 to 4 that steps 3 to 5 change** (the decision above), each in the plugin's own
      `ui-tests/` beside the item's other tests (`reload.spec.ts`, `writes.spec.ts`, `undo.spec.ts`, `hosts.spec.ts`).
   4. **Item 6** (the decision above): the playground's benchmark and SilverBullet's, their first numbers written.
@@ -645,8 +651,10 @@ Editor 3). The rest of the plan leans on this step.
   over its dialog, a filter or sort tool's menu, Silverware Table's choices
   list, cell popup, formula hint and fill tip, Silverware Layout's Move to grid
   picker, Silverware Assets' Rename and insert dialogs and upload progress, the
-  settings windows) and the icons' picker's states (Nothing found, a group with
-  a search, a tab switched). Then the rendering baselines of every dialog, menu
+  settings windows), the icons' picker's states (Nothing found, a group with
+  a search, a tab switched), and a database's tool menu held at the window's
+  right edge (`core/placemenu.ts`' clamp to `innerWidth`, in a window narrower
+  than the tool's left edge plus its menu's width). Then the rendering baselines of every dialog, menu
   and side panel (step S) checked to be in place. Then, in Preact in the core: the stack and
   its layers, dialogs, menus (from shared/popupmenu.ts), side panels (a second
   on top of the first), `useFloating`, `useKeptFocus`; the marks written by

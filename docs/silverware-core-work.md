@@ -505,8 +505,9 @@ Editor 3). The rest of the plan leans on this step.
     baseline on a desktop alone till then). Probed: on the playground too (not SilverBullet's), not Android's user
     agent, touch in a 1200 px window keeps it. A first test read the focus after the tap and passed unexpectedly where
     the load delayed the tap past the second drawing: the test now watches the field's element from before the filter
-    opens. Seen only in Chrome's phone emulation: a real phone to be checked by the user (step K). Expected drawn once
-    (step 6, the core's kept focus).
+    opens. A real phone did not show it (the user, 2026-11-27: Filter tapped, then its field at once, the caret kept
+    there; a person's tap comes later than the second drawing): fixed last in step K, or dropped with the user. Expected
+    drawn once (step 6, the core's kept focus).
   - On a phone, as a Silverware Table cell whose text does not fit is edited, its table scrolls to and fro every frame
     for about 20 to 25 frames (some 0.4 s) between two places 11 px apart (SilverBullet's `.sb-table-widget` scrollLeft
     95 and 106 in a Pixel 7's window), then stays at either, so a popup opened is placed and clipped by where it stopped
@@ -789,3 +790,6 @@ Editor 3). The rest of the plan leans on this step.
 - The library pages say that offline needs `config.set("sync.documents", true)`
   (docs/silverware-core.md, probe 5): true today, on `main`, released with the
   plugins' next releases.
+- Silverware Table's filter bubble (the conditions under a filter's field) has no ×: on a phone it is hard to close
+  (the user, 2026-11-27, trying the filter on a real phone). A close button of its own, as the menus' title has; not
+  in this branch's steps.

@@ -10,9 +10,9 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Page, type Locator } from "@playwright/test";
-import { boxOf, commandDefined, expectNoPageErrorsYet, ON_TOP, onTopAt, pageErrors, reloadSpaceLua } from "../../scripts/ui-test-helpers.ts";
+import { boxOf, commandDefined, expectNoPageErrorsYet, ON_TOP, onPhone, onTopAt, pageErrors, press, reloadSpaceLua } from "../../scripts/ui-test-helpers.ts";
 
-export { boxOf, expectNoPageErrorsYet, ON_TOP, onTopAt, reloadSpaceLua };
+export { boxOf, expectNoPageErrorsYet, ON_TOP, onPhone, onTopAt, press, reloadSpaceLua };
 import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 

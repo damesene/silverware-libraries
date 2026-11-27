@@ -122,9 +122,10 @@ P1 to P3 and I1 to I6 its *API changes*.
 Read this first; the dated entries below are the record of what each item did and found.
 
 - **Done and pushed** (branch `silverware-core`, each a commit of its own): step S items 1 to 4, and item 5 for
-  Silverware Database (`silverware-database/ui-tests/baselines/views.spec.ts`, `overlays.spec.ts`) and for Silverware
-  Table's dialogs and menus (`silverware-table/ui-tests/baselines/`, *Next* 2), and the shared baseline code with a
-  part's place (*Next* 1). Ten known bugs are marked, in eleven tests (step S, *Known*; `grep -rn "test.fail(" */ui-tests`).
+  Silverware Database (`silverware-database/ui-tests/baselines/views.spec.ts`, `overlays.spec.ts`, `dialogs.spec.ts`)
+  and for Silverware Table's dialogs and menus (`silverware-table/ui-tests/baselines/`, *Next* 2), and the shared
+  baseline code with a part's place (*Next* 1). Twelve known bugs are marked, in thirteen tests (step S, *Known*;
+  `grep -rn "test.fail(" */ui-tests`).
 - **Decided with the user (2026-11-27)**, after a review of the first answers against the plans and the code:
   - **Item 5 records every dialog, menu and floating list a later step changes, now**, before step 1: steps 1 to 5
     already reach them (step 3 the function dialog's list and help; step 4 every settings dialog, through
@@ -216,11 +217,25 @@ Read this first; the dated entries below are the record of what each item did an
      what it opened from, and a choices list near the window's bottom, laid above its cell (`menus.spec.ts`; the
      presses as a user's on each device, `press`, `barOn`, `barAction`, `menuOf` at a fixed point, `editCell`: Enter,
      a second tap on a phone, in its `helpers.ts`). Three bugs found, each marked (*Known*): a formula's help wider
-     than a phone's window, a phone's filter field losing its focus, a phone's table scrolling to and fro as a long
-     cell is edited; the bubble's and the popup's baselines on a desktop alone till then (`Part.devices`), the
-     formula's help recorded on a phone as it is (its fix shows as a change of that baseline). A fill's tip (a drag)
-     is item 3's, left for step 6. Next: Silverware Database's settings, conflict and delete dialogs and its
-     submenus.
+     than a phone's window, a phone's filter row drawn twice as it opens (a field tapped between losing its focus),
+     a phone's table scrolling to and fro as a long cell is edited; the bubble's and the popup's baselines on a
+     desktop alone till then (`Part.devices`), the formula's help recorded on a phone as it is (its fix shows as a
+     change of that baseline). A fill's tip (a drag) is item 3's, left for step 6. Silverware Database's settings, a
+     Properties save's conflict and Delete database dialogs, the ⋯ menu's Visible properties, Group and Group by
+     submenus, the view picker's and the sort's menus, the peek's icon and colour popovers
+     (`silverware-database/ui-tests/baselines/dialogs.spec.ts`; opened by clicks and taps: the database has no long
+     press; `onPhone` and `press` moved to `scripts/ui-test-helpers.ts`, the table's helpers taking them there; the
+     icon picker narrowed by a search, its thousands of icons Silverware Icons'), the settings on its General and
+     Views tabs, and a `keptThrough` of Visible properties' eye; a draft of Properties not told of a change made
+     elsewhere and that menu drawn anew whole found (*Known*). Left of the database for a unit of its own: the ⋯
+     menu's Color by submenu and its title's rename field, the calendar's and the timeline's Start and End submenus
+     (`views/spans.ts` `spanMenu`), a menu near the window's bottom or right edge (none recorded flipped yet), a
+     cell's floating editors (a typed select's suggestions, a multi-select, a link, a reference's search, files and a
+     file's menu), Properties' option palette and icon popover, a formula's names offered
+     (`.swd-formulafield-choices`); a select's and a date's pickers are the browser's (none to record), and so is an
+     item's removal (`editor.confirm`). Silverware Table's two units have no `keptThrough` of their own yet either:
+     one each in that unit's time (a menu's entry toggled, a dialog's field typed). Next: that unit, then Silverware
+     Chart's settings and menu.
   3. **The lists left of items 2 to 4 that steps 3 to 5 change** (the decision above), each in the plugin's own
      `ui-tests/` beside the item's other tests (`reload.spec.ts`, `writes.spec.ts`, `undo.spec.ts`, `hosts.spec.ts`).
   4. **Item 6** (the decision above): the playground's benchmark and SilverBullet's, their first numbers written.
@@ -454,12 +469,14 @@ Editor 3). The rest of the plan leans on this step.
   - Silverware Table's formula help is wider than a phone's window (478 px in Pixel 7's 412), its right part out of it
     (2026-11-27; silverware-table/ui-tests/baselines/menus.spec.ts, "a formula's help whole in the window (known:
     wider than a phone's)"). Expected placed within the window by the core's floating (step 6).
-  - On a touch screen in a narrow window Silverware Table's filter field loses the focus about 150 to 250 ms after
-    the tap that focused it, with or without a key, its bubble going with it (2026-11-27;
-    silverware-table/ui-tests/baselines/menus.spec.ts, "a filter typed: its field keeps the focus (known: …)"; its
-    bubble's baseline on a desktop alone till then). Probed: on the playground too (not SilverBullet's), not
-    Android's user agent, touch in a 1200 px window keeps it and at 412 px loses it, no `blur()` called (the field
-    drawn anew, the row still there). Not seen on a real phone yet. Expected kept by the core's kept focus (step 6).
+  - On a phone (touch in a narrow window) Silverware Table's filter row is drawn as the filter opens and again about
+    150 to 300 ms later, its field gone a frame and then another, so a field tapped in between loses the focus and
+    its bubble goes; a desktop draws it once (2026-11-27; silverware-table/ui-tests/baselines/menus.spec.ts, "a filter
+    opened: its field drawn once, so a tap on it keeps the focus (known: drawn anew a moment after)"; its bubble's
+    baseline on a desktop alone till then). Probed: on the playground too (not SilverBullet's), not Android's user
+    agent, touch in a 1200 px window keeps it. A first test read the focus after the tap and passed unexpectedly where
+    the load delayed the tap past the second drawing: the test now watches the field's element from before the
+    filter opens. Not seen on a real phone yet. Expected drawn once (step 6, the core's kept focus).
   - On a phone, as a Silverware Table cell whose text does not fit is edited, its table scrolls to and fro every
     frame for about 20 to 25 frames (some 0.4 s) between two places 11 px apart (SilverBullet's `.sb-table-widget`
     scrollLeft 95 and 106 in a Pixel 7's window), then stays at either, so a popup opened is placed and clipped by
@@ -468,6 +485,22 @@ Editor 3). The rest of the plan leans on this step.
     yet probed which two scrolls fight (candidates: the adapter's `revealCell`, `scrollIntoView` nearest of a cell
     wider than the window, and the browser bringing the edited field's caret into view). Expected still once the
     core places and reveals (steps 5 and 6).
+  - Silverware Database's Properties dialog follows a change made elsewhere only as a place is drawn anew
+    (`modules/properties/index.ts` `placeDrawn`; the peek has `host.onChanged` too), and a place shows a schema
+    changed elsewhere without that: an open draft is not marked stale, its note says "Not saved yet" till Save, which
+    then refuses and offers the conflict, nothing lost (2026-11-27;
+    silverware-database/ui-tests/baselines/dialogs.spec.ts, "a draft of Properties made of properties changed
+    elsewhere: told under its list before Save (known: …)"). The cause: a change made elsewhere reaches a place by
+    `refresh()` and `instance.update()` (core/place.ts), which does not draw, so `placeDrawn` and the dialog's
+    `follow()` never run. Being told before Save is the code's intent (modules/properties/index.ts, the comment over
+    `placeDrawn`: "a change made elsewhere … its open dialog follows"), not a decision with the user
+    (docs/silverware-database.md guarantees the conflict on Save alone); and `follow()`'s note then says "Save writes
+    nothing", where Save offers the conflict: that text to fix with it. Should it ever pass unexpectedly: an index
+    that briefly gives nothing makes `refresh()` draw. Expected told as the change comes (steps 4 and 6).
+  - Silverware Database's ⋯ › Visible properties menu is drawn anew whole as an eye in it is pressed, none of its
+    rows kept (2026-11-27; silverware-database/ui-tests/baselines/dialogs.spec.ts, "an eye in Visible properties
+    pressed: … (known: the menu drawn anew)"). Expected kept by the Preact conversion of the menus (step 10,
+    checkpoint C's measure).
   - A database's peek keeps the text colour of the theme it was opened in when the theme is switched while it is
     open: it copies the editor's colour into its inline style once (host/silverbullet/platform.ts `editorLook`), dark
     text on the dark theme (2026-11-26; silverware-database/ui-tests/baselines/overlays.spec.ts, "(known: kept

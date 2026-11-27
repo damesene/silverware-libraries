@@ -161,8 +161,8 @@ const PARTS: Readonly<Record<string, Part<Args>>> = {
     place: ({ page }) => ({ anchor: cell(page, 1, 1) }),
   },
   filterBubble: {
-    // (On a desktop alone: on a phone the field loses the focus a moment after it is tapped and the bubble goes, a
-    // known bug below)
+    // (On a desktop alone: on a phone the filter's row is drawn again a moment after it opens, a field tapped before
+    // losing the focus and its bubble, a known bug below)
     devices: ["desktop"],
     details: FRUIT,
     open: async ({ page }) => {
@@ -189,21 +189,34 @@ test.describe("on a phone", () => {
     expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   });
 
-  test("a filter typed: its field keeps the focus and its bubble stays (known: the focus lost a moment after the tap)", FRUIT, async ({ page }) => {
-    await filterTyped(page);
-    // Over a few hundred frames' time: the field still focused, the bubble still shown
-    const states = await page.evaluate(async () => {
-      const seen = new Set<string>();
-      for (let n = 0; n < 60; n++) {
-        await new Promise((done) => requestAnimationFrame(done));
-        seen.add(`${document.activeElement?.classList.contains("swt-filter")}/${!!document.querySelector(".swt-filter-bubble.swt-visible")}`);
-      }
-      return [...seen];
+  test("a filter opened: its field drawn once, so a tap on it keeps the focus (known: drawn anew a moment after)", FRUIT, async ({ page }) => {
+    await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(3);
+    const bar = await barOn(page, header(page, 0));
+    // The first filter field's element, each time another, frame by frame from before the filter is opened (a tap on
+    // it in between: its focus lost with it, its bubble with that)
+    await page.evaluate(() => {
+      const drawn: string[] = [];
+      (window as unknown as { swtDrawn: string[] }).swtDrawn = drawn;
+      let last: Element | null = null;
+      const start = performance.now();
+      const look = () => {
+        const field = document.querySelector(".swt-filter-row input.swt-filter");
+        if (field !== last) drawn.push(field ? "drawn" : "gone");
+        last = field;
+        if (performance.now() - start < 2000) requestAnimationFrame(look);
+      };
+      requestAnimationFrame(look);
     });
-    test.info().annotations.push({ type: "states", description: JSON.stringify(states) });
+    await press(page, bar.locator('button[aria-label="Filter"]'));
+    await expect(page.locator(".swt-filter-row input.swt-filter").first()).toBeVisible();
+    const drawn = await page.evaluate(async () => {
+      for (let n = 0; n < 90; n++) await new Promise((done) => requestAnimationFrame(done));
+      return (window as unknown as { swtDrawn: string[] }).swtDrawn;
+    });
+    test.info().annotations.push({ type: "drawn", description: JSON.stringify(drawn) });
     expectNoPageErrorsYet(page);
-    test.fail(true, "Known (2026-11-27): on a touch screen in a narrow window a filter's field loses the focus about 150 to 250 ms after the tap that focused it, with or without a key, its bubble going with it (probed on the playground too: not SilverBullet, not Android's user agent; touch in a 1200 px window keeps it, touch at 412 px loses it; no blur() called: the field drawn anew); not seen on a real phone yet; expected kept (step 6: the core's kept focus)");
-    expect(states).toEqual(["true/true"]);
+    test.fail(true, "Known (2026-11-27): on a phone (touch in a narrow window) a filter's row is drawn as the filter opens and again about 150 to 300 ms later (its field gone a frame, then another), so a field tapped in between loses the focus and its bubble goes; a desktop draws it once (probed on the playground too: not SilverBullet, not Android's user agent; touch in a 1200 px window keeps it); not seen on a real phone yet; expected drawn once (step 6: the core's kept focus)");
+    expect(drawn).toEqual(["drawn"]);
   });
 
   test("a cell whose text does not fit, edited: its table scrolled to it once (known: to and fro a while)", LONG, async ({ page }) => {

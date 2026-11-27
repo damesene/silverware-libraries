@@ -1,0 +1,16 @@
+[
+  "div.swd-lifted.swd-menu [style=\"--swd-accent,--swd-hover,--swd-line,--swd-quiet,--swd-surface,bottom,color-scheme:light,left,max-height,position,right,top\"]",
+  "  div.swd-menu-still [aria-label=\"Group by\" data-swd-list=\"\" role=\"menu\"]",
+  "    div.swd-menu-title",
+  "      button.swd-menu-back [aria-label=\"Back\" title=\"Back\" type=\"button\"]",
+  "        svg [aria-hidden=\"true\" svg=dd78964e]",
+  "      span.swd-menu-title-text [title=\"Group by\"] \"Group by\"",
+  "      button.swd-menu-close [aria-label=\"Close\" title=\"Close\" type=\"button\"]",
+  "        svg [aria-hidden=\"true\" svg=4659c561]",
+  "    button.swd-menu-current.swd-menu-item [aria-checked=\"true\" role=\"menuitemcheckbox\" type=\"button\"]",
+  "      span.swd-icon",
+  "      span.swd-label \"Status\"",
+  "    button.swd-menu-item [aria-checked=\"false\" role=\"menuitemcheckbox\" type=\"button\"]",
+  "      span.swd-icon",
+  "      span.swd-label \"Area\""
+]

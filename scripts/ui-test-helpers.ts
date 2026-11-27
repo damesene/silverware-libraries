@@ -19,6 +19,20 @@ export async function boxOf(target: Locator): Promise<{ x: number; y: number; wi
   return box!;
 }
 
+// As a user on each device presses (the baselines open their parts so: a desktop clicks, a phone taps)
+
+/** Whether the page is a phone's (a touch screen: no hover, a long press for a menu) */
+export const onPhone = (page: Page) => page.evaluate(() => matchMedia("(pointer: coarse)").matches);
+
+/** A press as a user makes it: a click, a tap at its centre on a phone */
+export async function press(page: Page, target: Locator): Promise<void> {
+  if (!(await onPhone(page))) return target.click();
+  await expect(target).toBeVisible();
+  await target.scrollIntoViewIfNeeded();
+  const box = await boxOf(target);
+  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+}
+
 type Commands = { clientSystem?: { commandHook?: { buildAllCommands(): Map<string, unknown> } } };
 
 /**

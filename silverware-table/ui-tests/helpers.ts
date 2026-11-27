@@ -23,10 +23,10 @@ import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { LONG_PRESS_MS } from "../src/core/press.ts";
 
-import { boxOf, expectNoPageErrorsYet, gatherPageErrors, ON_TOP, onTopAt, reloadSpaceLua, runSilverBulletCommand } from "../../scripts/ui-test-helpers.ts";
+import { boxOf, expectNoPageErrorsYet, gatherPageErrors, ON_TOP, onPhone, onTopAt, press, reloadSpaceLua, runSilverBulletCommand } from "../../scripts/ui-test-helpers.ts";
 import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
 
-export { boxOf, expectNoPageErrorsYet, ON_TOP, onTopAt, reloadSpaceLua, runSilverBulletCommand };
+export { boxOf, expectNoPageErrorsYet, ON_TOP, onPhone, onTopAt, press, reloadSpaceLua, runSilverBulletCommand };
 
 export { expect };
 
@@ -566,16 +566,7 @@ export async function tap(page: Page, target: Locator): Promise<void> {
 }
 
 // As a user on each device presses (the baselines open their parts so: a desktop hovers, right-clicks and clicks, a
-// phone taps and long-presses)
-
-/** Whether the page is a phone's (a touch screen: no hover, a long press for a menu) */
-export const onPhone = (page: Page) => page.evaluate(() => matchMedia("(pointer: coarse)").matches);
-
-/** A press as a user makes it: a click, a tap on a phone */
-export async function press(page: Page, target: Locator): Promise<void> {
-  if (await onPhone(page)) await tap(page, target);
-  else await target.click();
-}
+// phone taps and long-presses; `onPhone` and `press` shared, scripts/ui-test-helpers.ts)
 
 /** The table's toolbar shown on a cell: by a hover, by a tap on a phone */
 export async function barOn(page: Page, target: Locator): Promise<Locator> {

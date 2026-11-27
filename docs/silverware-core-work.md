@@ -87,6 +87,12 @@ where the work is, what to do next and what done means. **What** is built and
   - a deviation from the plans beyond the step's scope;
   - a version, a changelog entry, a release, a merge, a push (but step S's
     pushes of `silverware-core`, asked for by the user).
+- **A baseline that changed is shown to the user by groups** (decided with the
+  user, 2026-11-27, for step 1 on): for each commit that changes baselines, a
+  short summary of each group of parts changed alike (which parts, what changed:
+  the DOM, a colour, a box by how many px; and why: the change meant, its cause
+  in the commit); the user approves a group, not each file. A change the agent
+  cannot explain is a regression: fixed first, never written anew.
 - **At the end of a session**: *Progress* and *Notes for the next session*
   updated and committed (a `docs:` commit where the step is not done).
 
@@ -137,10 +143,9 @@ Read this first; the dated entries below are the record of what each item did an
     export), its toolbar and menus, its floating lists (the choices list, the formula hint, the cell popup);
     Silverware Database's settings, conflict and delete dialogs, its Visible properties and Group submenus, the
     peek's icon and colour popover (its place menu, Properties and peek are recorded); Silverware Chart's settings and
-    menu; Silverware Layout's page dialog and its handle's and column grips' menus; Silverware Assets' settings,
-    insert and rename dialogs, its file menu, side panel and a file enlarged; Silverware Tags' settings and manager;
-    Silverware Toolbar's settings, popup, an action's panel and Turn into list. About 5 to 6 units beyond the
-    database's.
+    menu; Silverware Layout's page dialog and its handle's menu; Silverware Assets' settings dialog and file menu;
+    Silverware Tags' settings and manager; Silverware Toolbar's settings and popup (narrowed with the user,
+    2026-11-27: *Next* 2). Five small units beyond the database's.
   - **Placement is recorded too**: `lookOf` measures boxes against the part itself only, so a menu moved off its
     button, a dialog no longer centred or a panel shifted would pass. Before the parts above, `lookOf` and
     `settledLook` take an optional anchor: the part's box against it (the button, the widget) and against the window;
@@ -251,8 +256,15 @@ Read this first; the dated entries below are the record of what each item did an
      reference's search, files under `<root page>/files` for the files editor and a file's menu (drawn by SilverBullet's
      own source, Silverware Assets not installed: `core/media.ts`); the editors open by `views/editors.ts` `editValue`
      and `views/fileseditor.ts`; each panel is lifted into the body (`.swd-lifted`, `views/float.ts` `floatPanel`), so
-     it is found in the document and placed against its cell; the phone's last-column panel is `float.ts`' clamp. Then
-     Silverware Chart's settings and menu.
+     it is found in the document and placed against its cell; the phone's last-column panel is `float.ts`' clamp.
+     **After it, the rest of item 5 narrowed** (decided with the user, 2026-11-27, weighing what the units found against
+     their cost: the first ones found most, the submenus and popovers on the shared menu code little): one small unit a
+     plugin, its main settings dialog and its main menu alone, what a step of the rewrite changes: Silverware Chart's
+     settings and menu, Silverware Layout's page dialog and its handle's menu, Silverware Assets' settings dialog and
+     file menu, Silverware Tags' settings and manager, Silverware Toolbar's settings and popup. Left out, on purpose:
+     Layout's column grips' menu, Assets' insert and rename dialogs, side panel and file enlarged, Toolbar's action
+     panel and Turn into list (the shared menu and dialog code they stand on is recorded; each part a later step changes
+     on its own gets its baseline in that step, before it).
   3. **The lists left of items 2 to 4 that steps 3 to 5 change** (the decision above), each in the plugin's own
      `ui-tests/` beside the item's other tests (`reload.spec.ts`, `writes.spec.ts`, `undo.spec.ts`, `hosts.spec.ts`).
   4. **Item 6** (the decision above): the playground's benchmark and SilverBullet's, their first numbers written.
@@ -486,22 +498,23 @@ Editor 3). The rest of the plan leans on this step.
   - Silverware Table's formula help is wider than a phone's window (478 px in Pixel 7's 412), its right part out of it
     (2026-11-27; silverware-table/ui-tests/baselines/menus.spec.ts, "a formula's help whole in the window (known:
     wider than a phone's)"). Expected placed within the window by the core's floating (step 6).
-  - On a phone (touch in a narrow window) Silverware Table's filter row is drawn as the filter opens and again about
-    150 to 300 ms later, its field gone a frame and then another, so a field tapped in between loses the focus and
-    its bubble goes; a desktop draws it once (2026-11-27; silverware-table/ui-tests/baselines/menus.spec.ts, "a filter
+  - On a phone (touch in a narrow window) Silverware Table's filter row is drawn as the filter opens and again about 150
+    to 300 ms later, its field gone a frame and then another, so a field tapped in between loses the focus and its
+    bubble goes; a desktop draws it once (2026-11-27; silverware-table/ui-tests/baselines/menus.spec.ts, "a filter
     opened: its field drawn once, so a tap on it keeps the focus (known: drawn anew a moment after)"; its bubble's
     baseline on a desktop alone till then). Probed: on the playground too (not SilverBullet's), not Android's user
     agent, touch in a 1200 px window keeps it. A first test read the focus after the tap and passed unexpectedly where
-    the load delayed the tap past the second drawing: the test now watches the field's element from before the
-    filter opens. Not seen on a real phone yet. Expected drawn once (step 6, the core's kept focus).
-  - On a phone, as a Silverware Table cell whose text does not fit is edited, its table scrolls to and fro every
-    frame for about 20 to 25 frames (some 0.4 s) between two places 11 px apart (SilverBullet's `.sb-table-widget`
-    scrollLeft 95 and 106 in a Pixel 7's window), then stays at either, so a popup opened is placed and clipped by
-    where it stopped (2026-11-27; silverware-table/ui-tests/baselines/menus.spec.ts, "a cell whose text does not
-    fit, edited: its table scrolled to it once (known: …)"; the popup's baseline on a desktop alone till then). Not
-    yet probed which two scrolls fight (candidates: the adapter's `revealCell`, `scrollIntoView` nearest of a cell
-    wider than the window, and the browser bringing the edited field's caret into view). Expected still once the
-    core places and reveals (steps 5 and 6).
+    the load delayed the tap past the second drawing: the test now watches the field's element from before the filter
+    opens. Seen only in Chrome's phone emulation: a real phone to be checked by the user (step K). Expected drawn once
+    (step 6, the core's kept focus).
+  - On a phone, as a Silverware Table cell whose text does not fit is edited, its table scrolls to and fro every frame
+    for about 20 to 25 frames (some 0.4 s) between two places 11 px apart (SilverBullet's `.sb-table-widget` scrollLeft
+    95 and 106 in a Pixel 7's window), then stays at either, so a popup opened is placed and clipped by where it stopped
+    (2026-11-27; silverware-table/ui-tests/baselines/menus.spec.ts, "a cell whose text does not fit, edited: its table
+    scrolled to it once (known: …)"; the popup's baseline on a desktop alone till then). Seen only in Chrome's phone
+    emulation: a real phone to be checked by the user (step K). Not yet probed which two scrolls fight (candidates: the
+    adapter's `revealCell`, `scrollIntoView` nearest of a cell wider than the window, and the browser bringing the
+    edited field's caret into view). Expected still once the core places and reveals (steps 5 and 6).
   - Silverware Database's Properties dialog follows a change made elsewhere only as a place is drawn anew
     (`modules/properties/index.ts` `placeDrawn`; the peek has `host.onChanged` too), and a place shows a schema
     changed elsewhere without that: an open draft is not marked stale, its note says "Not saved yet" till Save, which
@@ -527,7 +540,8 @@ Editor 3). The rest of the plan leans on this step.
     none with `overflow-anchor: none`), and the formula's field closes its list on any scroll (shared/formulafield.ts
     `closeOnScroll`), so the list shows a moment after each key and goes; a desktop's body does not move (2026-11-27;
     silverware-database/ui-tests/baselines/properties.spec.ts, "a formula typed: the names offered stay open under
-    its field (known: …)"; the list's baseline on a desktop alone till then). Both halves to weigh in step K: the
+    its field (known: …)"; the list's baseline on a desktop alone till then). Seen only in Chrome's phone emulation:
+    a real phone to be checked by the user (step K). Both halves to weigh in step K: the
     body's anchoring and a list closed by a scroll that does not move its field. Expected kept under the field (step
     6).
   - A database's peek keeps the text colour of the theme it was opened in when the theme is switched while it is
@@ -741,6 +755,9 @@ Editor 3). The rest of the plan leans on this step.
   and shown to the user, never the code bent to it. A fix that makes its test
   pass but changes another test's result is a change of behaviour: stop and
   ask.
+- **Seen only in Chrome's phone emulation** (a *Known* entry saying so): asked
+  of the user whether a real phone shows it before its fix is weighed; one a
+  real phone does not show is fixed last, or dropped with the user.
 - **Not in it**: new features; bugs no test records (each gets its test and
   mark first, then is fixed here).
 - **Done when**: no `test.fail(` in any `ui-tests/`, step S's *Known* empty;

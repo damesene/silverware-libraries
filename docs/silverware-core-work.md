@@ -16,16 +16,18 @@ where the work is, what to do next and what done means. **What** is built and
    both plans whole, then the CLAUDE.md of each plugin your step touches.
 2. Find the first step in *Progress* that is not done. Read its section in
    *Steps*: scope, what is not in it, the files, what done means.
-3. Read *Notes for the next session*: what the last session left open.
+3. Read *Notes for the next session*, first its *Where the work stands and
+   what is next*: what the last session left open and what to do next.
 4. Work on branch `silverware-core` only. Never on `main`, never push
-   without being asked.
+   without being asked (for step S the user asked for a push of
+   `silverware-core` after each unit of work: *Notes for the next session*).
 
 ## Rules of this work
 
 - **One step at a time, in order.** A step needs only the ones before it; do
   not start the next one with the current one unfinished.
-- **Every commit**: `npm run build`, then `npm run verify` passes (run from
-  `D:\`, read its "Tests N passed"); a change to how something is used gets
+- **Every commit**: `npm run build`, then `npm run verify` passes (read its
+  "Tests N passed"; on Windows run it from `D:\`); a change to how something is used gets
   its UI scenario and `npm run test:ui` passes. Commit messages as the root
   CLAUDE.md says: one line, Conventional Commits, scope the plugin or `core`,
   `!` for a breaking change, no body, no co-author trailer.
@@ -61,7 +63,8 @@ where the work is, what to do next and what done means. **What** is built and
   found, never checked by a passing run. Before a fix makes it pass, it is
   checked again (step K, *Before each fix*). `scripts/ui-test-locks.test.ts` (in
   `verify`) fails on a mark without a dated reason, without that check above
-  it, or not listed.
+  it, or whose file is named nowhere in this runbook (it does not read the
+  *Known* list itself: keep each marked file's entry there).
 - **A test's list of exceptions only shrinks.** The checks of this work
   (module state, SilverBullet's markers, page writes, UI islands) start with
   today's exceptions listed, each with the step that removes it; an entry is
@@ -75,7 +78,8 @@ where the work is, what to do next and what done means. **What** is built and
   - keeping a test from the parallel run (a lock), a test given a time of its
     own;
   - a deviation from the plans beyond the step's scope;
-  - a version, a changelog entry, a release, a push, a merge.
+  - a version, a changelog entry, a release, a merge, a push (but step S's
+    pushes of `silverware-core`, asked for by the user).
 - **At the end of a session**: *Progress* and *Notes for the next session*
   updated and committed (a `docs:` commit where the step is not done).
 
@@ -84,7 +88,7 @@ where the work is, what to do next and what done means. **What** is built and
 | Step | What | State |
 | --- | --- | --- |
 | 0 | The plans | done (2026-11-25) |
-| S | The safety net: tests against today's code | in progress: items 1 to 4 done (2026-11-26) |
+| S | The safety net: tests against today's code | in progress: items 1 to 4 done, 5 begun (Silverware Database, 2026-11-27) |
 | 1 | The core's skeleton, the gate, `requires:`, build and tests | not started |
 | 2 | Preact in the core, `.tsx` everywhere | not started |
 | A | Checkpoint A | |
@@ -105,6 +109,114 @@ Letters in parentheses name sections of docs/silverware-core.md, *Services*;
 P1 to P3 and I1 to I6 its *API changes*.
 
 ## Notes for the next session
+
+### Where the work stands and what is next (2026-11-27)
+
+Read this first; the dated entries below are the record of what each item did and found.
+
+- **Done and pushed** (branch `silverware-core`, each a commit of its own): step S items 1 to 4, and item 5 for
+  Silverware Database (`silverware-database/ui-tests/baselines/views.spec.ts`, `overlays.spec.ts`). Seven known bugs
+  are marked, in eight tests (step S, *Known*; `grep -rn "test.fail(" */ui-tests`).
+- **Asked of the user, not decided yet** (ask before the work they touch; write the answer and its date here):
+  - Item 5's scope: steps 6, 7 and 10 lean on baselines of every dialog, menu and side panel they move (step 6's
+    *Done when*; step 7: 17 dialogs and every menu; step 10 converts Silverware Table's conditions dialog early).
+    *Next* below names three parts. Either record them all in item 5 (Table's conditions, choices, view, pivot and
+    function dialogs and menus; Chart's settings and menu; Layout's menus and page dialog; Assets' rename, insert and
+    settings dialogs and file menu; Database's conflict and delete dialogs; the toolbar's popup), or record each at
+    the start of the step that moves it, before any change.
+  - Whether the lists left of items 2 to 4 ("Not yet exercised", "Not covered yet", "Not recorded yet") belong to
+    step S's *Done when*, or are left for later.
+  - (Ask all three at the start of the session. The move of the shared baseline code, *Next* 1's **First**, needs
+    none of the answers and goes first; Silverware Assets', Toolbar's and Tags' parts follow whatever the first
+    answer is, as they are in item 5 either way.)
+  - Item 6's setup: where it runs (step S says the playground; the database's helpers skip the playground, the model
+    `bench.spec.ts` runs against SilverBullet), how items are made (the database's playground sample has no size),
+    repetitions and workers, where the numbers are kept.
+- **Next, in order**:
+  1. **Item 5, the rest** (its scope: the first question above), each the database's way: a part per thing drawn,
+     opened in its theme, its DOM from the light run, its look per theme and device, a `keptThrough` check of one
+     action it redraws on. **First** move what the two database specs repeat into `scripts/ui-test-baselines.ts`
+     (the root CLAUDE.md's *Shared helpers first*): the phone (`PHONE`, Pixel 7 less its browser type), the `Part`
+     shape and `overlays.spec.ts`' loop (each part opened in its theme, a test per device, part and theme), its
+     baselines' names kept (`<part>-<device>-dom`, `<part>-<device>-<theme>`); `overlays.spec.ts` uses it, its
+     baselines unchanged (a checking run green); `views.spec.ts` takes `PHONE` from it and keeps its own loop (a view
+     drawn once, the theme switched in place). Silverware Tags and Toolbar have no `space` fixture (Tags: `openManager`,
+     `pageName`; Toolbar: its favourites fixture): adapt to their helpers; moving them onto `withSpace` is not this
+     item's. **Baselines run against SilverBullet's release alone**: a baselines spec skips the playground
+     (`test.skip(!onSilverBullet, …)`, as the database's helpers do), as `expectBaseline` keeps one file per name and
+     the playground draws otherwise; a baseline differing on SilverBullet's edge is told to the user, never recorded
+     for edge. Edge is not run per unit: CI's `edge-tests.yml` runs it as `main` or edge changes, and a difference
+     found there is reported, not fixed in the spec.
+     - Silverware Assets' side panel and a file enlarged (`silverware-assets/ui-tests/baselines/`; how to open them:
+       `silverware-assets/ui-tests/stacking.spec.ts`); its stability: another file opened in the panel open.
+     - Silverware Toolbar's settings dialog, its tabs and an item's panel (`silverware-toolbar/ui-tests/baselines/`;
+       how to open it: `openSettings` in `silverware-toolbar/ui-tests/settings.spec.ts`, moved into the toolbar's
+       `helpers.ts` to share it); its stability: an item's icon or label typed, the dialog's other rows kept.
+     - Silverware Tags' manager, its views (By tag, By page, Cleanup) and a review (`silverware-tags/ui-tests/baselines/`;
+       `openManager` in its helpers); its stability: the search typed, the tree's rows kept.
+     The `baselines/` area folders were agreed with the user (item 5's layout, below).
+     Then mark item 5 done in *Progress* and here.
+  2. **Item 6, the rendering cost**: a database's table, list and board views and a Silverware Table table with 1,000
+     and 10,000 items, timed, the times written here (a table of view, items, time, the machine). Not a test that
+     fails: a benchmark run on request, as `silverware-layout/ui-tests/bench.spec.ts` is (`SW_BENCH=1`, skipped
+     otherwise). Silverware Table has the playground's benchmark already (`playground/benchmark.ts`, `profile.ts`: a
+     table as large as asked, each phase timed, an interactive page, not a runner); the database's playground
+     (`/database.html`) runs over the memory store. Its setup is the user's (the third question above): ask first.
+  3. Step S done: *Progress* updated, then **stop for the user**: show the *Known* list and what was left
+     uncovered, and wait. A `docs:` commit; then **step 1** (its section below). From step 1 on a push is asked for
+     again each time (*Stop and ask*).
+- **How each unit of work is done** (the user's way, agreed 2026-11-26), one unit (a test file, a part of an item) at
+  a time:
+  1. Write it; run it once (`npm run test:ui:sb -- <file>`: it starts SilverBullet's test servers in Docker itself,
+     from port 3010; and `npm run test:ui -- <file>` where the plugin has a playground and the test is no baseline).
+     A **new baseline** is written by `SW_BASELINES=update npm run test:ui:sb -- <folder>`, its JSON read (does it hold
+     what the part shows: the dark theme's colours, the phone's size, no "none" where a part should be), then checked
+     by a run without the variable. Writing new baselines is the agent's work; **an existing baseline that changes is
+     the user's decision** (*Stop and ask*): never written anew to make a run pass.
+  2. Run the new files 10 times in parallel (`--repeat-each 10`): every run green, none flaky. A flaky one is a race
+     or a value that differs between runs: find which and fix it, never a pause or a retry. A value of a baseline
+     that differs between runs is made stable (`opaque`, `replace`, `omit`, `settledLook`'s waits, opening the part
+     in its final state) or its part left out of `parts` with a comment saying why; `TOLERANCE` (1 px) is raised
+     only by the user.
+  3. A review by a fresh agent (a general-purpose subagent, read-only, no Playwright: a run may be using the
+     servers) given the files and the task, not your conclusions: the new specs and their baseline JSON, the helpers
+     they use, the root CLAUDE.md's interaction-test rules, step S's item and *Rules of this work*; asked for races,
+     values that differ between runs, assertions weaker than a test's title, parts or states left out, rule
+     breaches, each finding with file:line and a fix. Fix what it finds; send the fixes to the same agent
+     (SendMessage) for a second look; repeat until it finds nothing that matters.
+  4. `npm run build`, then `npm run verify` (read its "Tests N passed"); one commit: Conventional Commits, one line,
+     imperative, no body, no co-author trailer (root CLAUDE.md), scoped by the plugin where it is one plugin's
+     (`test(assets): …`), no scope where it spans several; **push to `silverware-core`** (the user asked for that
+     after each unit of step S; never to `main`).
+  5. This section and the item's entry updated in the same commit, so nothing is kept only in a conversation.
+- **Runs longer than a few minutes go detached**: the Claude session runs in code-server's extension host, which
+  code-server stops 3 hours after its last browser tab closed (and a session controlled from a phone by Remote Control
+  keeps no tab open), killing the session's background commands with it. Write the runs into a script in the
+  session's scratchpad that appends a line per step to a results file there (each step's exit code and its
+  "N passed / failed / flaky" line, a last line `done`), start it with
+  `setsid nohup <script> > /dev/null 2>&1 < /dev/null &`, then wait for `done` in a background command (a loop
+  reading the file every 30 s). A restarted session reads the file to know where the run got to. A run stopped half way leaves SilverBullet's test containers:
+  `docker ps --format '{{.Names}}' | grep silverware-ui-tests | xargs -r docker rm -f`. Never two runs of one target at
+  once (their ports collide). `pkill -f` with a pattern from the command line kills the shell running it: list the
+  pids (`ps aux | grep …`) into a file and `kill` them.
+- **What was found the hard way** (each also in the entry it belongs to):
+  - Dark theme: SilverBullet 3.0 follows `prefers-color-scheme` (`page.emulateMedia`, then wait for
+    `data-sb-scheme`); a `data-theme` set by hand changes no colour. A part that copies colours as it opens (the peek)
+    is opened in its theme, the switch while open a test of its own.
+  - A fixed day: `page.clock.setSystemTime` before the page loads (the time runs on); `setFixedTime` stops it and
+    SilverBullet never finishes indexing.
+  - Values given in the order things were read (a database item's `data-item`, `page-1`, `page-2`) differ under load:
+    `domOf(…, { opaque: ["data-item"] })` numbers them by where they are drawn. A test folder's name (in an `href`,
+    URL-encoded) is replaced. The focus ring (`outline`) is not part of a look.
+  - CodeMirror draws the lines in view only: a widget under a long text is drawn once scrolled to.
+  - Silverware Editor's editor loads when the browser is idle: a cell or peek opened before keeps a plain field;
+    tests open it again until its `.cm-content` is there (`toPass`, a few seconds a try).
+  - A database's module start (the peek, Properties) follows its init page: after System: Reload, wait for what it
+    draws (the place menu's Properties) before using one.
+  - `test.fail` with no reason, or before the setup, takes any failure for the known one: the rule in *Rules of this
+    work*; `expectNoPageErrorsYet(page)` on the line above it; `scripts/ui-test-locks.test.ts` checks both.
+  - Probing SilverBullet: a temporary spec under `cross-plugin/ui-tests/probe/` printing what it reads
+    (`console.log`, read with `grep`), deleted after; what it found written here or in the plan.
 
 - **Step S, how it is laid out** (agreed with the user, 2026-11-26): the plugins together are `cross-plugin/ui-tests/`
   (SilverBullet only; an area folder each, a CI group each: `stacking/` now). System: Reload goes in **each plugin's**
@@ -159,7 +271,7 @@ P1 to P3 and I1 to I6 its *API changes*.
   the Undo command, a custom operation's Undo, Undo of a page changed after it, Add to pages and Remove from pages
   from a tag; a chart's exact block after a settings change, settings saved on the second of two alike; the picker's
   Nothing found, a group with a search, a tab switched; the editor's Ctrl+Z and Ctrl+Y per host, leaving by a press
-  beside, Ctrl+Enter in a cell, the notice of a key SilverBullet keeps. Next: items 5 and 6.
+  beside, Ctrl+Enter in a cell, the notice of a key SilverBullet keeps.
 - **Item 5, how it is laid out** (agreed with the user, 2026-11-26): each plugin's baselines in an area of its own,
   `<plugin>/ui-tests/baselines/` (a CI group each), on `scripts/ui-test-baselines.ts`: `domOf` (normalized DOM),
   `lookOf` (computed styles and boxes of named parts against the part's own box, a part holding text without its
@@ -174,8 +286,8 @@ P1 to P3 and I1 to I6 its *API changes*.
   drawn anew: known, what was kept in the report's annotations); its menu, peek and Properties, and the calendar and
   timeline at a fixed day (`page.clock.setSystemTime`: the time runs, `setFixedTime` stopped SilverBullet's indexing),
   each opened in its theme, and a filter written into the block by Enter and by the field left, SilverBullet drawing
-  the block's widget anew, the focus, caret and the page's scroll kept (`overlays.spec.ts`). Still to record: side
-  panels, the toolbar's settings, the tags' manager, and each with its stability.
+  the block's widget anew, the focus, caret and the page's scroll kept (`overlays.spec.ts`). What is left: *Where
+  the work stands and what is next*, above.
 
 ## Steps
 

@@ -1,0 +1,6 @@
+[
+  "div.swt-choices.swt-floating.swt-visible [role=\"listbox\" style=\"left,min-width,top\"]",
+  "  div.swt-choice [aria-selected=\"false\" role=\"option\"] \"open\"",
+  "  div.swt-choice [aria-selected=\"false\" role=\"option\"] \"in progress\"",
+  "  div.swt-active.swt-choice.swt-current [aria-selected=\"true\" role=\"option\"] \"done\""
+]

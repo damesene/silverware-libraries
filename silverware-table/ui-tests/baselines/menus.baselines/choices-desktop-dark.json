@@ -1,0 +1,100 @@
+{
+  "list": {
+    "box": [
+      0,
+      0,
+      413,
+      82
+    ],
+    "style": {
+      "display": "flex",
+      "position": "fixed",
+      "visibility": "visible",
+      "overflow": "auto",
+      "font-family": "Inter, system-ui, sans-serif",
+      "font-size": "13px",
+      "font-weight": "400",
+      "font-style": "normal",
+      "line-height": "normal",
+      "text-align": "start",
+      "vertical-align": "baseline",
+      "white-space": "normal",
+      "text-overflow": "clip",
+      "text-decoration": "none",
+      "color": "rgb(227, 229, 236)",
+      "background-color": "rgb(21, 23, 30)",
+      "background-image": "none",
+      "border-top": "1px solid rgb(42, 46, 58)",
+      "border-bottom": "1px solid rgb(42, 46, 58)",
+      "border-left": "1px solid rgb(42, 46, 58)",
+      "border-right": "1px solid rgb(42, 46, 58)",
+      "border-radius": "8px",
+      "box-shadow": "rgba(0, 0, 0, 0.18) 0px 6px 24px 0px",
+      "padding": "4px",
+      "margin": "0px",
+      "gap": "normal",
+      "align-items": "normal",
+      "justify-content": "normal",
+      "flex-wrap": "nowrap",
+      "cursor": "auto",
+      "opacity": "1",
+      "z-index": "57"
+    }
+  },
+  "choice": {
+    "box": [
+      5,
+      5,
+      -1,
+      24
+    ],
+    "style": {
+      "display": "flex",
+      "position": "static",
+      "visibility": "visible",
+      "overflow": "visible",
+      "font-family": "Inter, system-ui, sans-serif",
+      "font-size": "13px",
+      "font-weight": "400",
+      "font-style": "normal",
+      "line-height": "normal",
+      "text-align": "start",
+      "vertical-align": "baseline",
+      "white-space": "nowrap",
+      "text-overflow": "clip",
+      "text-decoration": "none",
+      "color": "rgb(227, 229, 236)",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "background-image": "none",
+      "border-top": "0px none rgb(227, 229, 236)",
+      "border-bottom": "0px none rgb(227, 229, 236)",
+      "border-left": "0px none rgb(227, 229, 236)",
+      "border-right": "0px none rgb(227, 229, 236)",
+      "border-radius": "5px",
+      "box-shadow": "none",
+      "padding": "4px 8px",
+      "margin": "0px",
+      "gap": "8px",
+      "align-items": "normal",
+      "justify-content": "normal",
+      "flex-wrap": "nowrap",
+      "cursor": "pointer",
+      "opacity": "1",
+      "z-index": "auto"
+    }
+  },
+  "@place": {
+    "window": [
+      568,
+      207,
+      413,
+      82
+    ],
+    "anchor": [
+      0,
+      43,
+      413,
+      82
+    ]
+  }
+}

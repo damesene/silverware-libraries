@@ -23,10 +23,10 @@ import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { LONG_PRESS_MS } from "../src/core/press.ts";
 
-import { boxOf, ON_TOP, onTopAt, reloadSpaceLua, runSilverBulletCommand } from "../../scripts/ui-test-helpers.ts";
+import { boxOf, expectNoPageErrorsYet, gatherPageErrors, ON_TOP, onTopAt, reloadSpaceLua, runSilverBulletCommand } from "../../scripts/ui-test-helpers.ts";
 import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
 
-export { boxOf, ON_TOP, onTopAt, reloadSpaceLua, runSilverBulletCommand };
+export { boxOf, expectNoPageErrorsYet, ON_TOP, onTopAt, reloadSpaceLua, runSilverBulletCommand };
 
 export { expect };
 
@@ -107,6 +107,8 @@ export const test = base.extend({
   },
   page: async ({ page }, use, testInfo) => {
     const errors: string[] = [];
+    // (Read by `expectNoPageErrorsYet` too, before a known bug's mark)
+    gatherPageErrors(page, errors);
     const log: string[] = [];
     page.on("pageerror", (e) => {
       log.push(`[pageerror] ${e.message}`);
@@ -546,8 +548,9 @@ export async function hoverCell(page: Page, target: Locator): Promise<void> {
 }
 
 /** A touch held still on an element past the core's long press, through Chrome's touch events */
-export async function longPress(page: Page, target: Locator): Promise<void> {
-  const { x, y } = await center(target);
+export async function longPress(page: Page, target: Locator, at?: { readonly x: number; readonly y: number }): Promise<void> {
+  // (At its centre, or at a point of it: `at` from its top left)
+  const { x, y } = at ? await boxOf(target).then((box) => ({ x: box.x + at.x, y: box.y + at.y })) : await center(target);
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
   // Time is what a long press is: held a little past the threshold
@@ -560,4 +563,54 @@ export async function longPress(page: Page, target: Locator): Promise<void> {
 export async function tap(page: Page, target: Locator): Promise<void> {
   const { x, y } = await center(target);
   await page.touchscreen.tap(x, y);
+}
+
+// As a user on each device presses (the baselines open their parts so: a desktop hovers, right-clicks and clicks, a
+// phone taps and long-presses)
+
+/** Whether the page is a phone's (a touch screen: no hover, a long press for a menu) */
+export const onPhone = (page: Page) => page.evaluate(() => matchMedia("(pointer: coarse)").matches);
+
+/** A press as a user makes it: a click, a tap on a phone */
+export async function press(page: Page, target: Locator): Promise<void> {
+  if (await onPhone(page)) await tap(page, target);
+  else await target.click();
+}
+
+/** The table's toolbar shown on a cell: by a hover, by a tap on a phone */
+export async function barOn(page: Page, target: Locator): Promise<Locator> {
+  if (await onPhone(page)) await tap(page, target);
+  else await hoverCell(page, target);
+  const bar = page.locator(".swt-bar.swt-visible");
+  await expect(bar).toBeVisible();
+  return bar;
+}
+
+/** An action of the toolbar: its icon where it is there, else its entry in the ⋯ menu */
+export async function barAction(page: Page, label: string): Promise<void> {
+  const bar = await barOn(page, cell(page, 1, 0));
+  const icon = bar.locator(`button[aria-label="${label}"]`);
+  if (await icon.count()) return press(page, icon);
+  await press(page, bar.locator(".swt-bar-more"));
+  await press(page, menu(page).locator(".swt-menu-item").filter({ hasText: new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`) }).first());
+}
+
+/** A column's or a cell's menu, as a user opens it: a right click, a long press on a phone */
+export async function menuOf(page: Page, target: Locator): Promise<void> {
+  // (Pressed at a point near its top left: a menu opens at the press, so its place against the element holds whatever
+  // the element's size)
+  if (await onPhone(page)) await longPress(page, target, PRESS_AT);
+  else await target.click({ button: "right", position: PRESS_AT });
+  await expect(menu(page)).toBeVisible();
+}
+
+/** Where `menuOf` presses an element: near its top left, clear of a cell's grips at its edges */
+const PRESS_AT = { x: 24, y: 12 } as const;
+
+/** A cell edited as a user starts it: selected by a press, then Enter; on a phone, which has no Enter to press, a second tap */
+export async function editCell(page: Page, target: Locator): Promise<void> {
+  await press(page, target);
+  if (await onPhone(page)) await press(page, target);
+  else await page.keyboard.press("Enter");
+  await expect(page.locator(".swt-cell-editor")).toBeFocused();
 }

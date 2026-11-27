@@ -122,9 +122,9 @@ P1 to P3 and I1 to I6 its *API changes*.
 Read this first; the dated entries below are the record of what each item did and found.
 
 - **Done and pushed** (branch `silverware-core`, each a commit of its own): step S items 1 to 4, and item 5 for
-  Silverware Database (`silverware-database/ui-tests/baselines/views.spec.ts`, `overlays.spec.ts`), and the shared
-  baseline code with a part's place (*Next* 1). Seven known bugs
-  are marked, in eight tests (step S, *Known*; `grep -rn "test.fail(" */ui-tests`).
+  Silverware Database (`silverware-database/ui-tests/baselines/views.spec.ts`, `overlays.spec.ts`) and for Silverware
+  Table's dialogs and menus (`silverware-table/ui-tests/baselines/`, *Next* 2), and the shared baseline code with a
+  part's place (*Next* 1). Ten known bugs are marked, in eleven tests (step S, *Known*; `grep -rn "test.fail(" */ui-tests`).
 - **Decided with the user (2026-11-27)**, after a review of the first answers against the plans and the code:
   - **Item 5 records every dialog, menu and floating list a later step changes, now**, before step 1: steps 1 to 5
     already reach them (step 3 the function dialog's list and help; step 4 every settings dialog, through
@@ -211,7 +211,16 @@ Read this first; the dated entries below are the record of what each item did an
      its place in the window, each on a start page of its own, a `Part`'s `details`: `startingOn`), opened as a user
      on each device does (a desktop: a hover, a right click, clicks, a result's ⤢; a phone, `pointer: coarse` under
      the Pixel 7's emulation, probed: a tap shows the toolbar, a long press a menu, taps choose, a result from its
-     cell's menu, Show result). Next: Silverware Table's toolbar, menus and floating lists.
+     cell's menu, Show result). Silverware Table's toolbar, a cell's, a column's and the ⋯ menus, a choice column's
+     choices, a formula's help, a filter's bubble and a cell's popup over a long text, each with its place against
+     what it opened from, and a choices list near the window's bottom, laid above its cell (`menus.spec.ts`; the
+     presses as a user's on each device, `press`, `barOn`, `barAction`, `menuOf` at a fixed point, `editCell`: Enter,
+     a second tap on a phone, in its `helpers.ts`). Three bugs found, each marked (*Known*): a formula's help wider
+     than a phone's window, a phone's filter field losing its focus, a phone's table scrolling to and fro as a long
+     cell is edited; the bubble's and the popup's baselines on a desktop alone till then (`Part.devices`), the
+     formula's help recorded on a phone as it is (its fix shows as a change of that baseline). A fill's tip (a drag)
+     is item 3's, left for step 6. Next: Silverware Database's settings, conflict and delete dialogs and its
+     submenus.
   3. **The lists left of items 2 to 4 that steps 3 to 5 change** (the decision above), each in the plugin's own
      `ui-tests/` beside the item's other tests (`reload.spec.ts`, `writes.spec.ts`, `undo.spec.ts`, `hosts.spec.ts`).
   4. **Item 6** (the decision above): the playground's benchmark and SilverBullet's, their first numbers written.
@@ -268,6 +277,14 @@ Read this first; the dated entries below are the record of what each item did an
     draws (the place menu's Properties) before using one.
   - `test.fail` with no reason, or before the setup, takes any failure for the known one: the rule in *Rules of this
     work*; `expectNoPageErrorsYet(page)` on the line above it; `scripts/ui-test-locks.test.ts` checks both.
+  - CI runs the UI tests against SilverBullet alone: a playground's failure shows only in a local `npm run test:ui`.
+    Silverware Table's touch tests of a tall dialog started on the sample page and set their own with `setPage`, so
+    `cell(page, 1, 0, 1)` was the sample's table till the new page was drawn: the pivot's failed on every run from the
+    commit that added it. They now start on their pages (`startingOn`), as the table's CLAUDE.md says.
+  - A part whose place differs run to run may move by itself: watch it from before the action that opens it (its
+    scroll events, or `requestAnimationFrame` in one `evaluate`) before taking it for a race of the test (a phone's
+    table scrolling to and fro, *Known*: read twice a second apart it seemed to land at random; read every frame it
+    went to and fro for about 20 frames and then stayed).
   - Probing SilverBullet: a temporary spec under `cross-plugin/ui-tests/probe/` printing what it reads
     (`console.log`, read with `grep`), deleted after; what it found written here or in the plan.
 
@@ -434,6 +451,23 @@ Editor 3). The rest of the plan leans on this step.
   - A database's view is drawn anew whole as its filter is typed in, and as an item changes elsewhere: every row put
     anew, none kept (2026-11-26; silverware-database/ui-tests/baselines/views.spec.ts, "(known: every row drawn
     anew)", two tests). Expected kept by the Preact conversion of the views (step 10, checkpoint C's measure).
+  - Silverware Table's formula help is wider than a phone's window (478 px in Pixel 7's 412), its right part out of it
+    (2026-11-27; silverware-table/ui-tests/baselines/menus.spec.ts, "a formula's help whole in the window (known:
+    wider than a phone's)"). Expected placed within the window by the core's floating (step 6).
+  - On a touch screen in a narrow window Silverware Table's filter field loses the focus about 150 to 250 ms after
+    the tap that focused it, with or without a key, its bubble going with it (2026-11-27;
+    silverware-table/ui-tests/baselines/menus.spec.ts, "a filter typed: its field keeps the focus (known: …)"; its
+    bubble's baseline on a desktop alone till then). Probed: on the playground too (not SilverBullet's), not
+    Android's user agent, touch in a 1200 px window keeps it and at 412 px loses it, no `blur()` called (the field
+    drawn anew, the row still there). Not seen on a real phone yet. Expected kept by the core's kept focus (step 6).
+  - On a phone, as a Silverware Table cell whose text does not fit is edited, its table scrolls to and fro every
+    frame for about 20 to 25 frames (some 0.4 s) between two places 11 px apart (SilverBullet's `.sb-table-widget`
+    scrollLeft 95 and 106 in a Pixel 7's window), then stays at either, so a popup opened is placed and clipped by
+    where it stopped (2026-11-27; silverware-table/ui-tests/baselines/menus.spec.ts, "a cell whose text does not
+    fit, edited: its table scrolled to it once (known: …)"; the popup's baseline on a desktop alone till then). Not
+    yet probed which two scrolls fight (candidates: the adapter's `revealCell`, `scrollIntoView` nearest of a cell
+    wider than the window, and the browser bringing the edited field's caret into view). Expected still once the
+    core places and reveals (steps 5 and 6).
   - A database's peek keeps the text colour of the theme it was opened in when the theme is switched while it is
     open: it copies the editor's colour into its inline style once (host/silverbullet/platform.ts `editorLook`), dark
     text on the dark theme (2026-11-26; silverware-database/ui-tests/baselines/overlays.spec.ts, "(known: kept

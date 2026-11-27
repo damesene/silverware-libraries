@@ -1,0 +1,13 @@
+[
+  "div.swt-bar.swt-floating.swt-visible [style=\"left,max-width,top\"]",
+  "  div.swt-bar-main",
+  "    span.swt-bar-gap",
+  "    button.swt-bar-icon [aria-label=\"Filter\" aria-pressed=\"false\" tabindex=\"-1\" title=\"Show or hide the filter row (hidden, the filters still apply: the toolbar and the headers show them)\" type=\"button\"]",
+  "      svg [aria-hidden=\"true\" svg=d8febcd8]",
+  "    button.swt-bar-icon [aria-label=\"Edit mode\" aria-pressed=\"false\" tabindex=\"-1\" title=\"Off: a click selects a cell; a second click, a double click, Enter or typing edits it. Click to edit on the first click\" type=\"button\"]",
+  "      svg [aria-hidden=\"true\" svg=5914671a]",
+  "    button.swt-bar-icon [aria-label=\"Lazy saving\" aria-pressed=\"false\" tabindex=\"-1\" title=\"Lazy saving: cells edited are saved together, a moment after editing stops\" type=\"button\"]",
+  "      svg [aria-hidden=\"true\" svg=a1aae821]",
+  "    button.swt-bar-icon.swt-bar-more [aria-label=\"More\" tabindex=\"-1\" title=\"More for this table\" type=\"button\"]",
+  "      svg [aria-hidden=\"true\" svg=0ebc84d6]"
+]

@@ -6,7 +6,7 @@
 // own (`startingOn`), not the shared sample. Against SilverBullet alone, as every baseline.
 import type { Locator, Page } from "@playwright/test";
 import { type Part, recordParts } from "../../../scripts/ui-test-baselines.ts";
-import { bodyRows, cell, expect, header, hoverCell, longPress, menu, startingOn, table, tap, target, test } from "../helpers.ts";
+import { barAction, bodyRows, cell, expect, header, menu, menuOf, onPhone, press, startingOn, table, target, test } from "../helpers.ts";
 
 test.skip(target !== "silverbullet", "baselines are SilverBullet's (the playground draws otherwise)");
 
@@ -24,40 +24,6 @@ const SCORES = startingOn("| Item | Score |\n|---|---|\n| Pear | 10 |\n| Fig | 6
 const CHOICES = startingOn(`| Task | Status #choice-status |\n|---|---|\n| A | done |\n| B | open |\n| <meta core.table columntypes.choice.status='["open","in progress","done"]'> |\n`);
 const SPILL = startingOn("| Tag | List |\n|---|---|\n| b | \\#SPILL! <meta formulas.f='=SORT(UNIQUE([tag]))'> |\n| a | |\n| b | |\n");
 const SHOP = startingOn("# Shop\n\n| Fruit | Qty |\n|---|--:|\n| Pear | 3 |\n| Apple | 10 |\n| <meta core.table core.name='shop'> |\n");
-
-/** Whether the page is a phone's (a touch screen: no hover, a long press for a menu) */
-const onPhone = (page: Page) => page.evaluate(() => matchMedia("(pointer: coarse)").matches);
-
-/** A press as a user makes it: a click, a tap on a phone */
-async function press(page: Page, target: Locator): Promise<void> {
-  if (await onPhone(page)) await tap(page, target);
-  else await target.click();
-}
-
-/** The table's toolbar shown on a cell: by a hover, by a tap on a phone */
-async function barOn(page: Page, target: Locator): Promise<Locator> {
-  if (await onPhone(page)) await tap(page, target);
-  else await hoverCell(page, target);
-  const bar = page.locator(".swt-bar.swt-visible");
-  await expect(bar).toBeVisible();
-  return bar;
-}
-
-/** An action of the toolbar: its icon where it is there, else its entry in the ⋯ menu */
-async function barAction(page: Page, label: string): Promise<void> {
-  const bar = await barOn(page, cell(page, 1, 0));
-  const icon = bar.locator(`button[aria-label="${label}"]`);
-  if (await icon.count()) return press(page, icon);
-  await press(page, bar.locator(".swt-bar-more"));
-  await press(page, menu(page).locator(".swt-menu-item").filter({ hasText: new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`) }).first());
-}
-
-/** A column's or a cell's menu, as a user opens it: a right click, a long press on a phone */
-async function menuOf(page: Page, target: Locator): Promise<void> {
-  if (await onPhone(page)) await longPress(page, target);
-  else await target.click({ button: "right" });
-  await expect(menu(page)).toBeVisible();
-}
 
 /** The dialog of this class shown, given */
 async function shown(page: Page, selector: string): Promise<Locator> {

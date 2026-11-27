@@ -1,0 +1,58 @@
+{
+  "hint": {
+    "box": [
+      0,
+      0,
+      478,
+      169
+    ],
+    "style": {
+      "display": "flex",
+      "position": "fixed",
+      "visibility": "visible",
+      "overflow": "visible",
+      "font-family": "Inter, system-ui, sans-serif",
+      "font-size": "12px",
+      "font-weight": "400",
+      "font-style": "normal",
+      "line-height": "normal",
+      "text-align": "start",
+      "vertical-align": "baseline",
+      "white-space": "normal",
+      "text-overflow": "clip",
+      "text-decoration": "none",
+      "color": "rgb(31, 35, 48)",
+      "background-color": "rgb(252, 252, 253)",
+      "background-image": "none",
+      "border-top": "1px solid rgb(228, 230, 238)",
+      "border-bottom": "1px solid rgb(228, 230, 238)",
+      "border-left": "1px solid rgb(228, 230, 238)",
+      "border-right": "1px solid rgb(228, 230, 238)",
+      "border-radius": "4px",
+      "box-shadow": "rgba(0, 0, 0, 0.15) 0px 2px 8px 0px",
+      "padding": "5px 8px",
+      "margin": "0px",
+      "gap": "8px",
+      "align-items": "flow-start",
+      "justify-content": "normal",
+      "flex-wrap": "nowrap",
+      "cursor": "auto",
+      "opacity": "1",
+      "z-index": "56"
+    }
+  },
+  "@place": {
+    "window": [
+      718,
+      209,
+      478,
+      169
+    ],
+    "anchor": [
+      -3,
+      45,
+      478,
+      169
+    ]
+  }
+}

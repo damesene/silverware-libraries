@@ -1,0 +1,23 @@
+[
+  "div.swt-floating.swt-formula-hint.swt-visible [style=\"left,top\"]",
+  "  button.swt-formula-functions [aria-label=\"Functions: find one by its name or what it does (Shift+F3)\" title=\"Functions: find one by its name or what it does (Shift+F3)\" type=\"button\"]",
+  "    svg [aria-hidden=\"true\" svg=6db9c41b]",
+  "  div.swt-formula-hint-body",
+  "    div.swt-formula-choices [role=\"listbox\"]",
+  "      div.swt-formula-choice.swt-formula-choice-function [aria-selected=\"true\" role=\"option\"]",
+  "        code \"SUBSTITUTE\"",
+  "        span \"The text with old_text (matching case) replaced by new_text: everywhere, or only its instance-th occurrence.\"",
+  "      div.swt-formula-choice.swt-formula-choice-function [aria-selected=\"false\" role=\"option\"]",
+  "        code \"SUM\"",
+  "        span \"Adds numbers, cells and ranges; times add up to a time (14:00 and 20:00 are 34:00).\"",
+  "      div.swt-formula-choice.swt-formula-choice-function [aria-selected=\"false\" role=\"option\"]",
+  "        code \"SUMIFS\"",
+  "        span \"Adds the cells of sum_range in the places whose cells meet every condition: a value, \\\">10\\\", \\\"<>done\\\", \\\"app*\\\" (* any text, ? one character), \\\"\\\" (empty) or \\\"<>\\\" (not empty).\"",
+  "      div.swt-formula-choice.swt-formula-choice-function [aria-selected=\"false\" role=\"option\"]",
+  "        code \"SUMPRODUCT\"",
+  "        span \"Multiplies the ranges' cells in the same places and adds the products; a cell that is not a number counts as 0.\"",
+  "    div.swt-formula-help",
+  "      code \"SUBSTITUTE(text, old_text, new_text, [instance])\"",
+  "      span \"The text with old_text (matching case) replaced by new_text: everywhere, or only its instance-th occurrence.\"",
+  "    div.swt-formula-tab \"Tab: insert · ↑ ↓: pick · Enter: save as typed · Esc: close\""
+]

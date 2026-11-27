@@ -1,0 +1,4 @@
+[
+  "div.swt-cell-popup.swt-floating.swt-visible [style=\"font-family,font-size,font-weight,left,line-height,top,width\"]",
+  "  textarea.swt-cell-editor.swt-cell-popup-field.swt-ui [style=\"height\" :value=\"A note that goes on and on, much longer than the column it is in. A note that goes on and on, much longer than the column it is in. A note that goes on and on, much longer than the column it is in. A note that goes on and on, much longer than the column it is in.\"]"
+]

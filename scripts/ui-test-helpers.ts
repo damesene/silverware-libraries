@@ -84,13 +84,21 @@ export function pageErrors(page: Page, alsoAllowed?: RegExp): string[] {
 const gathered = new WeakMap<Page, string[]>();
 
 /**
- * No error in the page so far (`pageErrors`'): checked before a test marks itself failing for a known bug
+ * A fixture's own list of the page's errors made the one `expectNoPageErrorsYet` reads (a fixture that gathers them
+ * itself, as Silverware Table's with its log, not by `pageErrors`)
+ */
+export function gatherPageErrors(page: Page, errors: string[]): void {
+  gathered.set(page, errors);
+}
+
+/**
+ * No error in the page so far (as `pageErrors` or a fixture's own list, `gatherPageErrors`, gathered them): checked before a test marks itself failing for a known bug
  * (`test.fail(true, "Known …")`), so an error of the page before it is a failure, not taken for the known one (the
  * fixture checks the errors only after the test)
  */
 export function expectNoPageErrorsYet(page: Page): void {
   const errors = gathered.get(page);
-  if (!errors) throw new Error("expectNoPageErrorsYet: the page's errors are not gathered by pageErrors");
+  if (!errors) throw new Error("expectNoPageErrorsYet: the page's errors are not gathered (pageErrors, gatherPageErrors)");
   expect(errors, "errors in the page before the known bug's mark").toEqual([]);
 }
 

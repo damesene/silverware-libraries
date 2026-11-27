@@ -1,6 +1,6 @@
 // On a touch screen (the "touch" project: a phone's viewport, touch events)
 import type { Locator, Page } from "@playwright/test";
-import { cell, expect, longPress, markdown, menu, menuTitle, setPage, startingOn, table, runSilverBulletCommand, tableIcon, tap, target, test } from "./helpers.ts";
+import { cell, expect, longPress, markdown, menu, menuTitle, startingOn, table, runSilverBulletCommand, tableIcon, tap, target, test } from "./helpers.ts";
 
 test.describe("Touch", () => {
   test("a long press on a cell opens its menu", async ({ page }) => {
@@ -140,9 +140,9 @@ test.describe("Touch: a dialog taller than the screen", () => {
     expect(await body.evaluate((b) => b.scrollTop)).toBeGreaterThan(0);
   }
 
-  test("the rules of conditional formatting: a rule of many keywords edited, Save in view, the rest scrolled to", async ({ page }) => {
-    const rows = Array.from({ length: 8 }, (_, i) => `{"pattern":"word${i}","style":{"fill":"green"}}`).join(",");
-    await setPage(page, `| Item | Status |\n|---|---|\n| Pear | word1 |\n| Fig | word2 |\n| <meta core.table conditions.-c-status.rules='[{"format":["byPattern",{"rows":[${rows}]}]}]'> |\n`);
+  const RULES = Array.from({ length: 8 }, (_, i) => `{"pattern":"word${i}","style":{"fill":"green"}}`).join(",");
+  test("the rules of conditional formatting: a rule of many keywords edited, Save in view, the rest scrolled to", startingOn(`| Item | Status |\n|---|---|\n| Pear | word1 |\n| Fig | word2 |\n| <meta core.table conditions.-c-status.rules='[{"format":["byPattern",{"rows":[${RULES}]}]}]'> |\n`), async ({ page }) => {
+    await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(2);
     await tap(page, cell(page, 1, 0));
     // (Its icon in the toolbar of a table with rules, the bar shown once placed)
     await tap(page, page.locator('.swt-bar.swt-visible button[aria-label="Conditional formatting"]'));
@@ -153,9 +153,13 @@ test.describe("Touch: a dialog taller than the screen", () => {
     await fitsTheScreen(page, dialog);
   });
 
-  test("a pivot's settings with its preview: Save in view, the rest scrolled to", async ({ page }) => {
-    const source = Array.from({ length: 30 }, (_, i) => `| R${i} | ${i} |`).join("\n");
-    await setPage(page, `| Region | Revenue |\n|---|--:|\n${source}\n| <meta core.table core.name='orders'> |\n\n| Region | Sum of Revenue |\n|---|--:|\n| R0 | 0 |\n| <meta core.table pivot.source='orders' pivot.rows='region' pivot.values='SUM([revenue])'> |\n`);
+  const ORDERS = Array.from({ length: 30 }, (_, i) => `| R${i} | ${i} |`).join("\n");
+  test("a pivot's settings with its preview: Save in view, the rest scrolled to", startingOn(`| Region | Revenue |\n|---|--:|\n${ORDERS}\n| <meta core.table core.name='orders'> |\n\n| Region | Sum of Revenue |\n|---|--:|\n| R0 | 0 |\n| <meta core.table pivot.source='orders' pivot.rows='region' pivot.values='SUM([revenue])'> |\n`), async ({ page }) => {
+    // (SilverBullet's editor draws the lines near the view alone: the pivot, under thirty rows, drawn once they are
+    // scrolled through)
+    await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(30);
+    await cell(page, 30, 0).scrollIntoViewIfNeeded();
+    await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
     await cell(page, 1, 0, 1).scrollIntoViewIfNeeded();
     await tap(page, cell(page, 1, 0, 1));
     await tap(page, page.locator('.swt-bar.swt-visible button[aria-label="Pivot settings…"]'));

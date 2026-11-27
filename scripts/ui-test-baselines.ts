@@ -310,6 +310,8 @@ export type Part<A> = {
   readonly place?: (args: A) => PlaceOf;
   /** Its tests' details, given to `declare` (a page to start on: Silverware Table's `startingOn`) */
   readonly details?: TestDetails;
+  /** Recorded on these devices alone (where it cannot be on another: a known bug there, said where it is used) */
+  readonly devices?: readonly ("desktop" | "phone")[];
 };
 
 /** What `domOf` is given for a part: from the test's fixtures where it reads them (a test's folder replaced) */
@@ -337,7 +339,8 @@ export function recordParts<A extends { page: Page }>(group: Grouping, declare: 
   for (const [device, use] of [["desktop", {}], ["phone", PHONE]] as const) {
     group.describe(`on a ${device}`, () => {
       group.use(use);
-      for (const [name, { open, parts: shown, font, place, details }] of Object.entries(parts)) {
+      for (const [name, { open, parts: shown, font, place, details, devices }] of Object.entries(parts)) {
+        if (devices && !devices.includes(device)) continue;
         for (const theme of ["light", "dark"] as const) {
           declare(`the ${name} opened in the ${theme} theme: its look${theme === "light" ? " and its DOM" : ""}`, async (args) => {
             await args.page.emulateMedia({ colorScheme: theme });

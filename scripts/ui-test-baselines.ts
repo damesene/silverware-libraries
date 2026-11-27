@@ -21,10 +21,12 @@ const SHOWN = ["role", "hidden", "title", "type", "disabled", "tabindex", "dragg
  * An element's subtree, a line an element: its tag, its classes sorted, its attributes that show (`SHOWN`, `aria-*`,
  * `data-*` but the tests' own `data-test-*` and those matching `omit`: another plugin's, which its own baselines
  * keep), the properties its inline style sets (their names: their values are geometry, kept by `lookOf`), its own
- * text trimmed. An SVG is its tag, classes and a short hash of its markup (an icon swapped shows; its paths are its
- * set's). `replace` takes out what differs between runs (a test's folder in a link); an `opaque` attribute's values
- * (an item's key, given in the order the store read the pages) are numbered as they first come in the subtree, `#1`,
- * `#2`…: the same item the same number wherever it is drawn
+ * text trimmed, a form field's state appended after its attributes (`:checked`, `:indeterminate`, `:value`, a list
+ * of several choices its values: its properties, which its attributes need not show). An SVG is its tag, classes and
+ * a short hash of its markup (an icon swapped shows; its paths are its set's). `replace` takes out what differs
+ * between runs (a test's folder in a link); an `opaque` attribute's values (an item's key, given in the order the
+ * store read the pages) are numbered as they first come in the subtree, `#1`, `#2`…: the same item the same number
+ * wherever it is drawn
  */
 export async function domOf(target: Locator, options: { replace?: Readonly<Record<string, string>>; omit?: RegExp; opaque?: readonly string[] } = {}): Promise<string[]> {
   const lines = await target.evaluate(
@@ -55,6 +57,13 @@ export async function domOf(target: Locator, options: { replace?: Readonly<Recor
         attrs.sort();
         const svg = element.namespaceURI === "http://www.w3.org/2000/svg";
         if (svg) attrs.push(`svg=${hash(element.innerHTML)}`);
+        // A form field's state, which its properties hold and its attributes need not: a box's ticked, a field's
+        // value, a list's option chosen (decided 2026-11-27: a dialog drawing its boxes without its values fails)
+        if (element instanceof HTMLInputElement && (element.type === "checkbox" || element.type === "radio")) {
+          attrs.push(`:checked=${element.checked}`);
+          if (element.indeterminate) attrs.push(":indeterminate=true");
+        } else if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) attrs.push(`:value=${JSON.stringify(element.value)}`);
+        else if (element instanceof HTMLSelectElement) attrs.push(`:value=${JSON.stringify(element.multiple ? [...element.selectedOptions].map((one) => one.value) : element.value)}`);
         const own = [...element.childNodes]
           .filter((node) => node.nodeType === Node.TEXT_NODE)
           .map((node) => node.textContent?.trim() ?? "")

@@ -19,7 +19,7 @@
   "      button.swd-peek-color.swd-peek-color-none [aria-expanded=\"false\" aria-haspopup=\"dialog\" aria-label=\"Color: none\" title=\"Color\" type=\"button\"]",
   "        span.swd-peek-swatch",
   "        span.swd-peek-color-name \"Color\"",
-  "    input.swd-peek-name [aria-label=\"Name\"]",
+  "    input.swd-peek-name [aria-label=\"Name\" :value=\"Fix login\"]",
   "  div.swd-peek-props-box",
   "    div.swd-peek-properties",
   "      div.swd-peek-row [data-property=\"status\"]",

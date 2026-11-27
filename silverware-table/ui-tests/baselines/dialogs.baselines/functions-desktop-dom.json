@@ -8,7 +8,7 @@
   "      svg [aria-hidden=\"true\" svg=94a72995]",
   "  div.swt-dialog-body",
   "    div.swt-functions",
-  "      input.swt-functions-search [aria-label=\"Search functions\" placeholder=\"Search by name or what it does\" type=\"search\"]",
+  "      input.swt-functions-search [aria-label=\"Search functions\" placeholder=\"Search by name or what it does\" type=\"search\" :value=\"\"]",
   "      div.swt-functions-groups [role=\"group\"]",
   "        button.swt-functions-group [aria-pressed=\"true\" type=\"button\"] \"All\"",
   "        button.swt-functions-group [aria-pressed=\"false\" type=\"button\"] \"Math\"",

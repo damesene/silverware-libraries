@@ -23,7 +23,7 @@
   "          div.swt-excel-option-actions",
   "            label.swt-excel-file",
   "              span.swt-excel-file-label \"File name:\"",
-  "              input.swt-excel-file-input [aria-label=\"File name\" type=\"text\"]",
+  "              input.swt-excel-file-input [aria-label=\"File name\" type=\"text\" :value=\"shop\"]",
   "              span.swt-excel-file-extension \".xlsx\"",
   "            button.swt-dialog-primary [type=\"button\"] \"Download\"",
   "        ul.swt-excel-option-text",

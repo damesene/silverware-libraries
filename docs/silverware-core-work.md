@@ -539,15 +539,15 @@ Editor 3). The rest of the plan leans on this step.
     kept, none of its buttons (`core/toolbar.ts` `show`: `replaceChildren`, each button made again) (2026-11-27;
     silverware-table/ui-tests/baselines/menus.spec.ts, "the toolbar's Filter pressed: … (known: its buttons drawn
     anew)"). Expected kept by the Preact conversion (step 10, checkpoint C's measure).
-  - On a phone, Silverware Database's Properties closes the names offered as a formula is typed: its body moves as
-    the field's help and result change their height (its scroll anchored: 117, 98, 138 px after "=", "U" and "PP";
-    none with `overflow-anchor: none`), and the formula's field closes its list on any scroll (shared/formulafield.ts
+  - On a phone, Silverware Database's Properties closes the names offered as a formula is typed: its body moves as the
+    field's help and result change their height (its scroll anchored: 117, 98, 138 px after "=", "U" and "PP"; none with
+    `overflow-anchor: none`), and the formula's field closes its list on any scroll (shared/formulafield.ts
     `closeOnScroll`), so the list shows a moment after each key and goes; a desktop's body does not move (2026-11-27;
-    silverware-database/ui-tests/baselines/properties.spec.ts, "a formula typed: the names offered stay open under
-    its field (known: …)"; the list's baseline on a desktop alone till then). Seen only in Chrome's phone emulation:
-    a real phone to be checked by the user (step K). Both halves to weigh in step K: the
-    body's anchoring and a list closed by a scroll that does not move its field. Expected kept under the field (step
-    6).
+    silverware-database/ui-tests/baselines/properties.spec.ts, "a formula typed: the names offered stay open under its
+    field (known: …)"; the list's baseline on a desktop alone till then). A real phone did not show it (the user,
+    2026-11-27: "=UPP" typed, the list kept under the field): fixed last in step K, or dropped with the user. Both
+    halves to weigh in step K: the body's anchoring and a list closed by a scroll that does not move its field. Expected
+    kept under the field (step 6).
   - A database's peek keeps the text colour of the theme it was opened in when the theme is switched while it is
     open: it copies the editor's colour into its inline style once (host/silverbullet/platform.ts `editorLook`), dark
     text on the dark theme (2026-11-26; silverware-database/ui-tests/baselines/overlays.spec.ts, "(known: kept

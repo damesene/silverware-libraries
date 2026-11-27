@@ -122,9 +122,10 @@ P1 to P3 and I1 to I6 its *API changes*.
 Read this first; the dated entries below are the record of what each item did and found.
 
 - **Done and pushed** (branch `silverware-core`, each a commit of its own): step S items 1 to 4, and item 5 for
-  Silverware Database (`silverware-database/ui-tests/baselines/views.spec.ts`, `overlays.spec.ts`, `dialogs.spec.ts`)
+  Silverware Database (`silverware-database/ui-tests/baselines/views.spec.ts`, `overlays.spec.ts`, `dialogs.spec.ts`;
+  `menus.spec.ts` and `properties.spec.ts` the first half of its last unit, *Next* 2)
   and for Silverware Table's dialogs and menus (`silverware-table/ui-tests/baselines/`, *Next* 2), and the shared
-  baseline code with a part's place (*Next* 1). Twelve known bugs are marked, in thirteen tests (step S, *Known*;
+  baseline code with a part's place (*Next* 1). Fourteen known bugs are marked, in fifteen tests (step S, *Known*;
   `grep -rn "test.fail(" */ui-tests`).
 - **Decided with the user (2026-11-27)**, after a review of the first answers against the plans and the code:
   - **Item 5 records every dialog, menu and floating list a later step changes, now**, before step 1: steps 1 to 5
@@ -227,15 +228,25 @@ Read this first; the dated entries below are the record of what each item did an
      press; `onPhone` and `press` moved to `scripts/ui-test-helpers.ts`, the table's helpers taking them there; the
      icon picker narrowed by a search, its thousands of icons Silverware Icons'), the settings on its General and
      Views tabs, and a `keptThrough` of Visible properties' eye; a draft of Properties not told of a change made
-     elsewhere and that menu drawn anew whole found (*Known*). Left of the database for a unit of its own: the ⋯
-     menu's Color by submenu and its title's rename field, the calendar's and the timeline's Start and End submenus
-     (`views/spans.ts` `spanMenu`), a menu near the window's bottom or right edge (none recorded flipped yet), a
-     cell's floating editors (a typed select's suggestions, a multi-select, a link, a reference's search, files and a
-     file's menu), Properties' option palette and icon popover, a formula's names offered
-     (`.swd-formulafield-choices`); a select's and a date's pickers are the browser's (none to record), and so is an
-     item's removal (`editor.confirm`). Silverware Table's two units have no `keptThrough` of their own yet either:
-     one each in that unit's time (a menu's entry toggled, a dialog's field typed). Next: that unit, then Silverware
-     Chart's settings and menu.
+     elsewhere and that menu drawn anew whole found (*Known*). The database's last unit, in two commits (agreed with the
+     user, 2026-11-27: smaller to review, the editors' data no hold on the rest). **First, done**: the ⋯ menu's Color by
+     submenu and its title turned into the name's field, a calendar's Start and a timeline's End submenus
+     (`views/spans.ts` `spanMenu`), the ⋯ menu of a place at the bottom of SilverBullet's scroller, laid above its
+     button (`menus.spec.ts`; the page scrolled to its end, the button by `scrollIntoView` end: a phone's bar lies under
+     the scroller, so the scroller's bottom, not the window's), Properties' option palette and icon picker and a
+     formula's names offered (`properties.spec.ts`, the list on a desktop alone); what the specs share in
+     `baselines/parts.ts` (not a spec); for Silverware Table a `keptThrough` each: the toolbar's Filter pressed
+     (`menus.spec.ts`) and a height typed in the settings (`dialogs.spec.ts`, kept). Two bugs found (*Known*): the
+     table's toolbar drawing its buttons anew, and on a phone the formula's names closed as it is typed. A menu held in
+     the window at its right edge (`placemenu.ts`' clamp to `innerWidth`) is not recorded yet: the ⋯ menus are laid
+     leftwards from their button and the view picker's, laid rightwards, starts at the place's left, so none reaches it
+     (the peek's colour popover at the right margin is `views/popover.ts`'); recorded first in step 6 (the overlays), a
+     tool menu in a window narrower than its left edge plus its width.  `keptThrough` now throws where two items share a
+     name or one has none (a module's settings row has no `data-swt-setting`: rows are named by their text). **Second,
+     next**: a cell's floating editors (a typed select's suggestions, one of a table's last column on a phone held in
+     the window by `views/float.ts`' clamp, a multi-select, a link, a reference's search, files and a file's menu); a
+     select's and a date's pickers are the browser's (none to record), and so is an item's removal (`editor.confirm`).
+     Then Silverware Chart's settings and menu.
   3. **The lists left of items 2 to 4 that steps 3 to 5 change** (the decision above), each in the plugin's own
      `ui-tests/` beside the item's other tests (`reload.spec.ts`, `writes.spec.ts`, `undo.spec.ts`, `hosts.spec.ts`).
   4. **Item 6** (the decision above): the playground's benchmark and SilverBullet's, their first numbers written.
@@ -501,6 +512,18 @@ Editor 3). The rest of the plan leans on this step.
     rows kept (2026-11-27; silverware-database/ui-tests/baselines/dialogs.spec.ts, "an eye in Visible properties
     pressed: … (known: the menu drawn anew)"). Expected kept by the Preact conversion of the menus (step 10,
     checkpoint C's measure).
+  - Silverware Table's toolbar draws its buttons anew whole as the table's view changes (Filter pressed): the bar
+    kept, none of its buttons (`core/toolbar.ts` `show`: `replaceChildren`, each button made again) (2026-11-27;
+    silverware-table/ui-tests/baselines/menus.spec.ts, "the toolbar's Filter pressed: … (known: its buttons drawn
+    anew)"). Expected kept by the Preact conversion (step 10, checkpoint C's measure).
+  - On a phone, Silverware Database's Properties closes the names offered as a formula is typed: its body moves as
+    the field's help and result change their height (its scroll anchored: 117, 98, 138 px after "=", "U" and "PP";
+    none with `overflow-anchor: none`), and the formula's field closes its list on any scroll (shared/formulafield.ts
+    `closeOnScroll`), so the list shows a moment after each key and goes; a desktop's body does not move (2026-11-27;
+    silverware-database/ui-tests/baselines/properties.spec.ts, "a formula typed: the names offered stay open under
+    its field (known: …)"; the list's baseline on a desktop alone till then). Both halves to weigh in step K: the
+    body's anchoring and a list closed by a scroll that does not move its field. Expected kept under the field (step
+    6).
   - A database's peek keeps the text colour of the theme it was opened in when the theme is switched while it is
     open: it copies the editor's colour into its inline style once (host/silverbullet/platform.ts `editorLook`), dark
     text on the dark theme (2026-11-26; silverware-database/ui-tests/baselines/overlays.spec.ts, "(known: kept

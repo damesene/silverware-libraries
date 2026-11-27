@@ -240,16 +240,23 @@ export type Kept = { readonly root: "kept" | "anew"; readonly kept: string[]; re
  * of `items` (a selector within it, each named by `key`: an attribute, `@data-item`, or the text of an element within it, `.swd-table-name`: an item's name, which holds where an opaque key given in the order things were read does not) those that are the same
  * node after it (`kept`) and those put anew (`anew`); `blinked` the nodes taken out and put back meanwhile (a
  * MutationObserver over `within`, a node counted as it comes back: an element replaced by a new one is in `anew`, not
- * here). Read once `settled` holds and then the part has had no change for ten frames (its redraws done)
+ * here). Every item needs a name of its own (else it throws: one would go unchecked). Read once `settled` holds and then the part has had no change for ten frames (its redraws done)
  */
 export async function keptThrough(within: Locator, items: string, key: string, action: () => Promise<void>, settled: () => Promise<void>): Promise<Kept> {
   await within.evaluate(
     (root, { items, key }) => {
       const nameOf = (one: Element) => (key.startsWith("@") ? one.getAttribute(key.slice(1)) : one.querySelector(key)?.textContent?.trim()) ?? "";
+      // (Each item by a name of its own: two alike, or one without, would leave one unchecked)
+      const named = (all: Element[]) => {
+        const names = all.map(nameOf);
+        const wrong = names.find((name, at) => !name || names.indexOf(name) !== at);
+        if (wrong !== undefined) throw new Error(`keptThrough: the items of ${items} are not each named by ${key} ("${wrong}" ${wrong ? "twice" : "empty"})`);
+        return new Map(all.map((one, at) => [names[at]!, one]));
+      };
       const removed = new Set<Node>();
       const state = {
         root,
-        marked: new Map([...root.querySelectorAll(items)].map((one) => [nameOf(one), one])),
+        marked: named([...root.querySelectorAll(items)]),
         blinked: 0,
         changed: 0,
         observer: new MutationObserver((records) => {
@@ -286,7 +293,14 @@ export async function keptThrough(within: Locator, items: string, key: string, a
       const state = (window as unknown as { swTestKept: { root: Element; marked: Map<string, Element>; blinked: number; observer: MutationObserver } }).swTestKept;
       state.observer.disconnect();
       const nameOf = (one: Element) => (key.startsWith("@") ? one.getAttribute(key.slice(1)) : one.querySelector(key)?.textContent?.trim()) ?? "";
-      const now = new Map([...root.querySelectorAll(items)].map((one) => [nameOf(one), one]));
+      // (Each item by a name of its own: two alike, or one without, would leave one unchecked)
+      const named = (all: Element[]) => {
+        const names = all.map(nameOf);
+        const wrong = names.find((name, at) => !name || names.indexOf(name) !== at);
+        if (wrong !== undefined) throw new Error(`keptThrough: the items of ${items} are not each named by ${key} ("${wrong}" ${wrong ? "twice" : "empty"})`);
+        return new Map(all.map((one, at) => [names[at]!, one]));
+      };
+      const now = named([...root.querySelectorAll(items)]);
       const kept = [...now].filter(([name, one]) => state.marked.get(name) === one).map(([name]) => name).sort();
       const anew = [...now].filter(([name, one]) => state.marked.get(name) !== one).map(([name]) => name).sort();
       return { root: root === state.root ? "kept" : "anew", kept, anew, blinked: state.blinked };

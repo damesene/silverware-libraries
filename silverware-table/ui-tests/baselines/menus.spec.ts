@@ -5,7 +5,7 @@
 // only by SW_BASELINES=update), a cell's popup over a long text, and a list near the window's bottom, laid above its
 // cell. Against SilverBullet alone, as every baseline. A fill's tip (a drag) is item 3's, left for step 6.
 import type { Locator, Page } from "@playwright/test";
-import { type Part, PHONE, recordParts } from "../../../scripts/ui-test-baselines.ts";
+import { keptThrough, type Part, PHONE, recordParts } from "../../../scripts/ui-test-baselines.ts";
 import { barOn, cell, editCell, expect, expectNoPageErrorsYet, header, menu, menuOf, press, startingOn, table, target, test } from "../helpers.ts";
 
 test.skip(target !== "silverbullet", "baselines are SilverBullet's (the playground draws otherwise)");
@@ -176,6 +176,22 @@ const PARTS: Readonly<Record<string, Part<Args>>> = {
 };
 
 recordParts(test, (title, body, details) => test(title, details, ({ page }) => body({ page })), PARTS);
+
+test("the toolbar's Filter pressed: the filter row shown, the bar and its buttons the same nodes (known: its buttons drawn anew)", FRUIT, async ({ page }) => {
+  await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(3);
+  const bar = await barOn(page, cell(page, 1, 0));
+  const kept = await keptThrough(bar, "button", "@aria-label", () => press(page, bar.locator('button[aria-label="Filter"]')), async () => {
+    await expect(page.locator(".swt-filter-row input.swt-filter")).toHaveCount(3);
+  });
+  test.info().annotations.push({ type: "kept", description: JSON.stringify(kept) });
+  // (What holds today: the bar itself kept, nothing put back, the same four buttons)
+  expect(kept.root).toBe("kept");
+  expect(kept.blinked).toBe(0);
+  expect([...kept.kept, ...kept.anew].sort()).toEqual(["Edit mode", "Filter", "Lazy saving", "More"]);
+  expectNoPageErrorsYet(page);
+  test.fail(true, "Known (2026-11-27): the toolbar draws its buttons anew whole as the table's view changes (a button pressed: Filter; core/toolbar.ts show: replaceChildren, each button made again), the bar kept but none of its buttons; expected kept by the Preact conversion (step 10, checkpoint C's measure)");
+  expect(kept.anew).toEqual([]);
+});
 
 test.describe("on a phone", () => {
   test.use(PHONE);

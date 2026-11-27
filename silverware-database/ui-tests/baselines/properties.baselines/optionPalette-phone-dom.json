@@ -1,0 +1,23 @@
+[
+  "div.swd-option-palette [data-option=\"Todo\"]",
+  "  button.swd-option-auto.swd-option-swatch [aria-pressed=\"true\" title=\"The color of its place among the options\" type=\"button\"] \"Auto\"",
+  "  button.swd-option-swatch [aria-label=\"Todo: gray\" aria-pressed=\"false\" data-color-name=\"gray\" title=\"gray\" type=\"button\"]",
+  "    span.swd-pill [data-color=\"0\"] \"gray\"",
+  "  button.swd-option-swatch [aria-label=\"Todo: blue\" aria-pressed=\"false\" data-color-name=\"blue\" title=\"blue\" type=\"button\"]",
+  "    span.swd-pill [data-color=\"1\"] \"blue\"",
+  "  button.swd-option-swatch [aria-label=\"Todo: green\" aria-pressed=\"false\" data-color-name=\"green\" title=\"green\" type=\"button\"]",
+  "    span.swd-pill [data-color=\"2\"] \"green\"",
+  "  button.swd-option-swatch [aria-label=\"Todo: yellow\" aria-pressed=\"false\" data-color-name=\"yellow\" title=\"yellow\" type=\"button\"]",
+  "    span.swd-pill [data-color=\"3\"] \"yellow\"",
+  "  button.swd-option-swatch [aria-label=\"Todo: orange\" aria-pressed=\"false\" data-color-name=\"orange\" title=\"orange\" type=\"button\"]",
+  "    span.swd-pill [data-color=\"4\"] \"orange\"",
+  "  button.swd-option-swatch [aria-label=\"Todo: red\" aria-pressed=\"false\" data-color-name=\"red\" title=\"red\" type=\"button\"]",
+  "    span.swd-pill [data-color=\"5\"] \"red\"",
+  "  button.swd-option-swatch [aria-label=\"Todo: purple\" aria-pressed=\"false\" data-color-name=\"purple\" title=\"purple\" type=\"button\"]",
+  "    span.swd-pill [data-color=\"6\"] \"purple\"",
+  "  button.swd-option-swatch [aria-label=\"Todo: pink\" aria-pressed=\"false\" data-color-name=\"pink\" title=\"pink\" type=\"button\"]",
+  "    span.swd-pill [data-color=\"7\"] \"pink\"",
+  "  label.swd-option-own.swd-option-swatch [aria-pressed=\"false\" title=\"A color of your own\"]",
+  "    input.swd-option-own-input [aria-label=\"Todo: a color of your own\" type=\"color\" :value=\"#3a7bd5\"]",
+  "    span \"Custom…\""
+]

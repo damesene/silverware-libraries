@@ -6,12 +6,9 @@
 // caret and the page's scroll kept through SilverBullet drawing the block anew.
 import type { Locator, Page } from "@playwright/test";
 import { keptThrough, type Part, recordParts, setTheme } from "../../../scripts/ui-test-baselines.ts";
-import { expect, expectNoPageErrorsYet, type Space, fieldReady, item, root, test } from "../helpers.ts";
+import { expect, expectNoPageErrorsYet, type Space, fieldReady, item, test } from "../helpers.ts";
+import { type Args, BLOCK, DOM, TASKS } from "./parts.ts";
 
-const TASKS = { "Page/db-tasks": root("tasks", "Tasks"), "Page/db-tasks/Fix login": item("Todo", "a0"), "Page/db-tasks/Write docs": item("Done", "a1") };
-const BLOCK = (view: string, extra = "") => `# Page\n\n\`\`\`silverware-database\nid: tasks\nview: ${view}\n${extra}\`\`\`\n`;
-// Silverware Layout's marks on a widget of its (its own baselines keep them)
-const OTHERS = /^data-swl-/;
 // The day the dated views are drawn on: a Monday, mid-month, its morning (local time: the machine's, Node's and the
 // browser's alike); an item on it, one later that week, one over the weekend
 const TODAY = new Date("2026-11-16T09:00:00");
@@ -23,9 +20,6 @@ const DATED_PAGES = {
   "Page/db-tasks/Sync": DATED("2026-11-18T10:00", "2026-11-18T11:00", "a1"),
   "Page/db-tasks/Trip": DATED("2026-11-20", "2026-11-23", "a2"),
 };
-
-// What its parts are opened with: the test's page and space
-type Args = { page: Page; space: Space };
 
 /** The peek on Fix login, its field the editor (one opened before the editor loaded keeps a plain field: opened again) */
 async function openPeek(page: Page, space: Space): Promise<Locator> {
@@ -98,7 +92,7 @@ const PARTS: Readonly<Record<string, Part<Args>>> = {
   },
 };
 
-recordParts(test, (title, body) => test(title, ({ page, space }) => body({ page, space })), PARTS, { omit: OTHERS, opaque: ["data-item"], replace: ({ space }) => ({ [encodeURI(space.folder)]: "<folder>", [space.folder]: "<folder>" }) });
+recordParts(test, (title, body) => test(title, ({ page, space }) => body({ page, space })), PARTS, DOM);
 
 test("the theme switched to dark with the peek open: its text in the dark theme's colour (known: kept light)", async ({ page, space }) => {
   await page.emulateMedia({ colorScheme: "light" });

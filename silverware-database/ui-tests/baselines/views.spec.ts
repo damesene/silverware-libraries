@@ -3,10 +3,9 @@
 // (Chrome's Pixel 7: its size, touch and pixel ratio), recorded against today's code (scripts/ui-test-baselines.ts; written anew only
 // by SW_BASELINES=update); and what typing in a filter and an item changed elsewhere leave in place.
 import { domOf, expectBaseline, keptThrough, PHONE, setTheme, settledLook } from "../../../scripts/ui-test-baselines.ts";
-import { expect, expectNoPageErrorsYet, item, root, test } from "../helpers.ts";
+import { expect, expectNoPageErrorsYet, item, test } from "../helpers.ts";
+import { BLOCK, DOM, TASKS } from "./parts.ts";
 
-const TASKS = { "Page/db-tasks": root("tasks", "Tasks"), "Page/db-tasks/Fix login": item("Todo", "a0"), "Page/db-tasks/Write docs": item("Done", "a1") };
-const BLOCK = (view: string) => `# Page\n\n\`\`\`silverware-database\nid: tasks\nview: ${view}\n\`\`\`\n`;
 // SilverBullet's font of the page's text, which the place's text is in
 const FONT = "iA-Mono";
 // The place's chrome, every view's
@@ -34,8 +33,6 @@ const VIEWS = {
     parts: { board: ".swd-board", column: ".swd-board-column", secondColumn: ".swd-board-column:nth-child(2)", title: ".swd-board-title", count: ".swd-board-count", cards: ".swd-board-cards", card: ".swd-board-card", name: ".swd-board-name", add: ".swd-board-add" },
   },
 } as const;
-// Silverware Layout's marks on a widget of its (its own baselines keep them)
-const OTHERS = /^data-swl-/;
 
 for (const [device, use] of [["desktop", {}], ["phone", PHONE]] as const) {
   test.describe(`on a ${device}`, () => {
@@ -45,7 +42,7 @@ for (const [device, use] of [["desktop", {}], ["phone", PHONE]] as const) {
         await space.open({ Page: BLOCK(view), ...TASKS }, "Page");
         const place = page.locator(".swd-place");
         await expect(place.locator(items)).toHaveCount(2);
-        await expectBaseline(`${view}-${device}-dom`, await domOf(place, { omit: OTHERS, opaque: ["data-item"] }));
+        await expectBaseline(`${view}-${device}-dom`, await domOf(place, { omit: DOM.omit, opaque: DOM.opaque }));
         for (const theme of ["light", "dark"] as const) {
           await setTheme(page, theme);
           await expectBaseline(`${view}-${device}-${theme}`, await settledLook(page, place, { ...CHROME, ...parts }, FONT));

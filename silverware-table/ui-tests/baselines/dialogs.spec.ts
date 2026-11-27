@@ -5,7 +5,7 @@
 // (scripts/ui-test-baselines.ts `recordParts`; written anew only by SW_BASELINES=update). Each starts on a page of its
 // own (`startingOn`), not the shared sample. Against SilverBullet alone, as every baseline.
 import type { Locator, Page } from "@playwright/test";
-import { type Part, recordParts } from "../../../scripts/ui-test-baselines.ts";
+import { keptThrough, type Part, recordParts } from "../../../scripts/ui-test-baselines.ts";
 import { barAction, bodyRows, cell, expect, header, menu, menuOf, onPhone, press, startingOn, table, target, test } from "../helpers.ts";
 
 test.skip(target !== "silverbullet", "baselines are SilverBullet's (the playground draws otherwise)");
@@ -141,3 +141,20 @@ const PARTS: Readonly<Record<string, Part<Args>>> = {
 };
 
 recordParts(test, (title, body, details) => test(title, details, ({ page }) => body({ page })), PARTS);
+
+test("a height typed in the settings: its rows and fields the same nodes", FRUIT, async ({ page }) => {
+  const dialog = await PARTS.settings!.open({ page });
+  const field = dialog.locator('[data-swt-setting="silverware.table.maxHeight"] input');
+  await press(page, field);
+  const before = await field.elementHandle();
+  // (Rows by their names: a module's row has no data-swt-setting)
+  const kept = await keptThrough(dialog, ".swt-settings-row", ".swt-settings-name", () => field.pressSequentially("300"), async () => {
+    await expect(field).toHaveValue(/300$/);
+  });
+  test.info().annotations.push({ type: "kept", description: JSON.stringify(kept) });
+  expect(kept).toMatchObject({ root: "kept", anew: [], blinked: 0 });
+  expect(kept.kept).toContain("Maximum table height (px)");
+  // The field typed in the same node, still focused
+  expect(await before!.evaluate((one) => one.isConnected)).toBe(true);
+  await expect(field).toBeFocused();
+});

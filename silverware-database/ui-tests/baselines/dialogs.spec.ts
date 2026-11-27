@@ -7,33 +7,8 @@
 // told of a change made elsewhere (known); the Visible properties menu through an eye pressed (known: drawn anew).
 import type { Locator, Page } from "@playwright/test";
 import { keptThrough, type Part, recordParts } from "../../../scripts/ui-test-baselines.ts";
-import { expect, expectNoPageErrorsYet, fieldReady, item, press, root, runCommand, type Space, test } from "../helpers.ts";
-
-type Args = { page: Page; space: Space };
-
-const TASKS = { "Page/db-tasks": root("tasks", "Tasks"), "Page/db-tasks/Fix login": item("Todo", "a0"), "Page/db-tasks/Write docs": item("Done", "a1") };
-const BLOCK = (view: string) => `# Page\n\n\`\`\`silverware-database\nid: tasks\nview: ${view}\n\`\`\`\n`;
-// A root of two select properties: a board grouped by one, the other offered
-const TWO = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n    area: { type: select, label: Area, options: [Web, App] }\n---\n";
-// Silverware Layout's marks on a widget of its (its own baselines keep them)
-const OTHERS = /^data-swl-/;
-const FONT = "Inter";
-// What a dialog of the database's frame shows (shared/dialog.ts): its box, title, close, its foot's buttons
-const FRAME = { dialog: "", title: ".swd-settings-title", close: ".swd-settings-close", cancel: ".swd-settings-foot .swd-settings-cancel", save: ".swd-settings-foot .swd-settings-save" };
-// A menu's box, its title, an entry and its label
-const MENU = { menu: "", title: ".swd-menu-title", item: ".swd-menu-item", label: ".swd-menu-item .swd-label" };
-
-/** The menu open (lifted into the body), given */
-async function openMenu(page: Page): Promise<Locator> {
-  const menu = page.locator(".swd-menu:visible");
-  await expect(menu).toHaveCount(1);
-  return menu;
-}
-
-/** An entry of the menu open chosen by its label (its value after it left out), pressed */
-async function choose(page: Page, label: string): Promise<void> {
-  await press(page, page.locator(".swd-menu:visible .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: new RegExp(`^${label}(:|$)`) }) }).first());
-}
+import { expect, expectNoPageErrorsYet, fieldReady, press, runCommand, type Space, test } from "../helpers.ts";
+import { type Args, BLOCK, choose, DOM, FONT, FRAME, ICON_POP, iconFound, MENU, moreMenu, openMenu, propertiesOpen, TASKS, TWO } from "./parts.ts";
 
 /** The peek on Fix login (one opened before the editor loaded keeps a plain field: opened again) */
 async function openPeek(page: Page, space: Space): Promise<Locator> {
@@ -54,9 +29,7 @@ async function openPeek(page: Page, space: Space): Promise<Locator> {
  * written by the client, as another would, the place showing it
  */
 async function propertiesChangedElsewhere(page: Page, space: Space): Promise<void> {
-  await space.open({ Page: BLOCK("table"), ...TASKS }, "Page");
-  await press(page, page.locator(".swd-more"));
-  await choose(page, "Properties");
+  await propertiesOpen(page, space);
   await press(page, page.locator('[data-property="status"] .swd-prop-head'));
   await page.locator('[data-property="status"] .swd-property-label').fill("State");
   await expect(page.locator(".swd-properties-note")).toHaveText("Not saved yet");
@@ -115,7 +88,7 @@ const PARTS: Readonly<Record<string, Part<Args>>> = {
   deleteDatabase: {
     open: async ({ page, space }) => {
       await space.open({ Page: BLOCK("table"), ...TASKS }, "Page");
-      await press(page, page.locator(".swd-more"));
+      await moreMenu(page);
       await choose(page, "Delete database…");
       const dialog = page.locator(".swd-settings.swd-delete-database");
       // (Its pages read: their lines and the field for its name shown then)
@@ -131,7 +104,7 @@ const PARTS: Readonly<Record<string, Part<Args>>> = {
   shownMenu: {
     open: async ({ page, space }) => {
       await space.open({ Page: BLOCK("table"), ...TASKS, "Page/db-tasks": TWO }, "Page");
-      await press(page, page.locator(".swd-more"));
+      await moreMenu(page);
       await choose(page, "Visible properties");
       const menu = await openMenu(page);
       await expect(menu.locator(".swd-shown-row")).toHaveCount(2);
@@ -145,7 +118,7 @@ const PARTS: Readonly<Record<string, Part<Args>>> = {
     open: async ({ page, space }) => {
       await space.open({ Page: BLOCK("board"), ...TASKS, "Page/db-tasks": TWO }, "Page");
       await expect(page.locator(".swd-board-column")).toHaveCount(2);
-      await press(page, page.locator(".swd-more"));
+      await moreMenu(page);
       await choose(page, "Group");
       const menu = await openMenu(page);
       await expect(menu.locator(".swd-group-row")).toHaveCount(2);
@@ -159,7 +132,7 @@ const PARTS: Readonly<Record<string, Part<Args>>> = {
     open: async ({ page, space }) => {
       await space.open({ Page: BLOCK("board"), ...TASKS, "Page/db-tasks": TWO }, "Page");
       await expect(page.locator(".swd-board-column")).toHaveCount(2);
-      await press(page, page.locator(".swd-more"));
+      await moreMenu(page);
       await choose(page, "Group");
       await choose(page, "Group by");
       const menu = await openMenu(page);
@@ -201,15 +174,10 @@ const PARTS: Readonly<Record<string, Part<Args>>> = {
       const peek = await openPeek(page, space);
       await press(page, peek.locator(".swd-peek-icon"));
       const pop = page.locator('.swd-pop[aria-label="Icon"]');
-      await expect(pop.locator(".swi-item").first()).toBeVisible();
-      // (A few icons found by a name: every set's thousands are Silverware Icons' to record)
-      await pop.locator(".swi-field").fill("rocket");
-      await expect(pop.locator(".swi-item")).toHaveCount(1);
-      // (Its icon drawn: one of a set still loading is drawn again once it has)
-      await expect(pop.locator('[data-swi-state="pending"]')).toHaveCount(0);
+      await iconFound(pop);
       return pop;
     },
-    parts: { pop: "", head: ".swd-pop-head", title: ".swd-pop-title", set: ".swi-set", field: ".swi-field", icon: ".swi-item" },
+    parts: ICON_POP,
     font: FONT,
     place: ({ page }) => ({ anchor: page.locator(".swd-peek-icon") }),
   },
@@ -227,7 +195,7 @@ const PARTS: Readonly<Record<string, Part<Args>>> = {
   },
 };
 
-recordParts(test, (title, body) => test(title, ({ page, space }) => body({ page, space })), PARTS, { omit: OTHERS, opaque: ["data-item", "aria-activedescendant"] /* (the icon picker's active item: there or not; its id, made of a count of pickers, is not shown) */, replace: ({ space }) => ({ [encodeURI(space.folder)]: "<folder>", [space.folder]: "<folder>" }) });
+recordParts(test, (title, body) => test(title, ({ page, space }) => body({ page, space })), PARTS, DOM);
 
 test("a draft of Properties made of properties changed elsewhere: told under its list before Save (known: told after Save alone)", async ({ page, space }) => {
   await propertiesChangedElsewhere(page, space);
@@ -238,7 +206,7 @@ test("a draft of Properties made of properties changed elsewhere: told under its
 
 test("an eye in Visible properties pressed: the view drawn without it, the menu and its rows the same nodes, nothing put back (known: the menu drawn anew)", async ({ page, space }) => {
   await space.open({ Page: BLOCK("table"), ...TASKS, "Page/db-tasks": TWO }, "Page");
-  await press(page, page.locator(".swd-more"));
+  await moreMenu(page);
   await choose(page, "Visible properties");
   const menu = await openMenu(page);
   await expect(menu.locator(".swd-shown-row")).toHaveCount(2);

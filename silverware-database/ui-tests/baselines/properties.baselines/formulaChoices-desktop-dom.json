@@ -1,0 +1,6 @@
+[
+  "div.swd-formulafield-choices [role=\"listbox\" style=\"left,min-width,top\"]",
+  "  div.swd-formulafield-choice.swd-formulafield-choice-active [aria-selected=\"true\" role=\"option\"]",
+  "    span.swd-formulafield-choice-name \"UPPER\"",
+  "    span.swd-formulafield-choice-kind \"function\""
+]

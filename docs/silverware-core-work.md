@@ -65,6 +65,13 @@ where the work is, what to do next and what done means. **What** is built and
   `verify`) fails on a mark without a dated reason, without that check above
   it, or whose file is named nowhere in this runbook (it does not read the
   *Known* list itself: keep each marked file's entry there).
+- **`main` is merged into this branch at a checkpoint only** (decided with
+  the user, 2026-11-27): SilverBullet's image and `main`'s fixes can move the
+  rendering baselines; they are run before and after the merge and written
+  anew only in the merge's own commit, their diff shown to the user.
+- **What step S left for a later step is recorded before that step starts**
+  (decided with the user, 2026-11-27): each such case is the first task of the
+  step that changes it (steps 6 and 8 name theirs).
 - **A test's list of exceptions only shrinks.** The checks of this work
   (module state, SilverBullet's markers, page writes, UI islands) start with
   today's exceptions listed, each with the step that removes it; an entry is
@@ -88,7 +95,7 @@ where the work is, what to do next and what done means. **What** is built and
 | Step | What | State |
 | --- | --- | --- |
 | 0 | The plans | done (2026-11-25) |
-| S | The safety net: tests against today's code | in progress: items 1 to 4 done, 5 begun (Silverware Database, 2026-11-27) |
+| S | The safety net: tests against today's code | in progress: items 1 to 4 done (their lists that steps 3 to 5 change: *Next* 3), 5 begun (Silverware Database, 2026-11-27) |
 | 1 | The core's skeleton, the gate, `requires:`, build and tests | not started |
 | 2 | Preact in the core, `.tsx` everywhere | not started |
 | A | Checkpoint A | |
@@ -117,53 +124,87 @@ Read this first; the dated entries below are the record of what each item did an
 - **Done and pushed** (branch `silverware-core`, each a commit of its own): step S items 1 to 4, and item 5 for
   Silverware Database (`silverware-database/ui-tests/baselines/views.spec.ts`, `overlays.spec.ts`). Seven known bugs
   are marked, in eight tests (step S, *Known*; `grep -rn "test.fail(" */ui-tests`).
-- **Asked of the user, not decided yet** (ask before the work they touch; write the answer and its date here):
-  - Item 5's scope: steps 6, 7 and 10 lean on baselines of every dialog, menu and side panel they move (step 6's
-    *Done when*; step 7: 17 dialogs and every menu; step 10 converts Silverware Table's conditions dialog early).
-    *Next* below names three parts. Either record them all in item 5 (Table's conditions, choices, view, pivot and
-    function dialogs and menus; Chart's settings and menu; Layout's menus and page dialog; Assets' rename, insert and
-    settings dialogs and file menu; Database's conflict and delete dialogs; the toolbar's popup), or record each at
-    the start of the step that moves it, before any change.
-  - Whether the lists left of items 2 to 4 ("Not yet exercised", "Not covered yet", "Not recorded yet") belong to
-    step S's *Done when*, or are left for later.
-  - (Ask all three at the start of the session. The move of the shared baseline code, *Next* 1's **First**, needs
-    none of the answers and goes first; Silverware Assets', Toolbar's and Tags' parts follow whatever the first
-    answer is, as they are in item 5 either way.)
-  - Item 6's setup: where it runs (step S says the playground; the database's helpers skip the playground, the model
-    `bench.spec.ts` runs against SilverBullet), how items are made (the database's playground sample has no size),
-    repetitions and workers, where the numbers are kept.
+- **Decided with the user (2026-11-27)**, after a review of the first answers against the plans and the code:
+  - **Item 5 records every dialog, menu and floating list a later step changes, now**, before step 1: steps 1 to 5
+    already reach them (step 3 the function dialog's list and help; step 4 every settings dialog, through
+    `Platform.settings`, and a chart's block written by the `codeBlocks` part; step 5 where Silverware Table's
+    toolbar, menus and controls are placed, `viewBounds`, and the side panels, by the core's watcher of the editor's
+    area), steps 6 and 7 move them all. The parts, by plugin (each plugin's `baselines/` folder a CI group):
+    Silverware Table's eight dialogs (settings, conditions, pivot, view, function, choices, result view, Excel
+    export), its toolbar and menus, its floating lists (the choices list, the formula hint, the cell popup);
+    Silverware Database's settings, conflict and delete dialogs, its Visible properties and Group submenus, the
+    peek's icon and colour popover (its place menu, Properties and peek are recorded); Silverware Chart's settings and
+    menu; Silverware Layout's page dialog and its handle's and column grips' menus; Silverware Assets' settings,
+    insert and rename dialogs, its file menu, side panel and a file enlarged; Silverware Tags' settings and manager;
+    Silverware Toolbar's settings, popup, an action's panel and Turn into list. About 5 to 6 units beyond the
+    database's.
+  - **Placement is recorded too**: `lookOf` measures boxes against the part itself only, so a menu moved off its
+    button, a dialog no longer centred or a panel shifted would pass. Before the parts above, `lookOf` and
+    `settledLook` take an optional anchor: the part's box against it (the button, the widget) and against the window;
+    the baselines recorded without it stay as they are. A menu opened near the window's right or bottom edge (its
+    flipped place) and the phone's sheet are recorded among the parts.
+  - **`main` is merged into this branch at a checkpoint only**: SilverBullet's image (Dependabot) and `main`'s fixes
+    can move baselines, and each baseline written anew is the user's. The baselines are run before and after the
+    merge, and written anew only in the merge's own commit, their diff shown to the user.
+  - **The lists left of items 2 to 4** are each recorded **before the earliest step that changes it starts**. Those
+    steps 3 to 5 change are part of step S's *Done when*: Silverware Table's functions and sources reset by a reload,
+    Silverware Icons' `defineSets` after a reload, Silverware Database's press beside its block, the Tags panel
+    across a reload, Silverware Layout's font zoom, Silverware Assets' File: Upload, a chart's exact block after a
+    settings change and settings saved on the second of two blocks alike, Silverware Tags' operations with their
+    Undo, Silverware Editor's keys in each host (Ctrl+Z, Ctrl+Y, leaving by a press beside, Ctrl+Enter, the notice of
+    a key SilverBullet keeps). The rest are the first task of the step that changes them, written into its section:
+    item 3's stackings left (step 6), the picker's states (step 6), `onWrite` reset and Layout's providers registered
+    again (step 8).
+  - **Item 6 measures in both places**, each for what it shows (the conversions change the views' code; SilverBullet
+    draws the block's widget anew on a write, renders a code widget twice, empties the index while a page is indexed
+    again: what the playground has none of):
+    - **The playground**: one drawing's cost, steady. `database.html?big=N` (a database of N items over the memory
+      store) and `__bench.store().changeOutside(…)` (an item changed elsewhere), as measured on 2026-11-22
+      (docs/silverware-database-formulas.md); N 1,000 and 10,000, `silverware.database.pageSize` N (the drawing the
+      conversions change) and the default 50 (what users get: Load more). Silverware Table by its playground's
+      benchmark (`playground/benchmark.ts`, `profile.ts`), 1,000 and 10,000 rows: its tables are not converted to
+      Preact, so its numbers watch steps 4, 5 and 9.
+    - **SilverBullet**: **how many times** each action draws the place and the view (counted by a MutationObserver
+      the spec sets on the page, the `.swd-place` and view roots added: never a counter in `src/`; the number steady
+      where the time is not), and its time: the page opened, the block written (a filter by Enter), an item changed
+      elsewhere, a filter typed. A database of 1,000 items (5,000 if its indexing, once per size, stays within a few
+      minutes), seeded as `silverware-layout/ui-tests/bench.spec.ts` seeds its space, `silverware.database.pageSize`
+      set to its size and to the default 50, as in the playground.
+    - Per view (table, list, board, calendar, timeline): the first draw until the place holds still, the redraw
+      after an item changed elsewhere, each filter key to the frame after it, Load more, a board's drag's frames;
+      each with the long tasks (over 50 ms) and the nodes added and removed. One warm-up left out, then the median,
+      least and most of 5; `--workers 1`, nothing else running.
+    - Benchmark specs run on request (`SW_BENCH=1`, skipped otherwise), as `bench.spec.ts`. The numbers in a table
+      in item 6's entry: what, items, time, draws, the commit, the date, the machine, SilverBullet's version. After
+      each conversion (step 10) both are run on the commit before it and the one after, in the same session: numbers
+      months apart (another machine, SilverBullet, Chromium) are not compared.
 - **Next, in order**:
-  1. **Item 5, the rest** (its scope: the first question above), each the database's way: a part per thing drawn,
-     opened in its theme, its DOM from the light run, its look per theme and device, a `keptThrough` check of one
-     action it redraws on. **First** move what the two database specs repeat into `scripts/ui-test-baselines.ts`
+  1. **The shared baseline code**: move what the two database specs repeat into `scripts/ui-test-baselines.ts`
      (the root CLAUDE.md's *Shared helpers first*): the phone (`PHONE`, Pixel 7 less its browser type), the `Part`
      shape and `overlays.spec.ts`' loop (each part opened in its theme, a test per device, part and theme), its
      baselines' names kept (`<part>-<device>-dom`, `<part>-<device>-<theme>`); `overlays.spec.ts` uses it, its
      baselines unchanged (a checking run green); `views.spec.ts` takes `PHONE` from it and keeps its own loop (a view
-     drawn once, the theme switched in place). Silverware Tags and Toolbar have no `space` fixture (Tags: `openManager`,
-     `pageName`; Toolbar: its favourites fixture): adapt to their helpers; moving them onto `withSpace` is not this
-     item's. **Baselines run against SilverBullet's release alone**: a baselines spec skips the playground
-     (`test.skip(!onSilverBullet, …)`, as the database's helpers do), as `expectBaseline` keeps one file per name and
-     the playground draws otherwise; a baseline differing on SilverBullet's edge is told to the user, never recorded
-     for edge. Edge is not run per unit: CI's `edge-tests.yml` runs it as `main` or edge changes, and a difference
-     found there is reported, not fixed in the spec.
-     - Silverware Assets' side panel and a file enlarged (`silverware-assets/ui-tests/baselines/`; how to open them:
-       `silverware-assets/ui-tests/stacking.spec.ts`); its stability: another file opened in the panel open.
-     - Silverware Toolbar's settings dialog, its tabs and an item's panel (`silverware-toolbar/ui-tests/baselines/`;
-       how to open it: `openSettings` in `silverware-toolbar/ui-tests/settings.spec.ts`, moved into the toolbar's
-       `helpers.ts` to share it); its stability: an item's icon or label typed, the dialog's other rows kept.
-     - Silverware Tags' manager, its views (By tag, By page, Cleanup) and a review (`silverware-tags/ui-tests/baselines/`;
-       `openManager` in its helpers); its stability: the search typed, the tree's rows kept.
-     The `baselines/` area folders were agreed with the user (item 5's layout, below).
-     Then mark item 5 done in *Progress* and here.
-  2. **Item 6, the rendering cost**: a database's table, list and board views and a Silverware Table table with 1,000
-     and 10,000 items, timed, the times written here (a table of view, items, time, the machine). Not a test that
-     fails: a benchmark run on request, as `silverware-layout/ui-tests/bench.spec.ts` is (`SW_BENCH=1`, skipped
-     otherwise). Silverware Table has the playground's benchmark already (`playground/benchmark.ts`, `profile.ts`: a
-     table as large as asked, each phase timed, an interactive page, not a runner); the database's playground
-     (`/database.html`) runs over the memory store. Its setup is the user's (the third question above): ask first.
-  3. Step S done: *Progress* updated, then **stop for the user**: show the *Known* list and what was left
-     uncovered, and wait. A `docs:` commit; then **step 1** (its section below). From step 1 on a push is asked for
+     drawn once, the theme switched in place). With it, `lookOf`'s optional anchor (the decision above).
+  2. **Item 5's parts** (the decision above), a unit per plugin folder (Silverware Table perhaps two: its dialogs,
+     then its menus and floating lists), each the database's way: a part per thing drawn, opened in its theme, its
+     DOM from the light run, its look per theme and device with its placement, a `keptThrough` check of one action
+     it redraws on. Silverware Tags and Toolbar have no `space` fixture (Tags: `openManager`, `pageName`; Toolbar:
+     its favourites fixture): adapt to their helpers; moving them onto `withSpace` is not this item's. How to open
+     some: Assets' side panel and a file enlarged, `silverware-assets/ui-tests/stacking.spec.ts`; the toolbar's
+     settings, `openSettings` in `silverware-toolbar/ui-tests/settings.spec.ts` (moved into its `helpers.ts` to share
+     it); the tags' manager, `openManager` (its views By tag, By page and Cleanup, and a review). Their stability
+     actions: Assets, another file opened in the panel open; the toolbar's settings, an item's icon or label typed,
+     the dialog's other rows kept; the tags' manager, the search typed, the tree's rows kept. **Baselines run against SilverBullet's release alone**: a baselines spec
+     skips the playground (`test.skip(!onSilverBullet, …)`, as the database's helpers do), as `expectBaseline` keeps
+     one file per name and the playground draws otherwise; a baseline differing on SilverBullet's edge is told to the
+     user, never recorded for edge. Edge is not run per unit: CI's `edge-tests.yml` runs it as `main` or edge
+     changes, and a difference found there is reported, not fixed in the spec. The `baselines/` area folders were
+     agreed with the user (item 5's layout, below). Then mark item 5 done in *Progress* and here.
+  3. **The lists left of items 2 to 4 that steps 3 to 5 change** (the decision above), each in the plugin's own
+     `ui-tests/` beside the item's other tests (`reload.spec.ts`, `writes.spec.ts`, `undo.spec.ts`, `hosts.spec.ts`).
+  4. **Item 6** (the decision above): the playground's benchmark and SilverBullet's, their first numbers written.
+  5. Step S done: *Progress* updated, then **stop for the user**: show the *Known* list and what was left for later
+     steps, and wait. A `docs:` commit; then **step 1** (its section below). From step 1 on a push is asked for
      again each time (*Stop and ask*).
 - **How each unit of work is done** (the user's way, agreed 2026-11-26), one unit (a test file, a part of an item) at
   a time:
@@ -240,7 +281,7 @@ Read this first; the dated entries below are the record of what each item did an
   (one bar, one menu, one editor, one chart toolbar, a row or an action done once, Silverware Assets' Upload file
   there with no notice of its actions defined again, Ctrl+Z undoing one edit, a preview or chart drawn once for an embed put in after), Undo kept, a
   table's sheet view kept, the toolbar's favourites kept, a peek's typed text written once. Not yet exercised by
-  it (each re-run by a load, the cheapest check named): Silverware Table's definitions and `onWrite` listeners
+  it (each re-run by a load, the cheapest check named; when each is recorded: the decision of 2026-11-27 above): Silverware Table's definitions and `onWrite` listeners
   reset (a unit test: one listener after a reset), Silverware Icons' `defineSets` (a `Library/` set, reloaded, its
   icon drawn, no notification), Layout's handle with each provider registered again (one handle on a table hovered),
   Silverware Database's press beside its block, the Tags panel (a row opened: one manager; a manager open across the
@@ -326,7 +367,8 @@ Editor 3). The rest of the plan leans on this step.
      the place's chrome, the peek, dialogs, menus, side panels, the toolbar's
      settings, the tags workspace), in its main states:
      - **DOM**: a normalized `outerHTML` (classes, `data-*`, structure);
-     - **look and geometry**, kept as text, not pictures: the computed styles
+     - **look and geometry**, kept as text, not pictures (and, decided
+       2026-11-27, a part's place against its anchor and the window): the computed styles
        of its key elements (font, colours, spacing, borders, sizes) and their
        boxes against the anchor and each other, light and dark theme, desktop
        and phone, compared with a tolerance, text widths left out (they follow
@@ -341,16 +383,22 @@ Editor 3). The rest of the plan leans on this step.
        records it as it is (marked, with the fix expected): the conversion
        turns it green, checkpoint C's measure.
   6. **Rendering cost**: a database's views and a table drawn with 1,000 and
-     10,000 items, timed in the playground, written here; compared after each
-     conversion.
+     10,000 items, timed in the playground (one drawing's cost, steady), and in
+     SilverBullet each action's draws counted and timed (what the playground
+     lacks: the widget drawn anew on a write, rendered twice, the index emptied
+     while a page is indexed again); decided 2026-11-27, its method in *Notes
+     for the next session*' decision of that day; written here; compared after
+     each conversion, the commit before and after run in one session.
   Stored screenshots (docs/silverware-look-compare.md, its second kind: a few
   scenes, Linux in Docker, refreshed only on purpose) only if the look and
   geometry baselines let something through.
 - **Not in it**: changes of the plugins' code, but test hooks a test needs
   (none in what SilverBullet runs: the root CLAUDE.md's rule).
 - **Done when**: every item above has its tests, green in parallel and
-  `--repeat-each 10` for the new files; the known blinks and lost focus listed
-  here with their tests; the rendering costs written here.
+  `--repeat-each 10` for the new files; the lists left of items 2 to 4 that
+  steps 3 to 5 change recorded, the rest written into the step that changes
+  them (decided 2026-11-27, *Rules of this work*); the known blinks and lost focus listed here with
+  their tests; the rendering costs written here.
 - **Known, recorded by tests** (agreed with the user, 2026-11-26): the test asserts the behaviour wanted and is marked
   `test.fail(true, "Known (YYYY-MM-DD): …")` just before that assertion, after what sets it up (a setup that breaks
   is an ordinary failure). The report shows it expected to fail with its reason; the fix shows as "unexpectedly
@@ -490,8 +538,14 @@ Editor 3). The rest of the plan leans on this step.
 
 ### 6. Overlays in the core (2 to 3 weeks)
 
-- **Scope**: the rendering baselines of every dialog, menu and side panel
-  (step S) checked to be in place. Then, in Preact in the core: the stack and
+- **Scope**: first, what step S left for this step recorded against today's
+  code (decided 2026-11-27): item 3's stackings left (Properties' own menus
+  over its dialog, a filter or sort tool's menu, Silverware Table's choices
+  list, cell popup, formula hint and fill tip, Silverware Layout's Move to grid
+  picker, Silverware Assets' Rename and insert dialogs and upload progress, the
+  settings windows) and the icons' picker's states (Nothing found, a group with
+  a search, a tab switched). Then the rendering baselines of every dialog, menu
+  and side panel (step S) checked to be in place. Then, in Preact in the core: the stack and
   its layers, dialogs, menus (from shared/popupmenu.ts), side panels (a second
   on top of the first), `useFloating`, `useKeptFocus`; the marks written by
   the host, their watchers as signals; the layers' variables set by the core
@@ -519,7 +573,11 @@ Editor 3). The rest of the plan leans on this step.
 
 ### 8. The registry of the plugins' APIs (1 week)
 
-- **Scope**: F; Silverware Icons, Editor, Assets, Layout, Table's `tables` and
+- **Scope**: first, what step S left for this step recorded against today's
+  code (decided 2026-11-27): Silverware Table's `onWrite` listeners reset by a
+  reload (one listener after it), and Silverware Layout's providers registered
+  again by a reload (one handle on a table, a chart, a database and a file).
+  Then F; Silverware Icons, Editor, Assets, Layout, Table's `tables` and
   `onWrite` offered and taken through it; the Lua handovers `*.api` removed
   (P3: breaking, the user decides the release).
 - **Done when**: no plugin reads another's API from Lua, and the Lua bridges

@@ -143,12 +143,12 @@ for (const [how, write] of [
     const field = await filterTyped(page, space);
     const before = await where(page, field);
     const rows = page.locator(".swd-table tbody tr");
-    const kept = await keptThrough(page.locator(".swd-place"), ".swd-table tbody tr", "data-item", () => write(page), async () => {
+    const kept = await keptThrough(page.locator(".swd-place"), ".swd-table tbody tr", ".swd-table-name", () => write(page), async () => {
       await expect.poll(() => space.saved("Page")).toContain('table.filter: {"name":"Fix"}');
     });
     // (What the write did: SilverBullet drew the block's widget anew, the place with its row)
     test.info().annotations.push({ type: "kept", description: JSON.stringify(kept) });
-    expect([kept.root, kept.kept, kept.anew]).toEqual(["anew", [], ["page-1"]]);
+    expect([kept.root, kept.kept, kept.anew]).toEqual(["anew", [], ["Fix login"]]);
     await expect(rows).toHaveText([/Fix login/]);
     if (how === "Enter") {
       await expect(field).toBeFocused();

@@ -64,14 +64,14 @@ test("typing in a filter: the field the same and focused, its caret at the end; 
   await field.click();
   await field.evaluate((one) => one.setAttribute("data-test-field", ""));
   const place = page.locator(".swd-place");
-  const kept = await keptThrough(place, ".swd-table tbody tr", "data-item", () => page.keyboard.type("Fix"), () => expect(rows).toHaveCount(1));
+  const kept = await keptThrough(place, ".swd-table tbody tr", ".swd-table-name", () => page.keyboard.type("Fix"), () => expect(rows).toHaveCount(1));
   await expect(page.locator('.swd-filter input[data-test-field][data-key="name"]')).toBeFocused();
   await expect.poll(() => field.evaluate((input: HTMLInputElement) => [input.value, input.selectionStart])).toEqual(["Fix", 3]);
   // (What today's code did, in the report: the claim of the mark below)
   test.info().annotations.push({ type: "kept", description: JSON.stringify(kept) });
   expectNoPageErrorsYet(page);
   test.fail(true, "Known (2026-11-26): a view is drawn anew whole as its filter is typed in, its rows put anew (el() and replaceChildren); kept by the Preact conversion of the views (step 10, checkpoint C's measure)");
-  expect(kept).toEqual({ root: "kept", kept: ["page-1"], anew: [], blinked: 0 });
+  expect(kept).toEqual({ root: "kept", kept: ["Fix login"], anew: [], blinked: 0 });
 });
 
 test("an item changed elsewhere: its row shown anew, the other row the same node, nothing put back (known: every row drawn anew)", async ({ page, space }) => {
@@ -83,12 +83,12 @@ test("an item changed elsewhere: its row shown anew, the other row the same node
   const kept = await keptThrough(
     page.locator(".swd-place"),
     ".swd-table tbody tr",
-    "data-item",
+    ".swd-table-name",
     () => page.evaluate(([name, text]) => (window as unknown as { client: Client }).client.clientSystem.localSyscall("space.writePage", [name, text]).then(() => undefined), [`${space.folder}/Page/db-tasks/Write docs`, changed] as const),
     () => expect(rows.filter({ hasText: "Write docs" }).locator(".swd-pill")).toHaveText("Todo"),
   );
   test.info().annotations.push({ type: "kept", description: JSON.stringify(kept) });
   expectNoPageErrorsYet(page);
   test.fail(true, "Known (2026-11-26): an item changed elsewhere draws the view anew whole, every row put anew; kept by the Preact conversion of the views (step 10, checkpoint C's measure)");
-  expect(kept).toEqual({ root: "kept", kept: ["page-1"], anew: ["page-2"], blinked: 0 });
+  expect(kept).toEqual({ root: "kept", kept: ["Fix login"], anew: ["Write docs"], blinked: 0 });
 });

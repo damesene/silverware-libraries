@@ -144,6 +144,11 @@ Read this first; the dated entries below are the record of what each item did an
     `settledLook` take an optional anchor: the part's box against it (the button, the widget) and against the window;
     the baselines recorded without it stay as they are. A menu opened near the window's right or bottom edge (its
     flipped place) and the phone's sheet are recorded among the parts.
+  - **Form fields' state is part of a DOM baseline** (decided with the user, 2026-11-27): `domOf` records an `input`'s,
+    a `textarea`'s and a `select`'s value, a box's `checked` and the option chosen (properties, which attributes do
+    not show), what differs between runs replaced as the folder is: a conversion that loses a dialog's values while
+    drawing the same boxes fails. The baselines recorded before it are written anew once, in a commit of their own,
+    its diff (values added, nothing else) shown to the user.
   - **`main` is merged into this branch at a checkpoint only**: SilverBullet's image (Dependabot) and `main`'s fixes
     can move baselines, and each baseline written anew is the user's. The baselines are run before and after the
     merge, and written anew only in the merge's own commit, their diff shown to the user.
@@ -202,6 +207,11 @@ Read this first; the dated entries below are the record of what each item did an
      user, never recorded for edge. Edge is not run per unit: CI's `edge-tests.yml` runs it as `main` or edge
      changes, and a difference found there is reported, not fixed in the spec. The `baselines/` area folders were
      agreed with the user (item 5's layout, below). Then mark item 5 done in *Progress* and here.
+     **Done so far**: Silverware Table's eight dialogs (`silverware-table/ui-tests/baselines/dialogs.spec.ts`, each with
+     its place in the window, each on a start page of its own, a `Part`'s `details`: `startingOn`), opened as a user
+     on each device does (a desktop: a hover, a right click, clicks, a result's ⤢; a phone, `pointer: coarse` under
+     the Pixel 7's emulation, probed: a tap shows the toolbar, a long press a menu, taps choose, a result from its
+     cell's menu, Show result). Next: Silverware Table's toolbar, menus and floating lists.
   3. **The lists left of items 2 to 4 that steps 3 to 5 change** (the decision above), each in the plugin's own
      `ui-tests/` beside the item's other tests (`reload.spec.ts`, `writes.spec.ts`, `undo.spec.ts`, `hosts.spec.ts`).
   4. **Item 6** (the decision above): the playground's benchmark and SilverBullet's, their first numbers written.

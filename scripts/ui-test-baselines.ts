@@ -9,7 +9,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { devices, expect, type Locator, type Page, test } from "@playwright/test";
+import { devices, expect, type Locator, type Page, test, type TestDetails } from "@playwright/test";
 
 /** How far a box may move or grow, in px, and still be the same (rounding, a font's hinting); the only numbers kept */
 const TOLERANCE = 1;
@@ -228,7 +228,7 @@ export type Kept = { readonly root: "kept" | "anew"; readonly kept: string[]; re
 
 /**
  * What `action` leaves in place: `within`'s element itself (`root`: the same node, or one drawn anew in its place), and
- * of `items` (a selector within it, each named by its attribute `key`, which every item has) those that are the same
+ * of `items` (a selector within it, each named by `key`: an attribute, `@data-item`, or the text of an element within it, `.swd-table-name`: an item's name, which holds where an opaque key given in the order things were read does not) those that are the same
  * node after it (`kept`) and those put anew (`anew`); `blinked` the nodes taken out and put back meanwhile (a
  * MutationObserver over `within`, a node counted as it comes back: an element replaced by a new one is in `anew`, not
  * here). Read once `settled` holds and then the part has had no change for ten frames (its redraws done)
@@ -236,10 +236,11 @@ export type Kept = { readonly root: "kept" | "anew"; readonly kept: string[]; re
 export async function keptThrough(within: Locator, items: string, key: string, action: () => Promise<void>, settled: () => Promise<void>): Promise<Kept> {
   await within.evaluate(
     (root, { items, key }) => {
+      const nameOf = (one: Element) => (key.startsWith("@") ? one.getAttribute(key.slice(1)) : one.querySelector(key)?.textContent?.trim()) ?? "";
       const removed = new Set<Node>();
       const state = {
         root,
-        marked: new Map([...root.querySelectorAll(items)].map((one) => [one.getAttribute(key) ?? "", one])),
+        marked: new Map([...root.querySelectorAll(items)].map((one) => [nameOf(one), one])),
         blinked: 0,
         changed: 0,
         observer: new MutationObserver((records) => {
@@ -275,7 +276,8 @@ export async function keptThrough(within: Locator, items: string, key: string, a
     (root, { items, key }) => {
       const state = (window as unknown as { swTestKept: { root: Element; marked: Map<string, Element>; blinked: number; observer: MutationObserver } }).swTestKept;
       state.observer.disconnect();
-      const now = new Map([...root.querySelectorAll(items)].map((one) => [one.getAttribute(key) ?? "", one]));
+      const nameOf = (one: Element) => (key.startsWith("@") ? one.getAttribute(key.slice(1)) : one.querySelector(key)?.textContent?.trim()) ?? "";
+      const now = new Map([...root.querySelectorAll(items)].map((one) => [nameOf(one), one]));
       const kept = [...now].filter(([name, one]) => state.marked.get(name) === one).map(([name]) => name).sort();
       const anew = [...now].filter(([name, one]) => state.marked.get(name) !== one).map(([name]) => name).sort();
       return { root: root === state.root ? "kept" : "anew", kept, anew, blinked: state.blinked };
@@ -297,6 +299,8 @@ export type Part<A> = {
   readonly font: string;
   /** Where its place is read against (`PlaceOf`: a part laid over the page alone); none: its place not recorded */
   readonly place?: (args: A) => PlaceOf;
+  /** Its tests' details, given to `declare` (a page to start on: Silverware Table's `startingOn`) */
+  readonly details?: TestDetails;
 };
 
 /** What `domOf` is given for a part: from the test's fixtures where it reads them (a test's folder replaced) */
@@ -309,7 +313,7 @@ export type DomOptions<A> = { readonly omit?: RegExp; readonly opaque?: readonly
  * A `test()` called in this helper instead would keep its baselines beside scripts/, and Playwright refuses a body
  * whose first parameter is not destructured. Its tests share that line of the spec: pick one by `-g`, not `file:line`
  */
-export type Declare<A> = (title: string, body: (args: A) => Promise<void>) => void;
+export type Declare<A> = (title: string, body: (args: A) => Promise<void>, details: TestDetails) => void;
 
 /** What `recordParts` takes of the spec's `test`: its groups and their options (a device) */
 export type Grouping = { describe(title: string, body: () => void): void; use(options: object): void };
@@ -324,7 +328,7 @@ export function recordParts<A extends { page: Page }>(group: Grouping, declare: 
   for (const [device, use] of [["desktop", {}], ["phone", PHONE]] as const) {
     group.describe(`on a ${device}`, () => {
       group.use(use);
-      for (const [name, { open, parts: shown, font, place }] of Object.entries(parts)) {
+      for (const [name, { open, parts: shown, font, place, details }] of Object.entries(parts)) {
         for (const theme of ["light", "dark"] as const) {
           declare(`the ${name} opened in the ${theme} theme: its look${theme === "light" ? " and its DOM" : ""}`, async (args) => {
             await args.page.emulateMedia({ colorScheme: theme });
@@ -332,7 +336,7 @@ export function recordParts<A extends { page: Page }>(group: Grouping, declare: 
             await setTheme(args.page, theme);
             if (theme === "light") await expectBaseline(`${name}-${device}-dom`, await domOf(part, { omit: dom.omit, opaque: dom.opaque, replace: dom.replace?.(args) }));
             await expectBaseline(`${name}-${device}-${theme}`, await settledLook(args.page, part, shown, font, place?.(args)));
-          });
+          }, details ?? {});
         }
       }
     });

@@ -93,6 +93,8 @@ where the work is, what to do next and what done means. **What** is built and
   the DOM, a colour, a box by how many px; and why: the change meant, its cause
   in the commit); the user approves a group, not each file. A change the agent
   cannot explain is a regression: fixed first, never written anew.
+- **A commit of docs alone needs no `npm run verify`** (the user, 2026-11-27): it checks code, bundles and
+  changelogs, none of which such a commit touches; a commit with any code or test runs it, as the root CLAUDE.md says.
 - **At the end of a session**: *Progress* and *Notes for the next session*
   updated and committed (a `docs:` commit where the step is not done).
 
@@ -512,10 +514,11 @@ Editor 3). The rest of the plan leans on this step.
     for about 20 to 25 frames (some 0.4 s) between two places 11 px apart (SilverBullet's `.sb-table-widget` scrollLeft
     95 and 106 in a Pixel 7's window), then stays at either, so a popup opened is placed and clipped by where it stopped
     (2026-11-27; silverware-table/ui-tests/baselines/menus.spec.ts, "a cell whose text does not fit, edited: its table
-    scrolled to it once (known: …)"; the popup's baseline on a desktop alone till then). Seen only in Chrome's phone
-    emulation: a real phone to be checked by the user (step K). Not yet probed which two scrolls fight (candidates: the
-    adapter's `revealCell`, `scrollIntoView` nearest of a cell wider than the window, and the browser bringing the
-    edited field's caret into view). Expected still once the core places and reveals (steps 5 and 6).
+    scrolled to it once (known: …)"; the popup's baseline on a desktop alone till then). A real phone did not show it
+    (the user, 2026-11-27: the long cell edited, its row grown once to hold the text, nothing moving to and fro): fixed
+    last in step K, or dropped with the user. Not yet probed which two scrolls fight (candidates: the adapter's
+    `revealCell`, `scrollIntoView` nearest of a cell wider than the window, and the browser bringing the edited field's
+    caret into view). Expected still once the core places and reveals (steps 5 and 6).
   - Silverware Database's Properties dialog follows a change made elsewhere only as a place is drawn anew
     (`modules/properties/index.ts` `placeDrawn`; the peek has `host.onChanged` too), and a place shows a schema
     changed elsewhere without that: an open draft is not marked stale, its note says "Not saved yet" till Save, which
@@ -793,3 +796,5 @@ Editor 3). The rest of the plan leans on this step.
 - Silverware Table's filter bubble (the conditions under a filter's field) has no ×: on a phone it is hard to close
   (the user, 2026-11-27, trying the filter on a real phone). A close button of its own, as the menus' title has; not
   in this branch's steps.
+- Silverware Table's column width cannot be set on a phone (the user, 2026-11-27, on a real phone): the width handle
+  is a pointer's drag at a header's edge; a touch way to set it is to be made. Not in this branch's steps.

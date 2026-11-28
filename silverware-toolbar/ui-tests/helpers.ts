@@ -73,11 +73,12 @@ export const test = base.extend<{ favorites: Favorites | null }>({
   baseURL: async ({ baseURL }, use) => {
     await use(target === "silverbullet" ? `http://127.0.0.1:${server().port}/` : baseURL);
   },
-  page: async ({ page, favorites }, use, testInfo) => {
+  page: async ({ page, favorites, hasTouch }, use, testInfo) => {
     // A mouse's tests on a machine without touch, whatever this one has: a touchscreen or a pen makes Chromium report
     // touch points (navigator.maxTouchPoints 10 on a Windows machine with a digitizer), and the toolbar then offers
-    // what a finger needs (src/index.ts) as on a phone
-    if (testInfo.project.name !== "touch") await page.addInitScript(() => Object.defineProperty(Navigator.prototype, "maxTouchPoints", { get: () => 0 }));
+    // what a finger needs (src/index.ts) as on a phone. A phone emulated (the touch project, a baseline's phone) keeps
+    // its touch
+    if (!hasTouch) await page.addInitScript(() => Object.defineProperty(Navigator.prototype, "maxTouchPoints", { get: () => 0 }));
     // (A 404 allowed among them: a file's preview kept in the space looked for by Silverware Assets, as Assets' own
     // tests allow)
     const errors = pageErrors(page);

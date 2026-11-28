@@ -1,7 +1,7 @@
 // The editor's font size (docs/silverware-layout-font-size.md), in SilverBullet: the setting from the settings
 // dialog, Font zoom by Ctrl + scroll and Ctrl+0, its label, this device's zoom kept across a reload and Reset.
 import type { Page } from "@playwright/test";
-import { boxOf, expect, LAYOUT_SETTINGS, runCommand, test } from "./helpers.ts";
+import { boxOf, expect, LAYOUT_SETTINGS, reloadSpaceLua, runCommand, test } from "./helpers.ts";
 
 const PAGE = "# Page\n\nSome text to zoom.\n";
 // SilverBullet's theme's font size
@@ -50,6 +50,32 @@ test("Ctrl + scroll over the page: a pixel a step, its label naming the size and
   await expect.poll(() => fontSize(page)).toBe(THEME);
   await expect(label(page)).toHaveText(`Font size ${THEME} px · default`);
   // The text as it was: Ctrl+0 typed nothing
+  await expect(page.locator(".cm-line", { hasText: "Some text to zoom." })).toHaveText("Some text to zoom.");
+});
+
+test("after System: Reload a notch still a pixel, Ctrl+0 the default (no listener twice); this device's zoom kept", async ({ page, space }) => {
+  await space.open({ Page: PAGE }, "Page");
+  await runCommand(page, LAYOUT_SETTINGS);
+  await expect(page.locator(".swl-dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".swl-dialog")).toHaveCount(0);
+  await zoom(page, 1);
+  await expect.poll(() => fontSize(page)).toBe(THEME + 1);
+  await reloadSpaceLua(page);
+  // (Started again: its dialog shown by its command and closed, nothing left over the editor)
+  await runCommand(page, LAYOUT_SETTINGS);
+  await expect(page.locator(".swl-dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".swl-dialog")).toHaveCount(0);
+  await expect.poll(() => fontSize(page)).toBe(THEME + 1);
+  await zoom(page, 1);
+  await expect(label(page)).toHaveText(`Font size ${THEME + 2} px`);
+  // (Settled: the label gone after the last step, the size one pixel more, not two)
+  await expect(label(page)).toBeHidden({ timeout: 3000 });
+  expect(await fontSize(page)).toBe(THEME + 2);
+  await page.locator(".cm-line", { hasText: "Some text to zoom." }).click();
+  await page.keyboard.press("Control+0");
+  await expect.poll(() => fontSize(page)).toBe(THEME);
   await expect(page.locator(".cm-line", { hasText: "Some text to zoom." })).toHaveText("Some text to zoom.");
 });
 

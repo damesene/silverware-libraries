@@ -1,0 +1,17 @@
+[
+  "div.swl-menu.swl-popup [style=\"left,max-width,top\"]",
+  "  div [aria-label=\"Table\" role=\"menu\" tabindex=\"-1\"]",
+  "    div.swl-menu-title",
+  "      span.swl-menu-title-text [title=\"Table\"] \"Table\"",
+  "      button.swl-menu-close [aria-label=\"Close\" title=\"Close\" type=\"button\"]",
+  "        svg [aria-hidden=\"true\" svg=94a72995]",
+  "    div.swl-menu-segmented",
+  "      span.swl-label \"Align\"",
+  "      div.swl-segments [aria-label=\"Align\" role=\"group\"]",
+  "        button.swl-segment [aria-checked=\"false\" aria-label=\"Left\" role=\"menuitemradio\" title=\"Left\" type=\"button\"]",
+  "          svg [aria-hidden=\"true\" svg=81f03e18]",
+  "        button.swl-segment [aria-checked=\"true\" aria-label=\"Center (default)\" role=\"menuitemradio\" title=\"Center (default)\" type=\"button\"]",
+  "          svg [aria-hidden=\"true\" svg=4371f451]",
+  "        button.swl-segment [aria-checked=\"false\" aria-label=\"Right\" role=\"menuitemradio\" title=\"Right\" type=\"button\"]",
+  "          svg [aria-hidden=\"true\" svg=7c47bdfa]"
+]

@@ -2,7 +2,7 @@
 // a drop, File: Upload, a name taken, Cancel, a paste left to SilverBullet (text, a fenced block), the setting off, a
 // grid's cell's field.
 import type { Locator, Page } from "@playwright/test";
-import { expect, gridsDrawn, PIXEL_PNG, runCommand, test } from "./helpers.ts";
+import { cursorAfter, insertDialog as dialog, insertRows as rows, expect, gridsDrawn, PIXEL_PNG, runCommand, test, uploadReplaced } from "./helpers.ts";
 
 const PNG = PIXEL_PNG.toString("base64");
 type Given = { readonly name: string; readonly type: string };
@@ -33,27 +33,7 @@ async function drop(page: Page, x: number, y: number, files: readonly Given[]): 
   );
 }
 
-const dialog = (page: Page) => page.locator(".swa-dialog.swa-insert-window");
-const rows = (page: Page) => dialog(page).locator(".swa-insert-row");
 const pageText = (page: Page) => page.locator("#sb-main .cm-content");
-
-/** File: Upload as Silverware Assets replaces it: a command of Space Lua, once its init page ran (before: SilverBullet's own) */
-async function uploadReplaced(page: Page): Promise<void> {
-  await page.waitForFunction(() => {
-    // (As SilverBullet runs a command by its name: the commands its UI was told of last, a moment after Space Lua loads)
-    const client = (window as unknown as { client?: { ui?: { viewState?: { commands?: Map<string, { run?: unknown }> } } } }).client;
-    const command = client?.ui?.viewState?.commands?.get("File: Upload");
-    // (SilverBullet's own invokes its plug)
-    return !!command && !/\binvoke\(/.test(String(command.run));
-  });
-}
-
-/** The cursor at the end of a line of the page's text */
-async function cursorAfter(page: Page, text: string): Promise<void> {
-  const line = page.locator("#sb-main .cm-line", { hasText: text });
-  await line.click();
-  await page.keyboard.press("End");
-}
 
 test("an image pasted: the dialog, its name the time's in the page's folder, inserted as chosen, written into the space", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nBefore\n\nAfter\n" }, "Page");

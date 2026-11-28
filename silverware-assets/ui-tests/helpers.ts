@@ -154,3 +154,31 @@ async function keptPath(dir: string, name: string): Promise<string | undefined> 
   const found = files.find((file) => file.startsWith(`${base}.`) && file.endsWith(`.${extension}`) && /^\d+-\d+$/.test(file.slice(base.length + 1, -extension.length - 1)));
   return found && join(dir, found);
 }
+
+/** The insert dialog (a paste, a drop, File: Upload) and its rows, a file each */
+export const insertDialog = (page: Page) => page.locator(".swa-dialog.swa-insert-window");
+export const insertRows = (page: Page) => insertDialog(page).locator(".swa-insert-row");
+
+/** File: Upload as Silverware Assets replaces it: a command of Space Lua, once its init page ran (before: SilverBullet's own) */
+export async function uploadReplaced(page: Page, anew = false): Promise<void> {
+  // (After a load of Space Lua, `anew`: not the command of before, kept by the test as `swOldUpload`)
+  await page.waitForFunction((anew) => {
+    // (As SilverBullet runs a command by its name: the commands its UI was told of last, a moment after Space Lua loads)
+    const w = window as unknown as { client?: { ui?: { viewState?: { commands?: Map<string, { run?: unknown }> } } }; swOldUpload?: unknown };
+    const command = w.client?.ui?.viewState?.commands?.get("File: Upload");
+    // (SilverBullet's own invokes its plug)
+    if (!command || /\binvoke\(/.test(String(command.run))) return false;
+    if (!anew) {
+      w.swOldUpload = command;
+      return true;
+    }
+    return command !== w.swOldUpload;
+  }, anew);
+}
+
+/** The cursor at the end of a line of the page's text */
+export async function cursorAfter(page: Page, text: string): Promise<void> {
+  const line = page.locator("#sb-main .cm-line", { hasText: text });
+  await line.click();
+  await page.keyboard.press("End");
+}

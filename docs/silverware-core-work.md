@@ -524,6 +524,82 @@ Editor 3). The rest of the plan leans on this step.
      while a page is indexed again); decided 2026-11-27, its method in *Notes
      for the next session*' decision of that day; written here; compared after
      each conversion, the commit before and after run in one session.
+
+     **Measured (2026-11-28)**, on commit b2606910 with the bench specs (nothing of `src/` changed), an Intel i3-9100
+     (3 cores), Linux, Playwright 1.65.1's Chromium headless, SilverBullet 3.0.0 (Docker, `3.0.0-slim`); `--workers 1`,
+     nothing else running; each cell the median (least-most) of 5 after a warm-up, in ms.
+
+     *The playground's database* (`silverware-database/ui-tests/bench.spec.ts`): per action its time until the page
+     holds still 500 ms, the long tasks' sum, the nodes added and removed (the mutation records' own nodes: a view's
+     root redrawn counts as one). A calendar shows no Load more button (it lies in a day's cell, hidden where the day
+     shows none: "-"). `?big=N` has a date property `due` since (the calendar and the timeline place items by it): its
+     numbers are not like-for-like with those of 2026-11-22 (docs/silverware-database-formulas.md). `?pageSize=P` sets
+     `silverware.database.pageSize` (playground/database.ts).
+
+     | View | Items | At first | First draw: ms, long, nodes | Changed elsewhere | Filter key | Load more |
+     | --- | --- | --- | --- | --- | --- | --- |
+     | table | 1000 | 1000 | 447 (435-474), 389, 86 | 213 (210-214), 120, 10 | 192 (175-209), 92, 11 | - |
+     | list | 1000 | 1000 | 418 (396-810), 162, 86 | 143 (142-277), 82, 10 | 88 (85-89), 0, 11 | - |
+     | board | 1000 | 1000 | 375 (361-382), 101, 85 | 80 (78-86), 0, 8 | 52 (51-53), 0, 9 | - |
+     | calendar | 1000 | 1000 | 352 (348-359), 75, 85 | 60 (44-64), 0, 8 | 14 (13-34), 0, 9 | - |
+     | timeline | 1000 | 1000 | 429 (412-448), 202, 85 | 118 (114-122), 87, 8 | 54 (53-55), 0, 9 | - |
+     | table | 1000 | 50 | 354 (341-362), 78, 86 | 42 (35-50), 0, 10 | 20 (19-25), 0, 11 | 81 (63-105), 0, 12 |
+     | list | 1000 | 50 | 340 (339-358), 60, 87 | 46 (28-59), 0, 12 | 16 (16-19), 0, 13 | 63 (52-111), 0, 14 |
+     | board | 1000 | 50 | 353 (342-357), 64, 85 | 56 (41-64), 0, 8 | 18 (18-19), 0, 9 | 66 (52-92), 0, 10 |
+     | calendar | 1000 | 50 | 358 (340-370), 75, 85 | 54 (33-64), 0, 8 | 18 (14-21), 0, 9 | - |
+     | timeline | 1000 | 50 | 347 (343-365), 66, 85 | 55 (47-63), 0, 8 | 15 (14-15), 0, 9 | 39 (33-49), 0, 10 |
+     | table | 10000 | 10000 | 1501 (1488-1533), 3588, 86 | 2040 (2029-2050), 1158, 10 | 1480 (1477-1509), 1183, 11 | - |
+     | list | 10000 | 10000 | 1105 (1098-1115), 1276, 86 | 1320 (1313-1337), 744, 10 | 847 (843-857), 567, 11 | - |
+     | board | 10000 | 10000 | 739 (729-764), 618, 85 | 706 (697-729), 419, 8 | 570 (534-593), 406, 9 | - |
+     | calendar | 10000 | 10000 | 570 (568-636), 297, 85 | 255 (254-265), 234, 8 | 57 (57-62), 53, 9 | - |
+     | timeline | 10000 | 10000 | 1315 (1299-1360), 3336, 85 | 1082 (1067-1095), 1273, 8 | 526 (493-634), 441, 9 | - |
+     | table | 10000 | 50 | 502 (486-512), 226, 86 | 177 (151-183), 153, 10 | 33 (33-36), 0, 11 | 99 (82-112), 59, 12 |
+     | list | 10000 | 50 | 492 (483-553), 210, 87 | 184 (156-187), 160, 12 | 33 (29-37), 0, 13 | 96 (70-105), 0, 14 |
+     | board | 10000 | 50 | 503 (491-518), 223, 85 | 188 (169-199), 160, 8 | 35 (35-38), 0, 9 | 87 (69-99), 0, 10 |
+     | calendar | 10000 | 50 | 588 (570-613), 294, 85 | 260 (236-307), 238, 8 | 58 (56-61), 56, 9 | - |
+     | timeline | 10000 | 50 | 521 (495-530), 223, 85 | 191 (186-197), 171, 8 | 34 (33-36), 0, 9 | 74 (52-100), 0, 10 |
+
+     *The playground's table* (`silverware-table/ui-tests/bench.spec.ts`, its benchmark panel: 8 columns, a calculated
+     column, a totals row): "shown", from the press or key to the frame painted after the table shows it (the last row
+     drawn; the cell's text saved), measured in the page; "work", Silverware Table's own as the panel's log sums it
+     (its "shown after" is not taken: it grows with every later entry of the action). The cell edited by a double
+     click, a key, Enter.
+
+     | Rows | Generated: shown | Generated: work | Cell edited: shown | Cell edited: work |
+     | --- | --- | --- | --- | --- |
+     | 1000 | 1236 (1224-1259) | 284 (281-315) | 1410 (1401-1432) | 376 (365-379) |
+     | 10000 | 15875 (15727-16030) | 2786 (2776-2873) | 14670 (14058-15031) | 3840 (3367-3938) |
+
+     *SilverBullet's database* (`silverware-database/ui-tests/sbbench.spec.ts`, 1000 items): per action its time until
+     the page's content holds still (2 s for the page opened, loaded anew, and an item changed elsewhere, its page written
+     through SilverBullet; 500 ms for a key typed in the name's filter and the filter kept by Enter, "Written"), the long
+     tasks' sum, and the places and the views' bodies added (each a widget or a view drawn whole; a view's own update in
+     place adds neither). Between runs the filter is taken off again once its write is on disk. Read: a change elsewhere
+     draws nothing anew (0/0: the view updates in place; the list's least 0, one run where nothing changed in 2 s); a
+     write draws one place and two bodies (the still copy, then the view); opened includes SilverBullet's own load.
+
+     | View | Items | At first | Opened | Changed elsewhere | Filter key | Written |
+     | --- | --- | --- | --- | --- | --- | --- |
+     | table | 1000 | 1000 | 2008 (1962-2416), 1013, 1/1 | 378 (373-566), 522, 0/0 | 378 (376-468), 305, 0/0 | 187 (180-210), 278, 1/2 |
+     | list | 1000 | 1000 | 1654 (1623-1741), 663, 1/1 | 752 (0-777), 567, 0/0 | 212 (209-285), 166, 0/0 | 120 (108-124), 148, 1/2 |
+     | board | 1000 | 1000 | 1341 (1329-1386), 359, 1/1 | 193 (177-217), 79, 0/0 | 72 (71-78), 0, 0/0 | 50 (45-70), 58, 1/2 |
+     | calendar | 1000 | 1000 | 1221 (1172-1232), 231, 1/1 | 145 (141-160), 0, 0/0 | 13 (12-14), 0, 0/0 | 37 (32-46), 0, 1/2 |
+     | timeline | 1000 | 1000 | 1560 (1516-1599), 573, 1/1 | 304 (296-308), 147, 0/0 | 119 (115-121), 59, 0/0 | 108 (101-121), 110, 1/2 |
+     | table | 1000 | 50 | 1230 (1213-1356), 182, 1/1 | 146 (135-156), 0, 0/0 | 16 (15-18), 0, 0/0 | 52 (49-61), 63, 1/2 |
+     | list | 1000 | 50 | 1124 (1080-1228), 253, 1/1 | 145 (129-154), 0, 0/0 | 11 (11-17), 0, 0/0 | 38 (36-40), 0, 1/2 |
+     | board | 1000 | 50 | 1244 (1091-1269), 236, 1/1 | 141 (136-143), 0, 0/0 | 11 (10-12), 0, 0/0 | 33 (33-38), 0, 1/2 |
+     | calendar | 1000 | 50 | 1244 (1131-1356), 247, 1/1 | 144 (140-159), 0, 0/0 | 13 (12-16), 0, 0/0 | 39 (34-42), 0, 1/2 |
+     | timeline | 1000 | 50 | 1111 (1072-1234), 182, 1/1 | 153 (137-179), 0, 0/0 | 18 (17-31), 0, 0/0 | 43 (40-43), 0, 1/2 |
+
+     Found while measuring (not a bug of the benchmark): a filter changed again before the place is drawn anew from its
+     last write compares with the block as it was, so taking off a filter just kept writes nothing and the earlier
+     write lands after (timeline, 1000 items, every time: the field shows no filter, the page keeps `{"name":"1"}`;
+     core/place.ts `setFilter` against `keptFilter()`). Not in *Known* yet: its test needs the write held back until the
+     second change (seen only where drawing anew is slow); reported to the user, for step K.
+
+     Left out: a board's drag's frames (a drag in Playwright moves by steps of its own, not a hand's: its frames would
+     measure the steps). Before and after each conversion (step 10) these are run again on the commits before and
+     after, in one session, and compared with each other, never with these.
   Stored screenshots (docs/silverware-look-compare.md, its second kind: a few
   scenes, Linux in Docker, refreshed only on purpose) only if the look and
   geometry baselines let something through.

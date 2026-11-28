@@ -63,8 +63,10 @@ const ui = {
   notify: (message: string, options?: { readonly type?: "info" | "error" }) => flash(message, options?.type ?? "info"),
   ask: (message: string) => confirm(message),
 };
-// The views' settings, as SilverBullet's config would give them
-const settings = { get: (_path: string, fallback: unknown) => fallback };
+// The views' settings, as SilverBullet's config would give them (`?pageSize=N`: the items a view shows at first, for a
+// measuring script; else the default)
+const PAGE_SIZE = Number(new URLSearchParams(location.search).get("pageSize") ?? 0);
+const settings = { get: (path: string, fallback: unknown) => (path === "silverware.database.pageSize" && PAGE_SIZE > 0 ? PAGE_SIZE : fallback) };
 
 let store: MemoryStore;
 // Its items with their formulas' values: what the places and the modules read, as in SilverBullet
@@ -101,11 +103,13 @@ function bigDatabase(count: number): (typeof SAMPLE_DATABASES)[number] {
         { key: "price", label: "Price", type: "number", params: {}, readonly: false },
         { key: "hours", label: "Hours", type: "number", params: {}, readonly: false },
         { key: "status", label: "Status", type: "select", params: { options: ["Todo", "Doing", "Done"] }, readonly: false },
+        // (A date, for the calendar and the timeline: the items over November's days)
+        { key: "due", label: "Due", type: "date", params: {}, readonly: false },
         { key: "total", label: "Total", type: "formula", params: { formula: "=[@qty]*[@price]", resultType: "number" }, readonly: true },
         { key: "share", label: "Share", type: "formula", params: { formula: "=[@hours]/SUM([hours])" }, readonly: true },
       ],
     },
-    items: Array.from({ length: count }, (_, i) => ({ name: `Item ${i}`, values: { qty: (i * 7) % 13, price: (i % 5) + 1, hours: (i % 9) + 1, status: ["Todo", "Doing", "Done"][i % 3]! }, rank: ranks[i] })),
+    items: Array.from({ length: count }, (_, i) => ({ name: `Item ${i}`, values: { qty: (i * 7) % 13, price: (i % 5) + 1, hours: (i % 9) + 1, status: ["Todo", "Doing", "Done"][i % 3]!, due: `2026-11-${String((i % 30) + 1).padStart(2, "0")}` }, rank: ranks[i] })),
   };
 }
 

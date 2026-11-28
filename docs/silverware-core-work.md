@@ -109,7 +109,7 @@ where the work is, what to do next and what done means. **What** is built and
 | --- | --- | --- |
 | 0 | The plans | done (2026-11-25) |
 | S | The safety net: tests against today's code | done (2026-11-28; the lists left of items 2 to 4: *Next* 3; item 6's numbers in item 6) |
-| 1 | The core's skeleton, the gate, `requires:`, build and tests | in progress (2026-11-28): the core 1.0.0 confirmed by the user, its changelog's first entry with it |
+| 1 | The core's skeleton, the gate, `requires:`, build and tests | done but the hand check (2026-11-28): the core 1.0.0 confirmed by the user, its changelog's first entry with it; pushed; Library: Install by hand is the user's (*Where the work stands*) |
 | 2 | Preact in the core, `.tsx` everywhere | not started |
 | A | Checkpoint A | |
 | 3 | The formulas' registries (G), P1 | not started |
@@ -133,6 +133,24 @@ P1 to P3 and I1 to I6 its *API changes*.
 ### Where the work stands and what is next (2026-11-28)
 
 Read this first; the dated entries below are the record of what each item did and found.
+
+- **Step 1 (2026-11-28)**: its whole *Scope* done and pushed (commits `feat(core)`, `test`, `test(core)` of that day).
+  Every plugin starts through its gate (silverware-core/ui-tests/gate.spec.ts: with the core; no core, 0.9.0, 2.0.0,
+  each plugin's message told once, its API's stubs refusing alike, no command, no table drawn; the toolbar alone
+  refused, Assets and Layout starting without its `defineActions`), 10 runs each green; the full `test:ui:sb` (937
+  passed) and `test:ui` (324 passed) green with it; two reviews by fresh agents, their findings fixed. **Left, the
+  user's**: Library: Install of a plugin from the pushed branch's GitHub URI installs the core by its `../`
+  requirement (step 1's *Done when*); asked of the user, then step 1 done in *Progress*. Found, not verified:
+  - Whether Library: Update All installs a core **not installed** (a plugin installed before the core existed): the
+    gate's message and the core's library page tell the user so. Checked with the hand check above; where it does
+    not, the message is changed (in scripts/coregate.mjs) before any release.
+  - The bundle's external `./silverware-core.js` (scripts/build.mjs) being the same module instance as the gate's
+    `js.importFromSpace("Library/damesene/silverware-core.js")`: nothing imports the core's code yet, so step 2's
+    first import checks it (one instance per window, docs/silverware-core.md).
+  - With no core, the twelve plugins' notifications stack (one each), and each load of Space Lua while refused tells
+    them again (the gate runs anew): seen, left as it is (the user's to decide, at release).
+  - check-build's gate checks (scripts/coregate.mjs `validateGuarded`, `validateOthersTaken`) read each line of the
+    pages: a guard goes on its `if`'s line, another plugin's function named whole (silverware-core/CLAUDE.md).
 
 - **Done and pushed** (branch `silverware-core`, each a commit of its own): step S items 1 to 4, and item 5 for
   Silverware Database (`silverware-database/ui-tests/baselines/views.spec.ts`, `overlays.spec.ts`, `dialogs.spec.ts`,

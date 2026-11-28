@@ -89,8 +89,8 @@ where the work is, what to do next and what done means. **What** is built and
     pushes of `silverware-core`, asked for by the user).
 - **Step S's rest and step 1 run on without stopping** (the user, 2026-11-28: "unless something truly needs deciding,
   do the whole of step 1 autonomously"): step S's stop (*Next* 5) becomes a report of the *Known* list, not a wait;
-  step 1's commits are pushed to `silverware-core` as step S's are. What still waits for the user: the core's version
-  and its changelog's first entry (the root CLAUDE.md), a baseline changed (shown by groups, above), a lock, a change
+  step 1's commits are pushed to `silverware-core` as step S's are. What still waits for the user (the core's version
+  and its changelog's first entry confirmed, 2026-11-28: 1.0.0 and the entry drafted, its date that of the release): a baseline changed (shown by groups, above), a lock, a change
   of what a space has, a deviation from the plans; and Library: Install checked by hand, which only the user can do.
 - **A baseline that changed is shown to the user by groups** (decided with the
   user, 2026-11-27, for step 1 on): for each commit that changes baselines, a
@@ -108,8 +108,8 @@ where the work is, what to do next and what done means. **What** is built and
 | Step | What | State |
 | --- | --- | --- |
 | 0 | The plans | done (2026-11-25) |
-| S | The safety net: tests against today's code | in progress: items 1 to 4 done (their lists that steps 3 to 5 change: *Next* 3), 5 done (2026-11-28; the lists left of items 2 to 4: *Next* 3, item 6: *Next* 4) |
-| 1 | The core's skeleton, the gate, `requires:`, build and tests | not started |
+| S | The safety net: tests against today's code | done (2026-11-28; the lists left of items 2 to 4: *Next* 3; item 6's numbers in item 6) |
+| 1 | The core's skeleton, the gate, `requires:`, build and tests | in progress (2026-11-28): the core 1.0.0 confirmed by the user, its changelog's first entry with it |
 | 2 | Preact in the core, `.tsx` everywhere | not started |
 | A | Checkpoint A | |
 | 3 | The formulas' registries (G), P1 | not started |
@@ -330,9 +330,10 @@ Read this first; the dated entries below are the record of what each item did an
      the step that changes them: Remove of several, the subtags' options, Page tags and the panel's + and − with Undo,
      a custom operation's Undo, Add to and Remove from pages.
   4. **Item 6** (the decision above): the playground's benchmark and SilverBullet's, their first numbers written.
-  5. Step S done: *Progress* updated, then **stop for the user**: show the *Known* list and what was left for later
-     steps, and wait. A `docs:` commit; then **step 1** (its section below). From step 1 on a push is asked for
-     again each time (*Stop and ask*).
+     **Done** (2026-11-28): numbers in step S, item 6; a race of a database's filter found by it written there.
+  5. Step S done: *Progress* updated, the *Known* list reported to the user (not a wait, *Rules*: step S's rest and
+     step 1 run on). **Done** (2026-11-28). Then **step 1** (its section below), its commits pushed to
+     `silverware-core`.
 - **How each unit of work is done** (the user's way, agreed 2026-11-26), one unit (a test file, a part of an item) at
   a time:
   1. Write it; run it once (`npm run test:ui:sb -- <file>`: it starts SilverBullet's test servers in Docker itself,

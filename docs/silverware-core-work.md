@@ -159,6 +159,13 @@ Read this first; the dated entries below are the record of what each item did an
   `<plugin>/ui-tests/baselines/<plugin>.spec.ts`, *Next* 2): item 5 done; and the shared baseline code with a part's
   place (*Next* 1). Fifteen known bugs are marked, in sixteen tests (step S, *Known*;
   `grep -rn "test.fail(" */ui-tests`).
+- **Decided with the user (2026-11-28)**: the rendering baselines stay text, never screenshots: the DOM is a public
+  surface (a theme's selectors: docs/silverware-preact.md, *Choice*, *Risks*), which a picture does not guard, and
+  pixels differ between machines (on Windows the tests run against SilverBullet's release, not Docker). What text
+  did not see, a control **covered** by another element (a layer's z-index, another plugin's overlay) or **clipped**
+  by an ancestor, is recorded as text from step 6 on, its first unit (step 6, *Scope*): the overlays' layers change
+  there. A baseline failing with nothing changed is written down here, each time; a part failing so again has what
+  it records narrowed there alone, never everywhere.
 - **Decided with the user (2026-11-27)**, after a review of the first answers against the plans and the code:
   - **Item 5 records every dialog, menu and floating list a later step changes, now**, before step 1: steps 1 to 5
     already reach them (step 3 the function dialog's list and help; step 4 every settings dialog, through
@@ -826,7 +833,17 @@ Editor 3). The rest of the plan leans on this step.
 
 ### 6. Overlays in the core (2 to 3 weeks)
 
-- **Scope**: first, what step S left for this step recorded against today's
+- **Scope**: first, **what each key element of a part shows recorded in the rendering baselines** (decided with the
+  user, 2026-11-28; *Where the work stands*), against today's code, before anything here moves a layer: in
+  scripts/ui-test-baselines.ts, beside `lookOf`'s boxes, for each key element a line of whether it is seen, read
+  once the look settled (`settledLook`): `covered` where the element at its box's centre (`elementFromPoint`, through
+  open shadow roots as shared/shadow.ts reads them) is neither it nor inside it, naming the element over it (its tag
+  and classes); `clipped` where its box is not whole within the window and within each ancestor that clips
+  (`overflow` other than `visible`), with the side; else `seen`. An element hidden on purpose (`display: none`, out of
+  the part's view) recorded as such, not measured. Text, as the baselines are: no screenshots (the user's choice,
+  2026-11-28). Its own unit tests (an element covered, one clipped by a scrolling ancestor, one in a shadow root);
+  then every baseline written anew once, in a commit of its own, its diff (the new lines alone, nothing else
+  changed) shown to the user. Then what step S left for this step recorded against today's
   code (decided 2026-11-27): item 3's stackings left (Properties' own menus
   over its dialog, a filter or sort tool's menu, Silverware Table's choices
   list, cell popup, formula hint and fill tip, Silverware Layout's Move to grid

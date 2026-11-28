@@ -167,6 +167,7 @@ export const test = base.extend({
         await rm(join(server().space, `${name}.md`), { force: true });
         await rm(join(server().space, `${SETTINGS_PAGE}.md`), { force: true });
         for (const other of otherPagesOf.get(page) ?? []) await rm(join(server().space, `${other}.md`), { force: true });
+        for (const file of otherFilesOf.get(page) ?? []) await rm(join(server().space, file), { force: true });
       }
     }
   },
@@ -357,6 +358,19 @@ export async function setOtherPage(page: Page, name: string, text: string): Prom
   }
 }
 const otherPagesOf = new WeakMap<Page, string[]>();
+
+/**
+ * Writes a file of the space that is no page (a script's JS module, `Library/…/functions.js`), gone after the test:
+ * SilverBullet only, before a page's block imports it (a file new to it, read as imported)
+ */
+export async function setOtherFile(page: Page, path: string, text: string): Promise<void> {
+  if (target !== "silverbullet") return;
+  otherFilesOf.set(page, [...(otherFilesOf.get(page) ?? []), path]);
+  const at = join(server().space, path);
+  await mkdir(dirname(at), { recursive: true });
+  await writeFile(at, text);
+}
+const otherFilesOf = new WeakMap<Page, string[]>();
 
 /** A table enhanced by Silverware Table, by its place on the page (0: Fruit) */
 export const table = (page: Page, index = 0): Locator => page.locator(".sb-table-widget.swt-table").nth(index);

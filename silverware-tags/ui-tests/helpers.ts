@@ -18,9 +18,9 @@ import { SAMPLE_PAGES } from "../../playground/tags-sample.ts";
 import { configFile, silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
-import { commandDefined, ON_TOP, onTopAt, reloadSpaceLua } from "../../scripts/ui-test-helpers.ts";
+import { commandDefined, expectNoPageErrorsYet, gatherPageErrors, ON_TOP, onTopAt, reloadSpaceLua } from "../../scripts/ui-test-helpers.ts";
 
-export { commandDefined, expect, ON_TOP, onTopAt, reloadSpaceLua };
+export { commandDefined, expect, expectNoPageErrorsYet, ON_TOP, onTopAt, reloadSpaceLua };
 
 const target = process.env.SW_TARGET === "silverbullet" ? "silverbullet" : "playground";
 export const onSilverBullet = target === "silverbullet";
@@ -41,6 +41,8 @@ export const test = base.extend({
   },
   page: async ({ page }, use) => {
     const errors: string[] = [];
+    // (Read by `expectNoPageErrorsYet` too, before a known bug's mark)
+    gatherPageErrors(page, errors);
     // (Read by its stack: SilverBullet's own, as it starts, thrown in its client alone)
     page.on("pageerror", (e) => void (silverBulletsOwnError(e.stack ?? e.message) || errors.push(e.message)));
     page.on("console", (m) => {

@@ -108,7 +108,7 @@ where the work is, what to do next and what done means. **What** is built and
 | Step | What | State |
 | --- | --- | --- |
 | 0 | The plans | done (2026-11-25) |
-| S | The safety net: tests against today's code | in progress: items 1 to 4 done (their lists that steps 3 to 5 change: *Next* 3), 5 in progress: Silverware Database and Silverware Table done (2026-11-28), the narrowed units of Chart, Layout, Assets, Tags and Toolbar left (*Next* 2) |
+| S | The safety net: tests against today's code | in progress: items 1 to 4 done (their lists that steps 3 to 5 change: *Next* 3), 5 done (2026-11-28; the lists left of items 2 to 4: *Next* 3, item 6: *Next* 4) |
 | 1 | The core's skeleton, the gate, `requires:`, build and tests | not started |
 | 2 | Preact in the core, `.tsx` everywhere | not started |
 | A | Checkpoint A | |
@@ -137,8 +137,9 @@ Read this first; the dated entries below are the record of what each item did an
 - **Done and pushed** (branch `silverware-core`, each a commit of its own): step S items 1 to 4, and item 5 for
   Silverware Database (`silverware-database/ui-tests/baselines/views.spec.ts`, `overlays.spec.ts`, `dialogs.spec.ts`,
   `menus.spec.ts`, `properties.spec.ts`, `editors.spec.ts`: done, *Next* 2) and for Silverware Table's dialogs and
-  menus (`silverware-table/ui-tests/baselines/`, *Next* 2), and the shared baseline code with a part's place (*Next*
-  1). Fifteen known bugs are marked, in sixteen tests (step S, *Known*;
+  menus (`silverware-table/ui-tests/baselines/`, *Next* 2), and for Chart, Layout, Assets, Tags and Toolbar (each
+  `<plugin>/ui-tests/baselines/<plugin>.spec.ts`, *Next* 2): item 5 done; and the shared baseline code with a part's
+  place (*Next* 1). Fifteen known bugs are marked, in sixteen tests (step S, *Known*;
   `grep -rn "test.fail(" */ui-tests`).
 - **Decided with the user (2026-11-27)**, after a review of the first answers against the plans and the code:
   - **Item 5 records every dialog, menu and floating list a later step changes, now**, before step 1: steps 1 to 5
@@ -287,6 +288,35 @@ Read this first; the dated entries below are the record of what each item did an
      target never at once** (the root CLAUDE.md): a re-record started beside a `--repeat-each` run failed both.
   3. **The lists left of items 2 to 4 that steps 3 to 5 change** (the decision above), each in the plugin's own
      `ui-tests/` beside the item's other tests (`reload.spec.ts`, `writes.spec.ts`, `undo.spec.ts`, `hosts.spec.ts`).
+     What the tests had of each (read 2026-11-28; the new test goes where it says):
+     - Silverware Table's functions and sources across System: Reload: no UI test (unit tests alone:
+       `features/formulas.test.ts`, `host/silverbullet/sources.test.ts`). In `silverware-table/ui-tests/reload.spec.ts`,
+       with `sources.spec.ts`' `defineSources`, `SAMPLE_SOURCES` and its `=COUNTIFS(@tasks[done], "FALSE")`; functions
+       by a `Library/` page calling `silverware.table.defineFunctions` (no helper yet).
+     - Silverware Icons' `defineSets` after a reload: none. In `silverware-icons/ui-tests/reload.spec.ts`; its `open`
+       writes under `UiIcons/` alone, so a `Library/` page needs a writer and its cleanup in its helpers.
+     - Silverware Database's press beside its block: `database.spec.ts` (five points, without a reload) asserts the
+       place shown and no fence alone. Missing: the caret and focus after it, the page unchanged, and after a reload.
+       In `silverware-database/ui-tests/reload.spec.ts`.
+     - Silverware Tags' panel across a reload: none (the manager alone). In `silverware-tags/ui-tests/reload.spec.ts`
+       (`panelRow`, `panelAction`, `openManager`): a row opened gives one manager.
+     - Silverware Layout's font zoom: `fontsize.spec.ts` exact (a pixel a step, the label, Ctrl+0), a browser reload
+       alone. Missing: a step after System: Reload (a listener twice: two px a notch). In `fontsize.spec.ts`.
+     - Silverware Assets' File: Upload: `insert.spec.ts` exact. Missing: one dialog after System: Reload, none told;
+       the setting off. In `silverware-assets/ui-tests/reload.spec.ts` (`uploadReplaced`, `dialog`, `rows` moved from
+       `insert.spec.ts` to helpers).
+     - Silverware Chart: `writes.spec.ts` has the Type menu on the second of two blocks alike and Save with nothing
+       changed, exact; a settings Save that changes something only by fragments (`chart.spec.ts`). Missing: the whole
+       page after such a Save, on the first and on the second of two blocks alike. In `writes.spec.ts`.
+     - Silverware Tags' operations with Undo: `undo.spec.ts` exact for Remove, merge, Cleanup's merge, by page.
+       Missing (item 4's own list): Rename exact, Remove of several, the subtags' options, Page tags, the panel's + and
+       −, the Undo command, a custom operation's, Undo of a page changed since, Add to and Remove from pages. In
+       `undo.spec.ts` (`writtenThenUndone`).
+     - Silverware Editor's keys: hosts are a grid's cell and the peek (Silverware Table's cell is not the editor).
+       Ctrl+Z and Ctrl+Y in the grid (the editor not ensured), Ctrl+Z alone in the peek; a press beside, by
+       fragments; Ctrl+Enter in neither (the grid binds `Mod-Enter` to leave; the peek passes keys: today's to record);
+       the notice of a kept key in the grid, in the peek only in its name's plain input. In
+       `silverware-editor/ui-tests/hosts.spec.ts`, the editor ensured (its "opened again until it is the editor").
   4. **Item 6** (the decision above): the playground's benchmark and SilverBullet's, their first numbers written.
   5. Step S done: *Progress* updated, then **stop for the user**: show the *Known* list and what was left for later
      steps, and wait. A `docs:` commit; then **step 1** (its section below). From step 1 on a push is asked for

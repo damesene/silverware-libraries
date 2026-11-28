@@ -43,7 +43,11 @@ export const test = base.extend<{ open: (text: string) => Promise<void> }>({
       expect(errors, "errors in the page").toEqual([]);
     } finally {
       await page.close();
-      if (onSilverBullet) await rm(join(server().space, FOLDER), { recursive: true, force: true });
+      if (onSilverBullet) {
+        await rm(join(server().space, FOLDER), { recursive: true, force: true });
+        // (A test's own files of Space Lua, under the real Library/: `inLibrary`)
+        await rm(join(server().space, "Library", FOLDER), { recursive: true, force: true });
+      }
     }
   },
   open: async ({ page }, use) => {
@@ -63,4 +67,16 @@ export const picker = (page: Page): Locator => page.locator("#picker .swi-picker
 /** The values of the icons shown, in order */
 export function shownValues(page: Page): Promise<string[]> {
   return picker(page).locator(".swi-item").evaluateAll((items) => items.map((item) => (item as HTMLElement).dataset.swiValue ?? ""));
+}
+
+/**
+ * Files written under the space's real Library/ (`Library/UiIcons/<name>`, where SilverBullet runs Space Lua), removed
+ * after the test; Space Lua loaded again to take a new block (`reloadSpaceLua`)
+ */
+export async function inLibrary(files: Readonly<Record<string, string>>): Promise<void> {
+  for (const [name, text] of Object.entries(files)) {
+    const path = join(server().space, "Library", FOLDER, name);
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, text);
+  }
 }

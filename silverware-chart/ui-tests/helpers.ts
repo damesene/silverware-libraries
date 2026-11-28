@@ -10,7 +10,7 @@ import { test as base, expect, type Page } from "@playwright/test";
 import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { silverBulletsOwnError } from "../../scripts/silverbullet-noise.ts";
-import { appendToPage, ON_TOP, onTopAt, reloadSpaceLua } from "../../scripts/ui-test-helpers.ts";
+import { appendToPage, gatherPageErrors, ON_TOP, onTopAt, reloadSpaceLua } from "../../scripts/ui-test-helpers.ts";
 
 export { appendToPage, expect, ON_TOP, onTopAt, reloadSpaceLua };
 
@@ -27,6 +27,8 @@ export const test = base.extend<{ open: (text: string) => Promise<void> }>({
   page: async ({ page }, use) => {
     test.skip(!onSilverBullet, "charts are drawn by SilverBullet's code widgets: tested against SilverBullet only");
     const errors: string[] = [];
+    // (Read by `expectNoPageErrorsYet` too, before a known bug's mark)
+    gatherPageErrors(page, errors);
     // (Read by its stack: SilverBullet's own, as it starts, thrown in its client alone)
     page.on("pageerror", (e) => void (silverBulletsOwnError(e.stack ?? e.message) || errors.push(e.message)));
     page.on("console", (m) => {

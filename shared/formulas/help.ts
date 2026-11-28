@@ -23,7 +23,7 @@ export const REFERENCE_HELP: FormulaHelp = {
 };
 
 // After these a reference can follow: clicking the table inserts one there
-const BEFORE_OPERAND = new Set(["=", "(", ",", ";", "+", "-", "*", "/", "^", "&", "<", ">"]);
+const BEFORE_OPERAND: ReadonlySet<string> = new Set(["=", "(", ",", ";", "+", "-", "*", "/", "^", "&", "<", ">"]);
 
 // A reference inserted by pointing at the table, and where it was inserted
 export type PointedSpan = { readonly from: number; readonly to: number; readonly text: string };

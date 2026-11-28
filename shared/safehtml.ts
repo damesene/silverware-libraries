@@ -14,7 +14,7 @@ const UNSAFE = "script, iframe, object, embed, frame, frameset, base, meta, link
 // A value that is a script's URL (spaces and control characters, which a browser skips, taken out first)
 const SCRIPT_URL = /^(javascript|vbscript):/i;
 // Attributes that hold a document of their own
-const DOCUMENT_ATTRIBUTES = new Set(["srcdoc"]);
+const DOCUMENT_ATTRIBUTES: ReadonlySet<string> = new Set(["srcdoc"]);
 // A URL in a style that is not data (loaded from elsewhere: what was shown told to another server)
 const OUTSIDE_URL = /url\(\s*(['"]?)(?!\s*data:)[^)]*\)/gi;
 

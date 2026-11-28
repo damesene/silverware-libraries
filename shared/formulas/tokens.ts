@@ -22,7 +22,7 @@ export type Token =
 
 export const REF_ERROR = "#REF!";
 
-const OPERATORS = ["<=", ">=", "<>", "+", "-", "*", "/", "^", "&", "=", "<", ">", "(", ")", ",", ";", ":", "%"];
+const OPERATORS: readonly string[] = ["<=", ">=", "<>", "+", "-", "*", "/", "^", "&", "=", "<", ">", "(", ")", ",", ";", ":", "%"];
 
 // [@[a]:[b]] and [@[a]]: columns written in brackets of their own, after @
 const THIS_ROW_RANGE_RE = /^\[\s*@\s*\[([^\]]*)\](?:\s*:\s*\[([^\]]*)\])?\s*\]/;

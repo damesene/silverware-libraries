@@ -293,7 +293,7 @@ export function callsCustomFunctions(cells: FormulaCells, table: TableModel): bo
 }
 
 // Functions whose result is not of their arguments alone: of the time, of chance
-const VOLATILE = new Set(["TODAY", "NOW", "RAND", "RANDBETWEEN"]);
+const VOLATILE: ReadonlySet<string> = new Set(["TODAY", "NOW", "RAND", "RANDBETWEEN"]);
 
 /**
  * Whether a formula's result is of what it reads alone: every function it calls built in (a custom one is defined

@@ -26,7 +26,7 @@ export const CORE: Owner = "core";
  */
 export type Attributes = ReadonlyMap<Owner, ReadonlyMap<string, string>>;
 
-export const NO_ATTRIBUTES: Attributes = new Map();
+export const NO_ATTRIBUTES: ReadonlyMap<Owner, ReadonlyMap<string, string>> = new Map();
 
 /** A cell: its content in the cell language (inline markdown, unescaped: `|` is `|`), and its attributes */
 export type ModelCell = { readonly content: string; readonly attributes: Attributes };

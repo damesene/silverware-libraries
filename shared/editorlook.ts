@@ -11,7 +11,7 @@ const HASHTAG = "#swlsample";
 export const LOOK_SAMPLE = `- [ ] a\n- [x] b\n\n${HASHTAG}\n\n| c |\n|---|\n| d |`;
 
 // What makes a box's look, and its mark's
-const BOX = [
+const BOX: readonly string[] = [
   "appearance", "box-sizing", "display", "position", "width", "height", "margin-top", "margin-right", "margin-bottom", "margin-left",
   "padding-top", "padding-right", "padding-bottom", "padding-left", "border-top-width", "border-right-width", "border-bottom-width",
   "border-left-width", "border-top-style", "border-right-style", "border-bottom-style", "border-left-style", "border-top-color",
@@ -19,14 +19,14 @@ const BOX = [
   "border-bottom-right-radius", "border-bottom-left-radius", "background-color", "background-image", "color", "accent-color",
   "vertical-align", "font-size",
 ];
-const MARK = [
+const MARK: readonly string[] = [
   "content", "display", "position", "box-sizing", "left", "top", "right", "bottom", "width", "height", "border-top-width",
   "border-right-width", "border-bottom-width", "border-left-width", "border-top-style", "border-right-style",
   "border-bottom-style", "border-left-style", "border-top-color", "border-right-color", "border-bottom-color",
   "border-left-color", "background-color", "transform",
 ];
 // What makes a hashtag's look (its place in the line too: padding, margin)
-const TAG = [
+const TAG: readonly string[] = [
   "color", "background-color", "border-top-width", "border-right-width", "border-bottom-width", "border-left-width", "border-top-style",
   "border-right-style", "border-bottom-style", "border-left-style", "border-top-color", "border-right-color", "border-bottom-color",
   "border-left-color", "border-top-left-radius", "border-top-right-radius", "border-bottom-right-radius", "border-bottom-left-radius",
@@ -35,7 +35,7 @@ const TAG = [
 ];
 
 // What makes a table's cell's look (its header's alike): its text, its room, its ground, its line under it
-const TABLE_CELL = [
+const TABLE_CELL: readonly string[] = [
   "font-size", "font-weight", "line-height", "color", "background-color", "padding-top", "padding-right", "padding-bottom", "padding-left",
   "border-bottom-width", "border-bottom-style", "border-bottom-color", "text-transform", "letter-spacing",
 ];

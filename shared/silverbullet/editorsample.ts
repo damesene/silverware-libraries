@@ -11,17 +11,17 @@ import type { EditorLook, LookProperties } from "../editor.ts";
 import { readProperties, readSample } from "../editorlook.ts";
 
 // What makes a heading's line, its text's colour on its own element
-const HEADING = ["font-size", "font-weight", "letter-spacing", "line-height", "padding-top", "padding-bottom"];
-const STRONG = ["font-weight"];
+const HEADING: readonly string[] = ["font-size", "font-weight", "letter-spacing", "line-height", "padding-top", "padding-bottom"];
+const STRONG: readonly string[] = ["font-weight"];
 // (No colour of code's: SilverBullet's is a code block's text in no language, not its language's parts nor inline code)
-const INLINE_CODE = [
+const INLINE_CODE: readonly string[] = [
   "font-family", "font-size", "font-size-adjust", "line-height", "background-color", "border-top-left-radius", "border-top-right-radius",
   "border-bottom-right-radius", "border-bottom-left-radius", "padding-top", "padding-right", "padding-bottom", "padding-left",
 ];
-const CODE_LINE = ["font-family", "font-size-adjust", "background-color", "padding-left", "padding-right"];
-const RULE = ["border-top-width", "border-top-style", "border-top-color", "margin-top", "margin-bottom"];
+const CODE_LINE: readonly string[] = ["font-family", "font-size-adjust", "background-color", "padding-left", "padding-right"];
+const RULE: readonly string[] = ["border-top-width", "border-top-style", "border-top-color", "margin-top", "margin-bottom"];
 // Sizes taken in em: a font's of the text round it, the rest of the element's own font
-const EM = new Set(["font-size", "letter-spacing", "line-height", "padding-top", "padding-right", "padding-bottom", "padding-left", "margin-top", "margin-bottom"]);
+const EM: ReadonlySet<string> = new Set(["font-size", "letter-spacing", "line-height", "padding-top", "padding-right", "padding-bottom", "padding-left", "margin-top", "margin-bottom"]);
 
 const SAMPLE = [
   '<div class="cm-line sb-line-h1"><span class="sb-h1">a</span></div>',

@@ -87,6 +87,11 @@ where the work is, what to do next and what done means. **What** is built and
   - a deviation from the plans beyond the step's scope;
   - a version, a changelog entry, a release, a merge, a push (but step S's
     pushes of `silverware-core`, asked for by the user).
+- **Step S's rest and step 1 run on without stopping** (the user, 2026-11-28: "unless something truly needs deciding,
+  do the whole of step 1 autonomously"): step S's stop (*Next* 5) becomes a report of the *Known* list, not a wait;
+  step 1's commits are pushed to `silverware-core` as step S's are. What still waits for the user: the core's version
+  and its changelog's first entry (the root CLAUDE.md), a baseline changed (shown by groups, above), a lock, a change
+  of what a space has, a deviation from the plans; and Library: Install checked by hand, which only the user can do.
 - **A baseline that changed is shown to the user by groups** (decided with the
   user, 2026-11-27, for step 1 on): for each commit that changes baselines, a
   short summary of each group of parts changed alike (which parts, what changed:
@@ -133,7 +138,7 @@ Read this first; the dated entries below are the record of what each item did an
   Silverware Database (`silverware-database/ui-tests/baselines/views.spec.ts`, `overlays.spec.ts`, `dialogs.spec.ts`,
   `menus.spec.ts`, `properties.spec.ts`, `editors.spec.ts`: done, *Next* 2) and for Silverware Table's dialogs and
   menus (`silverware-table/ui-tests/baselines/`, *Next* 2), and the shared baseline code with a part's place (*Next*
-  1). Twelve known bugs are marked, in thirteen tests (step S, *Known*;
+  1). Fifteen known bugs are marked, in sixteen tests (step S, *Known*;
   `grep -rn "test.fail(" */ui-tests`).
 - **Decided with the user (2026-11-27)**, after a review of the first answers against the plans and the code:
   - **Item 5 records every dialog, menu and floating list a later step changes, now**, before step 1: steps 1 to 5
@@ -264,7 +269,22 @@ Read this first; the dated entries below are the record of what each item did an
      menu, Silverware Assets' settings dialog and file menu, Silverware Tags' settings and manager, Silverware Toolbar's
      settings and popup. Left out, on purpose: Layout's column grips' menu, Assets' insert and rename dialogs, side
      panel and file enlarged, Toolbar's action panel and Turn into list (the shared menu and dialog code they stand on
-     is recorded; each part a later step changes on its own gets its baseline in that step, before it).
+     is recorded; each part a later step changes on its own gets its baseline in that step, before it). **Chart,
+     Layout and Assets, done** (2026-11-28, each `<plugin>/ui-tests/baselines/<plugin>.spec.ts`): Silverware Chart's
+     ⋯ menu (the chart hovered, on a phone tapped: Chrome sends a tap's mousemove, which shows its toolbar) and its
+     settings dialog (General's rows, a switch's track; a `keptThrough` of a switch turned on: its rows kept), and a
+     known bug (a menu inside a menu, *Known*); Silverware Layout's settings dialog (its Page tab's slider, amount,
+     px/% segments, alignment; its subtitle, the page's name, written one length before it is read) and a small
+     table's handle's menu (Align alone; on a phone a handle shows only beside a widget narrower than the window);
+     Silverware Assets' settings window (its first tab) and an image preview's "…" menu. **Tags and Toolbar, done**
+     (2026-11-28): Silverware Tags' settings dialog and its manager (By tag on the sample's pages, its first tag
+     chosen), and a known bug (the manager not over a phone's whole screen); Silverware Toolbar's popup of every action
+     (from the bar's "…": on a phone the bar docked at the bottom, its fixture keeping an emulated phone's touch,
+     `hasTouch`) and its settings dialog from it, and a known bug (the popup's actions wider than its list). Item 5 is
+     done. The toolbar's bar of a chart
+     is left out (the narrowing: its menu's place follows it). A fixture that gathers the page's errors itself hands
+     them to `expectNoPageErrorsYet` by `gatherPageErrors` (Silverware Chart's, as the table's). **Two runs of one
+     target never at once** (the root CLAUDE.md): a re-record started beside a `--repeat-each` run failed both.
   3. **The lists left of items 2 to 4 that steps 3 to 5 change** (the decision above), each in the plugin's own
      `ui-tests/` beside the item's other tests (`reload.spec.ts`, `writes.spec.ts`, `undo.spec.ts`, `hosts.spec.ts`).
   4. **Item 6** (the decision above): the playground's benchmark and SilverBullet's, their first numbers written.
@@ -536,6 +556,19 @@ Editor 3). The rest of the plan leans on this step.
     kept, nothing blinks (`views/editors.ts`, `list.replaceChildren`) (2026-11-28;
     silverware-database/ui-tests/baselines/editors.spec.ts, "a reference's search typed on: … (known: its list drawn
     anew)"). Expected kept by the Preact conversion of the editors (step 10, checkpoint C's measure).
+  - Silverware Chart's ⋯ menu is a menu inside a menu to assistive technology: its floating box has `role="menu"`
+    (`src/core/toolbar.ts`) and the shared menu inside it its own (`shared/menu.ts`); Silverware Layout's popup has
+    one (2026-11-28; silverware-chart/ui-tests/baselines/chart.spec.ts, "the chart's menu one menu to assistive
+    technology: …"). Expected one once the core's menus place it (step 6); the menu's DOM baseline changes with it.
+  - Silverware Tags' manager is not over the whole screen on a phone, as its settings and every plugin's dialog are:
+    the style page's phone rule (`max-width: 640px`) takes `.swg-dialog` alone, and `.swg-dialog.swg-workspace` keeps
+    its height of at most 760 px over it, the manager centred with the page above and below (a rule of the window's
+    width, so a real phone too) (2026-11-28; silverware-tags/ui-tests/baselines/tags.spec.ts, "the manager over the
+    whole screen, … (known: 760 px tall)"). Expected fixed in step K; the manager's phone baseline changes with it.
+  - Silverware Toolbar's popup of every action: each action is 100% of its list wide and padded besides
+    (`.swb-option`, its box `content-box`), so 16 px wider than the list, which scrolls sideways
+    (2026-11-28; silverware-toolbar/ui-tests/baselines/toolbar.spec.ts, "the popup's actions within its list: …
+    (known: 16 px wider)"). Expected fixed in step K (`box-sizing: border-box`); the popup's baselines change with it.
   - Silverware Table's toolbar draws its buttons anew whole as the table's view changes (Filter pressed): the bar
     kept, none of its buttons (`core/toolbar.ts` `show`: `replaceChildren`, each button made again) (2026-11-27;
     silverware-table/ui-tests/baselines/menus.spec.ts, "the toolbar's Filter pressed: … (known: its buttons drawn
@@ -781,6 +814,10 @@ Editor 3). The rest of the plan leans on this step.
   (step K).
 
 ## Apart from this branch
+
+- Silverware Assets' settings window draws its select and its previews' folder field in the browser's own look
+  (`.swa-settings-select`, `.swa-settings-folder` set only `font`: grey, an inset border, in dark too), where the other
+  plugins' dialogs give theirs the dialog's colours (found by step S's baselines, 2026-11-28). Its look to match.
 
 - The library pages say that offline needs `config.set("sync.documents", true)`
   (docs/silverware-core.md, probe 5): true today, on `main`, released with the

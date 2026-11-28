@@ -476,7 +476,7 @@ config.define("silverware.table", {
 })
 
 -- Silverware Table only uses the public editor and config API, handed over here
-if js and js.window then
+if js and js.window and not silverware_internal.table.refused then
   local silverwareTableJs = js.importFromSpace("Library/damesene/silverware-table.js")
   silverwareTableJs.init({
     getText = editor.getText,

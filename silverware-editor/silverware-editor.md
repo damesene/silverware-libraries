@@ -3,6 +3,8 @@ name: Library/damesene/silverware-editor
 tags: meta/library
 version: 1.2.0
 description: "Silverware Editor: a markdown editor for the other Silverware plugins where they let you write (a grid's cell, a database item's content): markdown highlighted, lists continued on Enter, brackets closed, links to your pages completed. Without it they keep a plain text field."
+requires:
+- ../silverware-core/silverware-core.md
 files:
 - silverware-editor.js
 - silverware-editor-api.md

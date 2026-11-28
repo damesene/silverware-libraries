@@ -55,7 +55,7 @@ config.define("silverware.tags", {
 })
 
 -- Silverware Tags only uses the public space, editor, index and config API, handed over here
-if js and js.window then
+if js and js.window and not silverware_internal.tags.refused then
   local silverwareTagsJs = js.importFromSpace("Library/damesene/silverware-tags.js")
   silverwareTagsJs.init({
     listPages = function()

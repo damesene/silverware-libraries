@@ -98,3 +98,11 @@ author: damesene
 website: https://github.com/damesene/silverware-libraries/tree/main/silverware-icons
 uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-icons/silverware-icons.md
 ```
+
+```#meta/library/remote
+name: Silverware Core
+description: "What the Silverware plugins share in a window. Installed with each of them; nothing on its own."
+author: damesene
+website: https://github.com/damesene/silverware-libraries/tree/main/silverware-core
+uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-core/silverware-core.md
+```

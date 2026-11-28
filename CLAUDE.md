@@ -4,6 +4,7 @@
 
 | Plugin | Folder | Prefix | Its context |
 | --- | --- | --- | --- |
+| Silverware Core | `silverware-core/` | `swk-` | `silverware-core/CLAUDE.md`, docs/silverware-core.md (what the plugins share at run time, one per window; the version gate), docs/silverware-core-work.md (the work, step by step) |
 | Silverware Table | `silverware-table/` | `swt-` | `silverware-table/CLAUDE.md`, and in `src/`: `core/`, `features/`, `formulas/`, `columntypes/`, `conditions/`, `excel/`, `autofill/` |
 | Silverware Toolbar | `silverware-toolbar/` | `swb-` | `silverware-toolbar/CLAUDE.md`, docs/silverware-toolbar.md |
 | Silverware Tags | `silverware-tags/` | `swg-` | `silverware-tags/CLAUDE.md`, docs/silverware-tags.md |
@@ -23,8 +24,8 @@ docs/ holds each plugin's plan and decision log; a plugin's library page (`silve
 
 ```sh
 npm install
-npm run build        # every plugin's bundle (silverware-<name>/silverware-<name>.js), the icon sets' data, the shared CSS blocks
-npm run verify       # before a commit: tsc --noUnusedLocals, vitest, check-build (bundles and generated files match their sources, each plugin's version has its changelog entry)
+npm run build        # every plugin's bundle (silverware-<name>/silverware-<name>.js, the core's taken as ./silverware-core.js), the icon sets' data, the shared CSS blocks, each plugin's gate of Silverware Core (scripts/coregate.mjs)
+npm run verify       # before a commit: tsc --noUnusedLocals, vitest, check-build (bundles and generated files match their sources, the gates too, each plugin's version has its changelog entry, the core's `VERSION` its library page's)
 npm test             # vitest
 npm run test:ui:install  # once: Playwright's Chromium
 npm run test:ui      # Playwright against the playground (port 8010)
@@ -41,7 +42,8 @@ npm run deploy -- <space folder>   # copy every plugin into a local space's Libr
 - `silverware-<name>/`: `silverware-<name>.md` (library page: user docs only, `version:` in its frontmatter; its `files:` install the rest beside it), `CHANGELOG.md` (the repository's, not installed), `-init.md` (settings `config.define`, the JS loaded and its bridge, commands, events), `-api.md` (the `-- priority: 50` Space Lua API, before the user's scripts), `-style.md` (the CSS), the built `silverware-<name>.js` (committed: SilverBullet runs no build), `src/`, `ui-tests/` (`helpers.ts` of its own).
 - Named `Silverware <Name>`, commands `Silverware <Name>: …`, settings and Space Lua API under `silverware.<name>` (one global `silverware`, `silverware = silverware or {}`); what a plugin's Lua blocks share that is not API under `silverware_internal.<name>`, so `silverware.<name>.` completes to the API alone. `config.define("silverware.<name>", …)`: SilverBullet splits a dotted key into nested objects (its `client/config.ts`).
 - CSS classes, data attributes and CSS variables under the plugin's prefix.
-- A plugin needs no other installed. One plugin uses another only through its public API handed over by its init page's Lua (Silverware Chart takes Silverware Table's `silverware.table.tables`; the toolbar and the database take `silverware.icons.api`), never through its code: each plugin's isolation test checks imports.
+- **Every plugin needs Silverware Core** (`requires:` in its library page) and no other plugin installed. Its gate (a block of its API page written by `scripts/coregate.mjs`) refuses a core it was not built for, saying why; its bundle imports the core as `silverware-core`, its `src/api.ts` alone (silverware-core/CLAUDE.md). One plugin uses another only through its public API handed over by its init page's Lua (Silverware Chart takes Silverware Table's `silverware.table.tables`; the toolbar and the database take `silverware.icons.api`), never through its code: each plugin's isolation test checks imports.
+- **Where code goes** (docs/silverware-core.md, *Where code goes*): what must be one per window (a registry every plugin reads, a watcher of the document) or one version for every plugin is Silverware Core's; `shared/` is bundled into each plugin, pure or with state meant to be each plugin's own, and then listed (`shared/modulestate.test.ts`).
 - The scripts (build, deploy) list the plugins; vitest, tsc and Playwright find every plugin's tests; CI runs each folder's `ui-tests/` (each plugin's, and `cross-plugin/`'s: the plugins together, what one lays over another's, against SilverBullet only) and each area folder under it as a job of its own (`scripts/ui-test-groups.mjs`). What every folder's helpers share is in `scripts/ui-test-helpers.ts` (a test's space, `withSpace`; the page's errors, `pageErrors`): a new suite builds on it, not on a copy. Rendering baselines (a part's DOM, look and geometry kept as text, `<plugin>/ui-tests/baselines/`) are on `scripts/ui-test-baselines.ts`; a change of what a part draws fails them, and they are written anew only on purpose (`SW_BASELINES=update npm run test:ui:sb -- <folder>`), the diff read before it is committed.
 
 ## Working rules
@@ -49,7 +51,7 @@ npm run deploy -- <space folder>   # copy every plugin into a local space's Libr
 - **A plan is always a file of its own in docs/** (`docs/silverware-<name>-<topic>.md`), never written into a CLAUDE.md: a CLAUDE.md says what the code is and how to work in it, not what is to be built.
 - **Commit only when the user says so**; never push unless asked, never to `main`. A change spanning several fixes is split into commits, each with the bundles built from its own changes.
 - **Every commit**: `npm run build`, then `npm run verify` passes. A stale committed bundle ships old code; check-build fails on it.
-- **Commit messages**: [Conventional Commits](https://www.conventionalcommits.org), one line `<type>(<scope>): <description>`, imperative, lowercase, no period, no body, **no AI co-author trailer**. Types `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `chore`, `style`; scope the plugin (`table`, `toolbar`, `tags`, `chart`, `database`, `icons`), `playground`, or none for the repository. A change that breaks what a space has (settings, the Space Lua API, a theme's selectors or variables, stored markdown) is marked `!`: `feat(toolbar)!: …`. History before 2026-10-22 uses `Table Plus: …` / `Silverware: …` subjects.
+- **Commit messages**: [Conventional Commits](https://www.conventionalcommits.org), one line `<type>(<scope>): <description>`, imperative, lowercase, no period, no body, **no AI co-author trailer**. Types `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `chore`, `style`; scope the plugin (`core`, `table`, `toolbar`, `tags`, `chart`, `database`, `icons`), `playground`, or none for the repository. A change that breaks what a space has (settings, the Space Lua API, a theme's selectors or variables, stored markdown) is marked `!`: `feat(toolbar)!: …`. History before 2026-10-22 uses `Table Plus: …` / `Silverware: …` subjects.
 - The conversation with the user is in Czech; everything in the repository (code, comments, docs, commits) is English.
 - **A fix goes where it belongs**: a plugin's core gets generic mechanisms only (it knows no module by name, nor a module's classes or settings); a module's fix stays in the module.
 - **Shared helpers first**: before writing a module's own version of something another does, look in the plugin's core and in `shared/`; when two need the same thing, it moves there, generic.
@@ -80,7 +82,7 @@ npm run deploy -- <space folder>   # copy every plugin into a local space's Libr
 
 ## shared/
 
-Bundled into each plugin (nothing is shared at run time); its classes by a base the caller gives.
+Bundled into each plugin (what is shared at run time is Silverware Core's); its classes by a base the caller gives.
 
 - CSS of what shared/ draws is a template per part (`menu.css`, `segments.css`, `diffview.css`, `icons.css`, `scrollbar.css`; `__base__` the plugin's base, `__scrolls__` a page's own boxes that scroll: one thin scrollbar in every plugin, SilverBullet's page's left), written by `scripts/sharedstyles.mjs` into each style page using it between `/* <shared-…> */` marks; check-build fails where a block differs. Edit the template, never a page's block.
 - `pages/` is the page writer, the one place that knows how anything is written in a page (Silverware Tags, Database, Layout and Assets write through it, never a page's text themselves); its sections by part: `text` (a range taken out as read), `properties`, `tags`, `codeBlocks`, `grids`, `embeds`, `links`; a plugin registers a part of its own (`registerPart(definePluginPart({…}))`, its changes and section typed by the part, a page's builder giving the section with `p.part(it)`: no other plugin's types see them, and each plugin's bundle has a registry of its own); `replanOpenPage` plans the open page anew where it changed since it was read (quick writes one after another: a table's). `platform.ts` is interfaces only (`Platform = { editor, space, index, ui, settings }`): each plugin's binding makes it.

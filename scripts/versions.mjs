@@ -1,6 +1,7 @@
 // Each plugin's version and its changelog (CLAUDE.md, *Versions and changelogs*): the library page's frontmatter has
 // `version: X.Y.Z`, and the plugin's CHANGELOG.md has that version's entry first. Run by scripts/build.mjs, in a build
-// and in --check alike: nothing is written, a problem is told and fails the run.
+// and in --check alike: nothing is written, a problem is told and fails the run. Silverware Core's `VERSION` (its
+// src/api.ts, read by every plugin's gate) is its library page's.
 import { readFile } from "node:fs/promises";
 
 const VERSION = /^\d+\.\d+\.\d+$/;
@@ -26,13 +27,22 @@ export function validateVersion(library, page, changelog) {
   return undefined;
 }
 
+/** Why Silverware Core's `VERSION` (src/api.ts: what the plugins' gates read) is not its library page's, or undefined */
+export function validateCoreVersion(page, source) {
+  const version = frontmatterValue(page, "version");
+  const exported = /^export const VERSION = "([^"]*)";$/m.exec(source)?.[1];
+  if (exported === undefined) return 'silverware-core/src/api.ts exports no `VERSION = "X.Y.Z"`';
+  return exported === version ? undefined : `silverware-core/src/api.ts: VERSION is ${exported}, the library page says ${version}`;
+}
+
 /** Tells each library whose version or changelog does not hold; how many */
 export async function checkVersions(libraries) {
   let problems = 0;
   for (const library of libraries) {
     const page = (await readFile(`${library}/${library}.md`, "utf8")).replaceAll("\r\n", "\n");
     const changelog = (await readFile(`${library}/CHANGELOG.md`, "utf8").catch(() => undefined))?.replaceAll("\r\n", "\n");
-    const problem = validateVersion(library, page, changelog);
+    const source = library === "silverware-core" ? await readFile("silverware-core/src/api.ts", "utf8") : undefined;
+    const problem = validateVersion(library, page, changelog) ?? (source === undefined ? undefined : validateCoreVersion(page, source));
     if (problem) {
       console.error(problem);
       problems++;

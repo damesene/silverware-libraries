@@ -1,13 +1,16 @@
 // Bundles each library's src/index.ts into the .js file next to its library page.
 // --check builds in memory and fails when a committed bundle differs from its sources, or a style page's shared block
-// from its template (scripts/sharedstyles.mjs). Both fail where a plugin's version has no changelog entry (scripts/versions.mjs).
+// from its template (scripts/sharedstyles.mjs). Both fail where a plugin's version has no changelog entry (scripts/versions.mjs), and
+// --check where a plugin's gate of Silverware Core is not as scripts/coregate.mjs writes it.
 import * as esbuild from "esbuild";
 import { readFile, writeFile } from "node:fs/promises";
+import { coreGates } from "./coregate.mjs";
 import { iconFiles } from "./icons/index.mjs";
+import { LIBRARIES } from "./libraries.mjs";
 import { sharedStyles } from "./sharedstyles.mjs";
 import { checkVersions } from "./versions.mjs";
 
-const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags", "silverware-chart", "silverware-database", "silverware-icons", "silverware-layout", "silverware-assets", "silverware-assets-pdf", "silverware-assets-docx", "silverware-assets-xlsx", "silverware-editor"];
+const libraries = LIBRARIES;
 // Files bundled beside a library's, loaded by it when needed: Chart.js beside the chart's (src/chartjs.ts), docx-preview
 // and JSZip beside Silverware Assets DOCX's, ExcelJS beside Silverware Assets XLSX's (each src/vendor.ts)
 const beside = [
@@ -22,6 +25,12 @@ const copied = [
   { from: "node_modules/pdfjs-dist/build/pdf.min.mjs", to: "silverware-assets-pdf/silverware-assets-pdf-pdfjs.js" },
   { from: "node_modules/pdfjs-dist/build/pdf.worker.min.mjs", to: "silverware-assets-pdf/silverware-assets-pdf-pdfjs-worker.js" },
 ];
+// The plugins import Silverware Core as `silverware-core` (its src/api.ts for tsc, vitest and the playground): in a
+// bundle, the core's beside it, left out of the bundle
+const coreBeside = {
+  name: "silverware-core",
+  setup: (build) => build.onResolve({ filter: /^silverware-core$/ }, () => ({ path: "./silverware-core.js", external: true })),
+};
 const watch = process.argv.includes("--watch");
 const check = process.argv.includes("--check");
 
@@ -37,6 +46,8 @@ for (const { entry, outfile, name } of [...libraries.map((name) => ({ entry: `${
     minify: true,
     legalComments: "inline",
     logLevel: check ? "warning" : "info",
+    // A plugin's `silverware-core` is the core's bundle beside its own, imported as it is (one module per window)
+    plugins: name === "silverware-core" ? [] : [coreBeside],
   };
   if (watch) {
     const ctx = await esbuild.context(options);
@@ -77,6 +88,8 @@ for (const { path, text } of iconFiles()) {
 }
 // The CSS of what shared/ draws, in each plugin's style page (scripts/sharedstyles.mjs)
 stale += await sharedStyles(check);
+// Silverware Core's gate in each plugin's API page (scripts/coregate.mjs)
+stale += await coreGates(check);
 // Each plugin's version and its changelog's entry (scripts/versions.mjs)
 if (!watch) stale += await checkVersions(libraries);
 if (stale) process.exit(1);

@@ -97,7 +97,7 @@ config.define("silverware.toolbar", {
 })
 
 -- Silverware Toolbar only uses the public editor and config API, handed over here
-if js and js.window then
+if js and js.window and not silverware_internal.toolbar.refused then
   local silverwareToolbarJs = js.importFromSpace("Library/damesene/silverware-toolbar.js")
   silverwareToolbarJs.init({
     getSelection = editor.getSelection,

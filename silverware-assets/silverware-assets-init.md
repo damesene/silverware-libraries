@@ -47,7 +47,7 @@ config.define("silverware.assets", {
 
 -- Silverware Assets only uses the public space, editor and config API, handed over here; Silverware Layout's API
 -- where it is installed (silverware.layout.api: a file's width by its handle, what its grids draw)
-if js and js.window then
+if js and js.window and not silverware_internal.assets.refused then
   local silverwareAssetsJs = js.importFromSpace("Library/damesene/silverware-assets.js")
   silverwareAssetsJs.init({
     getCurrentPage = editor.getCurrentPage,
@@ -114,8 +114,8 @@ if js and js.window then
     end,
   })
   -- Upload file as a button of Silverware Toolbar (through its public API, where it is installed): into the field it is
-  -- run in (a grid's cell, a database's peek), else the page
-  if silverware.toolbar and silverware.toolbar.defineActions then
+  -- run in (a grid's cell, a database's peek), else the page; not where its gate refused it (its stubs only refuse)
+  if silverware.toolbar and silverware.toolbar.defineActions and not (silverware_internal.toolbar and silverware_internal.toolbar.refused) then
     silverware.toolbar.defineActions(silverwareAssetsJs.toolbarActions)
   end
   -- The page opened, handed over as it loads: where files inserted go, known at once (not asked as they are pasted)

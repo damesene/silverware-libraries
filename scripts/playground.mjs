@@ -20,6 +20,8 @@ const ctx = await esbuild.context({
   sourcemap: true,
   write: false,
   loader: { ".md": "text" },
+  // Silverware Core from its source, bundled into each page (one per page, as one per window in SilverBullet)
+  alias: { "silverware-core": "./silverware-core/src/api.ts" },
   logLevel: "info",
 });
 await ctx.watch();

@@ -41,7 +41,7 @@ config.define("silverware.chart", {
 })
 
 -- Silverware Chart only uses the public editor, space and config API (and Silverware Table's), handed over here
-if js and js.window then
+if js and js.window and not silverware_internal.chart.refused then
   local silverwareChartJs = js.importFromSpace("Library/damesene/silverware-chart.js")
   local bridge = {
     getText = editor.getText,
@@ -60,8 +60,9 @@ if js and js.window then
     -- Where an element of the editor is in the page's text: which of two charts written alike a widget shows
     posAtDOM = editor.posAtDOM,
   }
-  -- Silverware Table's API, where it is installed (its API page has priority 50: defined before this block)
-  if silverware.table and silverware.table.tables and silverware.table.onWrite then
+  -- Silverware Table's API, where it is installed and not refused by its gate (its stubs then only refuse; its API page
+  -- has priority 50: defined before this block)
+  if silverware.table and silverware.table.tables and silverware.table.onWrite and not (silverware_internal.table and silverware_internal.table.refused) then
     bridge.tables = silverware.table.tables
     bridge.onWrite = silverware.table.onWrite
   end

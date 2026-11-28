@@ -6,11 +6,49 @@ tags: meta
 The Space Lua API of [Silverware Database](silverware-database.md): `silverware.database.items` (a database's items, its formulas' values among them), `silverware.database.defineViews` (your own views), `silverware.database.defineTypes` (your own property types) and `silverware.database.defineConverters` (your own converters of selected text). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how it is used, and [silverware-database-init](silverware-database-init.md) for what starts Silverware Database.
 
 ```space-lua
+-- Silverware Core's gate (written by scripts/coregate.mjs: edit it there, never here), before the plugin's own blocks (priority
+-- 55: after the core's API page, 60, before the plugins' API pages, 50): Silverware Database starts only with a core of major
+-- 1, minor 0 or later; else it says so once, its API's functions say the same, its blocks do nothing
+-- priority: 55
+silverware = silverware or {}
+silverware_internal = silverware_internal or {}
+silverware_internal.database = silverware_internal.database or {}
+silverware_internal.database.refused = nil
+if js and js.window then
+  local ok, core = pcall(js.importFromSpace, "Library/damesene/silverware-core.js")
+  local installed = ok and core and core.VERSION or nil
+  local problem = nil
+  if not installed then
+    problem = "Silverware Database needs Silverware Core 1.0 or later (not installed): run Library: Update All, then reload the page"
+  else
+    local major, minor = string.match(installed, "^(%d+)%.(%d+)%.")
+    major, minor = tonumber(major), tonumber(minor)
+    if not major or not minor or major < 1 or (major == 1 and minor < 0) then
+      problem = "Silverware Database needs Silverware Core 1.0 or later (installed " .. installed .. "): run Library: Update All, then reload the page"
+    elseif major > 1 then
+      problem = "Silverware Database works with Silverware Core 1.x only (installed " .. installed .. "): update Silverware Database: run Library: Update All, then reload the page"
+    end
+  end
+  if problem then
+    silverware_internal.database.refused = problem
+    editor.flashNotification(problem, "error")
+    -- Its API's functions refuse with the same message, so a script calling one says why
+    local function refused() error(problem) end
+    silverware.database = {}
+    silverware.database.items = refused
+    silverware.database.defineViews = refused
+    silverware.database.defineTypes = refused
+    silverware.database.defineConverters = refused
+  end
+end
+```
+
+```space-lua
 -- priority: 50
 -- Silverware Database's Space Lua API, loaded before your scripts: see "Your own views and types"
 silverware = silverware or {}
 silverware.database = silverware.database or {}
-if js and js.window then
+if js and js.window and not silverware_internal.database.refused then
   local silverwareDatabaseJs = js.importFromSpace("Library/damesene/silverware-database.js")
   -- Space Lua is loaded (again): the scripts' definitions replace those of before
   silverwareDatabaseJs.resetDefinitions()
@@ -50,7 +88,7 @@ if js and js.window then
       editor.flashNotification(problem, "error")
     end
   end
-else
+elseif not silverware_internal.database.refused then
   -- Space Lua without a window (nothing to draw): nothing to define, no database read
   function silverware.database.items() return nil end
   function silverware.database.defineViews() end

@@ -6,6 +6,55 @@ tags: meta
 The Space Lua API of [Silverware Table](silverware-table.md): `silverware.table.defineFunctions`, `defineTypes`, `defineSeries`, `defineConditions` and `defineFormats` (your own functions, column types, AutoFill series, and conditions and formats of conditional formatting), `silverware.table.defineSource` (a table of the space formulas read as \@name, from a query), `silverware.table.evaluate` and `evaluateText` (a formula calculated from Space Lua: its values for a script, its text for a page), with `silverware.table.evaluateAlias` and `evaluateTextAlias` giving them shorter names, `silverware.table.errors` and `errorsText` (the formula errors of a page or the space), and for other plugins `silverware.table.tables` (a text's tables as data) and `silverware.table.onWrite` (edits of the page written with the tables' writes). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how each is used, and [silverware-table-init](silverware-table-init.md) for what starts Silverware Table.
 
 ```space-lua
+-- Silverware Core's gate (written by scripts/coregate.mjs: edit it there, never here), before the plugin's own blocks (priority
+-- 55: after the core's API page, 60, before the plugins' API pages, 50): Silverware Table starts only with a core of major
+-- 1, minor 0 or later; else it says so once, its API's functions say the same, its blocks do nothing
+-- priority: 55
+silverware = silverware or {}
+silverware_internal = silverware_internal or {}
+silverware_internal.table = silverware_internal.table or {}
+silverware_internal.table.refused = nil
+if js and js.window then
+  local ok, core = pcall(js.importFromSpace, "Library/damesene/silverware-core.js")
+  local installed = ok and core and core.VERSION or nil
+  local problem = nil
+  if not installed then
+    problem = "Silverware Table needs Silverware Core 1.0 or later (not installed): run Library: Update All, then reload the page"
+  else
+    local major, minor = string.match(installed, "^(%d+)%.(%d+)%.")
+    major, minor = tonumber(major), tonumber(minor)
+    if not major or not minor or major < 1 or (major == 1 and minor < 0) then
+      problem = "Silverware Table needs Silverware Core 1.0 or later (installed " .. installed .. "): run Library: Update All, then reload the page"
+    elseif major > 1 then
+      problem = "Silverware Table works with Silverware Core 1.x only (installed " .. installed .. "): update Silverware Table: run Library: Update All, then reload the page"
+    end
+  end
+  if problem then
+    silverware_internal.table.refused = problem
+    editor.flashNotification(problem, "error")
+    -- Its API's functions refuse with the same message, so a script calling one says why
+    local function refused() error(problem) end
+    silverware.table = {}
+    silverware.table.defineFunctions = refused
+    silverware.table.defineTypes = refused
+    silverware.table.defineSeries = refused
+    silverware.table.defineConditions = refused
+    silverware.table.defineFormats = refused
+    silverware.table.defineMenuEntries = refused
+    silverware.table.defineSource = refused
+    silverware.table.evaluate = refused
+    silverware.table.evaluateText = refused
+    silverware.table.errors = refused
+    silverware.table.errorsText = refused
+    silverware.table.tables = refused
+    silverware.table.onWrite = refused
+    silverware.table.evaluateAlias = refused
+    silverware.table.evaluateTextAlias = refused
+  end
+end
+```
+
+```space-lua
 -- priority: 50
 -- Silverware Table's Space Lua API, loaded before your scripts (they have priority 0
 -- unless they say otherwise): silverware.table.defineFunctions, silverware.table.defineTypes and
@@ -23,7 +72,7 @@ silverware.table = silverware.table or {}
 silverware_internal = silverware_internal or {}
 silverware_internal.table = silverware_internal.table or {}
 local internal = silverware_internal.table
-if js and js.window then
+if js and js.window and not silverware_internal.table.refused then
   local silverwareTableJs = js.importFromSpace("Library/damesene/silverware-table.js")
   -- Space Lua is loaded (again): the scripts' definitions replace those of before (kept until then)
   silverwareTableJs.resetDefinitions()
@@ -289,7 +338,7 @@ if js and js.window then
   function silverware.table.evaluateTextAlias(name)
     alias("evaluateTextAlias", name, function(formula) return silverware.table.evaluateText(formula) end)
   end
-else
+elseif not silverware_internal.table.refused then
   -- Space Lua without a window (no tables to show): nothing to define
   function silverware.table.defineFunctions() end
   function silverware.table.defineTypes() end

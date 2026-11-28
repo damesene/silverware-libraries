@@ -30,7 +30,7 @@ config.define("silverware.database", {
 })
 
 -- Silverware Database only uses the public editor, space, index, config and UI API, handed over here
-if js and js.window then
+if js and js.window and not silverware_internal.database.refused then
   local silverwareDatabaseJs = js.importFromSpace("Library/damesene/silverware-database.js")
   silverwareDatabaseJs.init({
     -- Silverware Icons, where it is installed (its API page, priority 50, has run by now): items' and properties'

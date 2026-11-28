@@ -106,7 +106,7 @@ config.define("silverware.layout", {
 })
 
 -- Silverware Layout only uses the public space, editor and config API, handed over here
-if js and js.window then
+if js and js.window and not silverware_internal.layout.refused then
   local silverwareLayoutJs = js.importFromSpace("Library/damesene/silverware-layout.js")
   silverwareLayoutJs.init({
     getCurrentPage = editor.getCurrentPage,
@@ -175,8 +175,9 @@ if js and js.window then
       end,
     })
   end
-  -- Wrap in grid and Move to grid as buttons of Silverware Toolbar, their mode a parameter (through its public API, where it is installed)
-  if silverware.toolbar and silverware.toolbar.defineActions then
+  -- Wrap in grid and Move to grid as buttons of Silverware Toolbar, their mode a parameter (through its public API, where it
+  -- is installed and not refused by its gate: its stubs only refuse)
+  if silverware.toolbar and silverware.toolbar.defineActions and not (silverware_internal.toolbar and silverware_internal.toolbar.refused) then
     silverware.toolbar.defineActions(silverwareLayoutJs.toolbarActions)
   end
   for _, slash in ipairs(silverwareLayoutJs.slashCommands()) do

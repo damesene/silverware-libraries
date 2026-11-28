@@ -1,0 +1,5 @@
+[
+  "div.swd-editor.swd-editor-choices.swd-editor-link.swd-floated.swd-lifted [aria-label=\"Link\" role=\"group\" style=\"--swd-accent,--swd-hover,--swd-line,--swd-quiet,--swd-surface,bottom,color:rgb(31, 35, 48),color-scheme:light,font-family,font-size,font-style,font-weight,left,letter-spacing,line-height,position,top\"]",
+  "  input.swd-editor.swd-link-address [aria-label=\"Address\" placeholder=\"https://…\" type=\"text\" :value=\"\"]",
+  "  input.swd-editor.swd-link-text [aria-label=\"Text shown\" placeholder=\"Text shown (the address where none)\" type=\"text\" :value=\"\"]"
+]

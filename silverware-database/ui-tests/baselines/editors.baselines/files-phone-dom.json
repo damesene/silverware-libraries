@@ -1,0 +1,17 @@
+[
+  "div.swd-editor.swd-editor-choices.swd-editor-files.swd-floated.swd-lifted [data-silverware-takes-files=\"\" style=\"--swd-accent,--swd-hover,--swd-line,--swd-quiet,--swd-surface,bottom,color:rgb(31, 35, 48),color-scheme:light,font-family,font-size,font-style,font-weight,left,letter-spacing,line-height,position,top\" tabindex=\"-1\"]",
+  "  div.swd-files-list [aria-label=\"Photos\" role=\"list\"]",
+  "    div.swd-files-row [role=\"listitem\" title=\"a.png\"]",
+  "      button.swd-files-grip [aria-label=\"Move a.png (Alt+↑ ↓)\" title=\"Drag to move (Alt+↑ ↓)\" type=\"button\"]",
+  "        svg [aria-hidden=\"true\" svg=86192dcc]",
+  "      span.swd-media [data-swd-media=\"image\" style=\"--swd-media-height,--swd-media-width\" title=\"a.png\"]",
+  "        img [draggable=\"false\" style=\"height,width\"]",
+  "      span.swd-files-menu-box",
+  "        button.swd-files-more [aria-haspopup=\"menu\" aria-label=\"a.png: its menu\" title=\"a.png: its menu\" type=\"button\"] \"⋯\"",
+  "        div.swd-files-menu [hidden=\"\" role=\"menu\"]",
+  "          button [role=\"menuitem\" type=\"button\"] \"View original\"",
+  "          a [href=\".fs/<folder>/Page/db-tasks/files/a.png\" role=\"menuitem\"] \"Download\"",
+  "          button.swd-files-remove [aria-label=\"Take a.png out\" type=\"button\"] \"Remove\"",
+  "  button.swd-files-upload [type=\"button\"] \"+ Add files…\"",
+  "  div.swd-editor-note [hidden=\"\" role=\"status\"]"
+]

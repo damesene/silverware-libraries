@@ -324,7 +324,8 @@ export type Part<A> = {
   readonly place?: (args: A) => PlaceOf;
   /** Its tests' details, given to `declare` (a page to start on: Silverware Table's `startingOn`) */
   readonly details?: TestDetails;
-  /** Recorded on these devices alone (where it cannot be on another: a known bug there, said where it is used) */
+  /** Recorded on these devices alone (where it cannot be on another: a known bug there, or the phone emulation's
+   * behaviour, step S *Known*'s rule; said where it is used) */
   readonly devices?: readonly ("desktop" | "phone")[];
 };
 

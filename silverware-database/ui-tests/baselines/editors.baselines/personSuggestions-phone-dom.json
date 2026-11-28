@@ -1,0 +1,5 @@
+[
+  "ul.swd-floated.swd-lifted.swd-suggest [role=\"listbox\" style=\"--swd-accent,--swd-hover,--swd-line,--swd-quiet,--swd-surface,bottom,color:rgb(31, 35, 48),color-scheme:light,font-family,font-size,font-style,font-weight,left,letter-spacing,line-height,position,top\"]",
+  "  li.swd-suggest-item [aria-selected=\"false\" data-swd-name=\"ada\" role=\"option\"] \"ada\"",
+  "  li.swd-suggest-item [aria-selected=\"false\" data-swd-name=\"bob\" role=\"option\"] \"bob\""
+]

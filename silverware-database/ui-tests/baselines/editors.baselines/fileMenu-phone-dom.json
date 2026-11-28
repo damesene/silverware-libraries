@@ -1,0 +1,6 @@
+[
+  "div.swd-files-menu [role=\"menu\" style=\"left,position,right,top\"]",
+  "  button [role=\"menuitem\" type=\"button\"] \"View original\"",
+  "  a [href=\".fs/<folder>/Page/db-tasks/files/a.png\" role=\"menuitem\"] \"Download\"",
+  "  button.swd-files-remove [aria-label=\"Take a.png out\" type=\"button\"] \"Remove\""
+]

@@ -1,0 +1,58 @@
+{
+  "bubble": {
+    "box": [
+      0,
+      0,
+      314,
+      131
+    ],
+    "style": {
+      "display": "flex",
+      "position": "fixed",
+      "visibility": "visible",
+      "overflow": "visible",
+      "font-family": "Inter, system-ui, sans-serif",
+      "font-size": "12px",
+      "font-weight": "400",
+      "font-style": "normal",
+      "line-height": "normal",
+      "text-align": "start",
+      "vertical-align": "baseline",
+      "white-space": "normal",
+      "text-overflow": "clip",
+      "text-decoration": "none",
+      "color": "rgb(227, 229, 236)",
+      "background-color": "rgb(21, 23, 30)",
+      "background-image": "none",
+      "border-top": "1px solid rgb(42, 46, 58)",
+      "border-bottom": "1px solid rgb(42, 46, 58)",
+      "border-left": "1px solid rgb(42, 46, 58)",
+      "border-right": "1px solid rgb(42, 46, 58)",
+      "border-radius": "8px",
+      "box-shadow": "rgba(0, 0, 0, 0.16) 0px 4px 16px 0px",
+      "padding": "6px",
+      "margin": "0px",
+      "gap": "6px",
+      "align-items": "normal",
+      "justify-content": "normal",
+      "flex-wrap": "nowrap",
+      "cursor": "auto",
+      "opacity": "1",
+      "z-index": "50"
+    }
+  },
+  "@place": {
+    "window": [
+      42,
+      194,
+      314,
+      131
+    ],
+    "anchor": [
+      -6,
+      23,
+      314,
+      131
+    ]
+  }
+}

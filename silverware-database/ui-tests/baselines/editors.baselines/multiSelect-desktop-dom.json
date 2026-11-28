@@ -1,0 +1,7 @@
+[
+  "div.swd-editor.swd-editor-choices.swd-floated.swd-lifted [aria-label=\"Team\" role=\"group\" style=\"--swd-accent,--swd-hover,--swd-line,--swd-quiet,--swd-surface,bottom,color:rgb(31, 35, 48),color-scheme:light,font-family,font-size,font-style,font-weight,left,letter-spacing,line-height,position,top\" tabindex=\"-1\"]",
+  "  label.swd-editor-choice \"Web\"",
+  "    input [type=\"checkbox\" :checked=false]",
+  "  label.swd-editor-choice \"App\"",
+  "    input [type=\"checkbox\" :checked=false]"
+]

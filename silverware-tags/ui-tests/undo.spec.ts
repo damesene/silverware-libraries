@@ -119,3 +119,63 @@ test("by page: a tag added and one taken off the pages picked, then undone: ever
     "Undo: Tags of 2 pages: add #review, remove #meeting",
   );
 });
+
+test("a rename typed into the tag's name applied, then undone: every page whole, then as it was", async ({ page }) => {
+  const before = await texts(page);
+  const window = await openManager(page, "todo");
+  await window.locator('[data-swg-tag="todo"] .swg-tag-row').click();
+  await window.locator(".swg-name-field").fill("task/open");
+  await window.locator(".swg-name-field").press("Enter");
+  await window.locator(".swg-apply").click();
+  await expect(window.locator(".swg-name-field")).toHaveValue("task/open");
+  await writtenThenUndone(
+    page,
+    window,
+    before,
+    {
+      "Projects/Alpha": "---\ntitle: Project Alpha\ntags:\n  - project/alpha\n  - active\n---\n# Alpha\n\n- [ ] Write the brief #task/open\n- [x] Kick-off #done\n",
+      "Meetings/2026-10-01": "---\ntags: meeting, project/alpha\n---\nWe agreed on the scope. #decision\n\n| Who | What |\n|---|---|\n| Ann | the brief #task/open |\n",
+      "Meetings/2026-10-15": "#meeting\n\n- [ ] Send the notes #task/open\n",
+    },
+    "Undo: Rename #todo to #task/open",
+  );
+});
+
+test("the command Undo last change after the window is closed: reviewed, then every page as it was", async ({ page }) => {
+  const before = await texts(page);
+  const window = await openManager(page, "idea");
+  await window.locator('[data-swg-tag="idea"] .swg-tag-row').click();
+  await window.locator('[data-swg-action="remove"]').click();
+  await window.locator(".swg-apply").click();
+  await expect(window.locator(".swg-undo")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".swg-workspace")).toHaveCount(0);
+  await command(page, "Silverware Tags: Undo last change");
+  const undo = page.locator(".swg-workspace");
+  await expect(undo.locator(".swg-review-title")).toHaveText("Undo: Remove #idea");
+  await undo.locator(".swg-apply").click();
+  await expect.poll(() => texts(page)).toEqual(before);
+  await expect(undo.locator(".swg-review-title")).toHaveCount(0);
+  await expect(undo.locator(".swg-undo")).toHaveCount(0);
+});
+
+test("Undo of a change whose page was changed since: that page left alone and said, the others as they were", async ({ page }) => {
+  const before = await texts(page);
+  const window = await openManager(page, "idea");
+  await window.locator('[data-swg-tag="idea"] .swg-tag-row').click();
+  await window.locator('[data-swg-action="remove"]').click();
+  await window.locator(".swg-apply").click();
+  await expect(window.locator(".swg-undo")).toBeVisible();
+  // One of its pages changed after it (as by hand, through SilverBullet)
+  const changed = "Thinking about idea of a garden. Later.\n\n```\n#notatag in code\n```\n";
+  await addPages(page, { "Journal/2026-10-30": changed });
+  await window.locator(".swg-undo").click();
+  await expect(window.locator(".swg-review-title")).toHaveText("Undo: Remove #idea");
+  // (The review: the other page put back, the changed one said left alone)
+  await expect(window.locator(".swg-workspace-body")).toContainText(`${pageName("Journal/2026-10-30")}: changed since it was written: left as it is`);
+  await expect(window.locator(".swg-workspace-body")).toContainText("1 tag on 1 page change");
+  await window.locator(".swg-apply").click();
+  await expect.poll(() => texts(page)).toEqual({ ...before, "Journal/2026-10-30": changed });
+  await expect(window.locator(".swg-review-title")).toHaveCount(0);
+  await expect(window.locator(".swg-undo")).toHaveCount(0);
+});

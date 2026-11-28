@@ -317,6 +317,18 @@ Read this first; the dated entries below are the record of what each item did an
        fragments; Ctrl+Enter in neither (the grid binds `Mod-Enter` to leave; the peek passes keys: today's to record);
        the notice of a kept key in the grid, in the peek only in its name's plain input. In
        `silverware-editor/ui-tests/hosts.spec.ts`, the editor ensured (its "opened again until it is the editor").
+     **Done** (2026-11-28), each where it says above: Table's VAT and sources read after System: Reload (a formula of
+     each written again; `setOtherFile` writes a script's JS module); Icons' set of one's own still answering, defined
+     once (whether its script ran again cannot be told: the registry keeps the sets of before until a new one, and
+     SilverBullet was seen running a deleted page's block again after a load of the page: for step 3, which moves the
+     registries); Database's press beside after a reload (the caret left at the page's end, the editor not focused,
+     nothing written); Tags' panel across a reload (its row drawn anew pressed); Layout's notch a pixel after a reload;
+     Assets' File: Upload after a reload (the command defined anew waited for); Chart's settings changed, the page whole,
+     on the second of two blocks alike too; Tags' rename exact and undone, the Undo command, Undo of a page changed
+     since; Editor's Ctrl+Z, Ctrl+Y, Ctrl+K said in the grid and the peek, Ctrl+Enter (the grid leaves, written; the
+     peek binds none: the editor's own, a line more indented as the last). Left of item 4's Tags list, for step K or
+     the step that changes them: Remove of several, the subtags' options, Page tags and the panel's + and − with Undo,
+     a custom operation's Undo, Add to and Remove from pages.
   4. **Item 6** (the decision above): the playground's benchmark and SilverBullet's, their first numbers written.
   5. Step S done: *Progress* updated, then **stop for the user**: show the *Known* list and what was left for later
      steps, and wait. A `docs:` commit; then **step 1** (its section below). From step 1 on a push is asked for
